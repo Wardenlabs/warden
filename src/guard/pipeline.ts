@@ -59,6 +59,7 @@ export async function evaluate(
   // document is exactly as untrusted as the prompt that carried it — and it is
   // the channel an attacker uses when the employee is innocent.
   let subject = masked;
+  let unreadableAttachments = 0;
   if (input.attachments?.length) {
     const ocrStart = Date.now();
     const extracted: string[] = [];
@@ -66,6 +67,7 @@ export async function evaluate(
       try {
         extracted.push(sanitize(await qvac.ocr(path)).masked);
       } catch (err) {
+        unreadableAttachments++;
         extracted.push(`[attachment could not be read: ${err instanceof Error ? err.message : err}]`);
       }
     }
@@ -73,7 +75,15 @@ export async function evaluate(
     passes.push({
       pass: 'ocr',
       ms: Date.now() - ocrStart,
-      detail: { attachments: input.attachments.length, chars: subject.length - masked.length }
+      // An attachment nobody could read is the case this pass exists for: the
+      // document-borne attack hides in exactly the text OCR would have
+      // surfaced. Clearing it would mean approving a document sight unseen.
+      ...(unreadableAttachments > 0 ? { verdict: 'ESCALATE' as const, failedClosed: true } : {}),
+      detail: {
+        attachments: input.attachments.length,
+        unreadable: unreadableAttachments,
+        chars: subject.length - masked.length
+      }
     });
   }
 
@@ -109,7 +119,8 @@ export async function evaluate(
     verdicts,
     rules: selected.rules,
     flags: iso.flags,
-    expectedRuleIds: selected.rules.map((r) => r.id)
+    expectedRuleIds: selected.rules.map((r) => r.id),
+    unreadableAttachments
   });
   passes.push({
     pass: 'aggregate',

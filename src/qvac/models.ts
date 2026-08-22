@@ -12,6 +12,7 @@
 import {
   EMBEDDINGGEMMA_300M_Q8_0,
   LLAMA_3_2_1B_INST_Q4_0,
+  OCR_LATIN,
   QWEN3_1_7B_INST_Q4,
   QWEN3_600M_INST_Q4
 } from '@qvac/sdk';
@@ -65,6 +66,14 @@ export const MODEL_SPECS: ModelSpec[] = [
     approxMB: 770,
     required: false,
     why: 'The company assistant sitting behind the gateway — the thing being protected in the demo.'
+  },
+  {
+    role: 'ocr',
+    entry: OCR_LATIN as unknown as RegistryEntry,
+    filename: 'latin_g2.gguf',
+    approxMB: 90,
+    required: false,
+    why: 'Reads text out of attachments, which is how the document-borne injection reaches the guard at all.'
   }
 ];
 

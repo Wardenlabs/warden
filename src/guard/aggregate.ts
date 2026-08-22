@@ -21,6 +21,8 @@ export type AggregateInput = {
   flags: IsolationFlags;
   /** Rules that were meant to be judged. A missing verdict is not an absence of evidence. */
   expectedRuleIds: string[];
+  /** Attachments whose text could not be extracted. */
+  unreadableAttachments?: number;
 };
 
 export type AggregateResult = {
@@ -43,7 +45,7 @@ function structuralConcerns(flags: IsolationFlags): string[] {
 }
 
 export function aggregate(input: AggregateInput): AggregateResult {
-  const { verdicts, rules, flags, expectedRuleIds } = input;
+  const { verdicts, rules, flags, expectedRuleIds, unreadableAttachments = 0 } = input;
   const byId = new Map(rules.map((r) => [r.id, r]));
   const fired: FiredRule[] = [];
   /** Rules the model hedged on. Allowed alone; escalated alongside other signals. */
@@ -94,6 +96,20 @@ export function aggregate(input: AggregateInput): AggregateResult {
         confidence: 0
       });
     }
+  }
+
+  // An attachment we could not read is the one case where the evidence the
+  // guard needed is precisely what went missing — a document-borne injection
+  // hides in the text OCR would have surfaced. Approving it would be approving
+  // a document sight unseen.
+  if (unreadableAttachments > 0) {
+    verdict = tighten(verdict, 'ESCALATE');
+    fired.push({
+      ruleId: 'attachment-unreadable',
+      ruleText: 'Attachments must be readable before their contents can be cleared',
+      reason: `${unreadableAttachments} attachment(s) could not be read — escalated rather than approved unseen`,
+      confidence: 1
+    });
   }
 
   const concerns = structuralConcerns(flags);
