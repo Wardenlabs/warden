@@ -14,7 +14,8 @@ import {
   LLAMA_3_2_1B_INST_Q4_0,
   OCR_LATIN,
   QWEN3_1_7B_INST_Q4,
-  QWEN3_600M_INST_Q4
+  QWEN3_600M_INST_Q4,
+  QWEN3_8B_INST_Q4_K_M
 } from '@qvac/sdk';
 import type { ModelRole } from './types.js';
 
@@ -76,6 +77,35 @@ export const MODEL_SPECS: ModelSpec[] = [
     why: 'Reads text out of attachments, which is how the document-borne injection reaches the guard at all.'
   }
 ];
+
+/**
+ * A larger adjudicator, for measuring whether size buys accuracy here.
+ *
+ * Not in MODEL_SPECS and not downloaded by setup: at ~5 GB it is a different
+ * proposition from the 1.1 GB default, and nobody should get it by accident.
+ * Fetch it deliberately and point the adjudicator at it:
+ *
+ *   npm run setup -- --model adjudicator-large
+ *   WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf npm run redteam
+ *
+ * Qwen3-4B would be the more proportionate step up and the SDK has a constant
+ * for it, but its source is `registry://s3/...` rather than HuggingFace, so it
+ * cannot be fetched over HTTPS — the same limitation that keeps the OCR model
+ * off the setup path. 8B is the next size that can actually be downloaded.
+ *
+ * Whether it is better here is an open question, not a claim. Nothing in this
+ * repo reports a number from it until someone runs the corpus against it.
+ */
+export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
+  'adjudicator-large': {
+    role: 'adjudicator',
+    entry: QWEN3_8B_INST_Q4_K_M as unknown as RegistryEntry,
+    filename: 'Qwen3-8B-Q4_K_M.gguf',
+    approxMB: 5030,
+    required: false,
+    why: 'Optional larger adjudicator, for measuring accuracy against model size on a given machine.'
+  }
+};
 
 /**
  * Turn a `registry://hf/...` source into a public HuggingFace download URL.

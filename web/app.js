@@ -188,6 +188,9 @@ function renderDraft() {
         ? `<div class="note">${esc(audienceLabel(draft.appliesTo))} — locked, you are writing this from their page.</div>`
         : `<div class="chips" id="audienceChips"></div>`}
 
+      ${draft.guidance ? `<div class="sub" style="margin:14px 0 6px">What the employee is told instead</div>
+      <div class="note">${esc(draft.guidance)}</div>` : ''}
+
       <div class="sub" style="margin:14px 0 6px">Would block</div>
       ${draft.examples.violating.map((e) => `<div class="note">· ${esc(e)}</div>`).join('')}
       <div class="sub" style="margin:11px 0 6px">Must still allow</div>
@@ -562,7 +565,22 @@ async function send() {
   const label = { ALLOW: 'allowed', BLOCK: 'blocked by Warden', ESCALATE: 'held for review' }[j.verdict];
 
   let why = '';
-  if (rule) why += `<div class="why"><b>Rule:</b> ${esc(rule.ruleText)}<br><b>Why:</b> ${esc(rule.reason)}</div>`;
+  if (rule) {
+    // A refusal that only names the rule leaves the person holding a question
+    // with nowhere to take it. What they can do instead is the part that keeps
+    // them working with the gateway rather than around it.
+    why += `<div class="why"><b>Rule:</b> ${esc(rule.ruleText)}</div>`;
+    if (rule.guidance) {
+      why += `<div class="why" style="margin-top:7px"><b>Instead:</b> ${esc(rule.guidance)}</div>`;
+    } else {
+      why += `<div class="why"><b>Why:</b> ${esc(rule.reason)}</div>`;
+    }
+    if (rule.allowedExamples?.length) {
+      why += `<div class="why" style="margin-top:7px"><b>These would go through:</b>${
+        rule.allowedExamples.map((e) => `<div style="margin-left:10px">· ${esc(e)}</div>`).join('')
+      }</div>`;
+    }
+  }
   if (j.maskedSpans?.length) {
     why += `<div class="why">${j.maskedSpans.length} secret(s) masked before checking: <code>${esc(j.maskedPrompt.slice(0, 90))}</code></div>`;
   }

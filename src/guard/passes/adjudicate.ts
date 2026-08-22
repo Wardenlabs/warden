@@ -132,19 +132,40 @@ function explain(rule: Rule, label: 'VIOLATES' | 'COMPLIES' | 'UNCLEAR'): string
   }
 }
 
-/** Judge one message against one rule. */
-export async function adjudicate(
+type Label = 'VIOLATES' | 'COMPLIES' | 'UNCLEAR';
+
+/**
+ * How many extra samples to draw before letting a VIOLATES stand.
+ *
+ * Zero restores single-shot behaviour. Two is the default, making it a
+ * majority of three. See `adjudicate` for why this is worth the calls.
+ */
+const CONFIRM_VOTES = Number(process.env['WARDEN_CONFIRM_VOTES'] ?? 2);
+
+/**
+ * Temperature for the confirming samples.
+ *
+ * The first sample is greedy, and greedy is deterministic — re-running it with
+ * a different seed returns the identical answer, so a vote over greedy samples
+ * is a vote counted three times. The confirmations have to sample to carry any
+ * information. Low, because the goal is to find where the model is genuinely
+ * torn, not to make it creative.
+ */
+const CONFIRM_TEMP = Number(process.env['WARDEN_CONFIRM_TEMP'] ?? 0.4);
+
+/** One labelled sample. */
+async function sampleLabel(
   qvac: QvacAdapter,
   iso: Isolated,
-  rule: Rule
-): Promise<{ verdict: RuleVerdict; trace: PassTrace }> {
-  const started = Date.now();
-
+  rule: Rule,
+  sampling?: { temp: number; seed: number }
+): Promise<Label> {
   const res = await qvac.completeJSON(
     {
       role: 'adjudicator',
       system: systemPrompt(rule, iso.nonce),
       user: `${iso.envelope}\n\nLabel the message against the rule.`,
+      ...(sampling ? { temp: sampling.temp, seed: sampling.seed } : {}),
       // The answer is one enum value. Anything longer means the model has left
       // the schema, and cutting it off beats waiting for it to wander back.
       maxTokens: 24,
@@ -169,8 +190,60 @@ export async function adjudicate(
     ADJUDICATION,
     ADJUDICATION_JSON_SCHEMA
   );
+  return res.value.verdict;
+}
 
-  const label = res.value.verdict;
+/**
+ * Judge one message against one rule.
+ *
+ * The first sample is greedy and decides on its own when it says COMPLIES or
+ * UNCLEAR, so ordinary traffic still costs exactly one call. A VIOLATES is the
+ * expensive answer — it stops someone working — so it is the one that has to
+ * be paid for, and it triggers `CONFIRM_VOTES` more samples with a majority
+ * deciding.
+ *
+ * Why this is worth the calls. Each prompt is judged against about four rules,
+ * and a single VIOLATES on any of them stops the request, so per-rule error
+ * compounds: at a measured ~13% per-rule false-positive rate, the chance that
+ * at least one of four fires wrongly is 1-(1-0.13)^4, which is the 44% the
+ * report shows. Majority voting amplifies whichever way the model leans, so it
+ * pushes a 13% error down and an 80% catch rate up at the same time.
+ *
+ * A dissenting minority is recorded as UNCLEAR rather than COMPLIES. The model
+ * genuinely disagreed with itself, and UNCLEAR says so; it does not block on
+ * its own, but the aggregator escalates it when something structural is also
+ * wrong.
+ *
+ * Failure of a confirming sample leaves the original VIOLATES standing. That
+ * keeps the direction of failure the same as everywhere else: a call we could
+ * not make is never evidence that something is fine.
+ */
+export async function adjudicate(
+  qvac: QvacAdapter,
+  iso: Isolated,
+  rule: Rule
+): Promise<{ verdict: RuleVerdict; trace: PassTrace }> {
+  const started = Date.now();
+
+  const first = await sampleLabel(qvac, iso, rule);
+
+  let label = first;
+  let votes: Label[] = [first];
+
+  if (first === 'VIOLATES' && CONFIRM_VOTES > 0) {
+    const extra = await Promise.all(
+      Array.from({ length: CONFIRM_VOTES }, (_, i) =>
+        sampleLabel(qvac, iso, rule, { temp: CONFIRM_TEMP, seed: 1000 + i }).catch(
+          // A confirmation we could not obtain does not get to acquit.
+          (): Label => 'VIOLATES'
+        )
+      )
+    );
+    votes = [first, ...extra];
+    const forViolation = votes.filter((v) => v === 'VIOLATES').length;
+    label = forViolation * 2 > votes.length ? 'VIOLATES' : 'UNCLEAR';
+  }
+
   const verdict: RuleVerdict = {
     ruleId: rule.id,
     violates: label === 'VIOLATES',
@@ -187,7 +260,11 @@ export async function adjudicate(
       verdict: label === 'VIOLATES'
         ? rule.severity === 'block' ? 'BLOCK' : 'ESCALATE'
         : 'ALLOW',
-      detail: { label, repaired: res.repaired, ruleText: rule.text }
+      detail: {
+        label,
+        ...(votes.length > 1 ? { votes } : {}),
+        ruleText: rule.text
+      }
     }
   };
 }

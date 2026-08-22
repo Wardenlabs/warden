@@ -10,6 +10,8 @@
  * has the authority to grant one.
  */
 
+import type { RuleSeverity } from '../policy/types.js';
+
 export type Verdict = 'ALLOW' | 'ESCALATE' | 'BLOCK';
 
 const STRICTNESS: Record<Verdict, number> = { ALLOW: 0, ESCALATE: 1, BLOCK: 2 };
@@ -42,6 +44,19 @@ export type FiredRule = {
   ruleText: string;
   reason: string;
   confidence: number;
+  /** `block` refuses outright; `escalate` routes to a human. */
+  severity?: RuleSeverity;
+  /**
+   * What to do instead, from the rule itself.
+   *
+   * A refusal that only says "blocked by policy" teaches people to route around
+   * the gateway, because it gives them nothing to act on. These two fields turn
+   * the refusal into an answer — and both are read from the ratified rule, not
+   * generated per decision, so they cost nothing and cannot fail to parse.
+   */
+  guidance?: string;
+  /** Nearby requests that are fine — the rule's own compliant examples. */
+  allowedExamples?: string[];
 };
 
 /** A span of text the sanitizer masked. The secret itself is never retained. */

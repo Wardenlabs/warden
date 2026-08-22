@@ -24,13 +24,38 @@ function config(): LocalConfig | null {
 }
 
 /**
+ * An explicit per-role model override, e.g.
+ * `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`.
+ *
+ * The adjudicator is the one role where model size plausibly buys accuracy, and
+ * the honest way to find out is to measure the same corpus against two of them
+ * on the same machine. That has to be doable without editing code, because the
+ * machine worth measuring on is somebody else's laptop.
+ */
+function overrideFor(role: ModelRole): string | null {
+  const path = process.env[`WARDEN_MODEL_${role.toUpperCase()}`];
+  if (!path) return null;
+  if (!existsSync(path)) {
+    // Silently falling back would mean a benchmark that reports one model's
+    // numbers under another model's name, which is worse than not running.
+    throw new Error(
+      `WARDEN_MODEL_${role.toUpperCase()} points at "${path}", which does not exist`
+    );
+  }
+  return path;
+}
+
+/**
  * Where a role's weights live.
  *
- * Prefers the path `npm run setup` recorded, falls back to the conventional
- * filename in the models directory, and finally hands back the SDK registry
- * constant so a machine with working P2P still resolves.
+ * An explicit env override wins, then the path `npm run setup` recorded, then
+ * the conventional filename in the models directory, and finally the SDK
+ * registry constant so a machine with working P2P still resolves.
  */
 function sourceFor(role: ModelRole): string | object {
+  const override = overrideFor(role);
+  if (override) return override;
+
   const fromConfig = config()?.models[role];
   if (fromConfig && existsSync(fromConfig)) return fromConfig;
 

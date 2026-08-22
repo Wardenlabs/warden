@@ -39,6 +39,20 @@ export const ruleSchema = z.object({
   severity: ruleSeveritySchema,
   examples: ruleExamplesSchema,
   /**
+   * What the employee should do instead, shown when this rule fires.
+   *
+   * Authored once, when the rule is written — never generated at decision time.
+   * That distinction is the whole reason this field can exist at all: asking
+   * the adjudicator for a free-text reason per decision was measured at 16/16
+   * false positives, because long generations overran the token cap and left
+   * truncated JSON. Here the sentence is written once by the compiler or the
+   * admin, costs nothing to serve, and cannot fail to parse.
+   *
+   * Optional: a rule without one still explains itself from its text and its
+   * compliant examples.
+   */
+  guidance: z.string().optional(),
+  /**
    * Always adjudicate this rule, bypassing top-K retrieval.
    *
    * Retrieval picks the rules most similar to the prompt, which is right for
@@ -91,6 +105,7 @@ export const RULE_DRAFT_JSON_SCHEMA = {
     scope: { type: 'string', enum: ['input', 'output', 'both'] },
     appliesTo: { type: 'array', items: { type: 'string' } },
     severity: { type: 'string', enum: ['block', 'escalate'] },
+    guidance: { type: 'string' },
     examples: {
       type: 'object',
       properties: {
@@ -101,6 +116,6 @@ export const RULE_DRAFT_JSON_SCHEMA = {
       additionalProperties: false
     }
   },
-  required: ['text', 'scope', 'appliesTo', 'severity', 'examples'],
+  required: ['text', 'scope', 'appliesTo', 'severity', 'guidance', 'examples'],
   additionalProperties: false
 } as const satisfies Record<string, unknown>;

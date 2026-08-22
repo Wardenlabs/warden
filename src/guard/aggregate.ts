@@ -59,7 +59,7 @@ export function aggregate(input: AggregateInput): AggregateResult {
 
     if (v.violates) {
       verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
-      fired.push({ ruleId: rule.id, ruleText: rule.text, reason: v.reason, confidence: v.confidence });
+      fired.push(firedFrom(rule, v.reason, v.confidence));
     } else if (v.unclear) {
       /**
        * A model that answered UNCLEAR did its job and expressed doubt. That is
@@ -76,7 +76,7 @@ export function aggregate(input: AggregateInput): AggregateResult {
        * something else independently looks wrong — see the structural check
        * below, which is deterministic and cannot be talked into silence.
        */
-      unclearRules.push({ ruleId: rule.id, ruleText: rule.text, reason: v.reason, confidence: v.confidence });
+      unclearRules.push(firedFrom(rule, v.reason, v.confidence));
     }
   }
 
@@ -131,24 +131,63 @@ export function aggregate(input: AggregateInput): AggregateResult {
   };
 }
 
+/** Carry the rule's own guidance onto the decision, so the refusal can use it. */
+function firedFrom(rule: Rule, reason: string, confidence: number): FiredRule {
+  return {
+    ruleId: rule.id,
+    ruleText: rule.text,
+    reason,
+    confidence,
+    severity: rule.severity,
+    ...(rule.guidance ? { guidance: rule.guidance } : {}),
+    // Two, not all of them. This is read by a person mid-keystroke in their
+    // terminal, and a wall of examples is skipped the same way no examples is.
+    ...(rule.examples.compliant.length > 0
+      ? { allowedExamples: rule.examples.compliant.slice(0, 2) }
+      : {})
+  };
+}
+
 /**
- * A sentence the employee actually reads, in their own tool.
+ * What the employee actually reads, in their own tool.
  *
- * It names the rule and the reason, because "blocked by policy" with no
- * specifics trains people to route around the gateway rather than work with it.
+ * A refusal is a dead end unless it answers the question the person is now
+ * holding: what am I allowed to do instead? "Blocked by policy" does not, and
+ * people who get it twice learn to route around the gateway — which protects
+ * nothing and is worse than not having one. So the message names the rule, says
+ * what to do instead, and shows two nearby requests that would have gone
+ * through.
+ *
+ * Every part of it is read from the ratified rule. Nothing here is generated at
+ * decision time: that was measured at 16/16 false positives when the
+ * adjudicator was asked for a reason, and it would put a text generation in the
+ * path of every refusal for prose that says less than the rule already does.
  */
 function explain(verdict: Verdict, fired: FiredRule[], concerns: string[]): string {
   if (verdict === 'ALLOW') return 'No policy concerns.';
 
-  const parts: string[] = [];
+  const lines: string[] = [];
   const top = fired[0];
-  if (top) {
-    parts.push(`Rule: "${top.ruleText}"`);
-    parts.push(top.reason);
-  }
-  if (concerns.length > 0) parts.push(`Also flagged: ${concerns.join(', ')}.`);
-  if (fired.length > 1) parts.push(`(${fired.length - 1} other rule${fired.length > 2 ? 's' : ''} also matched.)`);
 
-  if (verdict === 'ESCALATE') parts.push('Sent to an administrator for review.');
-  return parts.join(' ');
+  if (top) {
+    lines.push(`Rule: "${top.ruleText}"`);
+    if (top.guidance) lines.push(`Instead: ${top.guidance}`);
+    if (top.allowedExamples?.length) {
+      lines.push(`These would go through: ${top.allowedExamples.map((e) => `"${e}"`).join(' · ')}`);
+    }
+    // Only worth saying when there is no guidance to say instead of it — on its
+    // own it restates the verdict, which is the tautology this rewrite exists
+    // to remove.
+    if (!top.guidance) lines.push(top.reason);
+  }
+
+  if (concerns.length > 0) lines.push(`Also flagged: ${concerns.join(', ')}.`);
+  if (fired.length > 1) {
+    lines.push(`(${fired.length - 1} other rule${fired.length > 2 ? 's' : ''} also matched.)`);
+  }
+  if (verdict === 'ESCALATE') {
+    lines.push('Held for an administrator to review — you have not been refused, just queued.');
+  }
+
+  return lines.join('\n');
 }

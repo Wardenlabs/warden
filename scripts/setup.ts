@@ -17,7 +17,7 @@ import { arch, platform, release, totalmem } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { MODEL_SPECS, modelsDir, toHttpsUrl, type ModelSpec } from '../src/qvac/models.js';
+import { ALTERNATE_MODELS, MODEL_SPECS, modelsDir, toHttpsUrl, type ModelSpec } from '../src/qvac/models.js';
 
 const MIN_NODE_MAJOR = 22;
 const MIN_NODE_MINOR = 17;
@@ -258,6 +258,26 @@ async function main(): Promise<void> {
   mkdirSync(dir, { recursive: true });
   console.log(`\n${bold('Models')} ${dim(`→ ${resolve(dir)}`)}`);
 
+  /**
+   * `--model <name>` fetches one optional alternate and nothing else — the
+   * larger adjudicator is a 5 GB download and re-running the whole setup to get
+   * it is the kind of friction that stops a comparison from being made.
+   */
+  const requested = argValue(process.argv.slice(2), '--model');
+  if (requested) {
+    const alternate = ALTERNATE_MODELS[requested];
+    if (!alternate) {
+      console.log(red(`\nUnknown model "${requested}". Available: ${Object.keys(ALTERNATE_MODELS).join(', ')}\n`));
+      process.exit(1);
+    }
+    await download(alternate, dir);
+    console.log(
+      `\n${bold('Done.')} Point a role at it, e.g.\n` +
+      `  WARDEN_MODEL_${alternate.role.toUpperCase()}=${dir}/${alternate.filename} npm run redteam\n`
+    );
+    return;
+  }
+
   const wanted = process.env['WARDEN_ALL_MODELS'] ? MODEL_SPECS : MODEL_SPECS.filter((m) => m.required);
   for (const spec of wanted) await download(spec, dir);
 
@@ -288,3 +308,9 @@ main().catch((err) => {
   console.error(red('\nsetup failed:'), err);
   process.exitCode = 1;
 });
+
+/** Read `--flag value` out of argv. */
+function argValue(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  return i >= 0 ? args[i + 1] : undefined;
+}

@@ -51,19 +51,76 @@ function detect(payload) {
   return { tool: 'unknown', prompt: '' };
 }
 
+/**
+ * What the employee sees in their own terminal.
+ *
+ * This is the entire product from their side, and a refusal that only says
+ * "blocked by policy" is a dead end — it leaves them holding a question with
+ * nowhere to take it, and the second time it happens they start working around
+ * the gateway. So the block names the rule, says what to do instead, and shows
+ * two nearby requests that would have gone through.
+ *
+ * Wrapped, because these land in a narrow terminal pane and an unwrapped
+ * paragraph is one nobody reads.
+ */
+function wrap(text, indent = '   ', width = 76) {
+  const out = [];
+  let line = '';
+  for (const word of String(text).split(/\s+/)) {
+    if (line && (line + ' ' + word).length > width) {
+      out.push(indent + line);
+      line = word;
+    } else {
+      line = line ? line + ' ' + word : word;
+    }
+  }
+  if (line) out.push(indent + line);
+  return out;
+}
+
 function render(res) {
   const lines = [res.verdict === 'BLOCK' ? '⛔ Blocked by Warden' : '⏸ Held for review by Warden'];
   const rule = res.firedRules?.[0];
+
   if (rule) {
-    lines.push(`   Rule: ${rule.ruleText}`);
-    if (rule.reason) lines.push(`   Why:  ${rule.reason}`);
+    lines.push('');
+    lines.push(...wrap(rule.ruleText));
+
+    if (rule.guidance) {
+      lines.push('');
+      lines.push('   What to do instead');
+      lines.push(...wrap(rule.guidance));
+    } else if (rule.reason) {
+      lines.push(...wrap(rule.reason));
+    }
+
+    if (rule.allowedExamples?.length) {
+      lines.push('');
+      lines.push('   These would go through');
+      for (const example of rule.allowedExamples) lines.push(`     · ${example}`);
+    }
+
+    const others = (res.firedRules?.length ?? 1) - 1;
+    if (others > 0) {
+      lines.push('');
+      lines.push(`   ${others} other rule${others > 1 ? 's' : ''} also matched.`);
+    }
   } else if (res.explanation) {
-    lines.push(`   ${res.explanation}`);
+    lines.push('');
+    for (const part of String(res.explanation).split('\n')) lines.push(...wrap(part));
+  }
+
+  if (res.verdict === 'ESCALATE') {
+    lines.push('');
+    lines.push('   Queued for an administrator. You have not been refused.');
   }
   if (res.maskedSpans?.length) {
+    lines.push('');
     lines.push(`   Note: ${res.maskedSpans.length} secret(s) were masked before checking.`);
   }
-  lines.push(`   Audit: ${res.auditId}`);
+
+  lines.push('');
+  lines.push(`   Audit ${res.auditId} · quote this if you think it is wrong`);
   return lines.join('\n');
 }
 
