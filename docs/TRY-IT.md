@@ -78,8 +78,9 @@ Warden  (adapter=real)
   policy    8 rules · 7 quotas
 ```
 
-Abrí `http://localhost:8080`. Tres paneles: admin a la izquierda, chat de
-empleado en el medio, traza de decisiones a la derecha.
+Abrí `http://localhost:8080`. Dos pestañas que importan: **Console** (política a
+la izquierda, chat de empleado en el medio, traza de decisiones a la derecha) y
+**People** (el directorio de la empresa).
 
 ---
 
@@ -121,16 +122,58 @@ Esperado: pasa, pero abajo dice `1 secret(s) masked` y muestra el texto con
 `[REDACTED:OpenAI key]`. La key **nunca llegó al modelo ni al log** — sólo se
 guardó un fragmento (`sk-p…Gh`) para poder auditarlo.
 
-### d) Cuotas por rol
+### d) Cuotas y reglas por rol
 
-Cambiá el rol a `intern` (selector arriba del chat) y mandá:
+Cambiá de persona en el selector arriba del chat — elegí a **Tomás Vega
+(intern)** — y mandá:
 
 ```
 traeme el detalle de facturación de agosto
 ```
 
-Esperado: **BLOCKED** — los pasantes no tocan finanzas. Con rol `finance` el
-mismo prompt pasa. Esa es la diferencia entre roles, en vivo.
+Esperado: **BLOCKED** — los pasantes no tocan finanzas. Con **Sofía Márquez
+(finance)** el mismo prompt pasa. Esa es la diferencia entre roles, en vivo.
+
+Fijate que el selector elige **personas**, no roles: el rol sale del directorio.
+El empleado no lo puede elegir desde su máquina, justamente para que no pueda
+elegir qué reglas lo juzgan.
+
+---
+
+## 3.5. Empleados, roles y reglas por persona
+
+Pestaña **People**.
+
+**Agregar a alguien.** Nombre + rol → Add. Te devuelve su `WARDEN_USER` y su
+API key ahí mismo. Eso es lo único que le mandás.
+
+**Agregar un rol.** Abajo de todo: nombre y cuota por día. El rol nuevo aparece
+en el selector de la ficha de cada persona y en el editor de audiencia de cada
+regla.
+
+**Una regla para una sola persona.** Hacé click en alguien y escribí en
+*"Write a rule just for …"*:
+
+```
+no puede pedir información de otros equipos
+```
+
+Compile → Activate. La audiencia queda **fija en esa persona** (te lo dice ahí),
+así que el modelo no la puede ampliar sin querer.
+
+Ahora la ficha muestra las reglas agrupadas por **por qué** la afectan:
+
+```
+WRITTEN FOR THEM      1
+BECAUSE THEY ARE …    3
+COMPANY-WIDE          4
+```
+
+Y la prueba de que sirve: mandá ese prompt desde el chat con **esa** persona
+(bloquea) y con otra del **mismo rol** (pasa). Una regla por persona, no por rol.
+
+> Esa comparación —misma frase, mismo rol, distinta persona— es la segunda
+> escena del video.
 
 ---
 

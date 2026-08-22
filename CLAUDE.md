@@ -28,6 +28,8 @@ src/qvac/       the ONLY place @qvac/sdk is imported
   mock.ts       deterministic stand-in
   client.ts     per-role model loading
 src/policy/     Rule/Quota/PolicySpec, compiler, presets, store, retrieval
+  audience.ts   who a rule binds: `*`, a role, or `@employeeId`
+  people.ts     the company directory — employees, roles, API keys
 src/guard/      isolate, sanitize, quota, passes/adjudicate, aggregate, pipeline
 src/proxy/      OpenAI-compatible endpoint
 src/hook/       warden-hook CLI for Claude Code and Codex
@@ -59,6 +61,18 @@ on purpose — self-reported probability at this model size clustered at
 **One narrow question per rule.** Never batch rules into a single call. Small
 models asked about eight rules answer confidently about none.
 
+**`rulesForActor()` is the only way to pick a rule set.** It resolves all three
+audience kinds at once — company-wide, role, and `@employeeId`. Anything that
+filters `appliesTo` by hand will miss one of them, and a decision that skipped a
+rule looks exactly like a decision that passed it. `rulesForRole()` exists only
+where there is genuinely no identity (the red-team harness, an unknown caller);
+it cannot see personal rules, which is correct.
+
+**A claimed role is not a role.** `x-warden-role` comes from an environment
+variable on the employee's own machine. `resolveActor()` overrides it with the
+directory's value for anyone it knows, because otherwise editing a shell profile
+would let someone choose which rules judge them.
+
 **Untrusted text never enters a prompt un-fenced.** Call `isolate()` and use its
 `envelope`, plus `isolationPreamble(nonce)` in the system prompt. The nonce is
 chosen after the text is fixed, which is the point — a fixed delimiter is one
@@ -79,6 +93,11 @@ the audit log both render it.
 `RULE_DRAFT_JSON_SCHEMA` if the compiler should emit it), then the compiler
 prompt, then the console's draft renderer.
 
+**An audience kind** — `src/policy/audience.ts` owns the token vocabulary:
+`bindsActor` for matching, `sanitiseAudience` for anything a model produced,
+`describeAudience` for anything a human reads. Adding a kind means touching all
+three, and the compiler's system prompt so the model can name it.
+
 **A corpus class** — a new `src/redteam/corpus/NN-name.json`. The runner picks up
 any file in that directory. Set `expect` to what a *correct* guard should do.
 `ESCALATE` counts as stopping an attack.
@@ -97,8 +116,14 @@ prompt field and block format, and add its config under `integrations/`.
 - **The adjudicator is slow on CPU** — around 2-4s per rule. `WARDEN_TOP_K`
   bounds how many run, and `parallel: 4` at load time lets them overlap. If a
   demo machine is slow, lower `TOP_K` and say so rather than hiding it.
-- **`data/policies.json` is generated.** Edit `data/seed/policies.seed.json` and
-  delete the generated file to reseed.
+- **`data/policies.json` and `data/company.json` are generated.** Edit the seeds
+  (`data/seed/policies.seed.json`, `data/seed/company.json`) and delete the
+  generated file to reseed. Both are gitignored; the seeds are committed.
+- **The OCR model cannot be fetched over HTTPS.** `OCR_LATIN.src` is
+  `registry://s3/...`, not `registry://hf/...`, so `toHttpsUrl()` returns null
+  and `npm run setup` skips it. It only arrives over the P2P registry — the path
+  that hangs on restricted networks. Document-borne coverage depends on that
+  working.
 
 ## Honesty rules for this project
 

@@ -19,11 +19,17 @@
  * Configure (in ~/.zshrc or ~/.bashrc):
  *   export WARDEN_URL=http://192.168.1.42:8080   # the gateway machine
  *   export WARDEN_USER=fede
- *   export WARDEN_ROLE=analyst
+ *   export WARDEN_ROLE=analyst                   # only used if you are not in the directory
+ *
+ * WARDEN_ROLE is a fallback, not a claim the gateway honours. Anyone the admin
+ * has added to the directory is judged under the role set there, because a role
+ * an employee can edit in their own shell profile is a role they could use to
+ * pick which rules apply to them.
  */
 
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const USER = process.env.WARDEN_USER ?? 'unknown';
+/** Fallback only — the gateway's directory overrides this for known users. */
 const ROLE = process.env.WARDEN_ROLE ?? 'employee';
 
 /** This sits in the developer's keystroke path; past this we get out of the way. */

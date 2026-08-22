@@ -18,6 +18,8 @@ models/
 # Runtime data — regenerated, never committed
 data/audit.jsonl
 data/policies.json
+# the live directory; data/seed/company.json is the committed starting point
+data/company.json
 data/escalations.json
 data/cache/
 

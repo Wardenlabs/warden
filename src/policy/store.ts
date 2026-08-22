@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { bindsActor } from './audience.js';
 import { policySpecSchema, type PolicySpec, type Rule, type Quota } from './types.js';
 
 const POLICY_PATH = process.env['WARDEN_POLICY_PATH'] ?? 'data/policies.json';
@@ -80,9 +81,29 @@ export function seedIfEmpty(seedPath: string): PolicySpec {
   return savePolicy(seed.rules ?? [], seed.quotas ?? []);
 }
 
-/** Rules that apply to a given actor role — always includes the wildcard set. */
+/**
+ * Rules that bind this actor: the company-wide ones, the ones for their role,
+ * and the ones written for them personally.
+ *
+ * This is the only place the guard decides which rules a prompt is measured
+ * against, so the three audience kinds are resolved together rather than
+ * layered on by callers — a caller that forgot one would produce a decision
+ * that looks complete and is missing a rule.
+ */
+export function rulesForActor(spec: PolicySpec, actor: { id: string; role: string }): Rule[] {
+  return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
+}
+
+/**
+ * Rules for a role, with no particular person in mind.
+ *
+ * Used where there is genuinely no identity to resolve — the red-team harness,
+ * the baseline system prompt for an unknown caller. It cannot see rules
+ * written for a named employee, which is correct: those rules bind a person,
+ * not the role they happen to hold.
+ */
 export function rulesForRole(spec: PolicySpec, role: string): Rule[] {
-  return spec.rules.filter((r) => r.appliesTo.includes('*') || r.appliesTo.includes(role));
+  return rulesForActor(spec, { id: '', role });
 }
 
 /**

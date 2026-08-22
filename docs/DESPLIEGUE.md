@@ -34,22 +34,30 @@ Warden  (adapter=real)
 
 **Esa segunda línea es la que mandás por Telegram.**
 
-Ahora abrí `http://localhost:8080` y cargá las reglas de la empresa: elegís del
-catálogo, o las escribís en castellano y las compila el modelo. Preview,
-Activate, listo.
+Ahora abrí `http://localhost:8080`.
+
+**Pestaña Console** — cargá las reglas de la empresa: elegís del catálogo, o las
+escribís en castellano y las compila el modelo. Preview, Activate, listo.
+
+**Pestaña People** — cargá a tu gente. Nombre + rol → Add, y te devuelve el
+`WARDEN_USER` y la API key de esa persona. Si te falta un rol, lo creás abajo
+con su cuota diaria. Haciendo click en alguien ves todas las reglas que lo
+juzgan y podés escribirle una que aplique **sólo a él**.
 
 ## Qué le mandás a cada uno
 
-Un mensaje por persona, con tres datos:
+Un mensaje por persona, con dos datos:
 
 ```
 Gateway: http://192.168.1.42:8080
 Tu usuario: fede
-Tu rol: analyst
 ```
 
-Los roles válidos y quién es quién están en `data/seed/company.json`. El rol es
-lo que importa: decide qué reglas le aplican y qué cuota tiene.
+El rol **no** se lo mandás: sale del directorio. Si el empleado pone
+`WARDEN_ROLE` en su máquina, el gateway lo ignora para cualquiera que esté
+cargado en People — un rol que el empleado puede editar en su `.zshrc` es un rol
+con el que podría elegir qué reglas lo juzgan. `WARDEN_ROLE` sólo se usa como
+fallback para alguien que no está en el directorio.
 
 ---
 
@@ -75,6 +83,9 @@ export WARDEN_URL=http://192.168.1.42:8080
 export WARDEN_USER=fede
 export WARDEN_ROLE=analyst
 ```
+
+`WARDEN_ROLE` es opcional y sólo sirve si no estás en el directorio; para todos
+los demás manda lo que el admin puso en People.
 
 Después `source ~/.zshrc` o abrí una terminal nueva.
 
@@ -172,9 +183,10 @@ export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
 export OPENAI_API_KEY=wk-fede-8b1d40e2      # la key personal de Warden
 ```
 
-Las keys por empleado están en `data/seed/company.json`. Además de identificar
-a quién pide, **el empleado nunca ve la credencial de la empresa** — esa vive
-sólo en el gateway, así que no puede saltear la puerta porque no tiene con qué.
+La key de cada empleado está en su ficha en la pestaña People (y se puede rotar
+con **New key** si se filtra). Además de identificar a quién pide, **el empleado
+nunca ve la credencial de la empresa** — esa vive sólo en el gateway, así que no
+puede saltear la puerta porque no tiene con qué.
 
 Esta vía **sólo sirve con API keys**, no con suscripciones. Por eso existe el
 hook.

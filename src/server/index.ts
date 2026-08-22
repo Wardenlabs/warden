@@ -15,7 +15,17 @@ import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import express, { type Request, type Response } from 'express';
 import { adapter, isMock } from '../qvac/index.js';
-import { loadPolicy, rulesForRole, seedIfEmpty } from '../policy/store.js';
+import {
+  addRole,
+  loadDirectory,
+  removeEmployee,
+  removeRole,
+  rotateApiKey,
+  upsertEmployee,
+  findEmployee
+} from '../policy/people.js';
+import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
+import { bindsActor, describeAudience } from '../policy/audience.js';
 
 const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
 
@@ -37,7 +47,7 @@ app.use(express.json({ limit: '4mb' }));
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-warden-user, x-warden-role');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   next();
 });
 app.options(/.*/, (_req, res) => res.sendStatus(204));
@@ -90,10 +100,15 @@ app.get('/api/policy/presets', (_req, res) => {
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ error: 'text is required' });
-  const mod = await optional<{ compileRule: (a: unknown, t: string, p: unknown) => Promise<unknown> }>('../policy/compile.js');
+  const mod = await optional<{
+    compileRule: (a: unknown, t: string, p: unknown, o?: unknown) => Promise<unknown>;
+  }>('../policy/compile.js');
   const compileRule = mod?.compileRule;
   if (!compileRule) return res.status(503).json({ error: 'compiler not wired yet (OPE-7)' });
-  res.json(await compileRule(adapter(), text, loadPolicy()));
+  // `lockTo` is set when the admin writes a rule from inside one person's page.
+  // They already said who it is for by being there.
+  const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
+  res.json(await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {}));
 }));
 
 app.post('/api/policy/preview', asyncRoute(async (req, res) => {
@@ -108,6 +123,116 @@ app.post('/api/policy/ratify', asyncRoute(async (req, res) => {
   const ratifyRule = mod?.ratifyRule;
   if (!ratifyRule) return res.status(503).json({ error: 'ratify not wired yet (OPE-7)' });
   res.json(await ratifyRule(req.body?.rule));
+}));
+
+// ── People API ───────────────────────────────────────────────────────────────
+// The directory is what turns "add an employee" into something the guard acts
+// on: it decides the role a caller is judged under, the quota they consume, and
+// whether an `@id` rule binds them.
+
+app.get('/api/people', (_req, res) => {
+  const dir = loadDirectory();
+  const policy = loadPolicy();
+  res.json({
+    ...dir,
+    // Counting here rather than in the browser keeps one definition of "which
+    // rules apply to this person" — the same one the guard uses.
+    employees: dir.employees.map((e) => {
+      const applicable = rulesForActor(policy, e);
+      return {
+        ...e,
+        ruleCount: applicable.length,
+        personalRuleCount: applicable.filter((r) => r.appliesTo.includes(`@${e.id}`)).length,
+        quota: policy.quotas.find((q) => q.role === e.role)?.maxRequestsPerDay ?? null
+      };
+    })
+  });
+});
+
+app.post('/api/people', asyncRoute(async (req, res) => {
+  try {
+    const employee = upsertEmployee({
+      id: req.body?.id ? String(req.body.id) : undefined,
+      name: String(req.body?.name ?? ''),
+      role: String(req.body?.role ?? '')
+    });
+    res.json(employee);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}));
+
+app.post('/api/people/:id/key', asyncRoute(async (req, res) => {
+  const rotated = rotateApiKey(String(req.params['id']));
+  if (!rotated) return res.status(404).json({ error: 'no such employee' });
+  res.json(rotated);
+}));
+
+app.delete('/api/people/:id', asyncRoute(async (req, res) => {
+  const { removed, orphanedRules } = removeEmployee(String(req.params['id']), loadPolicy().rules);
+  if (!removed) return res.status(404).json({ error: 'no such employee' });
+  res.json({ removed, orphanedRules });
+}));
+
+app.post('/api/roles', asyncRoute(async (req, res) => {
+  try {
+    const { directory, role } = addRole(String(req.body?.role ?? ''));
+    // A role with no quota is unmetered. The console always sends one, so the
+    // common path leaves no unlimited role behind by accident.
+    const perDay = Number(req.body?.maxRequestsPerDay ?? 0);
+    if (perDay > 0) {
+      const policy = loadPolicy();
+      const quotas = policy.quotas
+        .filter((q) => q.role !== role)
+        .concat({ role, maxRequestsPerDay: Math.floor(perDay) });
+      savePolicy(policy.rules, quotas);
+    }
+    res.json(directory);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}));
+
+app.delete('/api/roles/:role', asyncRoute(async (req, res) => {
+  try {
+    const role = String(req.params['role']);
+    const dir = removeRole(role);
+    const policy = loadPolicy();
+    savePolicy(policy.rules, policy.quotas.filter((q) => q.role !== role));
+    res.json(dir);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}));
+
+/** Every rule that binds one person, split by why it binds them. */
+app.get('/api/people/:id/rules', (req, res) => {
+  const person = findEmployee(String(req.params['id']));
+  if (!person) return res.status(404).json({ error: 'no such employee' });
+  const policy = loadPolicy();
+  const rules = policy.rules.filter((r) => bindsActor(r.appliesTo, person));
+  res.json({
+    person,
+    rules: rules.map((r) => ({
+      id: r.id,
+      text: r.text,
+      severity: r.severity,
+      appliesTo: r.appliesTo,
+      audience: describeAudience(r.appliesTo, loadDirectory().employees),
+      binding: r.appliesTo.includes(`@${person.id}`)
+        ? 'personal'
+        : r.appliesTo.includes(person.role)
+          ? 'role'
+          : 'company'
+    }))
+  });
+});
+
+app.delete('/api/policy/rules/:id', asyncRoute(async (req, res) => {
+  const mod = await optional<{ removeRule: (id: string) => Promise<unknown> }>('../policy/compile.js');
+  const removeRule = mod?.removeRule;
+  if (!removeRule) return res.status(503).json({ error: 'policy editing not wired yet' });
+  res.json(await removeRule(String(req.params['id'])));
 }));
 
 // ── Guard check (used by the hook CLI) ───────────────────────────────────────
@@ -232,10 +357,7 @@ async function optional<T>(specifier: string): Promise<T | null> {
  * see the real contract immediately.
  */
 async function evaluateRequest(req: Request): Promise<unknown> {
-  const actor = {
-    id: String(req.header('x-warden-user') ?? req.body?.actor?.id ?? 'anon'),
-    role: String(req.header('x-warden-role') ?? req.body?.actor?.role ?? 'employee')
-  };
+  const actor = resolveActor(req);
   const prompt = extractPrompt(req.body);
 
   const mod = await optional<{ evaluate: (a: unknown, i: unknown, p: unknown) => Promise<unknown> }>('../guard/pipeline.js');
@@ -244,12 +366,34 @@ async function evaluateRequest(req: Request): Promise<unknown> {
 
   // Stub: exercises the rule set so the console shows real rule names, without
   // the full pipeline. Clearly labelled as a stub in the trace.
-  const rules = rulesForRole(loadPolicy(), actor.role);
+  const rules = rulesForActor(loadPolicy(), actor);
   return {
     verdict: 'ALLOW', auditId: 'stub', policyVersion: loadPolicy().version, totalMs: 0,
     firedRules: [], maskedPrompt: prompt, maskedSpans: [], passes: [{ pass: 'stub', ms: 0, detail: { rulesConsidered: rules.length } }],
     explanation: 'pipeline not wired yet (OPE-8)'
   };
+}
+
+/**
+ * Who is asking.
+ *
+ * The directory has the last word on the role. An employee sets WARDEN_ROLE on
+ * their own machine, so a claimed role is a request, not a fact — if the header
+ * decided it, anyone could pick the rule set they are judged against by editing
+ * their shell profile. A caller the directory has never seen keeps the role they
+ * claim, because a visitor with no entry is better judged by a plausible role
+ * than by none at all.
+ */
+function resolveActor(req: Request): { id: string; role: string } {
+  const id = String(req.header('x-warden-user') ?? req.body?.actor?.id ?? 'anon');
+  const claimed = String(req.header('x-warden-role') ?? req.body?.actor?.role ?? 'employee');
+  try {
+    const known = findEmployee(id);
+    if (known) return { id: known.id, role: known.role };
+  } catch {
+    /* no directory on disk yet — fall through to the claimed role */
+  }
+  return { id, role: claimed };
 }
 
 function extractPrompt(body: unknown): string {

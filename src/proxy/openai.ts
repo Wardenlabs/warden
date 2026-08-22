@@ -12,11 +12,11 @@
  * real upstream credential never leaves this machine: an employee cannot go
  * around the gateway, because they have nothing to go around it with.
  */
-import { readFileSync } from 'node:fs';
 import type { Request, Response } from 'express';
 import { evaluate } from '../guard/pipeline.js';
 import type { Actor, Decision } from '../guard/types.js';
-import { loadPolicy } from '../policy/store.js';
+import { findByApiKey, findEmployee } from '../policy/people.js';
+import { loadPolicy, rulesForActor } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 
 /** The local model that answers allowed prompts. Cloud is out by track rules. */
@@ -31,39 +31,29 @@ const UPSTREAM_MODEL = process.env['WARDEN_UPSTREAM_MODEL'] ?? 'warden';
  */
 const MODE = process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden';
 
-type Employee = { id: string; name: string; role: string; apiKey: string };
-
-let directory: Employee[] | null = null;
-
-function employees(): Employee[] {
-  if (directory) return directory;
-  try {
-    const company = JSON.parse(readFileSync('data/seed/company.json', 'utf8')) as {
-      employees?: Employee[];
-    };
-    directory = company.employees ?? [];
-  } catch {
-    directory = [];
-  }
-  return directory;
-}
-
 /**
  * Resolve the caller.
  *
  * The bearer token is the primary signal because real clients send it. Headers
- * are a development convenience for the web console, which has a role switcher
- * and no keys to juggle.
+ * are a development convenience for the web console, which has a person
+ * switcher and no keys to juggle.
+ *
+ * When the header names someone in the directory, the directory's role wins
+ * over whatever role the header claims. The role is an admin decision, and a
+ * client that could assert its own would be able to pick the rule set it is
+ * judged against — which is the whole thing this gateway exists to prevent.
  */
 function resolveActor(req: Request): Actor | null {
   const bearer = /^Bearer\s+(.+)$/i.exec(req.header('authorization') ?? '')?.[1]?.trim();
   if (bearer) {
-    const match = employees().find((e) => e.apiKey === bearer);
+    const match = findByApiKey(bearer);
     return match ? { id: match.id, role: match.role } : null;
   }
 
   const headerUser = req.header('x-warden-user');
   if (headerUser) {
+    const known = findEmployee(headerUser);
+    if (known) return { id: known.id, role: known.role };
     return { id: headerUser, role: req.header('x-warden-role') ?? 'employee' };
   }
 
@@ -71,9 +61,8 @@ function resolveActor(req: Request): Actor | null {
 }
 
 /** Rules folded into a system prompt — the baseline everyone else ships. */
-function baselineSystemPrompt(role: string): string {
-  const rules = loadPolicy()
-    .rules.filter((r) => r.appliesTo.includes('*') || r.appliesTo.includes(role))
+function baselineSystemPrompt(actor: Actor): string {
+  const rules = rulesForActor(loadPolicy(), actor)
     .map((r) => `- ${r.text}`)
     .join('\n');
   return `You are a company assistant. Follow these rules at all times:\n${rules}`;
@@ -136,7 +125,7 @@ export async function handleChatCompletion(
       outbound = messages.map((m) => (m === lastUser ? { ...m, content: decision.maskedPrompt } : m));
     }
   } else {
-    outbound = [{ role: 'system', content: baselineSystemPrompt(actor.role) }, ...messages];
+    outbound = [{ role: 'system', content: baselineSystemPrompt(actor) }, ...messages];
   }
 
   await forward(res, { ...body, messages: outbound, model: body.model ?? UPSTREAM_MODEL });

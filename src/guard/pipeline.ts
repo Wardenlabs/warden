@@ -12,7 +12,7 @@
  */
 import { recordDecision } from '../audit/log.js';
 import { selectRules } from '../policy/index.js';
-import { rulesForRole } from '../policy/store.js';
+import { rulesForActor } from '../policy/store.js';
 import type { PolicySpec } from '../policy/types.js';
 import type { QvacAdapter } from '../qvac/types.js';
 import { aggregate } from './aggregate.js';
@@ -93,7 +93,9 @@ export async function evaluate(
   passes.push({ pass: 'isolate', ms: Date.now() - isoStart, verdict: 'ALLOW', detail: iso.flags });
 
   // ── pass 2: retrieve ───────────────────────────────────────────────────────
-  const applicable = rulesForRole(policy, input.actor.role);
+  // Company-wide rules, the actor's role rules, and any rule the admin wrote
+  // for this person by name — resolved in one place so none can be forgotten.
+  const applicable = rulesForActor(policy, input.actor);
   const retrieveStart = Date.now();
   const selected = await selectRules(policy, applicable, iso.clean, TOP_K);
   passes.push({

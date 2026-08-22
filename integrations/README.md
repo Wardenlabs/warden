@@ -44,17 +44,22 @@ Warden  (adapter=real)
   network   http://192.168.1.42:8080   <- teammates point here
 ```
 
-Each employee sets three variables (in `~/.zshrc`, `~/.bashrc`, or their shell
-profile):
+Each employee sets these (in `~/.zshrc`, `~/.bashrc`, or their shell profile):
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
 export WARDEN_USER=fede
-export WARDEN_ROLE=analyst                   # must match a role in the policy
+export WARDEN_ROLE=analyst                   # fallback only, see below
 ```
 
-`WARDEN_ROLE` decides which rules and which quota apply, so it is the field
-that matters. Roles come from `data/seed/company.json`.
+`WARDEN_USER` is the field that matters. The gateway looks it up in the
+directory the admin manages in the console's People tab, and the role recorded
+there decides which rules and which quota apply — including any rule written for
+that person by name.
+
+`WARDEN_ROLE` is only consulted for someone the directory has never seen. It is
+deliberately not authoritative: a role an employee can edit in their own shell
+profile is a role they could use to pick which rules judge them.
 
 ## 3. Claude Code
 

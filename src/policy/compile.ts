@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto';
 import type { QvacAdapter } from '../qvac/types.js';
 import { isolate, isolationPreamble } from '../guard/isolate.js';
 import { adjudicate } from '../guard/passes/adjudicate.js';
+import { EVERYONE, employeeToken, sanitiseAudience } from './audience.js';
+import { loadDirectory } from './people.js';
 import { loadPolicy, savePolicy } from './store.js';
 import {
   RULE_DRAFT_JSON_SCHEMA,
@@ -30,23 +32,50 @@ import {
  * model asked for "examples" of a prohibition supplies only violations, and a
  * rule with no compliant anchors teaches the adjudicator to block on sight.
  */
+export type CompileOptions = {
+  /** Role names the rule may bind. Defaults to the company directory. */
+  roles?: string[];
+  /** People the rule may bind by name. Defaults to the company directory. */
+  people?: { id: string; name: string }[];
+  /**
+   * Force the audience instead of letting the model choose it.
+   *
+   * Set when the admin is writing a rule from inside one person's page: they
+   * have already said who it is for by being there, and asking a 1.7B model to
+   * re-derive that from prose is a way to get it wrong.
+   */
+  lockTo?: string[];
+};
+
 export async function compileRule(
   qvac: QvacAdapter,
   text: string,
   policy: PolicySpec,
-  roles: string[] = defaultRoles()
+  options: CompileOptions = {}
 ): Promise<Rule> {
+  const directory = safeDirectory();
+  const roles = options.roles ?? directory.roles;
+  const people = options.people ?? directory.employees;
   const iso = isolate(text);
 
   const system = [
     'You convert a policy statement written by a company administrator into a structured rule.',
     '',
-    `Valid role names: ${roles.join(', ')}. Use ["*"] when the rule binds everyone.`,
+    `Valid role names: ${roles.join(', ')}.`,
+    // Naming the people is what makes "Ana cannot ask for payroll" compile into
+    // a rule about Ana rather than a rule about everyone. Without the roster the
+    // model has no token for a person and defaults to the whole company, which
+    // is a much broader rule than the admin asked for.
+    people.length > 0
+      ? `Named employees, referred to with an @ prefix: ${people.map((p) => `${employeeToken(p.id)} (${p.name})`).join(', ')}.`
+      : '',
+    'Use ["*"] when the rule binds everyone.',
     '',
     'Fields:',
     '- text: one unambiguous sentence stating what is prohibited, in English.',
     '- scope: "input" for what employees send, "output" for what the assistant returns, "both".',
-    '- appliesTo: role names the rule binds.',
+    '- appliesTo: who the rule binds — role names, @employee tokens, or ["*"].',
+    '  Bind it to a person only when the administrator named that person.',
     '- severity: "block" to refuse outright, "escalate" to route to a human.',
     '- examples.violating: 2-3 realistic requests this rule should stop.',
     '- examples.compliant: 2-3 realistic requests that are NEARBY but legitimate and',
@@ -55,7 +84,9 @@ export async function compileRule(
     'Write examples in the same language the administrator used.',
     isolationPreamble(iso.nonce),
     '/no_think'
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const res = await qvac.completeJSON<RuleDraft>(
     {
@@ -73,9 +104,12 @@ export async function compileRule(
   return ruleSchema.parse({
     ...draft,
     id: `r-${slug(draft.text)}-${randomUUID().slice(0, 4)}`,
-    // Keep only roles that exist. A hallucinated role would silently narrow the
-    // rule to nobody, which fails open — the one direction we never accept.
-    appliesTo: sanitiseRoles(draft.appliesTo, roles)
+    // Keep only audiences that exist. A hallucinated role or employee id would
+    // silently narrow the rule to nobody, which fails open — the one direction
+    // we never accept.
+    appliesTo:
+      options.lockTo ??
+      sanitiseAudience(draft.appliesTo, roles, people.map((p) => p.id))
   });
 }
 
@@ -165,23 +199,19 @@ export async function removeRule(ruleId: string): Promise<PolicySpec> {
   return savePolicy(current.rules.filter((r) => r.id !== ruleId), current.quotas);
 }
 
-function sanitiseRoles(claimed: string[], known: string[]): string[] {
-  if (claimed.includes('*')) return ['*'];
-  const valid = claimed.filter((r) => known.includes(r));
-  // Falling back to everyone is the safe direction: too broad is visible and
-  // fixable, too narrow silently protects nobody.
-  return valid.length > 0 ? valid : ['*'];
-}
-
-function defaultRoles(): string[] {
+/**
+ * The directory, or an empty stand-in.
+ *
+ * Compilation must not fail because the company file is missing — a fresh
+ * clone with no directory can still write company-wide rules, which is the
+ * first thing anyone does. The fallback binds everyone, the broad direction.
+ */
+function safeDirectory(): { roles: string[]; employees: { id: string; name: string }[] } {
   try {
-    const company = JSON.parse(
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require('node:fs').readFileSync('data/seed/company.json', 'utf8')
-    ) as { roles?: string[] };
-    return company.roles ?? ['*'];
+    const dir = loadDirectory();
+    return { roles: dir.roles, employees: dir.employees };
   } catch {
-    return ['*'];
+    return { roles: [EVERYONE], employees: [] };
   }
 }
 

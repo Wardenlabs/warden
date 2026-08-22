@@ -4,183 +4,345 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden — local AI gateway</title>
+<!-- Inline, because a console for a product whose claim is "nothing leaves the
+     machine" should not be fetching an icon over the network. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2316202c'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
 <style>
   /*
    * Served as one static file with no build step. A demo that needs `npm run
    * build` before it can be shown is a demo that fails at the wrong moment, and
    * the whole console is small enough that a bundler would only add ways to
    * break.
+   *
+   * The palette is deliberately light. This is an administration tool that an
+   * operations lead opens next to their other business software, not a security
+   * console for someone on a night shift — and the dark-terminal look, whatever
+   * it signals about seriousness, makes a room full of judges squint.
    */
   :root {
-    --bg: #0d1117; --panel: #161b22; --edge: #262d36;
-    --ink: #e6edf3; --dim: #8b949e; --faint: #6e7681;
-    --allow: #3fb950; --block: #f85149; --escalate: #d29922; --accent: #58a6ff;
+    --bg: #f1f4f9;
+    --card: #ffffff;
+    --edge: #e3e8ef;
+    --edge-soft: #eef1f6;
+    --ink: #16202c;
+    --dim: #5b6b7c;
+    --faint: #93a1b0;
+    --accent: #2f6fed;
+    --accent-soft: #eaf0fe;
+    --allow: #12a150;
+    --allow-soft: #e6f6ed;
+    --block: #e5484d;
+    --block-soft: #fdecec;
+    --escalate: #d98207;
+    --escalate-soft: #fdf3e3;
+    --shadow: 0 1px 2px rgba(20, 33, 61, .04), 0 4px 14px rgba(20, 33, 61, .06);
+    --shadow-lift: 0 2px 4px rgba(20, 33, 61, .06), 0 8px 24px rgba(20, 33, 61, .10);
+    --r: 14px;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
-    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font: 13.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     height: 100vh; display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* ── top bar ─────────────────────────────────────────────────────────── */
   header {
-    display: flex; align-items: center; gap: 16px;
-    padding: 10px 16px; border-bottom: 1px solid var(--edge); background: var(--panel);
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 22px; background: var(--card); border-bottom: 1px solid var(--edge);
   }
-  header h1 { font-size: 14px; margin: 0; letter-spacing: .5px; }
-  header h1 span { color: var(--faint); font-weight: 400; margin-left: 8px; }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .logo {
+    width: 32px; height: 32px; border-radius: 9px; background: var(--ink); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.5px;
+  }
+  .brand h1 { font-size: 14.5px; margin: 0; font-weight: 650; letter-spacing: -.1px; }
+  .brand p { margin: 0; font-size: 11.5px; color: var(--faint); }
+
   .pill {
-    font: 11px/1 var(--mono); padding: 4px 8px; border-radius: 10px;
-    border: 1px solid var(--edge); color: var(--dim);
+    font-size: 11.5px; padding: 4px 11px; border-radius: 999px;
+    background: var(--edge-soft); color: var(--dim); white-space: nowrap;
   }
-  .pill.live { color: var(--allow); border-color: #1f3d28; }
-  .pill.mock { color: var(--escalate); border-color: #3d3418; }
-  nav { margin-left: auto; display: flex; gap: 4px; }
+  .pill.live { background: var(--allow-soft); color: var(--allow); }
+  .pill.mock { background: var(--escalate-soft); color: var(--escalate); }
+
+  nav { margin-left: auto; display: flex; gap: 3px; background: var(--edge-soft); padding: 3px; border-radius: 999px; }
   nav button {
-    background: none; border: 1px solid transparent; color: var(--dim);
-    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    background: none; border: none; color: var(--dim);
+    padding: 6px 15px; border-radius: 999px; cursor: pointer; font-size: 12.5px; font-weight: 500;
   }
-  nav button.on { background: var(--bg); border-color: var(--edge); color: var(--ink); }
+  nav button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(20,33,61,.10); }
 
-  main { flex: 1; display: grid; grid-template-columns: 340px 1fr 380px; overflow: hidden; }
-  main.single { grid-template-columns: 1fr; }
-  section { border-right: 1px solid var(--edge); display: flex; flex-direction: column; overflow: hidden; }
-  section:last-child { border-right: none; }
+  /* ── layout ──────────────────────────────────────────────────────────── */
+  main { flex: 1; overflow: hidden; padding: 16px; gap: 16px; }
+  main.grid3 { display: grid; grid-template-columns: 360px 1fr 400px; }
+  main.grid2 { display: grid; grid-template-columns: 1fr 400px; }
+  main.single { display: block; overflow-y: auto; }
+  main.single > .card { max-width: 1100px; margin: 0 auto; }
+
+  .card {
+    background: var(--card); border-radius: var(--r); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+  }
   .head {
-    padding: 9px 14px; border-bottom: 1px solid var(--edge);
-    font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint);
-    display: flex; align-items: center; gap: 8px;
+    padding: 13px 18px; border-bottom: 1px solid var(--edge-soft);
+    font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 9px;
   }
-  .head .ver { margin-left: auto; font-family: var(--mono); text-transform: none; font-size: 10px; }
-  .body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  .head .ver { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-weight: 400; }
+  .body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+  .sub {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px;
+    color: var(--faint); font-weight: 600; margin: 20px 0 9px;
+  }
+  .sub:first-child { margin-top: 0; }
 
+  /* ── controls ────────────────────────────────────────────────────────── */
   textarea, input, select {
-    width: 100%; background: var(--bg); color: var(--ink);
-    border: 1px solid var(--edge); border-radius: 6px; padding: 8px 10px;
-    font-family: inherit; font-size: 12.5px; resize: vertical;
+    width: 100%; background: var(--card); color: var(--ink);
+    border: 1px solid var(--edge); border-radius: 9px; padding: 9px 11px;
+    font-family: inherit; font-size: 13px; resize: vertical;
   }
-  textarea:focus, input:focus { outline: none; border-color: var(--accent); }
+  textarea::placeholder, input::placeholder { color: var(--faint); }
+  textarea:focus, input:focus, select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
   button.act {
-    background: var(--accent); color: #04121f; border: none; border-radius: 6px;
-    padding: 7px 14px; font-weight: 600; font-size: 12px; cursor: pointer;
+    background: var(--accent); color: #fff; border: none; border-radius: 9px;
+    padding: 9px 16px; font-weight: 600; font-size: 12.5px; cursor: pointer;
   }
-  button.act:disabled { opacity: .4; cursor: default; }
+  button.act:hover { background: #2560d4; }
+  button.act:disabled { opacity: .45; cursor: default; }
   button.ghost {
-    background: none; border: 1px solid var(--edge); color: var(--dim);
-    border-radius: 6px; padding: 7px 12px; font-size: 12px; cursor: pointer;
+    background: var(--card); border: 1px solid var(--edge); color: var(--dim);
+    border-radius: 9px; padding: 8px 14px; font-size: 12.5px; cursor: pointer;
   }
-  .row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  button.ghost:hover { border-color: var(--faint); color: var(--ink); }
+  button.danger { color: var(--block); border-color: #f3c9ca; }
+  button.danger:hover { background: var(--block-soft); border-color: var(--block); color: var(--block); }
+  .row { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+  .note { font-size: 11.5px; color: var(--faint); }
 
-  .cat { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
-  .cat button {
-    font-size: 11px; padding: 4px 9px; border-radius: 12px;
-    background: none; border: 1px solid var(--edge); color: var(--dim); cursor: pointer;
+  /* ── chips ───────────────────────────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 11.5px; padding: 5px 11px; border-radius: 999px;
+    background: var(--edge-soft); border: 1px solid transparent; color: var(--dim); cursor: pointer;
   }
-  .cat button.on { border-color: var(--accent); color: var(--accent); }
+  .chip.on { background: var(--accent-soft); border-color: #c7d9fb; color: var(--accent); font-weight: 600; }
+  .chip.static { cursor: default; }
+  .chip .x { margin-left: 6px; color: var(--faint); font-weight: 700; }
+  .chip .x:hover { color: var(--block); }
 
+  /* ── rules ───────────────────────────────────────────────────────────── */
   .rule {
-    border: 1px solid var(--edge); border-radius: 6px; padding: 9px 11px; margin-bottom: 7px;
-    background: var(--panel); font-size: 12px;
+    border: 1px solid var(--edge); border-radius: 11px; padding: 11px 13px; margin-bottom: 9px;
+    background: var(--card); font-size: 12.5px; position: relative;
   }
-  .rule .t { color: var(--ink); }
-  .rule .m { color: var(--faint); font-size: 10.5px; margin-top: 5px; font-family: var(--mono); }
+  /* Destructive actions stay out of the way until the pointer is on the row —
+     a Remove button next to every rule invites the click it should discourage. */
+  .rule .del {
+    position: absolute; top: 8px; right: 8px; opacity: 0;
+    padding: 3px 9px; font-size: 11px; transition: opacity .12s;
+  }
+  .rule:hover .del, .rule .del:focus { opacity: 1; }
+  .rule .t { color: var(--ink); line-height: 1.5; }
+  .rule .m {
+    color: var(--faint); font-size: 11px; margin-top: 7px;
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  }
   .rule.pick { cursor: pointer; }
-  .rule.pick:hover { border-color: var(--accent); }
+  .rule.pick:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+  .rule.draft { border-color: var(--accent); background: #fbfcff; }
+  .tag { padding: 2px 8px; border-radius: 999px; background: var(--edge-soft); color: var(--dim); font-size: 10.5px; font-weight: 600; }
+  .tag.block { background: var(--block-soft); color: var(--block); }
+  .tag.escalate { background: var(--escalate-soft); color: var(--escalate); }
+  .tag.personal { background: var(--accent-soft); color: var(--accent); }
 
-  .msg { margin-bottom: 12px; }
-  .msg .who { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .6px; }
+  /* ── people ──────────────────────────────────────────────────────────── */
+  .people-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(226px, 1fr)); gap: 12px; }
+  .person {
+    border: 1px solid var(--edge); border-radius: 12px; padding: 14px; cursor: pointer;
+    display: flex; gap: 12px; align-items: flex-start; background: var(--card);
+    transition: box-shadow .12s, border-color .12s;
+  }
+  .person:hover { box-shadow: var(--shadow-lift); border-color: #cfd8e3; }
+  .person.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px;
+    display: grid; place-items: center; font-weight: 650; font-size: 14px; letter-spacing: -.2px;
+  }
+  .avatar.lg { width: 56px; height: 56px; flex-basis: 56px; font-size: 19px; }
+  .person .nm { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+  .person .rl { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .person .st { font-size: 11px; color: var(--faint); margin-top: 7px; }
+  .key { font-family: var(--mono); font-size: 10.5px; color: var(--faint); word-break: break-all; }
+
+  .detail-top { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+  .detail-top .nm { font-size: 17px; font-weight: 650; letter-spacing: -.2px; }
+  .field { margin-bottom: 11px; }
+  .field label { display: block; font-size: 11px; color: var(--dim); margin-bottom: 4px; font-weight: 500; }
+
+  /* ── chat ────────────────────────────────────────────────────────────── */
+  .msg { margin-bottom: 15px; }
+  .msg .who { font-size: 11px; color: var(--faint); font-weight: 600; }
   .msg .txt { margin-top: 3px; white-space: pre-wrap; }
-  .msg.blocked .txt { border-left: 2px solid var(--block); padding-left: 10px; }
-  .msg.escalated .txt { border-left: 2px solid var(--escalate); padding-left: 10px; }
-  .msg.allowed .txt { border-left: 2px solid var(--allow); padding-left: 10px; }
-  .why { font-size: 11.5px; color: var(--dim); margin-top: 5px; }
+  .msg.blocked .txt, .msg.escalated .txt, .msg.allowed .txt {
+    padding: 9px 12px; border-radius: 10px; margin-top: 5px;
+  }
+  .msg.blocked .txt { background: var(--block-soft); color: var(--block); font-weight: 600; }
+  .msg.escalated .txt { background: var(--escalate-soft); color: var(--escalate); font-weight: 600; }
+  .msg.allowed .txt { background: var(--allow-soft); color: var(--allow); font-weight: 600; }
+  .why { font-size: 12px; color: var(--dim); margin-top: 6px; }
   .why b { color: var(--ink); font-weight: 600; }
+  .composer { padding: 14px 18px; border-top: 1px solid var(--edge-soft); }
 
+  /* ── trace ───────────────────────────────────────────────────────────── */
+  .decision { border: 1px solid var(--edge); border-radius: 11px; padding: 12px; margin-bottom: 10px; }
+  .decision .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .decision .prompt { font-size: 12px; color: var(--dim); margin-bottom: 9px; word-break: break-word; }
   .pass {
     display: flex; align-items: baseline; gap: 8px; font-family: var(--mono);
-    font-size: 11px; padding: 3px 0; border-bottom: 1px solid #1c222a;
+    font-size: 11px; padding: 4px 0; border-top: 1px solid var(--edge-soft);
   }
   .pass .n { flex: 1; color: var(--dim); }
-  .pass .v { font-weight: 600; }
-  .pass .ms { color: var(--faint); min-width: 46px; text-align: right; }
+  .pass .ms { color: var(--faint); min-width: 48px; text-align: right; }
+  .v { font-weight: 700; font-size: 11px; }
   .v.ALLOW { color: var(--allow); } .v.BLOCK { color: var(--block); } .v.ESCALATE { color: var(--escalate); }
-  .decision { border: 1px solid var(--edge); border-radius: 6px; padding: 10px; margin-bottom: 10px; background: var(--panel); }
-  .decision .top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
-  .decision .prompt { font-size: 11.5px; color: var(--dim); margin-bottom: 8px; word-break: break-word; }
+  .badge { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge.ALLOW { background: var(--allow-soft); color: var(--allow); }
+  .badge.BLOCK { background: var(--block-soft); color: var(--block); }
+  .badge.ESCALATE { background: var(--escalate-soft); color: var(--escalate); }
 
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--edge); }
-  th { color: var(--faint); font-weight: 500; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; }
+  /* ── tables + misc ───────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--edge-soft); }
+  th { color: var(--faint); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; }
   td.num { font-family: var(--mono); text-align: right; }
-  .bar { height: 4px; background: #21262d; border-radius: 2px; overflow: hidden; margin-top: 3px; }
-  .bar i { display: block; height: 100%; background: var(--allow); }
-  .empty { color: var(--faint); font-size: 12px; padding: 20px 0; text-align: center; }
-  code { font-family: var(--mono); font-size: 11px; background: #1c2128; padding: 1px 4px; border-radius: 3px; }
+  .bar { height: 5px; background: var(--edge-soft); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar i { display: block; height: 100%; border-radius: 3px; }
+  .empty { color: var(--faint); font-size: 12.5px; padding: 28px 0; text-align: center; }
+  .stat { font-size: 30px; font-weight: 650; letter-spacing: -1px; line-height: 1.1; }
+  code { font-family: var(--mono); font-size: 11px; background: var(--edge-soft); padding: 2px 5px; border-radius: 5px; }
+  .banner {
+    border-radius: 11px; padding: 11px 13px; font-size: 12.5px; margin-bottom: 14px;
+    background: var(--escalate-soft); color: #8a5200;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #d3dae3; border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
 <header>
-  <h1>WARDEN <span>local AI gateway</span></h1>
+  <div class="brand">
+    <span class="logo">W</span>
+    <div>
+      <h1>Warden</h1>
+      <p id="companyName">local AI gateway</p>
+    </div>
+  </div>
   <span class="pill" id="adapter">connecting…</span>
   <span class="pill" id="policyPill">—</span>
   <nav>
     <button class="on" data-tab="console">Console</button>
+    <button data-tab="people">People</button>
     <button data-tab="redteam">Red team</button>
   </nav>
 </header>
 
-<main id="tab-console">
-  <!-- ADMIN ------------------------------------------------------------- -->
-  <section>
-    <div class="head">Admin <span class="ver" id="ver"></span></div>
+<!-- ═══ CONSOLE ═══════════════════════════════════════════════════════════ -->
+<main id="tab-console" class="grid3">
+  <section class="card">
+    <div class="head">Policy <span class="ver" id="ver"></span></div>
     <div class="body">
-      <textarea id="ruleText" rows="3" placeholder="Escribí una regla…&#10;p.ej. nadie de ventas puede pedir datos de nómina"></textarea>
+      <div class="sub">Write a rule</div>
+      <textarea id="ruleText" rows="3" placeholder="Escribí una regla…&#10;p. ej. nadie de ventas puede pedir datos de nómina"></textarea>
       <div class="row">
         <button class="act" id="compile">Compile</button>
-        <span id="compileNote" style="font-size:11px;color:var(--faint)"></span>
+        <span class="note" id="compileNote"></span>
       </div>
 
-      <div class="cat" id="cats"></div>
-      <div id="presetList"></div>
+      <div class="sub">Or start from the catalogue</div>
+      <div class="chips" id="cats"></div>
+      <div id="presetList" style="margin-top:10px"></div>
 
-      <div id="draft" style="display:none"></div>
+      <div id="draft"></div>
 
-      <div class="head" style="margin:14px -14px 8px;border-top:1px solid var(--edge)">Active rules</div>
+      <div class="sub">Active rules</div>
       <div id="rules"></div>
 
-      <div class="head" style="margin:14px -14px 8px;border-top:1px solid var(--edge)">Quotas</div>
+      <div class="sub">Quotas by role</div>
       <div id="quotas"></div>
     </div>
   </section>
 
-  <!-- EMPLOYEE ----------------------------------------------------------- -->
-  <section>
+  <section class="card">
     <div class="head">
       Employee
-      <select id="role" style="width:auto;padding:2px 6px;font-size:11px;margin-left:8px"></select>
+      <select id="who" style="width:auto;padding:5px 9px;font-size:12px;margin-left:4px"></select>
     </div>
     <div class="body" id="chat"><div class="empty">Send a message to see the guard run.</div></div>
-    <div style="padding:12px 14px;border-top:1px solid var(--edge)">
+    <div class="composer">
       <textarea id="prompt" rows="2" placeholder="Escribí como empleado…"></textarea>
-      <div class="row"><button class="act" id="send">Send</button></div>
+      <div class="row"><button class="act" id="send">Send</button><span class="note">⌘/Ctrl + Enter</span></div>
     </div>
   </section>
 
-  <!-- TRACE -------------------------------------------------------------- -->
-  <section>
+  <section class="card">
     <div class="head">Decision trace <span class="ver" id="sse">●</span></div>
     <div class="body" id="trace"><div class="empty">Live decisions appear here.</div></div>
   </section>
 </main>
 
+<!-- ═══ PEOPLE ════════════════════════════════════════════════════════════ -->
+<main id="tab-people" class="grid2" style="display:none">
+  <section class="card">
+    <div class="head">
+      People
+      <span class="ver" id="headcount"></span>
+    </div>
+    <div class="body">
+      <div class="sub">Add someone</div>
+      <div class="row" style="margin-top:0">
+        <input id="newName" placeholder="Full name" style="flex:2;min-width:150px">
+        <select id="newRole" style="flex:1;min-width:110px"></select>
+        <button class="act" id="addPerson">Add</button>
+      </div>
+      <div class="note" id="addNote" style="margin-top:6px"></div>
+
+      <div class="sub">Directory</div>
+      <div class="people-grid" id="peopleGrid"></div>
+
+      <div class="sub">Roles</div>
+      <div class="chips" id="roleChips"></div>
+      <div class="row">
+        <input id="newRoleName" placeholder="New role" style="flex:2;min-width:130px">
+        <input id="newRoleQuota" type="number" min="1" placeholder="req/day" style="flex:1;min-width:90px">
+        <button class="ghost" id="addRole">Add role</button>
+      </div>
+      <div class="note" id="roleNote" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head">Person</div>
+    <div class="body" id="personDetail">
+      <div class="empty">Pick someone to see their rules and write one just for them.</div>
+    </div>
+  </section>
+</main>
+
+<!-- ═══ RED TEAM ══════════════════════════════════════════════════════════ -->
 <main id="tab-redteam" class="single" style="display:none">
-  <section>
+  <section class="card">
     <div class="head">Red team</div>
     <div class="body">
-      <div class="row" style="margin:0 0 14px">
+      <div class="row" style="margin:0 0 16px">
         <button class="act" id="runRt">Run suite</button>
         <button class="ghost" id="loadRt">Load last report</button>
-        <span id="rtNote" style="font-size:11px;color:var(--faint)"></span>
+        <span class="note" id="rtNote"></span>
       </div>
       <div id="rtOut"><div class="empty">Run the suite, or load the last report.</div></div>
     </div>

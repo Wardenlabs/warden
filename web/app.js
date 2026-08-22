@@ -1,20 +1,30 @@
 /**
  * Console behaviour. Plain ES modules, no framework, no build step.
  *
- * The three panes correspond to the three people who care: the admin who writes
- * the rules, the employee who hits them, and whoever later has to explain a
- * decision. That last one is why the trace is a first-class pane rather than a
- * debug view — "auditable in five seconds" only counts if the audit is visible
- * while the thing runs.
+ * Three views, matching the three people who care: the admin who writes the
+ * rules, whoever has to explain a decision afterwards, and the directory of
+ * everyone the rules land on. The trace is a first-class pane rather than a
+ * debug view because "auditable in five seconds" only counts if the audit is
+ * visible while the thing runs.
  */
 
 const $ = (id) => document.getElementById(id);
 const api = (path, opts) => fetch(path, opts).then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, j })));
-const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 let policy = { rules: [], quotas: [], version: '' };
+let company = { name: '', roles: [], employees: [] };
 let presets = [];
+let selectedPerson = null;
+
+/**
+ * The rule being drafted, and where it is being drafted.
+ *
+ * One draft at a time, deliberately. Two half-written rules in two panels is a
+ * way to activate the wrong one.
+ */
 let draft = null;
+let draftHost = 'admin';
 
 // ── boot ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +40,7 @@ async function boot() {
   pill.className = `pill ${health.j.mock ? 'mock' : 'live'}`;
 
   await refreshPolicy();
+  await refreshPeople();
   await loadPresets();
   subscribe();
 }
@@ -41,7 +52,44 @@ async function refreshPolicy() {
   $('policyPill').textContent = `${j.rules.length} rules`;
   renderRules();
   renderQuotas();
+}
+
+async function refreshPeople() {
+  const { j } = await api('/api/people');
+  company = j;
+  $('companyName').textContent = j.name || 'local AI gateway';
+  $('headcount').textContent = `${j.employees.length} people · ${j.roles.length} roles`;
+  renderPeople();
   renderRoles();
+  renderWhoPicker();
+  if (selectedPerson) {
+    const still = j.employees.find((e) => e.id === selectedPerson.id);
+    selectedPerson = still ?? null;
+    renderPersonDetail();
+  }
+}
+
+// ── avatars ──────────────────────────────────────────────────────────────────
+
+/**
+ * Initials on a tinted disc, coloured from a hash of the id.
+ *
+ * No photo service, no gravatar, no network call — this whole product's claim
+ * is that nothing leaves the machine, and a console that phones out for
+ * profile pictures would be the first thing a judge notices in devtools.
+ */
+const AVATAR_COLORS = [
+  ['#e8f0fe', '#1a56db'], ['#fdecee', '#c11c25'], ['#e6f6ed', '#0b7a3c'],
+  ['#fdf3e3', '#96590a'], ['#f1eafc', '#6429c4'], ['#e6f5f8', '#0d6f7d'],
+  ['#fdeaf3', '#b02a72'], ['#eef1f6', '#44546a']
+];
+
+function avatar(person, big = false) {
+  let h = 0;
+  for (const ch of person.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const [bg, fg] = AVATAR_COLORS[h % AVATAR_COLORS.length];
+  const initials = person.name.split(/\s+/).slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase();
+  return `<div class="avatar${big ? ' lg' : ''}" style="background:${bg};color:${fg}">${esc(initials)}</div>`;
 }
 
 // ── admin: presets ───────────────────────────────────────────────────────────
@@ -50,7 +98,7 @@ async function loadPresets() {
   const { j } = await api('/api/policy/presets');
   presets = Array.isArray(j) ? j : [];
   $('cats').innerHTML = presets
-    .map((c, i) => `<button data-cat="${i}">${esc(c.label ?? c.category)}</button>`)
+    .map((c, i) => `<button class="chip" data-cat="${i}">${esc(c.label ?? c.category)}</button>`)
     .join('');
   $('cats').onclick = (e) => {
     const btn = e.target.closest('button');
@@ -66,7 +114,7 @@ function showPresets(i) {
   $('presetList').innerHTML = cat.rules
     .map((r, k) => `<div class="rule pick" data-cat="${i}" data-r="${k}">
         <div class="t">${esc(r.text)}</div>
-        <div class="m">${r.severity} · ${r.appliesTo.join(', ')}</div>
+        <div class="m"><span class="tag ${r.severity}">${r.severity}</span> ${esc(audienceLabel(r.appliesTo))}</div>
       </div>`)
     .join('');
   $('presetList').onclick = (e) => {
@@ -77,39 +125,74 @@ function showPresets(i) {
     // being a way to skip them.
     const r = presets[Number(el.dataset.cat)].rules[Number(el.dataset.r)];
     draft = { ...r, id: `r-preset-${Date.now().toString(36)}` };
+    draftHost = 'admin';
     renderDraft();
   };
 }
 
 // ── admin: compile ───────────────────────────────────────────────────────────
 
-$('compile').onclick = async () => {
-  const text = $('ruleText').value.trim();
-  if (!text) return;
-  $('compile').disabled = true;
-  $('compileNote').textContent = 'compiling…';
+$('compile').onclick = () => compileInto('admin', $('ruleText').value, null, $('compileNote'), $('compile'));
+
+/**
+ * Compile a sentence into a rule.
+ *
+ * `lockTo` is passed when the admin is writing from inside one person's page.
+ * They already said who the rule is for by being there, and re-deriving that
+ * from the prose is a way for a small model to bind the rule to the whole
+ * company by accident.
+ */
+async function compileInto(host, text, lockTo, noteEl, btnEl) {
+  const clean = String(text ?? '').trim();
+  if (!clean) return;
+  if (btnEl) btnEl.disabled = true;
+  if (noteEl) noteEl.textContent = 'compiling on the local model…';
+
   const { ok, j } = await api('/api/policy/draft', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(lockTo ? { text: clean, lockTo } : { text: clean })
   });
-  $('compile').disabled = false;
-  $('compileNote').textContent = ok ? '' : (j.error ?? 'failed');
-  if (ok) { draft = j; renderDraft(); }
-};
+
+  if (btnEl) btnEl.disabled = false;
+  if (noteEl) noteEl.textContent = ok ? '' : (j.error ?? 'failed');
+  if (!ok) return;
+
+  draft = j;
+  draftHost = host;
+  renderDraft();
+}
+
+/** Where the draft card renders right now — the admin panel or a person's page. */
+function draftContainer() {
+  return draftHost === 'admin' ? $('draft') : $('personDraft');
+}
 
 function renderDraft() {
-  const d = $('draft');
-  if (!draft) { d.style.display = 'none'; return; }
-  d.style.display = 'block';
+  // Only one draft exists, so clear whichever container is not hosting it.
+  for (const el of [$('draft'), $('personDraft')]) if (el) el.innerHTML = '';
+  const d = draftContainer();
+  if (!d || !draft) return;
+
+  const locked = draftHost !== 'admin';
   d.innerHTML = `
-    <div class="rule" style="border-color:var(--accent)">
+    <div class="rule draft" style="margin-top:12px">
       <div class="t">${esc(draft.text)}</div>
-      <div class="m">${draft.scope} · ${draft.severity} · ${draft.appliesTo.join(', ')}</div>
-      <div class="m" style="margin-top:7px;color:var(--dim)">
-        blocks: ${draft.examples.violating.map((e) => `<div>· ${esc(e)}</div>`).join('')}
-        allows: ${draft.examples.compliant.map((e) => `<div>· ${esc(e)}</div>`).join('')}
+      <div class="m">
+        <span class="tag ${draft.severity}">${draft.severity}</span>
+        <span class="tag">${draft.scope}</span>
       </div>
+
+      <div class="sub" style="margin:13px 0 7px">Applies to</div>
+      ${locked
+        ? `<div class="note">${esc(audienceLabel(draft.appliesTo))} — locked, you are writing this from their page.</div>`
+        : `<div class="chips" id="audienceChips"></div>`}
+
+      <div class="sub" style="margin:14px 0 6px">Would block</div>
+      ${draft.examples.violating.map((e) => `<div class="note">· ${esc(e)}</div>`).join('')}
+      <div class="sub" style="margin:11px 0 6px">Must still allow</div>
+      ${draft.examples.compliant.map((e) => `<div class="note">· ${esc(e)}</div>`).join('')}
+
       <div class="row">
         <button class="ghost" id="previewBtn">Preview</button>
         <button class="act" id="ratifyBtn">Activate</button>
@@ -118,14 +201,60 @@ function renderDraft() {
       <div id="previewOut"></div>
     </div>`;
 
+  if (!locked) renderAudienceChips();
+
   $('previewBtn').onclick = runPreview;
   $('dropBtn').onclick = () => { draft = null; renderDraft(); };
   $('ratifyBtn').onclick = async () => {
+    $('ratifyBtn').disabled = true;
     await api('/api/policy/ratify', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ rule: draft })
     });
-    draft = null; $('ruleText').value = ''; renderDraft(); refreshPolicy();
+    draft = null;
+    $('ruleText').value = '';
+    const pt = $('personRuleText');
+    if (pt) pt.value = '';
+    renderDraft();
+    await refreshPolicy();
+    await refreshPeople();
+  };
+}
+
+/**
+ * The audience editor.
+ *
+ * The model proposes who a rule binds; the admin decides. Getting this wrong in
+ * either direction is expensive — too broad and the whole company trips over a
+ * rule meant for one team, too narrow and it guards nobody — and the admin is
+ * the only one who knows which was intended.
+ */
+function renderAudienceChips() {
+  const el = $('audienceChips');
+  if (!el) return;
+  const on = new Set(draft.appliesTo);
+  const opts = [
+    { token: '*', label: 'Everyone' },
+    ...company.roles.map((r) => ({ token: r, label: r })),
+    ...company.employees.map((e) => ({ token: `@${e.id}`, label: e.name }))
+  ];
+  el.innerHTML = opts
+    .map((o) => `<span class="chip${on.has(o.token) ? ' on' : ''}" data-token="${esc(o.token)}">${esc(o.label)}</span>`)
+    .join('');
+  el.onclick = (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const token = chip.dataset.token;
+    const next = new Set(draft.appliesTo);
+    if (token === '*') {
+      // "Everyone" is not one audience among many — it subsumes them.
+      draft.appliesTo = ['*'];
+    } else {
+      next.delete('*');
+      next.has(token) ? next.delete(token) : next.add(token);
+      draft.appliesTo = next.size ? [...next] : ['*'];
+    }
+    renderAudienceChips();
   };
 }
 
@@ -138,53 +267,274 @@ function renderDraft() {
  * catch it before it ships.
  */
 async function runPreview() {
-  $('previewOut').innerHTML = '<div class="m">running…</div>';
+  $('previewOut').innerHTML = '<div class="note" style="margin-top:10px">running the real adjudicator…</div>';
   const { ok, j } = await api('/api/policy/preview', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ rule: draft })
   });
-  if (!ok) { $('previewOut').innerHTML = `<div class="m">${esc(j.error)}</div>`; return; }
+  if (!ok) { $('previewOut').innerHTML = `<div class="note">${esc(j.error)}</div>`; return; }
 
   $('previewOut').innerHTML = `
-    <div style="margin-top:9px;font-size:11.5px">
+    <div style="margin-top:11px;font-size:12px">
       ${j.rows.map((r) => `
-        <div style="padding:3px 0;color:${r.isFalsePositive ? 'var(--block)' : 'var(--dim)'}">
-          <span class="v ${r.verdict}" style="font-family:var(--mono)">${r.verdict.padEnd(8)}</span>
-          ${esc(r.prompt.slice(0, 54))}
-          ${r.isFalsePositive ? ' <b style="color:var(--block)">← FALSE POSITIVE</b>' : ''}
-          ${r.isMiss ? ' <b style="color:var(--escalate)">← missed</b>' : ''}
+        <div style="padding:4px 0;display:flex;gap:9px;align-items:baseline">
+          <span class="v ${r.verdict}" style="min-width:66px;font-family:var(--mono)">${r.verdict}</span>
+          <span style="flex:1;color:${r.isFalsePositive ? 'var(--block)' : 'var(--dim)'}">${esc(r.prompt.slice(0, 70))}</span>
+          ${r.isFalsePositive ? '<b style="color:var(--block)">false positive</b>' : ''}
+          ${r.isMiss ? '<b style="color:var(--escalate)">missed</b>' : ''}
         </div>`).join('')}
       ${j.falsePositives > 0
-        ? `<div style="margin-top:8px;color:var(--block)"><b>${j.falsePositives} legitimate request${j.falsePositives > 1 ? 's' : ''} would be blocked.</b> Reword before activating.</div>`
-        : '<div style="margin-top:8px;color:var(--allow)">No false positives on these examples.</div>'}
+        ? `<div class="banner" style="margin-top:11px;background:var(--block-soft);color:var(--block)"><b>${j.falsePositives} legitimate request${j.falsePositives > 1 ? 's' : ''} would be blocked.</b> Reword before activating.</div>`
+        : '<div style="margin-top:11px;color:var(--allow);font-weight:600">No false positives on these examples.</div>'}
     </div>`;
 }
 
 // ── admin: active policy ─────────────────────────────────────────────────────
 
+/** `@id` means nothing to a reader; resolve it to a name. */
+function audienceLabel(appliesTo) {
+  if (!appliesTo?.length) return 'nobody';
+  if (appliesTo.includes('*')) return 'everyone';
+  return appliesTo
+    .map((t) => {
+      if (!t.startsWith('@')) return t;
+      const id = t.slice(1);
+      return company.employees.find((e) => e.id === id)?.name ?? `${id} (removed)`;
+    })
+    .join(', ');
+}
+
+const isPersonal = (rule) => rule.appliesTo.some((t) => t.startsWith('@'));
+
 function renderRules() {
   $('rules').innerHTML = policy.rules.length
     ? policy.rules.map((r) => `<div class="rule">
-        <div class="t">${esc(r.text)}</div>
-        <div class="m">${r.severity} · ${r.appliesTo.join(', ')}${r.pinned ? ' · always checked' : ''}</div>
+        <div class="t" style="padding-right:64px">${esc(r.text)}</div>
+        <div class="m">
+          <span class="tag ${r.severity}">${r.severity}</span>
+          <span class="tag${isPersonal(r) ? ' personal' : ''}">${esc(audienceLabel(r.appliesTo))}</span>
+          ${r.pinned ? '<span class="tag">always checked</span>' : ''}
+        </div>
+        <button class="ghost danger del" data-del="${esc(r.id)}">Remove</button>
       </div>`).join('')
     : '<div class="empty">No rules yet.</div>';
+
+  $('rules').onclick = async (e) => {
+    const btn = e.target.closest('[data-del]');
+    if (!btn) return;
+    await api(`/api/policy/rules/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
+    await refreshPolicy();
+    await refreshPeople();
+  };
 }
 
 function renderQuotas() {
-  $('quotas').innerHTML = policy.quotas
-    .map((q) => `<div style="font-size:11.5px;margin-bottom:6px">
+  $('quotas').innerHTML = policy.quotas.length
+    ? policy.quotas.map((q) => `<div style="font-size:12.5px;margin-bottom:7px;display:flex">
         <span style="color:var(--dim)">${esc(q.role)}</span>
-        <span style="float:right;font-family:var(--mono);color:var(--faint)">${q.maxRequestsPerDay}/day</span>
-      </div>`).join('');
+        <span style="margin-left:auto;font-family:var(--mono);color:var(--faint)">${q.maxRequestsPerDay}/day</span>
+      </div>`).join('')
+    : '<div class="note">No quotas set — every role is unmetered.</div>';
+}
+
+// ── people ───────────────────────────────────────────────────────────────────
+
+function renderPeople() {
+  $('peopleGrid').innerHTML = company.employees.length
+    ? company.employees.map((e) => `
+      <div class="person${selectedPerson?.id === e.id ? ' on' : ''}" data-id="${esc(e.id)}">
+        ${avatar(e)}
+        <div style="min-width:0;flex:1">
+          <div class="nm">${esc(e.name)}</div>
+          <div class="rl">${esc(e.role)}${e.quota ? ` · ${e.quota}/day` : ''}</div>
+          <div class="st">${e.ruleCount} rule${e.ruleCount === 1 ? '' : 's'}${
+            e.personalRuleCount ? ` · <b style="color:var(--accent)">${e.personalRuleCount} personal</b>` : ''
+          }</div>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">Nobody yet. Add the first person above.</div>';
+
+  $('peopleGrid').onclick = (e) => {
+    const card = e.target.closest('.person');
+    if (!card) return;
+    selectedPerson = company.employees.find((p) => p.id === card.dataset.id) ?? null;
+    if (draftHost !== 'admin') { draft = null; }
+    renderPeople();
+    renderPersonDetail();
+  };
 }
 
 function renderRoles() {
-  const roles = [...new Set(policy.quotas.map((q) => q.role))];
-  $('role').innerHTML = roles.map((r) => `<option${r === 'analyst' ? ' selected' : ''}>${esc(r)}</option>`).join('');
+  $('roleChips').innerHTML = company.roles
+    .map((r) => {
+      const held = company.employees.filter((e) => e.role === r).length;
+      return `<span class="chip static" title="${held} employee(s)">${esc(r)} <span style="color:var(--faint)">${held}</span>${
+        held === 0 ? `<span class="x" data-role="${esc(r)}">×</span>` : ''
+      }</span>`;
+    })
+    .join('');
+
+  $('roleChips').onclick = async (e) => {
+    const x = e.target.closest('[data-role]');
+    if (!x) return;
+    const { ok, j } = await api(`/api/roles/${encodeURIComponent(x.dataset.role)}`, { method: 'DELETE' });
+    $('roleNote').textContent = ok ? '' : (j.error ?? 'failed');
+    if (ok) { await refreshPeople(); await refreshPolicy(); }
+  };
+
+  const sel = $('newRole');
+  const keep = sel.value;
+  sel.innerHTML = company.roles.map((r) => `<option>${esc(r)}</option>`).join('');
+  if (company.roles.includes(keep)) sel.value = keep;
+}
+
+$('addPerson').onclick = async () => {
+  const name = $('newName').value.trim();
+  if (!name) return;
+  const { ok, j } = await api('/api/people', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, role: $('newRole').value })
+  });
+  $('addNote').textContent = ok
+    ? `${j.name} added · key ${j.apiKey} · WARDEN_USER=${j.id}`
+    : (j.error ?? 'failed');
+  if (ok) {
+    $('newName').value = '';
+    await refreshPeople();
+    selectedPerson = company.employees.find((e) => e.id === j.id) ?? null;
+    renderPeople();
+    renderPersonDetail();
+  }
+};
+
+$('addRole').onclick = async () => {
+  const role = $('newRoleName').value.trim();
+  if (!role) return;
+  const quota = Number($('newRoleQuota').value || 0);
+  const { ok, j } = await api('/api/roles', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ role, maxRequestsPerDay: quota })
+  });
+  $('roleNote').textContent = ok ? '' : (j.error ?? 'failed');
+  if (ok) {
+    $('newRoleName').value = '';
+    $('newRoleQuota').value = '';
+    await refreshPeople();
+    await refreshPolicy();
+  }
+};
+
+/**
+ * One person's page: who they are, and every rule that will judge them —
+ * separated by why it binds them, because "everyone" and "written for you" are
+ * very different things to be told when a prompt is refused.
+ */
+async function renderPersonDetail() {
+  const host = $('personDetail');
+  if (!selectedPerson) {
+    host.innerHTML = '<div class="empty">Pick someone to see their rules and write one just for them.</div>';
+    return;
+  }
+  const p = selectedPerson;
+  const { j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
+  const rules = j?.rules ?? [];
+  const group = (kind) => rules.filter((r) => r.binding === kind);
+
+  const section = (title, list, note) => `
+    <div class="sub">${title} <span style="color:var(--faint);font-weight:500">${list.length}</span></div>
+    ${list.length
+      ? list.map((r) => `<div class="rule">
+          <div class="t">${esc(r.text)}</div>
+          <div class="m"><span class="tag ${r.severity}">${r.severity}</span>
+            <span class="tag${r.binding === 'personal' ? ' personal' : ''}">${esc(r.audience)}</span></div>
+        </div>`).join('')
+      : `<div class="note">${note}</div>`}`;
+
+  host.innerHTML = `
+    <div class="detail-top">
+      ${avatar(p, true)}
+      <div style="min-width:0">
+        <div class="nm">${esc(p.name)}</div>
+        <div class="note">${esc(p.role)}${p.quota ? ` · ${p.quota} requests/day` : ' · unmetered'}</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Role</label>
+      <select id="editRole">${company.roles.map((r) => `<option${r === p.role ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>
+    </div>
+
+    <div class="field">
+      <label>API key — for tools that take a base URL. Never leaves this machine.</label>
+      <div class="key">${esc(p.apiKey)}</div>
+    </div>
+
+    <div class="field">
+      <label>What they put on their own machine</label>
+      <div class="key">WARDEN_USER=${esc(p.id)}</div>
+    </div>
+
+    <div class="row">
+      <button class="ghost" id="rotateKey">New key</button>
+      <button class="ghost danger" id="removePerson">Remove from directory</button>
+    </div>
+    <div class="note" id="personNote" style="margin-top:7px"></div>
+
+    <div class="sub">Write a rule just for ${esc(p.name.split(' ')[0])}</div>
+    <textarea id="personRuleText" rows="2" placeholder="p. ej. no puede pedir datos de otros equipos"></textarea>
+    <div class="row">
+      <button class="act" id="personCompile">Compile</button>
+      <span class="note" id="personCompileNote"></span>
+    </div>
+    <div id="personDraft"></div>
+
+    ${section('Written for them', group('personal'), 'No personal rules — only the company and role ones below.')}
+    ${section(`Because they are ${esc(p.role)}`, group('role'), 'No rules target this role.')}
+    ${section('Company-wide', group('company'), 'No company-wide rules.')}`;
+
+  $('editRole').onchange = async (e) => {
+    const { ok, j } = await api('/api/people', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: p.id, name: p.name, role: e.target.value })
+    });
+    $('personNote').textContent = ok ? `Now judged as ${j.role}.` : (j.error ?? 'failed');
+    if (ok) await refreshPeople();
+  };
+
+  $('rotateKey').onclick = async () => {
+    await api(`/api/people/${encodeURIComponent(p.id)}/key`, { method: 'POST' });
+    await refreshPeople();
+  };
+
+  $('removePerson').onclick = async () => {
+    const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
+    if (!ok) { $('personNote').textContent = j.error ?? 'failed'; return; }
+    selectedPerson = null;
+    await refreshPeople();
+    // Rules written only for someone who has left still exist and now bind
+    // nobody. Saying so beats leaving dead policy in the list unremarked.
+    if (j.orphanedRules?.length) {
+      $('personDetail').innerHTML =
+        `<div class="banner">${j.orphanedRules.length} rule(s) were written only for ${esc(j.removed.name)} and now apply to nobody. Retarget or remove them in the Policy panel.</div>`;
+    }
+  };
+
+  $('personCompile').onclick = () =>
+    compileInto('person', $('personRuleText').value, [`@${p.id}`], $('personCompileNote'), $('personCompile'));
+
+  if (draft && draftHost === 'person') renderDraft();
 }
 
 // ── employee chat ────────────────────────────────────────────────────────────
+
+function renderWhoPicker() {
+  const sel = $('who');
+  const keep = sel.value;
+  sel.innerHTML = company.employees
+    .map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}</option>`)
+    .join('');
+  if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+}
 
 $('send').onclick = send;
 $('prompt').onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); };
@@ -192,19 +542,24 @@ $('prompt').onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKe
 async function send() {
   const text = $('prompt').value.trim();
   if (!text) return;
-  const role = $('role').value || 'analyst';
+  const who = $('who').value || 'anon';
+  const person = company.employees.find((e) => e.id === who);
   $('prompt').value = '';
-  append('you', text, '');
+  append(person ? `${person.name} (${person.role})` : who, text, '');
 
+  // The role is deliberately not sent. The server resolves it from the
+  // directory, which is the same thing that happens when the hook calls in from
+  // an employee's laptop — a client that could assert its own role could pick
+  // the rules it is judged by.
   const { j } = await api('/api/guard/check', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-warden-user': 'demo', 'x-warden-role': role },
+    headers: { 'content-type': 'application/json', 'x-warden-user': who },
     body: JSON.stringify({ prompt: text })
   });
 
   const rule = j.firedRules?.[0];
   const cls = { ALLOW: 'allowed', BLOCK: 'blocked', ESCALATE: 'escalated' }[j.verdict];
-  const label = { ALLOW: 'allowed', BLOCK: 'blocked by warden', ESCALATE: 'held for review' }[j.verdict];
+  const label = { ALLOW: 'allowed', BLOCK: 'blocked by Warden', ESCALATE: 'held for review' }[j.verdict];
 
   let why = '';
   if (rule) why += `<div class="why"><b>Rule:</b> ${esc(rule.ruleText)}<br><b>Why:</b> ${esc(rule.reason)}</div>`;
@@ -220,7 +575,7 @@ async function send() {
 function append(who, text, extra, cls = '') {
   const el = document.createElement('div');
   el.className = `msg ${cls}`;
-  el.innerHTML = `<div class="who">${who}</div><div class="txt">${esc(text)}</div>${extra}`;
+  el.innerHTML = `<div class="who">${esc(who)}</div><div class="txt">${esc(text)}</div>${extra}`;
   const chat = $('chat');
   if (chat.querySelector('.empty')) chat.innerHTML = '';
   chat.append(el);
@@ -245,7 +600,7 @@ function renderTrace(d) {
   el.className = 'decision';
   el.innerHTML = `
     <div class="top">
-      <span class="v ${d.verdict}" style="font-family:var(--mono);font-weight:600">${d.verdict}</span>
+      <span class="badge ${d.verdict}">${d.verdict}</span>
       <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)">${d.totalMs}ms</span>
     </div>
     <div class="prompt">${esc((d.maskedPrompt ?? '').slice(0, 110))}</div>
@@ -261,15 +616,21 @@ function renderTrace(d) {
   while (trace.children.length > 25) trace.lastChild.remove();
 }
 
-// ── red team tab ─────────────────────────────────────────────────────────────
+// ── tabs ─────────────────────────────────────────────────────────────────────
+
+const TABS = { console: 'grid3', people: 'grid2', redteam: 'single' };
 
 document.querySelector('nav').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));
-  $('tab-console').style.display = b.dataset.tab === 'console' ? 'grid' : 'none';
-  $('tab-redteam').style.display = b.dataset.tab === 'redteam' ? 'grid' : 'none';
+  for (const [tab, layout] of Object.entries(TABS)) {
+    const el = $(`tab-${tab}`);
+    el.style.display = tab === b.dataset.tab ? (layout === 'single' ? 'block' : 'grid') : 'none';
+  }
 };
+
+// ── red team tab ─────────────────────────────────────────────────────────────
 
 $('loadRt').onclick = async () => {
   const { ok, j } = await api('/api/redteam/report');
@@ -295,21 +656,22 @@ function renderRedteam(s) {
   const p = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
   $('rtOut').innerHTML = `
-    ${s.adapter === 'mock' ? '<div class="rule" style="border-color:var(--escalate);margin-bottom:14px"><div class="t">These numbers come from the mock adapter, not a real model. They measure the harness, not the guard.</div></div>' : ''}
-    <div style="display:flex;gap:28px;margin-bottom:18px">
-      <div><div style="font-size:24px;font-weight:600">${p(caught, atotal)}%</div>
-           <div style="font-size:11px;color:var(--faint)">attacks stopped · ${caught}/${atotal}</div></div>
-      <div><div style="font-size:24px;font-weight:600;color:${fp ? 'var(--escalate)' : 'var(--allow)'}">${p(fp, ctotal)}%</div>
-           <div style="font-size:11px;color:var(--faint)">false positives · ${fp}/${ctotal}</div></div>
+    ${s.adapter === 'mock' ? '<div class="banner">These numbers come from the mock adapter, not a real model. They measure the harness, not the guard.</div>' : ''}
+    <div style="display:flex;gap:36px;margin-bottom:22px">
+      <div><div class="stat">${p(caught, atotal)}%</div>
+           <div class="note">attacks stopped · ${caught}/${atotal}</div></div>
+      <div><div class="stat" style="color:${fp ? 'var(--escalate)' : 'var(--allow)'}">${p(fp, ctotal)}%</div>
+           <div class="note">false positives · ${fp}/${ctotal}</div></div>
     </div>
     <table>
       <tr><th>Class</th><th style="text-align:right">Warden</th><th style="text-align:right">Baseline</th><th style="text-align:right">p50</th></tr>
       ${(s.warden ?? []).map((c) => {
         const b = (s.baseline ?? []).find((x) => x.class === c.class);
         const rate = p(c.correct, c.total);
+        const colour = rate > 70 ? 'var(--allow)' : rate > 40 ? 'var(--escalate)' : 'var(--block)';
         return `<tr>
           <td>${esc(c.class)}${c.isControl ? ' <span style="color:var(--faint)">(control)</span>' : ''}</td>
-          <td class="num">${rate}%<div class="bar"><i style="width:${rate}%;background:${rate > 70 ? 'var(--allow)' : rate > 40 ? 'var(--escalate)' : 'var(--block)'}"></i></div></td>
+          <td class="num">${rate}%<div class="bar"><i style="width:${rate}%;background:${colour}"></i></div></td>
           <td class="num" style="color:var(--faint)">${b ? p(b.correct, b.total) + '%' : '—'}</td>
           <td class="num" style="color:var(--faint)">${c.p50}ms</td>
         </tr>`;

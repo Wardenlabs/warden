@@ -188,7 +188,24 @@ function mockValue(
     return 0;
   }
 
-  if (type === 'array') return [];
+  // The rule compiler's schema is the one place the mock has to produce
+  // something structurally richer than a scalar. Returning an empty array here
+  // would fail the `min(1)` on appliesTo and take the whole admin flow down in
+  // mock mode, which is exactly the flow someone without a model is trying to
+  // work on.
+  if (type === 'array') {
+    if (k === 'appliesto') return ['*'];
+    if (k === 'violating') return [`mock: ${ctx.subject.slice(0, 80)}`];
+    if (k === 'compliant') return ['mock: a nearby request that must still be allowed'];
+    return [];
+  }
+
+  if (type === 'object' && k.includes('example')) {
+    return {
+      violating: [`mock: ${ctx.subject.slice(0, 80)}`],
+      compliant: ['mock: a nearby request that must still be allowed']
+    };
+  }
 
   if (k.includes('reason') || k.includes('explanation')) {
     if (ctx.injection.length > 0) return `mock: instruction-override phrasing (${ctx.injection[0]})`;

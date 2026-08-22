@@ -126,14 +126,19 @@ the aggregator.
 
 ## The admin console
 
-Three panes, matching the three people who care about any given decision.
+Two working views. **Console** is three panes matching the three people who care
+about any given decision — the admin writing rules, the employee hitting them,
+and whoever has to explain the outcome afterwards. **People** is the directory
+the rules land on.
 
-**Write a rule in plain Spanish** → a local model compiles it to structured
-policy, inventing few-shot examples as it goes → **preview** runs the candidate
-rule through the real adjudicator and flags any legitimate request it would
-wrongly block → **ratify** puts it in force immediately, no restart.
+### Writing a rule
 
-The model drafts; ratifying is a separate human step. That is a security
+**Write it in plain Spanish** → a local model compiles it to structured policy,
+inventing few-shot examples as it goes → **preview** runs the candidate rule
+through the real adjudicator and flags any legitimate request it would wrongly
+block → **activate** puts it in force immediately, no restart.
+
+The model drafts; activating is a separate human step. That is a security
 boundary, not politeness: if compilation could enact policy on its own, someone
 who reached the compiler could talk it into writing a permissive rule.
 
@@ -141,6 +146,51 @@ A catalogue of 18 ready-made rules across six categories (employees, finance,
 customers, legal, security, code) gets a new admin from a blank page to something
 useful in under a minute. Presets land in the same draft slot, so the catalogue
 is a starting point rather than a way to skip review.
+
+### Who a rule binds
+
+Every rule carries an audience, and there are exactly three kinds of token:
+
+| | |
+|---|---|
+| `*` | everyone |
+| `sales` | everyone holding that role |
+| `@ana` | one named person |
+
+They combine as a union, never an intersection. `["@ana", "sales"]` is Ana plus
+the sales team — the reading that fails safe, because an intersection would let
+one wrong token silently narrow a rule to nobody while it still looked active in
+the console.
+
+The compiler proposes an audience and the admin edits it with a chip per role
+and per person. Both directions of getting it wrong are expensive: too broad and
+the whole company trips over a rule meant for one team, too narrow and it guards
+no one. The admin is the only one who knows which was intended, so the model
+never gets the last word on it.
+
+### People
+
+The People tab is the directory: add someone, assign their role, create a role
+with its own daily quota, rotate a key, remove someone. Opening a person shows
+every rule that will judge them, grouped by *why* it binds them — written for
+them, because of their role, or company-wide — because "everyone is held to
+this" and "this was written about you" are very different things to be told when
+a prompt is refused.
+
+That page is also where a rule for one person gets written. The audience is
+locked to them: the admin already said who it was for by being on their page,
+and asking a 1.7B model to re-derive that from prose is a way to bind a personal
+rule to the whole company.
+
+**The directory decides the role, not the employee.** `WARDEN_ROLE` on someone's
+laptop is a fallback for people the directory has never seen. Anyone in it is
+judged under the role the admin set, because a role an employee can edit in
+their own shell profile is a role they could use to pick which rules apply to
+them.
+
+The live directory lives in `data/company.json`, seeded once from
+`data/seed/company.json` and owned by the console after that. The seed stays
+pristine, so a fresh clone always demonstrates the same company.
 
 ---
 
@@ -281,6 +331,9 @@ npm run typecheck
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
+| `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
+| `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
+| `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
 
 ---
 
