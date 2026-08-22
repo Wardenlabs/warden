@@ -10,7 +10,6 @@
   },
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "probe": "node scripts/probe-sdk.mjs",
     "smoke": "tsx scripts/smoke.ts",
     "dev": "tsx watch src/server/index.ts",
     "redteam": "tsx src/redteam/runner.ts",
