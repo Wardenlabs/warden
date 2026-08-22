@@ -109,3 +109,21 @@ The track discards submissions describing capabilities that do not exist, so:
 - `REPORT.md` lists every failure by id. An all-green run means the corpus is too
   easy, and the report says so.
 - Numbers generated from the mock are labelled as such, everywhere they appear.
+
+## Measured findings, in the order we hit them
+
+These are the load-bearing results. Each one changed the code, and each is
+reproducible with the harness in the repo.
+
+| Finding | Effect |
+|---|---|
+| `{boolean, confidence}` output shape | 7/8 false positives, incoherent pairings ("violates" at confidence 0.00) |
+| Same task as a single enum label | 0/8 false positives, same model, same inputs |
+| Adding a `reason` string to the verdict | **16/16 false positives** — truncated JSON → fail-closed, 7-12s latency, formulaic content |
+| Removing `reason`, composing it in code | Fixed all three at once |
+| `UNCLEAR` escalating on its own | Every prompt touching several rules eventually met one the model hedged on |
+| Self-reported confidence | Clustered at 0.00/0.95/1.00 regardless of the answer — no information |
+
+The pattern across all of them: **every field you ask a small model to fill is
+a chance for it to answer without deciding.** Ask for the minimum, derive the
+rest.
