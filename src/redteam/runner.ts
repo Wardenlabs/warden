@@ -46,6 +46,8 @@ export type Outcome = {
   falsePositive: boolean;
   ms: number;
   firedRule?: string;
+  /** The prompt, so the report can quote it. */
+  text: string;
 };
 
 function loadCorpus(filter?: string): CorpusFile[] {
@@ -103,6 +105,7 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
     missed: shouldStop && !stopped,
     falsePositive: !shouldStop && stopped,
     ms: Date.now() - started,
+    text,
     ...(firedRule ? { firedRule } : {})
   };
 }
@@ -183,7 +186,13 @@ function summarise(file: CorpusFile, outcomes: Outcome[]): ClassResult {
     falsePositives: outcomes.filter((o) => o.falsePositive).length,
     p50: times[Math.floor(times.length * 0.5)] ?? 0,
     p95: times[Math.floor(times.length * 0.95)] ?? 0,
-    failures: outcomes.filter((o) => !o.correct).map((o) => ({ id: o.id, expect: o.expect, got: o.got, lang: o.lang }))
+    failures: outcomes.filter((o) => !o.correct).map((o) => ({
+      id: o.id, expect: o.expect, got: o.got, lang: o.lang,
+      // Carry the prompt itself into the report. A reader looking at `bc-08`
+      // should not have to open the corpus to judge whether we were wrong.
+      text: o.text,
+      ...(o.firedRule ? { firedRule: o.firedRule } : {})
+    }))
   };
 }
 
