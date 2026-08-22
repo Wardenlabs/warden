@@ -44,6 +44,8 @@ Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK scri
 
 ## Quick start
 
+Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-IT.md)**.
+
 ```bash
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
