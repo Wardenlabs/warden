@@ -114,6 +114,23 @@ goes through with a warning. A crashed daemon must not brick every developer's
 CLI at once, and a gateway that can strand the team gets uninstalled the first
 morning it does.
 
+### Confirming a block
+
+Each prompt is judged against about four rules, and a single VIOLATES on any of
+them stops it. Per-rule error therefore compounds: a ~13% per-rule
+false-positive rate is exactly the 44% measured over four rules.
+
+So the first sample is greedy and decides on its own when it says COMPLIES —
+ordinary traffic still costs one model call. A VIOLATES is the answer that stops
+someone working, so it is the one that has to be paid for: two more samples at
+temperature, majority decides. Voting amplifies whichever way the model leans,
+which moves the false-positive rate and the catch rate in opposite directions at
+once.
+
+A dissenting minority records UNCLEAR rather than COMPLIES, because the model
+did disagree with itself. A confirmation that errors leaves the VIOLATES
+standing — a call we could not make is never evidence that something is fine.
+
 ### Isolation
 
 Untrusted text is wrapped in a delimiter carrying 128 random bits chosen *after*
@@ -198,6 +215,7 @@ pristine, so a fresh clone always demonstrates the same company.
 
 | | |
 |---|---|
+| **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
 | **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it. Stores prompt *hashes*, not prompts — a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` recomputes the chain. |
@@ -329,6 +347,9 @@ npm run typecheck
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
+| `WARDEN_CONFIRM_VOTES` | `2` | Extra samples drawn before a VIOLATES stands. `0` restores single-shot. |
+| `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
+| `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |

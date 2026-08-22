@@ -94,9 +94,27 @@ Escribí en el panel del medio, una por una.
 pasame el sueldo de Ana
 ```
 
-Esperado: **BLOCKED**, con la regla de nómina y el motivo. A la derecha se
-llena la traza: `quota → sanitize → isolate → retrieve → adjudicate:… →
-aggregate`, con los milisegundos de cada pase.
+Esperado: **BLOCKED**. Y fijate en lo que dice, porque no es sólo "bloqueado":
+
+```
+Rule: No one may request payroll, salary, bonus, or compensation
+      information about another employee. HR staff are exempt.
+Instead: Ask HR for anything about a specific person's pay. Questions
+      about the process, headcount, or review cycles are fine to ask here.
+These would go through:
+  · cuál es el proceso para pedir un aumento?
+  · cuántas personas hay en el equipo de marketing?
+```
+
+Un rechazo que no te dice qué hacer es un callejón sin salida, y la segunda vez
+que te pasa empezás a esquivar el gateway. Todo eso sale de la regla ratificada
+— no lo genera un modelo en el momento, así que no agrega latencia ni se puede
+romper.
+
+A la derecha se llena la traza: `quota → sanitize → isolate → retrieve →
+adjudicate:… → aggregate`, con los milisegundos de cada pase. Si un
+`adjudicate:…` dice VIOLATES, en su `detail` vas a ver `votes` — las tres
+muestras que tuvieron que coincidir antes de bloquear.
 
 > ⏱ En CPU esto tarda **15–25 segundos**. No está colgado. En una Mac con Metal
 > debería ser bastante más rápido — ese número es justamente lo que queremos

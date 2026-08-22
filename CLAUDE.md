@@ -61,6 +61,19 @@ on purpose — self-reported probability at this model size clustered at
 **One narrow question per rule.** Never batch rules into a single call. Small
 models asked about eight rules answer confidently about none.
 
+**Never generate text at decision time.** Anything an employee reads on a
+refusal — the guidance, the allowed examples — is read from the ratified rule,
+composed by code in `aggregate.ts`. Asking the adjudicator for prose per
+decision was measured at 16/16 false positives. If a refusal needs to say
+something new, add a field to `Rule` and have the compiler write it once.
+
+**A VIOLATES is confirmed before it stands.** The first sample is greedy and
+decides alone on COMPLIES; a VIOLATES draws `WARDEN_CONFIRM_VOTES` more samples
+at `WARDEN_CONFIRM_TEMP` and takes the majority. The confirmations must sample —
+greedy re-runs are identical, so a vote over them counts one answer three times.
+A minority VIOLATES records UNCLEAR, not COMPLIES; a confirmation that errors
+leaves the VIOLATES standing.
+
 **`rulesForActor()` is the only way to pick a rule set.** It resolves all three
 audience kinds at once — company-wide, role, and `@employeeId`. Anything that
 filters `appliesTo` by hand will miss one of them, and a decision that skipped a
@@ -91,7 +104,9 @@ the audit log both render it.
 
 **A rule field** — `src/policy/types.ts` (zod schema plus
 `RULE_DRAFT_JSON_SCHEMA` if the compiler should emit it), then the compiler
-prompt, then the console's draft renderer.
+prompt, then the console's draft renderer. If an employee should see it on a
+refusal, also `firedFrom()` in `aggregate.ts`, `render()` in
+`integrations/warden-hook.mjs`, and the chat pane in `web/app.js`.
 
 **An audience kind** — `src/policy/audience.ts` owns the token vocabulary:
 `bindsActor` for matching, `sanitiseAudience` for anything a model produced,
@@ -113,6 +128,15 @@ prompt field and block format, and add its config under `integrations/`.
 - **Stale servers.** `pkill -f "tsx src/server"` matches your own shell command
   and kills it. Use `ps -eo pid,args | grep '[t]sx .*server/index' | awk '{print $1}' | xargs kill`,
   and put it in its own command so the pattern is not in the same line.
+- **Only the first two examples per side reach the model.** `SHOTS_PER_SIDE` is
+  2, so `examples.compliant[0..1]` are the anchors and the rest are
+  documentation. Ordering is not cosmetic — putting the useful anchor third is
+  the same as not writing it.
+- **Runs are not reproducible even at temp 0.** Two identical runs of
+  `benign-controls` against policy `69d4ba36` gave 44% and 31% false positives.
+  `parallel: 4` batches concurrent adjudications and the batch composition
+  changes the numerics. With n=16 one prompt is ±6%, so never conclude anything
+  from a single-rep run — use `--reps 3` before believing a difference.
 - **The adjudicator is slow on CPU** — around 2-4s per rule. `WARDEN_TOP_K`
   bounds how many run, and `parallel: 4` at load time lets them overlap. If a
   demo machine is slow, lower `TOP_K` and say so rather than hiding it.
@@ -148,6 +172,9 @@ reproducible with the harness in the repo.
 | Removing `reason`, composing it in code | Fixed all three at once |
 | `UNCLEAR` escalating on its own | Every prompt touching several rules eventually met one the model hedged on |
 | Self-reported confidence | Clustered at 0.00/0.95/1.00 regardless of the answer — no information |
+| Per-rule attribution of false positives | `r-instruction-override` caused 4 of 5, and it is pinned so it runs on every prompt |
+| Its three violating examples were all imperatives, its compliant ones all meta-questions | Taught "imperative = override"; refused "draft a reply to this vendor" |
+| Two identical runs, same policy, temp 0 | 44% and 31% — `parallel: 4` batching makes runs non-reproducible |
 
 The pattern across all of them: **every field you ask a small model to fill is
 a chance for it to answer without deciding.** Ask for the minimum, derive the
