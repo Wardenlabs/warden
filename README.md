@@ -185,6 +185,43 @@ the whole company trips over a rule meant for one team, too narrow and it guards
 no one. The admin is the only one who knows which was intended, so the model
 never gets the last word on it.
 
+### Onboarding, generated per person
+
+Adding someone to the directory is half the job; their tools still have to point
+at the gateway. The console generates that too — **People → a person →
+Onboarding** — with their id, their key and this gateway's reachable address
+already filled in, tabbed by tool, one button per block and one that copies the
+whole thing as a message to paste into a chat.
+
+Every value an admin retypes is a value they can get wrong, and these fail
+silently: a mistyped `WARDEN_USER` does not error, it gets that person judged as
+a stranger.
+
+| Tool | How it is governed | On a subscription | Verified |
+|---|---|---|---|
+| Claude Code | `UserPromptSubmit` hook | ✅ | not yet |
+| Codex | `UserPromptSubmit` hook | ✅ | not yet |
+| OpenCode | `chat.message` plugin | ✅ | no |
+| Cursor | base URL + per-employee key | ❌ | not yet |
+| Aider, Continue, Open WebUI, scripts | `OPENAI_BASE_URL` + key | ❌ | not yet |
+| A terminal | the hook, run directly | ✅ | ✅ |
+
+**Verified means somebody watched that tool refuse a prompt.** Only the last row
+has been. The rest are wired from each tool's own documentation and tested at
+the hook boundary, which is not the same claim — the console says so on the page
+rather than leaving an admin to assume.
+
+The hook/proxy split is what decides whether a subscription can be governed at
+all. A hook runs on the employee's machine before the prompt leaves it, so it
+does not care what the tool authenticates against; the proxy path needs a
+settable base URL, which needs an API key. That is the whole reason the hook
+exists.
+
+The console also shows which tools each person **has actually been seen using**,
+from the tool name every hook call carries. What someone was told to install and
+what they installed are different things, and the difference is a directory that
+looks deployed while governing nobody.
+
 ### People
 
 The People tab is the directory: add someone, assign their role, create a role

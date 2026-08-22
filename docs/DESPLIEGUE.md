@@ -46,18 +46,36 @@ juzgan y podés escribirle una que aplique **sólo a él**.
 
 ## Qué le mandás a cada uno
 
-Un mensaje por persona, con dos datos:
+**No lo escribas a mano.** En la pestaña People, hacé click en la persona y
+bajá hasta **Onboarding**. Botón **"Copy the whole setup message"** → lo pegás
+en el chat y listo. Ya viene con su id, su key y la dirección real de este
+gateway adentro.
 
-```
-Gateway: http://192.168.1.42:8080
-Tu usuario: fede
-```
+Abajo del botón está la misma cosa por herramienta —Claude Code, Codex, Cursor,
+OpenCode, cualquier otra— cada bloque con su botón de copiar.
+
+Por qué generado y no a mano: cada valor que retipeás es uno que podés errar, y
+estos fallan en silencio. Un `WARDEN_USER` mal escrito no da error, simplemente
+hace que a esa persona la juzguen como a un desconocido.
 
 El rol **no** se lo mandás: sale del directorio. Si el empleado pone
 `WARDEN_ROLE` en su máquina, el gateway lo ignora para cualquiera que esté
 cargado en People — un rol que el empleado puede editar en su `.zshrc` es un rol
 con el que podría elegir qué reglas lo juzgan. `WARDEN_ROLE` sólo se usa como
 fallback para alguien que no está en el directorio.
+
+## Quién está conectado de verdad
+
+Las tarjetas de People muestran con qué herramientas se vio a cada uno
+—`Claude Code`, `Codex`, `Cursor`, `OpenCode`— o **not connected yet**.
+
+No es una declaración: sale del nombre de herramienta que manda cada llamada del
+hook. Lo que a alguien le dijiste que instale y lo que instaló son cosas
+distintas, y la diferencia es un directorio que parece desplegado y no gobierna
+a nadie.
+
+(Se resetea si reiniciás el gateway — es una vista de actividad, no un registro.
+El registro es el audit log.)
 
 ---
 
@@ -174,7 +192,13 @@ Ansible, un script de provisioning.
 
 ---
 
-# Otras herramientas (Cursor, scripts, Open WebUI)
+# Otras herramientas (Cursor, OpenCode, scripts, Open WebUI)
+
+**OpenCode** va por plugin, no por proxy: `integrations/opencode/warden.js` a
+`~/.config/opencode/plugin/warden.js`. Funciona con suscripción como los otros
+hooks. ⚠ Nadie lo vio bloquear todavía — si lo probás, contá qué pasó.
+
+
 
 Lo que sí deja cambiar el `base_url` va por el proxy, sin hook:
 

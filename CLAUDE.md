@@ -33,6 +33,7 @@ src/policy/     Rule/Quota/PolicySpec, compiler, presets, store, retrieval
 src/guard/      isolate, sanitize, quota, passes/adjudicate, aggregate, pipeline
 src/proxy/      OpenAI-compatible endpoint
 src/hook/       warden-hook CLI for Claude Code and Codex
+src/onboarding/ per-employee setup packs, one entry per supported tool
 src/redteam/    corpus/*.json, runner, report generator
 src/server/     Express host: proxy + /api + SSE
 web/            console — one HTML file, one ES module, no build step
@@ -117,8 +118,18 @@ three, and the compiler's system prompt so the model can name it.
 any file in that directory. Set `expect` to what a *correct* guard should do.
 `ESCALATE` counts as stopping an attack.
 
-**A tool integration** — extend `detect()` in `src/hook/cli.ts` with that tool's
-prompt field and block format, and add its config under `integrations/`.
+**A tool integration** — three places. `detect()` in
+`integrations/warden-hook.mjs` for the payload shape and the block format; an
+entry in `integrations()` in `src/onboarding/index.ts` so the console can hand
+someone the setup; and the config itself under `integrations/`. Set
+`verified: false` and leave it false until somebody has watched that tool refuse
+a prompt — the console renders it as "nobody has seen this block yet", which is
+the honest thing for an admin to read.
+
+**`connected` badges are observed, not asserted.** They come from the `source`
+field the hook sends, recorded in `src/policy/activity.ts`. In memory, resets
+with the process, like the quota counters. Do not turn it into a claim that
+someone is set up — it only ever says a request arrived from that tool.
 
 ## Things that will bite you
 

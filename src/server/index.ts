@@ -26,6 +26,8 @@ import {
 } from '../policy/people.js';
 import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
+import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
+import { onboardingFor, supportedTools } from '../onboarding/index.js';
 
 const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
 
@@ -143,10 +145,29 @@ app.get('/api/people', (_req, res) => {
         ...e,
         ruleCount: applicable.length,
         personalRuleCount: applicable.filter((r) => r.appliesTo.includes(`@${e.id}`)).length,
-        quota: policy.quotas.find((q) => q.role === e.role)?.maxRequestsPerDay ?? null
+        quota: policy.quotas.find((q) => q.role === e.role)?.maxRequestsPerDay ?? null,
+        // What they were told to install is not what they installed. Every hook
+        // call names its tool, so this is observed rather than asserted.
+        connected: activityFor(e.id)
       };
     })
   });
+});
+
+/**
+ * The setup for one person, filled in with their id, their key, and the address
+ * this gateway is actually reachable at — which is the value most likely to be
+ * copied wrong by hand, and the one whose mistakes are silent.
+ */
+app.get('/api/people/:id/onboarding', (req, res) => {
+  const person = findEmployee(String(req.params['id']));
+  if (!person) return res.status(404).json({ error: 'no such employee' });
+  res.json(onboardingFor(person, gatewayUrl(req)));
+});
+
+/** What the gateway knows how to onboard, and which of it anyone has verified. */
+app.get('/api/integrations', (_req, res) => {
+  res.json({ tools: supportedTools(), connectedPeople: connectedCount() });
 });
 
 app.post('/api/people', asyncRoute(async (req, res) => {
@@ -238,6 +259,12 @@ app.delete('/api/policy/rules/:id', asyncRoute(async (req, res) => {
 // ── Guard check (used by the hook CLI) ───────────────────────────────────────
 app.post('/api/guard/check', asyncRoute(async (req, res) => {
   const decision = await evaluateRequest(req);
+  // The hook names the tool it came from; that sighting is what the console's
+  // "connected" badges are built from.
+  recordActivity(
+    String(req.header('x-warden-user') ?? req.body?.actor?.id ?? ''),
+    typeof req.body?.source === 'string' ? req.body.source : undefined
+  );
   emitDecision(decision);
   res.json(decision);
 }));
@@ -324,6 +351,25 @@ app.listen(PORT, HOST, () => {
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);
 });
+
+/**
+ * The address to hand an employee.
+ *
+ * Taken from the request the console made, because that is by construction an
+ * address that reached this server. Guessing from the interface list gets it
+ * wrong on a machine with several, and an onboarding pack with the wrong host
+ * fails in the least helpful way possible: silently, on someone else's laptop.
+ */
+function gatewayUrl(req: Request): string {
+  const configured = process.env['WARDEN_PUBLIC_URL'];
+  if (configured) return configured.replace(/\/$/, '');
+  const host = req.header('host');
+  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) return `http://${host}`;
+  // The console is open on the gateway machine itself, so localhost is what it
+  // sees — but localhost is useless to everyone else. Prefer a LAN address.
+  const lan = lanAddresses()[0];
+  return lan ? `http://${lan}:${PORT}` : `http://${host ?? `localhost:${PORT}`}`;
+}
 
 /** Non-internal IPv4 addresses, so the banner tells teammates where to point. */
 function lanAddresses(): string[] {

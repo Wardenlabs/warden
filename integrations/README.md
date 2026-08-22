@@ -160,3 +160,59 @@ export OPENAI_API_KEY=wk-fede-8b1d40e2      # per-employee Warden key
 ```
 
 That path only works with API keys, which is exactly why the hook exists.
+
+---
+
+## The console generates all of this per person
+
+Everything below is the manual version. The admin console does it for you with
+the employee's id, key and this gateway's address already substituted:
+
+**People → pick a person → Onboarding.** Tabs per tool, a copy button on every
+block, and one button that copies the whole setup as a message you can paste
+into a chat.
+
+That matters because every value an admin retypes is a value they can get wrong,
+and the wrong ones fail silently — a mistyped `WARDEN_USER` does not error, it
+just gets that person judged as a stranger under whatever role they claim.
+
+## Which tools, and how each one is governed
+
+| Tool | How | Subscription | Verified |
+|---|---|---|---|
+| Claude Code | `UserPromptSubmit` hook | ✅ | not yet |
+| Codex | `UserPromptSubmit` hook | ✅ | not yet |
+| OpenCode | `chat.message` plugin | ✅ | **no — see below** |
+| Cursor | base URL + per-employee key | ❌ needs an API key | not yet |
+| Aider, Continue, Open WebUI, scripts | `OPENAI_BASE_URL` + key | ❌ needs an API key | not yet |
+| A terminal | the hook, run directly | ✅ | ✅ |
+
+"Verified" means somebody watched that tool refuse a prompt because of Warden.
+Only the last row has been. Everything else is wired from the tools' own
+documentation and tested at the hook boundary, which is not the same thing —
+[OPE-19](https://linear.app/operations-aleph/issue/OPE-19) is the card for
+closing that gap.
+
+**Hook or proxy** is the distinction that decides whether a tool can be governed
+on a subscription at all. A hook runs on the employee's machine before the
+prompt leaves it, so it does not care what the tool authenticates against. The
+proxy path needs a settable base URL, which needs an API key — that is why the
+hook exists, and why Cursor cannot be governed on a Cursor subscription.
+
+## OpenCode
+
+[`opencode/warden.js`](opencode/warden.js) → `~/.config/opencode/plugin/warden.js`
+
+The plugin shells out to the same hook every other integration uses and throws
+when it exits non-zero. Whether throwing from `chat.message` actually aborts the
+message has **not been observed here**, and there are open upstream issues about
+hooks not firing. If it silently does nothing, that is the failure to report.
+
+## Anything else
+
+The hook reads the prompt from whichever of these the payload carries:
+`user_input`, `prompt`, `message`, `text`, `input`, or the last user turn of an
+OpenAI-shaped `messages` array. A wrapper for a tool not listed here only has to
+put JSON on stdin and check the exit code — `2` means refused, and the reason is
+on stderr. Pass `source` to have the tool named in the console's connected
+badges.

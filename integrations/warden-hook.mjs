@@ -42,13 +42,46 @@ async function readStdin() {
 }
 
 /**
- * Which tool called us, inferred from the payload rather than configured.
- * Claude Code sends `user_input`; Codex sends `prompt`.
+ * Which tool called us, and what the person typed.
+ *
+ * Inferred from the payload rather than configured, because the alternative is
+ * an employee setting a flag per tool and getting it wrong silently. Claude Code
+ * sends `user_input`, Codex sends `prompt`, and anything wiring itself up
+ * through a plugin can say so with `source`.
+ *
+ * The generic shapes at the bottom are what make "any tool" more than a slogan:
+ * a wrapper someone writes in an afternoon only has to put the text on stdin
+ * under one of the obvious names.
  */
 function detect(payload) {
-  if (typeof payload.user_input === 'string') return { tool: 'claude-code', prompt: payload.user_input };
-  if (typeof payload.prompt === 'string') return { tool: 'codex', prompt: payload.prompt };
-  return { tool: 'unknown', prompt: '' };
+  const text =
+    firstString(payload.user_input, payload.prompt, payload.message, payload.text, payload.input) ??
+    lastUserMessage(payload.messages) ??
+    '';
+
+  // An explicit source wins: a plugin knows what it is, and guessing from the
+  // field name would call OpenCode "codex" because both use `prompt`.
+  if (typeof payload.source === 'string' && payload.source) {
+    return { tool: payload.source, prompt: text };
+  }
+  if (typeof payload.user_input === 'string') return { tool: 'claude-code', prompt: text };
+  if (typeof payload.prompt === 'string') return { tool: 'codex', prompt: text };
+  return { tool: text ? 'generic' : 'unknown', prompt: text };
+}
+
+function firstString(...values) {
+  for (const v of values) if (typeof v === 'string' && v.trim()) return v;
+  return undefined;
+}
+
+/** OpenAI-shaped payloads: judge the last thing the person actually said. */
+function lastUserMessage(messages) {
+  if (!Array.isArray(messages)) return undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m?.role === 'user' && typeof m.content === 'string') return m.content;
+  }
+  return undefined;
 }
 
 /**
@@ -178,10 +211,21 @@ async function main() {
   const message = render(res);
   process.stderr.write(message + '\n');
 
+  /**
+   * Each tool reads a different refusal shape, and a tool that does not
+   * recognise the one it gets falls back to the exit code — which is why
+   * `exit 2` below is the part that must always happen.
+   */
   if (tool === 'codex') {
     process.stdout.write(JSON.stringify({ decision: 'block', reason: message }) + '\n');
-  } else {
+  } else if (tool === 'claude-code') {
     process.stdout.write(JSON.stringify({ continue: false, reason: message }) + '\n');
+  } else {
+    // Unknown callers get both keys. Neither is harmful to a tool that ignores
+    // it, and one of them is probably the one it reads.
+    process.stdout.write(
+      JSON.stringify({ continue: false, decision: 'block', reason: message }) + '\n'
+    );
   }
 
   process.exit(2);

@@ -78,7 +78,9 @@
   /* ── layout ──────────────────────────────────────────────────────────── */
   main { flex: 1; overflow: hidden; padding: 16px; gap: 16px; }
   main.grid3 { display: grid; grid-template-columns: 360px 1fr 400px; }
-  main.grid2 { display: grid; grid-template-columns: 1fr 400px; }
+  /* The person pane holds config blocks people copy out of it, so it gets more
+     room than a sidebar would — a wrapped shell command is a mistyped one. */
+  main.grid2 { display: grid; grid-template-columns: 1fr 540px; }
   main.single { display: block; overflow-y: auto; }
   main.single > .card { max-width: 1100px; margin: 0 auto; }
 
@@ -183,6 +185,25 @@
   .detail-top .nm { font-size: 17px; font-weight: 650; letter-spacing: -.2px; }
   .field { margin-bottom: 11px; }
   .field label { display: block; font-size: 11px; color: var(--dim); margin-bottom: 4px; font-weight: 500; }
+
+  /* ── onboarding ──────────────────────────────────────────────────────── */
+  .codewrap { position: relative; margin-top: 5px; }
+  .code {
+    margin: 0; padding: 10px 12px; background: #f7f9fc; border: 1px solid var(--edge);
+    border-radius: 9px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55;
+    white-space: pre; overflow-x: auto; color: #1f2c3a;
+  }
+  .codewrap .copy {
+    position: absolute; top: 6px; right: 6px; padding: 3px 10px; font-size: 11px;
+    opacity: 0; transition: opacity .12s;
+  }
+  .codewrap:hover .copy, .codewrap .copy:focus { opacity: 1; }
+  .tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tool {
+    font-size: 10px; padding: 2px 7px; border-radius: 999px;
+    background: var(--edge-soft); color: var(--faint);
+  }
+  .tool.on { background: var(--allow-soft); color: var(--allow); font-weight: 600; }
 
   /* ── chat ────────────────────────────────────────────────────────────── */
   .msg { margin-bottom: 15px; }

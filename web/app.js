@@ -92,6 +92,40 @@ function avatar(person, big = false) {
   return `<div class="avatar${big ? ' lg' : ''}" style="background:${bg};color:${fg}">${esc(initials)}</div>`;
 }
 
+/**
+ * Copy to clipboard, with a fallback that actually matters here.
+ *
+ * The console is normally opened over the LAN at http://192.168.x.x, which is
+ * not a secure context, and `navigator.clipboard` is undefined there. A copy
+ * button that silently does nothing on the machine the admin is actually using
+ * is worse than no button.
+ */
+async function copyText(text, btn) {
+  let ok = false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    }
+  } catch { /* fall through to the textarea trick */ }
+
+  if (!ok) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+  }
+
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = ok ? 'Copied' : 'Select it manually';
+    setTimeout(() => { btn.textContent = original; }, 1600);
+  }
+}
+
 // ── admin: presets ───────────────────────────────────────────────────────────
 
 async function loadPresets() {
@@ -309,6 +343,16 @@ function audienceLabel(appliesTo) {
 
 const isPersonal = (rule) => rule.appliesTo.some((t) => t.startsWith('@'));
 
+/** Tool ids as they arrive from the hook, in words. */
+const TOOL_NAMES = {
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
+  cursor: 'Cursor',
+  opencode: 'OpenCode',
+  generic: 'other tool',
+  proxy: 'API'
+};
+
 function renderRules() {
   $('rules').innerHTML = policy.rules.length
     ? policy.rules.map((r) => `<div class="rule">
@@ -352,6 +396,11 @@ function renderPeople() {
           <div class="rl">${esc(e.role)}${e.quota ? ` · ${e.quota}/day` : ''}</div>
           <div class="st">${e.ruleCount} rule${e.ruleCount === 1 ? '' : 's'}${
             e.personalRuleCount ? ` · <b style="color:var(--accent)">${e.personalRuleCount} personal</b>` : ''
+          }</div>
+          <div class="tools">${
+            e.connected?.length
+              ? e.connected.map((c) => `<span class="tool on" title="${c.count} request(s), last ${esc(c.at)}">${esc(TOOL_NAMES[c.tool] ?? c.tool)}</span>`).join('')
+              : '<span class="tool">not connected yet</span>'
           }</div>
         </div>
       </div>`).join('')
@@ -483,6 +532,9 @@ async function renderPersonDetail() {
     </div>
     <div class="note" id="personNote" style="margin-top:7px"></div>
 
+    <div class="sub">Onboarding <span style="color:var(--faint);font-weight:500">what you send them</span></div>
+    <div id="onboarding"><div class="note">loading…</div></div>
+
     <div class="sub">Write a rule just for ${esc(p.name.split(' ')[0])}</div>
     <textarea id="personRuleText" rows="2" placeholder="p. ej. no puede pedir datos de otros equipos"></textarea>
     <div class="row">
@@ -526,6 +578,80 @@ async function renderPersonDetail() {
     compileInto('person', $('personRuleText').value, [`@${p.id}`], $('personCompileNote'), $('personCompile'));
 
   if (draft && draftHost === 'person') renderDraft();
+
+  void renderOnboarding(p);
+}
+
+/**
+ * The setup for one person, per tool, with their values already in it.
+ *
+ * Generated on the server rather than assembled here, so the console and a
+ * pasted chat message say the same thing, and so the gateway address is one the
+ * server knows is reachable rather than one the admin typed from memory.
+ */
+async function renderOnboarding(person) {
+  const host = $('onboarding');
+  if (!host) return;
+  const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`);
+  if (!ok) { host.innerHTML = `<div class="note">${esc(j.error ?? 'failed')}</div>`; return; }
+
+  const tools = j.integrations;
+  const step = (st) => `
+    <div style="margin-top:11px">
+      <div style="font-size:12px;font-weight:600">${esc(st.title)}</div>
+      ${st.note ? `<div class="note" style="margin:3px 0 5px">${esc(st.note)}</div>` : ''}
+      <div class="codewrap">
+        <pre class="code">${esc(st.code)}</pre>
+        <button class="ghost copy" data-copy="${encodeURIComponent(st.code)}">Copy</button>
+      </div>
+    </div>`;
+
+  host.innerHTML = `
+    <div class="row" style="margin-top:0">
+      <button class="act" id="copyAll">Copy the whole setup message</button>
+      <span class="note" id="copyNote"></span>
+    </div>
+
+    <div class="sub" style="margin:14px 0 7px">Everyone does this first</div>
+    ${j.common.map(step).join('')}
+
+    <div class="sub" style="margin:16px 0 7px">Then their tool</div>
+    <div class="chips" id="toolTabs">
+      ${tools.map((t, i) => `<span class="chip${i === 0 ? ' on' : ''}" data-tool="${i}">${esc(t.name)}</span>`).join('')}
+    </div>
+    <div id="toolBody"></div>`;
+
+  const showTool = (i) => {
+    const t = tools[i];
+    $('toolBody').innerHTML = `
+      <div style="margin-top:11px">
+        <div class="chips" style="margin-bottom:8px">
+          <span class="chip static">${t.kind === 'hook' ? 'runs before the prompt leaves the machine' : 'routes through the gateway'}</span>
+          <span class="chip static" style="${t.worksOnSubscription ? '' : 'background:var(--escalate-soft);color:var(--escalate)'}">
+            ${t.worksOnSubscription ? 'works on a subscription' : 'needs an API key, not a subscription'}
+          </span>
+          ${t.verified
+            ? '<span class="chip static" style="background:var(--allow-soft);color:var(--allow)">verified working</span>'
+            : '<span class="chip static" style="background:var(--block-soft);color:var(--block)">nobody has seen this block yet</span>'}
+        </div>
+        <div class="note">${esc(t.summary)}</div>
+        ${t.steps.map(step).join('')}
+      </div>`;
+  };
+  showTool(0);
+
+  $('toolTabs').onclick = (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    [...$('toolTabs').children].forEach((c) => c.classList.toggle('on', c === chip));
+    showTool(Number(chip.dataset.tool));
+  };
+
+  $('copyAll').onclick = (e) => copyText(j.message, e.target);
+  host.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-copy]');
+    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
+  });
 }
 
 // ── employee chat ────────────────────────────────────────────────────────────
