@@ -65,9 +65,17 @@ function configFor(role: ModelRole): Record<string, unknown> {
   }
 }
 
+/**
+ * The plugin that handles a role's model.
+ *
+ * These are the SDK's plugin identifiers, not descriptive names — `embedding`
+ * and `ocr` both fail to resolve with "Plugin not found for model type". That
+ * failure surfaced as retrieval silently degrading to judging every rule, which
+ * doubled the work per prompt and pushed adjudications past their timeout.
+ */
 function modelTypeFor(role: ModelRole): string {
-  if (role === 'embedder') return 'embedding';
-  if (role === 'ocr') return 'ocr';
+  if (role === 'embedder') return 'llamacpp-embedding';
+  if (role === 'ocr') return 'ggml-ocr';
   return 'llm';
 }
 

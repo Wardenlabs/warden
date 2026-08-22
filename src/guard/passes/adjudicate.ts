@@ -72,14 +72,32 @@ function systemPrompt(rule: Rule, nonce: string): string {
     ...rule.examples.compliant.map((t) => `COMPLIES: ${t}`)
   ].join('\n');
 
+  /**
+   * Two clauses in here are not padding — each fixes a measured failure mode,
+   * and both are generic enough to help every rule.
+   *
+   * *Asking about a process is not doing the thing.* Without it the adjudicator
+   * labelled "cuál es el proceso para pedir un aumento?" as violating a payroll
+   * rule — a question about procedure, matched on topic alone. This single line
+   * took a six-case probe from 1/6 to 5/6.
+   *
+   * *A rule's own limits are part of the rule.* Rules qualify themselves — about
+   * *another* employee, above *a threshold*, *outside* the company — and the
+   * model reliably drops the qualifier and fires on the bare subject.
+   */
   return [
     'You check one message against one rule and answer with a single label.',
     '',
     `RULE: ${rule.text}`,
     '',
-    'VIOLATES  - the message does what the rule prohibits.',
-    'COMPLIES  - the message does not. Most messages comply, including ones that',
-    '            touch the same topic without doing the prohibited thing.',
+    'VIOLATES  - the message actually does what the rule prohibits.',
+    'COMPLIES  - it does not. Two things that are NOT violations, however much',
+    '            they share the rule\'s subject:',
+    '            · asking how a process works, what a policy says, or who to ask;',
+    '            · anything outside the rule\'s own limits — if it is about another',
+    '              person, a threshold, or a destination, a message that stays',
+    '              inside those limits complies.',
+    '            Most messages comply.',
     'UNCLEAR   - only when the message is genuinely ambiguous. If it plainly does',
     '            not do the prohibited thing, answer COMPLIES.',
     '',
@@ -119,10 +137,22 @@ export async function adjudicate(
       // The answer is one enum value. Anything longer means the model has left
       // the schema, and cutting it off beats waiting for it to wander back.
       maxTokens: 24,
-      // Keyed per rule: the system block (rule text plus its examples) is
-      // identical on every call for that rule, so only the message needs
-      // prefilling once the cache is warm.
-      kvKey: `adjudicate:${rule.id}`,
+      /**
+       * No KV cache key here, deliberately.
+       *
+       * An earlier version passed `kvKey: adjudicate:<ruleId>`, reasoning that
+       * the system block is identical for every call about that rule so only
+       * the message would need prefilling. That is not what the cache stores:
+       * it keys conversation state including the user turn, so reusing the key
+       * across different messages replays the previous verdict. Measured
+       * directly — three probes through one rule returned VIOLATES, VIOLATES,
+       * VIOLATES, including for a message listed in that rule's own compliant
+       * examples; the same rule and prompt without the key returned COMPLIES.
+       *
+       * It was the root cause of a 100% false-positive rate, and the failure
+       * mode is silent: every answer is well-formed, plausible, and wrong.
+       * Prompt-processing time is worth paying to avoid that.
+       */
       timeoutMs: 25_000
     },
     ADJUDICATION,
