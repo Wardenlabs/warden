@@ -15,7 +15,8 @@
     "dev": "tsx watch src/server/index.ts",
     "redteam": "tsx src/redteam/runner.ts",
     "typecheck": "tsc --noEmit",
-    "verify-audit": "tsx scripts/verify-audit.ts"
+    "verify-audit": "tsx scripts/verify-audit.ts",
+    "benchmark": "tsx scripts/benchmark.ts"
   },
   "dependencies": {
     "@qvac/sdk": "^0.17.1",
