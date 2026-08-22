@@ -13,20 +13,25 @@ checks, and prompt policy checks."*
 
 ---
 
-## 1. Install the hook binary
+## 1. Install the hook
 
-From the repo root:
+One file, no dependencies, nothing else to install:
 
 ```bash
-npm install
-npm link          # puts `warden-hook` on your PATH
+curl -o ~/.warden-hook.mjs \
+  https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs
+chmod +x ~/.warden-hook.mjs
 ```
 
 Check it:
 
 ```bash
-echo '{"user_input":"hello"}' | warden-hook   # exit 0, silent
+echo '{"user_input":"hello"}' | node ~/.warden-hook.mjs   # exit 0, silent
 ```
+
+Employees never clone the repo or download a model — only the machine running
+the gateway does. From inside the repo, `npm link` gives you the same thing as
+`warden-hook` on your PATH.
 
 ## 2. Point it at the gateway
 
@@ -59,7 +64,7 @@ Merge `claude-code/settings.json` into `~/.claude/settings.json`:
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "warden-hook" }] }
+      { "hooks": [{ "type": "command", "command": "node ~/.warden-hook.mjs" }] }
     ]
   }
 }
@@ -77,7 +82,7 @@ Merge `codex/config.toml` into `~/.codex/config.toml`:
 
 [[hooks.UserPromptSubmit.hooks]]
 type = "command"
-command = "warden-hook"
+command = "node ~/.warden-hook.mjs"
 ```
 
 Codex blocks on `{"decision": "block", "reason": "..."}` and on exit code 2.

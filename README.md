@@ -295,8 +295,9 @@ Warden  (adapter=real)
   network   http://192.168.1.42:8080   <- teammates point here
 ```
 
-Employees set `WARDEN_URL`, `WARDEN_USER` and `WARDEN_ROLE`, and install the hook
-per [`integrations/README.md`](integrations/README.md). Identity for the proxy
+Employees install one 4 KB file — `curl` it, set three environment variables,
+add four lines to their tool's config. They never clone the repo or download a
+model. Step by step in **[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md)**. Identity for the proxy
 path travels as a per-employee API key, which also keeps the company's upstream
 credential on the gateway: an employee cannot route around the guard, because
 they have nothing to route around it with.

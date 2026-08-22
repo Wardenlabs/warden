@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "warden-hook"
+            "command": "node ~/.warden-hook.mjs"
           }
         ]
       }
