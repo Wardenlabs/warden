@@ -1,0 +1,10 @@
+# Merge into ~/.codex/config.toml
+#
+# Fires before Codex sends the prompt to the model. Blocks on
+# {"decision":"block","reason":"..."} or exit code 2 — warden-hook emits both.
+
+[[hooks.UserPromptSubmit]]
+
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "warden-hook"

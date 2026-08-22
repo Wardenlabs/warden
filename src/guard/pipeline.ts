@@ -1,0 +1,158 @@
+/**
+ * The guard: one prompt in, one decision out.
+ *
+ * Cheap and certain first, expensive and probabilistic last. Quotas and secret
+ * detection are counters and regexes, so they run ahead of any model and cost
+ * nothing; by the time inference happens the request has already survived
+ * everything that can be decided without it.
+ *
+ * Every stage records a trace entry. The trace is not debug output — it is what
+ * the console renders and what the audit log keeps, and it is how a human
+ * answers "why was this blocked" in five seconds instead of five minutes.
+ */
+import { recordDecision } from '../audit/log.js';
+import { selectRules } from '../policy/index.js';
+import { rulesForRole } from '../policy/store.js';
+import type { PolicySpec } from '../policy/types.js';
+import type { QvacAdapter } from '../qvac/types.js';
+import { aggregate } from './aggregate.js';
+import { isolate } from './isolate.js';
+import { adjudicateAll } from './passes/adjudicate.js';
+import { checkQuota } from './quota.js';
+import { sanitize } from './sanitize.js';
+import type { Decision, GuardInput, PassTrace } from './types.js';
+
+/** How many non-pinned rules to adjudicate. Each one is a model call. */
+const TOP_K = Number(process.env['WARDEN_TOP_K'] ?? 3);
+
+export async function evaluate(
+  qvac: QvacAdapter,
+  input: GuardInput,
+  policy: PolicySpec
+): Promise<Decision> {
+  const started = Date.now();
+  const passes: PassTrace[] = [];
+
+  // ── pass -2: quota ─────────────────────────────────────────────────────────
+  const quota = checkQuota(policy, input.actor);
+  passes.push(quota.trace);
+  if (!quota.allowed) {
+    return finish({
+      verdict: 'BLOCK', policy, passes, started,
+      input, maskedPrompt: input.prompt, maskedSpans: [], firedRules: [],
+      quota: { used: quota.used, limit: quota.limit ?? 0 },
+      explanation: `Daily limit reached for role "${input.actor.role}" (${quota.used}/${quota.limit}).`
+    });
+  }
+
+  // ── pass -1: secrets ───────────────────────────────────────────────────────
+  const sanitizeStart = Date.now();
+  const { masked, spans } = sanitize(input.prompt);
+  passes.push({
+    pass: 'sanitize',
+    ms: Date.now() - sanitizeStart,
+    verdict: 'ALLOW',
+    detail: { masked: spans.length, kinds: spans.map((s) => s.kind) }
+  });
+
+  // Attachment text joins the message here, before isolation, because a
+  // document is exactly as untrusted as the prompt that carried it — and it is
+  // the channel an attacker uses when the employee is innocent.
+  let subject = masked;
+  if (input.attachments?.length) {
+    const ocrStart = Date.now();
+    const extracted: string[] = [];
+    for (const path of input.attachments) {
+      try {
+        extracted.push(sanitize(await qvac.ocr(path)).masked);
+      } catch (err) {
+        extracted.push(`[attachment could not be read: ${err instanceof Error ? err.message : err}]`);
+      }
+    }
+    subject = [masked, ...extracted].join('\n\n--- attachment ---\n');
+    passes.push({
+      pass: 'ocr',
+      ms: Date.now() - ocrStart,
+      detail: { attachments: input.attachments.length, chars: subject.length - masked.length }
+    });
+  }
+
+  // ── pass 0: isolate ────────────────────────────────────────────────────────
+  const isoStart = Date.now();
+  const iso = isolate(subject);
+  passes.push({ pass: 'isolate', ms: Date.now() - isoStart, verdict: 'ALLOW', detail: iso.flags });
+
+  // ── pass 2: retrieve ───────────────────────────────────────────────────────
+  const applicable = rulesForRole(policy, input.actor.role);
+  const retrieveStart = Date.now();
+  const selected = await selectRules(policy, applicable, iso.clean, TOP_K);
+  passes.push({
+    pass: 'retrieve',
+    ms: Date.now() - retrieveStart,
+    detail: {
+      applicable: applicable.length,
+      selected: selected.rules.map((r) => r.id),
+      scores: selected.scores,
+      // A degraded retrieval judged every rule instead of the top few: slower,
+      // never less safe, and worth surfacing rather than hiding.
+      degraded: selected.degraded
+    }
+  });
+
+  // ── pass 3: adjudicate (concurrent) ────────────────────────────────────────
+  const { verdicts, traces } = await adjudicateAll(qvac, iso, selected.rules);
+  passes.push(...traces);
+
+  // ── pass 4: aggregate ──────────────────────────────────────────────────────
+  const aggStart = Date.now();
+  const result = aggregate({
+    verdicts,
+    rules: selected.rules,
+    flags: iso.flags,
+    expectedRuleIds: selected.rules.map((r) => r.id)
+  });
+  passes.push({
+    pass: 'aggregate',
+    ms: Date.now() - aggStart,
+    verdict: result.verdict,
+    detail: { fired: result.firedRules.length }
+  });
+
+  return finish({
+    verdict: result.verdict, policy, passes, started, input,
+    maskedPrompt: masked, maskedSpans: spans,
+    firedRules: result.firedRules,
+    quota: { used: quota.used, limit: quota.limit ?? 0 },
+    explanation: result.explanation
+  });
+}
+
+function finish(args: {
+  verdict: Decision['verdict'];
+  policy: PolicySpec;
+  passes: PassTrace[];
+  started: number;
+  input: GuardInput;
+  maskedPrompt: string;
+  maskedSpans: Decision['maskedSpans'];
+  firedRules: Decision['firedRules'];
+  quota: { used: number; limit: number };
+  explanation: string;
+}): Decision {
+  const partial = {
+    verdict: args.verdict,
+    policyVersion: args.policy.version,
+    totalMs: Date.now() - args.started,
+    firedRules: args.firedRules,
+    passes: args.passes,
+    maskedPrompt: args.maskedPrompt,
+    maskedSpans: args.maskedSpans,
+    quota: args.quota,
+    explanation: args.explanation
+  };
+
+  // Recording assigns the audit id, so the id the employee is shown is the one
+  // that actually exists in the log rather than a number generated alongside it.
+  const entry = recordDecision(args.input.actor, args.input.prompt, partial);
+  return { ...partial, auditId: entry.auditId };
+}

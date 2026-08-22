@@ -1,0 +1,14 @@
+{
+  "name": "Northwind Logistics SA",
+  "description": "Mid-size freight and warehousing company, ~180 employees. Runs an internal AI assistant behind Warden.",
+  "roles": ["intern", "analyst", "sales", "finance", "hr", "engineer", "admin"],
+  "employees": [
+    { "id": "ana",    "name": "Ana Ruiz",       "role": "hr",       "apiKey": "wk-ana-3f9c2a71" },
+    { "id": "fede",   "name": "Fede Tavano",    "role": "analyst",  "apiKey": "wk-fede-8b1d40e2" },
+    { "id": "jere",   "name": "Jeremías Souto", "role": "engineer", "apiKey": "wk-jere-51c7fa93" },
+    { "id": "gaston", "name": "Gastón Foncea",  "role": "sales",    "apiKey": "wk-gaston-2d6e8b04" },
+    { "id": "sofia",  "name": "Sofía Márquez",  "role": "finance",  "apiKey": "wk-sofia-9a4b17c5" },
+    { "id": "tomas",  "name": "Tomás Vega",     "role": "intern",   "apiKey": "wk-tomas-6e2f93d8" },
+    { "id": "martin", "name": "Martín Pulitano","role": "admin",    "apiKey": "wk-martin-0c5a72fb" }
+  ]
+}

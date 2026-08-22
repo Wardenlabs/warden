@@ -83,7 +83,7 @@ export class MockQvacAdapter implements QvacAdapter {
   ): Promise<StructuredResult<T>> {
     await tick();
 
-    const props = (jsonSchema['properties'] ?? {}) as Record<string, { type?: string }>;
+    const props = (jsonSchema['properties'] ?? {}) as Record<string, { type?: string; enum?: string[] }>;
     const subject = untrustedPart(req.user);
     const injection = hits(subject, INJECTION_SIGNALS);
     const violation = hits(subject, VIOLATION_SIGNALS);
@@ -91,7 +91,7 @@ export class MockQvacAdapter implements QvacAdapter {
 
     const out: Record<string, unknown> = {};
     for (const [key, spec] of Object.entries(props)) {
-      out[key] = mockValue(key, spec.type, { req, subject, flagged, injection, violation });
+      out[key] = mockValue(key, spec.type, spec.enum, { req, subject, flagged, injection, violation });
     }
 
     const parsed = zodSchema.safeParse(out);
@@ -153,8 +153,25 @@ export class MockQvacAdapter implements QvacAdapter {
 
 type Ctx = { req: CompleteRequest; subject: string; flagged: boolean; injection: string[]; violation: string[] };
 
-function mockValue(key: string, type: string | undefined, ctx: Ctx): unknown {
+function mockValue(
+  key: string,
+  type: string | undefined,
+  choices: string[] | undefined,
+  ctx: Ctx
+): unknown {
   const k = key.toLowerCase();
+
+  // Enum fields are answered by picking, not by inventing. The guard's verdicts
+  // are enums precisely because a real small model picks better than it fills
+  // slots, and the mock has to exercise that same shape or it stops standing in
+  // for anything.
+  if (choices?.length) {
+    const negative = choices.find((c) => /^(COMPLIES|ORDINARY|ALLOW|NONE|false)$/i.test(c));
+    const positive = choices.find((c) => /^(VIOLATES|MANIPULATION|BLOCK|true)$/i.test(c));
+    if (ctx.flagged && positive) return positive;
+    if (!ctx.flagged && negative) return negative;
+    return choices[0];
+  }
 
   if (type === 'boolean') {
     if (k.includes('injection')) return ctx.injection.length > 0;

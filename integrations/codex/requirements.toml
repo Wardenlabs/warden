@@ -1,0 +1,24 @@
+# Administrator-enforced configuration for Codex.
+#
+# Deploy this through whatever manages machine config in the company (MDM,
+# Ansible, a provisioning script). It is what turns Warden from something an
+# employee installed into something the organisation requires.
+#
+#   allow_managed_hooks_only  skips every non-managed hook source, so a user
+#                             cannot add hooks that shadow or bypass this one.
+#   [features].hooks = true   keeps managed hooks running even for a user who
+#                             disabled hooks locally.
+#
+# Codex marks these as managed: they cannot be switched off from the user's
+# hook browser.
+
+allow_managed_hooks_only = true
+
+[features]
+hooks = true
+
+[[hooks.UserPromptSubmit]]
+
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "warden-hook"

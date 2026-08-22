@@ -38,6 +38,15 @@ export const ruleSchema = z.object({
   appliesTo: z.array(z.string()).min(1),
   severity: ruleSeveritySchema,
   examples: ruleExamplesSchema,
+  /**
+   * Always adjudicate this rule, bypassing top-K retrieval.
+   *
+   * Retrieval picks the rules most similar to the prompt, which is right for
+   * topic-specific rules but wrong for the one that catches instruction
+   * override: an attacker phrases that to look like anything at all, so
+   * similarity is exactly the wrong filter for it.
+   */
+  pinned: z.boolean().optional(),
   /** Cached embedding of `text`, used for top-K retrieval. Absent until indexed. */
   embedding: z.array(z.number()).optional()
 });
