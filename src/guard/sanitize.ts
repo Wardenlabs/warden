@@ -25,7 +25,9 @@ const PATTERNS: Pattern[] = [
   { kind: 'api-key', label: 'Google key',    re: /\bAIza[A-Za-z0-9_-]{35}\b/g },
   { kind: 'token',   label: 'JWT',           re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
   { kind: 'token',   label: 'private key',   re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g },
-  { kind: 'card',    label: 'card number',   re: /\b(?:\d[ -]?){13,19}\b/g },
+  // Anchored on digits at both ends so it cannot swallow the following space —
+  // an earlier version turned "…332211 es del cliente" into "…]es del cliente".
+  { kind: 'card',    label: 'card number',   re: /\b\d(?:[ -]?\d){12,18}\b/g },
   { kind: 'email',   label: 'email',         re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g }
 ];
 
@@ -70,26 +72,52 @@ export type SanitizeResult = {
  * employee understands what happened.
  */
 export function sanitize(text: string): SanitizeResult {
-  const spans: MaskedSpan[] = [];
-  let masked = text;
+  // Every match is located against the *original* text, then replacements are
+  // applied back-to-front. Replacing as we scan would shift every subsequent
+  // offset by the length difference, so recorded spans would point at the wrong
+  // place in the text the caller still holds — and those offsets are what a UI
+  // would use to highlight what was masked.
+  type Hit = { kind: MaskedSpan['kind']; start: number; end: number; raw: string; label: string };
+  const hits: Hit[] = [];
+
+  const claim = (start: number, end: number) =>
+    hits.some((h) => start < h.end && end > h.start);
 
   for (const { kind, re, label } of PATTERNS) {
-    masked = masked.replace(new RegExp(re.source, re.flags), (match, offset: number) => {
-      if (kind === 'card' && !isPlausibleCard(match)) return match;
-      spans.push({ kind, start: offset, end: offset + match.length, preview: preview(match) });
-      return `[REDACTED:${label}]`;
-    });
+    for (const m of text.matchAll(new RegExp(re.source, re.flags))) {
+      const start = m.index ?? 0;
+      const end = start + m[0].length;
+      // Patterns run most-specific first, so an earlier, better-named match
+      // wins any overlap.
+      if (claim(start, end)) continue;
+      if (kind === 'card' && !isPlausibleCard(m[0])) continue;
+      hits.push({ kind, start, end, raw: m[0], label });
+    }
   }
 
-  masked = masked.replace(HIGH_ENTROPY, (match, offset: number) => {
-    if (match.startsWith('[REDACTED')) return match;
-    if (ALLOWLIST.test(match)) return match;
-    if (entropy(match) < ENTROPY_FLOOR) return match;
-    spans.push({ kind: 'high-entropy', start: offset, end: offset + match.length, preview: preview(match) });
-    return '[REDACTED:possible secret]';
-  });
+  for (const m of text.matchAll(HIGH_ENTROPY)) {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    if (claim(start, end)) continue;
+    if (ALLOWLIST.test(m[0])) continue;
+    if (entropy(m[0]) < ENTROPY_FLOOR) continue;
+    hits.push({ kind: 'high-entropy', start, end, raw: m[0], label: 'possible secret' });
+  }
 
-  return { masked, spans };
+  hits.sort((a, b) => a.start - b.start);
+
+  let masked = '';
+  let cursor = 0;
+  for (const h of hits) {
+    masked += text.slice(cursor, h.start) + `[REDACTED:${h.label}]`;
+    cursor = h.end;
+  }
+  masked += text.slice(cursor);
+
+  return {
+    masked,
+    spans: hits.map((h) => ({ kind: h.kind, start: h.start, end: h.end, preview: preview(h.raw) }))
+  };
 }
 
 /**

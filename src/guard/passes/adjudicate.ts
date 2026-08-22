@@ -6,14 +6,9 @@
  * confident answer about none of them in particular; asked about one rule with
  * that rule's own examples in front of it, it answers something usable.
  *
- * The verdict is a label from a fixed set rather than a boolean with a
- * confidence score. Measured on Qwen3: `{violates: bool, confidence: number}`
- * produced 7/8 false positives and incoherent pairings — "violates" at
- * confidence 0.00 — because filling two independent slots does not require
- * deciding anything. Forcing a single choice from an enum took false positives
- * to 0/8 on the same model and the same inputs, and removed a whole class of
- * validation failure: a label cannot fall outside its range the way a free
- * number can.
+ * The model returns a label and nothing else. Both of those choices were forced
+ * by measurement, and both are documented below, because they are the
+ * difference between a guard that works and one that blocks everything.
  */
 import { z } from 'zod';
 import type { QvacAdapter } from '../../qvac/types.js';
@@ -22,24 +17,33 @@ import { isolationPreamble, type Isolated } from '../isolate.js';
 import type { PassTrace } from '../types.js';
 
 /**
- * Three labels, not two.
+ * A label. No confidence score, and no free-text reason.
  *
- * `UNCLEAR` gives the model somewhere honest to put a genuinely ambiguous
- * request. Without it, uncertainty has to be expressed as one of the two
- * confident answers, and it lands on VIOLATES far more often than not.
+ * The earlier version asked for `{violates: boolean, confidence: number}` and
+ * produced 7/8 false positives with incoherent pairings — "violates" at
+ * confidence 0.00 — because filling two independent slots never requires
+ * deciding anything. An enum forces a choice, and took false positives to 0/8
+ * on identical inputs.
+ *
+ * The version after that added a `reason` string, and that single field cost
+ * the whole system: on a run of legitimate traffic it produced **16/16 false
+ * positives**. Three ways at once. Long reasons overran the token cap, leaving
+ * truncated JSON that failed validation and fell through to ESCALATE. Latency
+ * went from ~2s to 7-12s per rule generating prose nobody reads. And the
+ * reasons themselves were formulaic restatements of the rule — "the message
+ * does not request payroll data" — carrying no information the label did not.
+ *
+ * So the explanation is composed in code from the rule and the label. It is
+ * more accurate, it is instant, and it cannot fail to parse.
  */
 const ADJUDICATION = z.object({
-  verdict: z.enum(['VIOLATES', 'COMPLIES', 'UNCLEAR']),
-  reason: z.string().min(1).max(240)
+  verdict: z.enum(['VIOLATES', 'COMPLIES', 'UNCLEAR'])
 });
 
 const ADJUDICATION_JSON_SCHEMA = {
   type: 'object',
-  properties: {
-    verdict: { type: 'string', enum: ['VIOLATES', 'COMPLIES', 'UNCLEAR'] },
-    reason: { type: 'string' }
-  },
-  required: ['verdict', 'reason'],
+  properties: { verdict: { type: 'string', enum: ['VIOLATES', 'COMPLIES', 'UNCLEAR'] } },
+  required: ['verdict'],
   additionalProperties: false
 } as const;
 
@@ -56,9 +60,9 @@ export type RuleVerdict = {
  * Confidence is assigned from the label rather than requested from the model.
  *
  * A 1.7B model's self-reported probability carries no information — measured
- * values clustered at 0.00, 0.95 and 1.00 regardless of the answer. The label
- * is the signal; these numbers exist so the aggregator and the trace have a
- * consistent scale, and they are honest about what they are.
+ * values clustered at 0.00, 0.95 and 1.00 regardless of the answer. These
+ * numbers exist so the aggregator and the trace have a consistent scale, and
+ * they are honest about being derived.
  */
 const CONFIDENCE = { VIOLATES: 0.9, COMPLIES: 0.9, UNCLEAR: 0.4 } as const;
 
@@ -69,14 +73,15 @@ function systemPrompt(rule: Rule, nonce: string): string {
   ].join('\n');
 
   return [
-    'You check one message against one rule and label it.',
+    'You check one message against one rule and answer with a single label.',
     '',
     `RULE: ${rule.text}`,
     '',
     'VIOLATES  - the message does what the rule prohibits.',
     'COMPLIES  - the message does not. Most messages comply, including ones that',
     '            touch the same topic without doing the prohibited thing.',
-    'UNCLEAR   - genuinely cannot tell. Use this instead of guessing.',
+    'UNCLEAR   - only when the message is genuinely ambiguous. If it plainly does',
+    '            not do the prohibited thing, answer COMPLIES.',
     '',
     'Examples for this rule:',
     shots,
@@ -84,6 +89,18 @@ function systemPrompt(rule: Rule, nonce: string): string {
     isolationPreamble(nonce),
     '/no_think'
   ].join('\n');
+}
+
+/** A readable explanation, composed rather than generated. */
+function explain(rule: Rule, label: 'VIOLATES' | 'COMPLIES' | 'UNCLEAR'): string {
+  switch (label) {
+    case 'VIOLATES':
+      return `the request does what this rule prohibits`;
+    case 'UNCLEAR':
+      return `could not clearly tell whether this rule applies`;
+    case 'COMPLIES':
+      return `no conflict with this rule`;
+  }
 }
 
 /** Judge one message against one rule. */
@@ -99,7 +116,9 @@ export async function adjudicate(
       role: 'adjudicator',
       system: systemPrompt(rule, iso.nonce),
       user: `${iso.envelope}\n\nLabel the message against the rule.`,
-      maxTokens: 96,
+      // The answer is one enum value. Anything longer means the model has left
+      // the schema, and cutting it off beats waiting for it to wander back.
+      maxTokens: 24,
       // Keyed per rule: the system block (rule text plus its examples) is
       // identical on every call for that rule, so only the message needs
       // prefilling once the cache is warm.
@@ -116,7 +135,7 @@ export async function adjudicate(
     violates: label === 'VIOLATES',
     unclear: label === 'UNCLEAR',
     confidence: CONFIDENCE[label],
-    reason: res.value.reason
+    reason: explain(rule, label)
   };
 
   return {
@@ -126,8 +145,8 @@ export async function adjudicate(
       ms: Date.now() - started,
       verdict: label === 'VIOLATES'
         ? rule.severity === 'block' ? 'BLOCK' : 'ESCALATE'
-        : label === 'UNCLEAR' ? 'ESCALATE' : 'ALLOW',
-      detail: { label, reason: res.value.reason, repaired: res.repaired, ruleText: rule.text }
+        : 'ALLOW',
+      detail: { label, repaired: res.repaired, ruleText: rule.text }
     }
   };
 }
@@ -140,8 +159,11 @@ export async function adjudicate(
  * of queueing. Sequentially, eight rules at ~2s each would put every prompt
  * behind a sixteen-second wait.
  *
- * A rule whose adjudication fails does not sink the batch — it comes back as a
- * fail-closed trace, and the aggregator treats a missing verdict as ESCALATE.
+ * A rule whose adjudication fails yields a trace but **no verdict**. That
+ * asymmetry is deliberate: the aggregator compares the verdicts it received
+ * against the rules it expected, and escalates on the difference. Returning a
+ * placeholder verdict instead would make a crashed pass indistinguishable from
+ * a clean one — a fail-open hole in the middle of a fail-closed design.
  */
 export async function adjudicateAll(
   qvac: QvacAdapter,
@@ -155,13 +177,7 @@ export async function adjudicateAll(
         return await adjudicate(qvac, iso, rule);
       } catch (err) {
         return {
-          verdict: {
-            ruleId: rule.id,
-            violates: false,
-            unclear: true,
-            confidence: 0,
-            reason: `adjudication failed: ${err instanceof Error ? err.message : String(err)}`
-          } satisfies RuleVerdict,
+          verdict: null,
           trace: {
             pass: `adjudicate:${rule.id}`,
             ms: Date.now() - started,
@@ -175,7 +191,7 @@ export async function adjudicateAll(
   );
 
   return {
-    verdicts: settled.map((s) => s.verdict),
+    verdicts: settled.map((s) => s.verdict).filter((v): v is RuleVerdict => v !== null),
     traces: settled.map((s) => s.trace)
   };
 }

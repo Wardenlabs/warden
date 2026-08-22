@@ -26,6 +26,8 @@ export type AggregateInput = {
 export type AggregateResult = {
   verdict: Verdict;
   firedRules: FiredRule[];
+  /** Recorded for the trace and the report even when they did not change the verdict. */
+  unclearRules: FiredRule[];
   explanation: string;
 };
 
@@ -44,6 +46,8 @@ export function aggregate(input: AggregateInput): AggregateResult {
   const { verdicts, rules, flags, expectedRuleIds } = input;
   const byId = new Map(rules.map((r) => [r.id, r]));
   const fired: FiredRule[] = [];
+  /** Rules the model hedged on. Allowed alone; escalated alongside other signals. */
+  const unclearRules: FiredRule[] = [];
 
   let verdict: Verdict = 'ALLOW';
 
@@ -55,12 +59,22 @@ export function aggregate(input: AggregateInput): AggregateResult {
       verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
       fired.push({ ruleId: rule.id, ruleText: rule.text, reason: v.reason, confidence: v.confidence });
     } else if (v.unclear) {
-      // The model declined to decide. That is a request for a human, not a pass.
-      verdict = tighten(verdict, 'ESCALATE');
-      fired.push({
-        ruleId: rule.id, ruleText: rule.text,
-        reason: `could not determine: ${v.reason}`, confidence: v.confidence
-      });
+      /**
+       * A model that answered UNCLEAR did its job and expressed doubt. That is
+       * not the same as a pass that produced nothing, and it must not be
+       * treated the same way.
+       *
+       * An earlier version escalated on every UNCLEAR and measured **16/16
+       * false positives** on legitimate traffic: with several rules per prompt,
+       * a model that hedges on anything hedges on something, and every ordinary
+       * request ended up in front of a human. A guard nobody can work with gets
+       * switched off, which protects nothing.
+       *
+       * So a bare UNCLEAR is recorded and allowed. It escalates only when
+       * something else independently looks wrong — see the structural check
+       * below, which is deterministic and cannot be talked into silence.
+       */
+      unclearRules.push({ ruleId: rule.id, ruleText: rule.text, reason: v.reason, confidence: v.confidence });
     }
   }
 
@@ -85,7 +99,20 @@ export function aggregate(input: AggregateInput): AggregateResult {
   const concerns = structuralConcerns(flags);
   if (concerns.length > 0) verdict = tighten(verdict, 'ESCALATE');
 
-  return { verdict, firedRules: fired, explanation: explain(verdict, fired, concerns) };
+  // Doubt plus a structural signal is worth a human; either alone is not.
+  // The structural check is deterministic, so this cannot be argued down by
+  // anything written in the message.
+  if (unclearRules.length > 0 && concerns.length > 0) {
+    verdict = tighten(verdict, 'ESCALATE');
+    fired.push(...unclearRules);
+  }
+
+  return {
+    verdict,
+    firedRules: fired,
+    unclearRules,
+    explanation: explain(verdict, fired, concerns)
+  };
 }
 
 /**
