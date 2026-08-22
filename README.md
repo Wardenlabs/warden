@@ -188,11 +188,42 @@ on the same model and the same inputs.
 clustered at 0.00, 0.95 and 1.00 regardless of the answer. Warden derives
 confidence from the label instead, and says so.
 
-**One narrow question per rule beats one broad question about all of them.**
+**Asking the model to justify itself cost us the system.** Adding a `reason`
+string next to the verdict broke it three ways at once: long reasons overran the
+token cap, leaving truncated JSON that failed validation and fell through to
+escalation; latency went from ~2s to 7–12s per rule; and the reasons were
+formulaic restatements of the rule carrying nothing the label did not. The
+explanation is now composed in code. More accurate, instant, cannot fail to
+parse.
+
+**A KV cache key silently replayed old verdicts.** This is the one worth
+repeating. We keyed the cache per rule — `adjudicate:<ruleId>` — reasoning that
+the system block is identical across calls about that rule, so only the new
+message needs prefilling. That is not what the cache holds: it keys conversation
+state *including the user turn*. Three probes through one rule returned
+VIOLATES, VIOLATES, VIOLATES — including for a message listed in that rule's own
+compliant examples. Without the key, COMPLIES.
+
+It produced a **100% false-positive rate**, and nothing about it looked wrong
+from the outside: every response was well-formed, schema-valid, plausible, and
+replaying a previous answer. No amount of output validation catches that. Only
+running the same input twice and noticing it should have differed does.
+
+**The adjudicator matched on topic rather than action.** It labelled *"cuál es
+el proceso para pedir un aumento?"* as violating a payroll rule — a question
+about procedure, matched on subject alone. Two generic clauses fixed it: asking
+how a process works is not doing the prohibited thing, and a rule's own
+qualifiers (*another* employee, *above* a threshold, *outside* the company) are
+part of the rule. A six-case probe went from 1/6 to 5/6.
 
 **A grammar guarantees shape, not sense.** Constrained decoding eliminated
 malformed output entirely and did nothing for wrong verdicts. Both layers earn
 their place.
+
+The thread running through all of these: **every field you ask a small model to
+fill is a chance for it to answer without deciding, and every optimisation that
+touches inference can change the answer rather than just its cost.** The
+benign-controls class caught all of them. Nothing else would have.
 
 ---
 
