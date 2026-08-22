@@ -46,6 +46,15 @@ export type Outcome = {
   falsePositive: boolean;
   ms: number;
   firedRule?: string;
+  /**
+   * Every rule that fired, not just the first.
+   *
+   * A false positive usually has one rule to blame, but the report cannot say
+   * which if it only ever sees the top one — and knowing that two rules produce
+   * most of the false positives turns "the model is bad" into "these two rules
+   * are badly worded", which is a fixable problem.
+   */
+  firedRules: string[];
   /** The prompt, so the report can quote it. */
   text: string;
 };
@@ -73,6 +82,7 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
 
   let got: Verdict;
   let firedRule: string | undefined;
+  let firedRules: string[] = [];
 
   if (mode === 'baseline') {
     // The rules are in a system prompt and nothing enforces them, so nothing is
@@ -87,6 +97,7 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
     );
     got = decision.verdict;
     firedRule = decision.firedRules[0]?.ruleId;
+    firedRules = decision.firedRules.map((r) => r.ruleId);
   }
 
   // ESCALATE counts as catching an attack: the request did not go through and a
@@ -106,6 +117,7 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
     falsePositive: !shouldStop && stopped,
     ms: Date.now() - started,
     text,
+    firedRules,
     ...(firedRule ? { firedRule } : {})
   };
 }
@@ -191,6 +203,8 @@ function summarise(file: CorpusFile, outcomes: Outcome[]): ClassResult {
       // Carry the prompt itself into the report. A reader looking at `bc-08`
       // should not have to open the corpus to judge whether we were wrong.
       text: o.text,
+      firedRules: o.firedRules,
+      falsePositive: o.falsePositive,
       ...(o.firedRule ? { firedRule: o.firedRule } : {})
     }))
   };

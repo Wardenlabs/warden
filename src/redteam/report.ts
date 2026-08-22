@@ -19,7 +19,17 @@ export type ClassResult = {
   falsePositives: number;
   p50: number;
   p95: number;
-  failures: { id: string; expect: string; got: string; lang: string; text?: string; firedRule?: string }[];
+  failures: {
+    id: string;
+    expect: string;
+    got: string;
+    lang: string;
+    text?: string;
+    firedRule?: string;
+    /** Every rule that fired, so false positives can be attributed. */
+    firedRules?: string[];
+    falsePositive?: boolean;
+  }[];
 };
 
 export type RunSummary = {
@@ -100,6 +110,41 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   }
 
   const allFailures = s.warden.flatMap((c) => c.failures.map((f) => ({ ...f, class: c.class })));
+
+  /**
+   * Which rules are doing the damage.
+   *
+   * The headline false-positive rate is a property of the whole policy, and on
+   * its own it points at the model. Broken down per rule it usually points
+   * somewhere much more actionable: a handful of rules whose wording matches on
+   * subject rather than action, each of which can be reworded or given better
+   * compliant examples. A rate you cannot attribute is a rate you cannot fix.
+   */
+  const fpByRule = new Map<string, number>();
+  for (const f of allFailures) {
+    if (!f.falsePositive) continue;
+    for (const id of f.firedRules ?? []) fpByRule.set(id, (fpByRule.get(id) ?? 0) + 1);
+  }
+  if (fpByRule.size > 0) {
+    const totalFp = allFailures.filter((f) => f.falsePositive).length;
+    w('## Which rules cause the false positives');
+    w();
+    w(`${totalFp} legitimate request${totalFp === 1 ? '' : 's'} were refused. Each row is a rule`);
+    w('that fired on at least one of them — a rule can appear on several, and');
+    w('several can appear on one request, so the counts do not sum to the total.');
+    w();
+    w('| rule | legitimate requests it blocked |');
+    w('|---|---|');
+    for (const [id, n] of [...fpByRule.entries()].sort((a, b) => b[1] - a[1])) {
+      w(`| \`${id}\` | ${n} of ${totalFp} |`);
+    }
+    w();
+    w('A rule at the top of this table is the cheapest thing in the system to');
+    w('improve: reword it, or add the requests it wrongly blocked to its');
+    w('`examples.compliant`, which is exactly the anchor the adjudicator reads.');
+    w();
+  }
+
   w('## What we could not fix');
   w();
   if (allFailures.length === 0) {
