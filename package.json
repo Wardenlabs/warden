@@ -5,8 +5,11 @@
   "type": "module",
   "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
   "license": "Apache-2.0",
-  "engines": { "node": ">=22.17" },
+  "engines": {
+    "node": ">=22.17"
+  },
   "scripts": {
+    "setup": "tsx scripts/setup.ts",
     "probe": "node scripts/probe-sdk.mjs",
     "smoke": "tsx scripts/smoke.ts",
     "dev": "tsx watch src/server/index.ts",
