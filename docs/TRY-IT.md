@@ -20,6 +20,11 @@ Necesitás ~3 GB libres para los modelos.
 
 ---
 
+> ⚠️ **Copiá los comandos de a uno.** zsh (el shell por defecto en macOS) no
+> trata `#` como comentario en modo interactivo, así que pegar varias líneas con
+> comentarios al costado hace que se salte alguna en silencio — o falle con
+> `zsh: unknown file attribute`. Nos pasó.
+
 ## 1. Bajar y preparar
 
 ```bash
@@ -61,6 +66,10 @@ de cada comando.
 ```bash
 npm run dev
 ```
+
+Fijate que diga `adapter=real`. Si dice `adapter=mock`, o si nunca corriste
+`setup`, no hay modelos y el primer prompt va a intentar bajarlos por P2P y
+colgarse. Corré `npm run setup` antes.
 
 ```
 Warden  (adapter=real)
@@ -154,7 +163,7 @@ Esto es lo más importante del producto y lo que **todavía nadie verificó**
 (Linear OPE-19).
 
 ```bash
-npm link          # deja `warden-hook` en el PATH
+npm link
 ```
 
 Probalo suelto primero:

@@ -20,7 +20,7 @@ tiene los modelos; las demás sólo bajan un archivo de 4 KB.
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
 npm install
-npm run setup      # baja los modelos, ~10 min
+npm run setup
 npm run dev
 ```
 

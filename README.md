@@ -50,8 +50,8 @@ Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-I
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
 npm install
-npm run setup     # diagnoses the machine, downloads models, proves inference works
-npm run dev       # http://localhost:8080
+npm run setup
+npm run dev
 ```
 
 `npm run setup` ends with a report you can paste anywhere:
