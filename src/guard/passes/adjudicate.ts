@@ -66,10 +66,21 @@ export type RuleVerdict = {
  */
 const CONFIDENCE = { VIOLATES: 0.9, COMPLIES: 0.9, UNCLEAR: 0.4 } as const;
 
+/**
+ * Few-shot examples per side.
+ *
+ * Two each, not all of them. Removing the KV cache key for correctness means
+ * every call reprocesses the whole prompt, so prompt length is now the dominant
+ * cost — and a six-example block roughly doubles it. Two per side was enough in
+ * probing, and keeping the sides balanced matters more than the count: an
+ * imbalance teaches the model which answer is expected.
+ */
+const SHOTS_PER_SIDE = 2;
+
 function systemPrompt(rule: Rule, nonce: string): string {
   const shots = [
-    ...rule.examples.violating.map((t) => `VIOLATES: ${t}`),
-    ...rule.examples.compliant.map((t) => `COMPLIES: ${t}`)
+    ...rule.examples.violating.slice(0, SHOTS_PER_SIDE).map((t) => `VIOLATES: ${t}`),
+    ...rule.examples.compliant.slice(0, SHOTS_PER_SIDE).map((t) => `COMPLIES: ${t}`)
   ].join('\n');
 
   /**
