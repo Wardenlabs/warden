@@ -11,6 +11,7 @@
  * clearly-marked stub, never with a lie about being finished — a stub returns
  * plausible shape, logs that it is a stub, and is replaced in place.
  */
+import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import express, { type Request, type Response } from 'express';
 import { adapter, isMock } from '../qvac/index.js';
@@ -150,6 +151,43 @@ app.post('/v1/chat/completions', asyncRoute(async (req, res) => {
   await handleChatCompletion(req, res, emitDecision);
 }));
 
+// ── red team ─────────────────────────────────────────────────────────────────
+// The last run is kept on disk so the console can show results without
+// re-running a suite that takes minutes against a real model.
+const RT_RESULT = 'data/redteam-last.json';
+
+app.get('/api/redteam/report', (_req, res) => {
+  const last = readSeedJson<unknown | null>(RT_RESULT, null);
+  if (!last) return res.status(404).json({ error: 'no run yet — npm run redteam' });
+  res.json(last);
+});
+
+app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
+  const { spawn } = await import('node:child_process');
+  const child = spawn('npx', ['tsx', 'src/redteam/runner.ts'], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: 'ignore',
+    detached: false
+  });
+  // Long enough that a mock run finishes inline; a real-model run keeps going
+  // and the console picks it up from disk on the next "Load last report".
+  const finished = await Promise.race([
+    new Promise<boolean>((r) => child.on('exit', () => r(true))),
+    new Promise<boolean>((r) => setTimeout(() => r(false), 120_000))
+  ]);
+  const last = readSeedJson<unknown | null>(RT_RESULT, null);
+  if (!last) {
+    return res.status(finished ? 500 : 202).json({
+      error: finished ? 'run produced no result' : 'still running — use Load last report in a minute'
+    });
+  }
+  res.json(last);
+}));
+
+// ── static console ───────────────────────────────────────────────────────────
+app.use(express.static('web'));
+
 app.get('/health', (_req, res) => res.json({ ok: true, mock: isMock() }));
 
 app.listen(PORT, HOST, () => {
@@ -158,7 +196,8 @@ app.listen(PORT, HOST, () => {
   for (const ip of lanAddresses()) {
     console.log(`  network   http://${ip}:${PORT}   <- teammates point here`);
   }
-  console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas\n`);
+  console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
+  console.log(`  console   open the local or network URL in a browser\n`);
 });
 
 /** Non-internal IPv4 addresses, so the banner tells teammates where to point. */
@@ -221,10 +260,16 @@ function extractPrompt(body: unknown): string {
   return lastUser?.content ?? '';
 }
 
+/**
+ * Read an optional JSON file, falling back when it is absent.
+ *
+ * Several files here are authored by the team rather than generated, so a
+ * missing one is a normal state during a build-out, not an error worth failing
+ * a request over.
+ */
 function readSeedJson<T>(path: string, fallback: T): T {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return JSON.parse(require('node:fs').readFileSync(path, 'utf8')) as T;
+    return JSON.parse(readFileSync(path, 'utf8')) as T;
   } catch {
     return fallback;
   }

@@ -163,6 +163,9 @@ async function main(): Promise<void> {
 
   printConsole(summary);
   writeReport(summary);
+  // Persist the structured result too, so the console can render it without
+  // parsing markdown or re-running the suite.
+  writeFileSync('data/redteam-last.json', JSON.stringify(summary, null, 2));
   console.log('\nwrote REPORT.md\n');
   await adapter().dispose();
 }
