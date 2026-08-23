@@ -20,22 +20,22 @@
    * it signals about seriousness, makes a room full of judges squint.
    */
   :root {
-    --bg: #f1f4f9;
+    --bg: #edf1f5;
     --card: #ffffff;
-    --edge: #e3e8ef;
-    --edge-soft: #eef1f6;
-    --ink: #16202c;
-    --dim: #5b6b7c;
-    --faint: #93a1b0;
-    --accent: #2f6fed;
-    --accent-soft: #eaf0fe;
+    --edge: #dce3eb;
+    --edge-soft: #edf1f5;
+    --ink: #111b28;
+    --dim: #526174;
+    --faint: #8492a4;
+    --accent: #1769ff;
+    --accent-soft: #e8f0ff;
     --allow: #12a150;
     --allow-soft: #e6f6ed;
     --block: #e5484d;
     --block-soft: #fdecec;
     --escalate: #d98207;
     --escalate-soft: #fdf3e3;
-    --shadow: 0 1px 2px rgba(20, 33, 61, .04), 0 4px 14px rgba(20, 33, 61, .06);
+    --shadow: 0 1px 2px rgba(17, 27, 40, .04), 0 10px 32px rgba(17, 27, 40, .06);
     --shadow-lift: 0 2px 4px rgba(20, 33, 61, .06), 0 8px 24px rgba(20, 33, 61, .10);
     --r: 14px;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -51,33 +51,37 @@
   /* ── top bar ─────────────────────────────────────────────────────────── */
   header {
     display: flex; align-items: center; gap: 14px;
-    padding: 12px 22px; background: var(--card); border-bottom: 1px solid var(--edge);
+    padding: 11px 18px; background: #111b28; color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: 0 3px 18px rgba(17,27,40,.16);
+    position: relative; z-index: 2;
   }
   .brand { display: flex; align-items: center; gap: 11px; }
   .logo {
-    width: 32px; height: 32px; border-radius: 9px; background: var(--ink); color: #fff;
+    width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: #fff;
     display: grid; place-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.5px;
   }
-  .brand h1 { font-size: 14.5px; margin: 0; font-weight: 650; letter-spacing: -.1px; }
-  .brand p { margin: 0; font-size: 11.5px; color: var(--faint); }
+  .brand h1 { font-size: 14.5px; margin: 0; font-weight: 680; letter-spacing: -.1px; }
+  .brand p { margin: 0; font-size: 11.5px; color: #9dabbc; }
 
   .pill {
     font-size: 11.5px; padding: 4px 11px; border-radius: 999px;
-    background: var(--edge-soft); color: var(--dim); white-space: nowrap;
+    background: rgba(255,255,255,.08); color: #c2ccda; white-space: nowrap;
+    border: 1px solid rgba(255,255,255,.07);
   }
-  .pill.live { background: var(--allow-soft); color: var(--allow); }
-  .pill.mock { background: var(--escalate-soft); color: var(--escalate); }
+  .pill.live { background: rgba(18,161,80,.15); color: #71d99e; border-color: rgba(113,217,158,.14); }
+  .pill.mock { background: rgba(217,130,7,.16); color: #ffc66d; border-color: rgba(255,198,109,.14); }
 
-  nav { margin-left: auto; display: flex; gap: 3px; background: var(--edge-soft); padding: 3px; border-radius: 999px; }
+  nav { margin-left: auto; display: flex; gap: 3px; background: rgba(255,255,255,.07); padding: 3px; border-radius: 10px; }
   nav button {
-    background: none; border: none; color: var(--dim);
-    padding: 6px 15px; border-radius: 999px; cursor: pointer; font-size: 12.5px; font-weight: 500;
+    background: none; border: none; color: #aeb9c8;
+    padding: 6px 14px; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 560;
   }
-  nav button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(20,33,61,.10); }
+  nav button:hover { color: #fff; }
+  nav button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 
   /* ── layout ──────────────────────────────────────────────────────────── */
-  main { flex: 1; overflow: hidden; padding: 16px; gap: 16px; }
-  main.grid3 { display: grid; grid-template-columns: 360px 1fr 400px; }
+  main { flex: 1; overflow: hidden; padding: 14px; gap: 14px; }
+  main.grid3 { display: grid; grid-template-columns: minmax(340px,.95fr) minmax(360px,1.15fr) minmax(320px,.9fr); }
   /* The person pane holds config blocks people copy out of it, so it gets more
      room than a sidebar would — a wrapped shell command is a mistyped one. */
   main.grid2 { display: grid; grid-template-columns: 1fr 540px; }
@@ -85,15 +89,17 @@
   main.single > .card { max-width: 1100px; margin: 0 auto; }
 
   .card {
-    background: var(--card); border-radius: var(--r); box-shadow: var(--shadow);
+    background: var(--card); border: 1px solid rgba(220,227,235,.9); border-radius: var(--r); box-shadow: var(--shadow);
     display: flex; flex-direction: column; overflow: hidden; min-height: 0;
   }
   .head {
-    padding: 13px 18px; border-bottom: 1px solid var(--edge-soft);
+    min-height: 52px; padding: 11px 16px; border-bottom: 1px solid var(--edge-soft);
     font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 9px;
   }
+  .head-title { line-height: 1.25; }
+  .head-title small { display: block; margin-top: 2px; color: var(--faint); font-size: 10.5px; font-weight: 450; }
   .head .ver { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-weight: 400; }
-  .body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+  .body { flex: 1; overflow-y: auto; padding: 16px; }
   .sub {
     font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px;
     color: var(--faint); font-weight: 600; margin: 20px 0 9px;
@@ -106,6 +112,7 @@
     border: 1px solid var(--edge); border-radius: 9px; padding: 9px 11px;
     font-family: inherit; font-size: 13px; resize: vertical;
   }
+  #who { max-width: 210px; margin-left: auto !important; }
   textarea::placeholder, input::placeholder { color: var(--faint); }
   textarea:focus, input:focus, select:focus {
     outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
@@ -142,6 +149,8 @@
     border: 1px solid var(--edge); border-radius: 11px; padding: 11px 13px; margin-bottom: 9px;
     background: var(--card); font-size: 12.5px; position: relative;
   }
+  .rule:has(.tag.block) { border-left: 3px solid rgba(229,72,77,.62); }
+  .rule:has(.tag.escalate) { border-left: 3px solid rgba(217,130,7,.62); }
   /* Destructive actions stay out of the way until the pointer is on the row —
      a Remove button next to every rule invites the click it should discourage. */
   .rule .del {
@@ -221,6 +230,9 @@
 
   /* ── trace ───────────────────────────────────────────────────────────── */
   .decision { border: 1px solid var(--edge); border-radius: 11px; padding: 12px; margin-bottom: 10px; }
+  .decision:has(.badge.BLOCK) { border-left: 3px solid var(--block); }
+  .decision:has(.badge.ALLOW) { border-left: 3px solid var(--allow); }
+  .decision:has(.badge.ESCALATE) { border-left: 3px solid var(--escalate); }
   .decision .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .decision .prompt { font-size: 12px; color: var(--dim); margin-bottom: 9px; word-break: break-word; }
   .pass {
@@ -250,6 +262,40 @@
     border-radius: 11px; padding: 11px 13px; font-size: 12.5px; margin-bottom: 14px;
     background: var(--escalate-soft); color: #8a5200;
   }
+  .quota-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+  .quota {
+    display: flex; align-items: center; gap: 8px; padding: 8px 9px;
+    background: #f7f9fb; border: 1px solid var(--edge-soft); border-radius: 9px;
+    font-size: 11.5px; color: var(--dim);
+  }
+  .quota b { margin-left: auto; font-family: var(--mono); color: var(--ink); font-size: 10.5px; }
+  .empty-state { display: grid; place-items: center; align-content: center; min-height: 100%; text-align: center; color: var(--faint); }
+  .empty-state .signal {
+    width: 44px; height: 44px; margin-bottom: 12px; border: 1px solid var(--edge);
+    border-radius: 14px; display: grid; place-items: center; color: var(--accent);
+    background: linear-gradient(145deg,#fff,var(--accent-soft)); box-shadow: inset 0 0 0 5px #f8faff;
+    font: 700 18px/1 var(--mono);
+  }
+  .empty-state b { display: block; color: var(--dim); font-size: 12.5px; margin-bottom: 3px; }
+  .empty-state span { max-width: 220px; font-size: 11.5px; }
+  button:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 1080px) {
+    body { height: auto; min-height: 100vh; }
+    main { overflow: visible; }
+    main.grid3 { grid-template-columns: minmax(320px,.9fr) minmax(390px,1.1fr); }
+    main.grid3 > .card { min-height: 650px; }
+    main.grid3 > .card:last-child { grid-column: 1 / -1; min-height: 390px; }
+  }
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; gap: 9px; }
+    header .pill { display: none; }
+    nav { order: 3; width: 100%; }
+    nav button { flex: 1; }
+    main.grid3, main.grid2 { grid-template-columns: 1fr; }
+    main.grid3 > .card:last-child { grid-column: auto; }
+    main.grid2 > .card { min-height: 560px; }
+  }
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: #d3dae3; border-radius: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -266,20 +312,20 @@
   </div>
   <span class="pill" id="adapter">connecting…</span>
   <span class="pill" id="policyPill">—</span>
-  <nav>
-    <button class="on" data-tab="console">Console</button>
-    <button data-tab="people">People</button>
-    <button data-tab="redteam">Red team</button>
+  <nav aria-label="Workspace views">
+    <button type="button" class="on" data-tab="console" aria-controls="tab-console" aria-selected="true">Console</button>
+    <button type="button" data-tab="people" aria-controls="tab-people" aria-selected="false">People</button>
+    <button type="button" data-tab="redteam" aria-controls="tab-redteam" aria-selected="false">Red team</button>
   </nav>
 </header>
 
 <!-- ═══ CONSOLE ═══════════════════════════════════════════════════════════ -->
 <main id="tab-console" class="grid3">
   <section class="card">
-    <div class="head">Policy <span class="ver" id="ver"></span></div>
+    <div class="head"><span class="head-title">Policy controls<small>Write, compile and scope rules</small></span><span class="ver" id="ver"></span></div>
     <div class="body">
       <div class="sub">Write a rule</div>
-      <textarea id="ruleText" rows="3" placeholder="Escribí una regla…&#10;p. ej. nadie de ventas puede pedir datos de nómina"></textarea>
+      <textarea id="ruleText" rows="3" aria-label="New policy rule" placeholder="Write a rule in plain language…&#10;e.g. sales cannot request payroll data"></textarea>
       <div class="row">
         <button class="act" id="compile">Compile</button>
         <span class="note" id="compileNote"></span>
@@ -301,19 +347,19 @@
 
   <section class="card">
     <div class="head">
-      Employee
-      <select id="who" style="width:auto;padding:5px 9px;font-size:12px;margin-left:4px"></select>
+      <span class="head-title">Prompt simulator<small>Test policy as an employee</small></span>
+      <select id="who" aria-label="Employee to simulate" style="width:auto;padding:6px 9px;font-size:12px;margin-left:4px"></select>
     </div>
-    <div class="body" id="chat"><div class="empty">Send a message to see the guard run.</div></div>
+    <div class="body" id="chat"><div class="empty-state"><div><div class="signal">›_</div><b>Run a policy check</b><span>Choose an employee and send a realistic prompt to see the decision.</span></div></div></div>
     <div class="composer">
-      <textarea id="prompt" rows="2" placeholder="Escribí como empleado…"></textarea>
+      <textarea id="prompt" rows="2" aria-label="Prompt to evaluate" placeholder="Write a prompt as this employee…"></textarea>
       <div class="row"><button class="act" id="send">Send</button><span class="note">⌘/Ctrl + Enter</span></div>
     </div>
   </section>
 
   <section class="card">
-    <div class="head">Decision trace <span class="ver" id="sse">●</span></div>
-    <div class="body" id="trace"><div class="empty">Live decisions appear here.</div></div>
+    <div class="head"><span class="head-title">Decision trace<small>Every enforcement pass, in order</small></span><span class="ver" id="sse">●</span></div>
+    <div class="body" id="trace"><div class="empty-state"><div><div class="signal">●</div><b>Listening for decisions</b><span>Verdicts, latency and pass-level detail will appear here live.</span></div></div></div>
   </section>
 </main>
 
@@ -321,7 +367,7 @@
 <main id="tab-people" class="grid2" style="display:none">
   <section class="card">
     <div class="head">
-      People
+      <span class="head-title">People<small>Directory, roles and connections</small></span>
       <span class="ver" id="headcount"></span>
     </div>
     <div class="body">
@@ -348,9 +394,9 @@
   </section>
 
   <section class="card">
-    <div class="head">Person</div>
+    <div class="head"><span class="head-title">Person<small>Access, onboarding and policy scope</small></span></div>
     <div class="body" id="personDetail">
-      <div class="empty">Pick someone to see their rules and write one just for them.</div>
+      <div class="empty-state"><div><div class="signal">ID</div><b>No person selected</b><span>Choose someone from the directory to manage their setup and rules.</span></div></div>
     </div>
   </section>
 </main>
@@ -358,14 +404,14 @@
 <!-- ═══ RED TEAM ══════════════════════════════════════════════════════════ -->
 <main id="tab-redteam" class="single" style="display:none">
   <section class="card">
-    <div class="head">Red team</div>
+    <div class="head"><span class="head-title">Red team<small>Attack coverage and false-positive rate</small></span></div>
     <div class="body">
       <div class="row" style="margin:0 0 16px">
         <button class="act" id="runRt">Run suite</button>
         <button class="ghost" id="loadRt">Load last report</button>
         <span class="note" id="rtNote"></span>
       </div>
-      <div id="rtOut"><div class="empty">Run the suite, or load the last report.</div></div>
+      <div id="rtOut"><div class="empty-state" style="min-height:260px"><div><div class="signal">RT</div><b>No report loaded</b><span>Run the suite or load the most recent report to inspect guard coverage.</span></div></div></div>
     </div>
   </section>
 </main>

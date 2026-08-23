@@ -60,6 +60,17 @@ profile). The installer writes them for you:
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
 export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by the admin
+export WARDEN_HEALTH_TIMEOUT_MS=2000
+export WARDEN_TIMEOUT_MS=30000
+```
+
+PowerShell (current session):
+
+```powershell
+$env:WARDEN_URL = 'http://192.168.1.42:8080'
+$env:WARDEN_API_KEY = 'wk-fede-8b1d40e2'
+$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
+$env:WARDEN_TIMEOUT_MS = '30000'
 ```
 
 **The key is the whole identity.** No name, no role — nothing an employee can
@@ -98,6 +109,9 @@ The hook emits both.
 ## 4. Codex
 
 Merge `codex/config.toml` into `~/.codex/config.toml`:
+
+The format and exit-code behavior follow the official
+[`UserPromptSubmit` hook documentation](https://developers.openai.com/codex/hooks).
 
 ```toml
 [[hooks.UserPromptSubmit]]
@@ -156,6 +170,13 @@ unusable answer escalates to a human; here that would mean a crashed daemon
 bricking every developer's CLI at once, and a gateway that can strand the team
 gets uninstalled the first morning it does. The missing heartbeat in the admin
 console is the alert.
+
+Availability and inference use separate deadlines. `/health` gets 2 seconds by
+default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets 30 seconds
+(`WARDEN_TIMEOUT_MS`). Both values must be positive and finite. The decision
+deadline includes reading and validating the complete HTTP body. A decision
+that exceeds 30 seconds still fails open; on 2026-08-23 one cold Windows Codex
+check took 35.954 seconds and reached the model, so Codex remains NOT VERIFIED.
 
 **Secrets are masked before the guard sees them.** An API key pasted into a
 prompt is replaced with `[REDACTED:OpenAI key]` before any model runs, and only
@@ -223,6 +244,11 @@ Only the last row has been. Everything else is wired from the tools' own
 documentation and tested at the hook boundary, which is not the same thing —
 [OPE-19](https://linear.app/operations-aleph/issue/OPE-19) is the card for
 closing that gap.
+
+The 2026-08-23 attempt did not close it. Claude Code blocked the six malicious
+cases but intermittently blocked benign traffic and its OAuth session had
+expired. Codex loaded the hook, but a cold decision exceeded 30 seconds and the
+prompt reached the model. See [`../docs/HOOK-VERIFICATION.md`](../docs/HOOK-VERIFICATION.md).
 
 **Hook or proxy** is the distinction that decides whether a tool can be governed
 on a subscription at all. A hook runs on the employee's machine before the

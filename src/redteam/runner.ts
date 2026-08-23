@@ -177,11 +177,14 @@ async function main(): Promise<void> {
   };
 
   printConsole(summary);
-  writeReport(summary);
+  const reportPath = summary.adapter === 'mock' ? 'data/redteam-last.mock.md' : 'REPORT.md';
+  const resultPath = summary.adapter === 'mock' ? 'data/redteam-last.mock.json' : 'data/redteam-last.json';
+  writeReport(summary, reportPath);
   // Persist the structured result too, so the console can render it without
-  // parsing markdown or re-running the suite.
-  writeFileSync('data/redteam-last.json', JSON.stringify(summary, null, 2));
-  console.log('\nwrote REPORT.md\n');
+  // parsing markdown or re-running the suite. Mock runs stay separate so a UI
+  // smoke test cannot overwrite the latest evidence from the real adapter.
+  writeFileSync(resultPath, JSON.stringify(summary, null, 2));
+  console.log(`\nwrote ${reportPath}\n`);
   await adapter().dispose();
 }
 

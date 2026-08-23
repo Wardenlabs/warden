@@ -14,21 +14,21 @@ working state.
 | Quotas | ✅ per role per day |
 | Audit log | ✅ hash-chained, `npm run verify-audit` passes |
 | OpenAI proxy | ✅ 401 / 403 / 429 / 502 all correct |
-| **Hook CLI** | ✅ blocks in both payload shapes, allows silently, fails open when Warden is down |
+| **Hook CLI boundary** | ✅ `npm run test:hook`: both payloads, silent ALLOW, BLOCK, health/decision timeout, gateway down, invalid response |
+| **Claude Code E2E** | ❌ NOT VERIFIED — attacks blocked, but benign traffic produced an intermittent false positive and OAuth was expired |
+| **Codex E2E** | ❌ NOT VERIFIED — a cold 35.954 s decision exceeded the 30 s hook timeout and the prompt reached the model |
 | Web console | ✅ three panes + red-team tab, verified in a browser |
 | Red-team corpus | ✅ 98 prompts, 12 classes |
 | Runner + REPORT.md | ✅ runs both modes, lists every failure by id |
-| Setup script | ✅ diagnoses, downloads over HTTPS, proves inference |
+| Setup script | ✅ exact-size resumable HTTPS downloads; exits non-zero unless real inference succeeds |
 | Benchmark generator | ⚠️ written, not yet run on real hardware |
 
 ## Open
 
-**Latency is the real problem.** ~24s per prompt on this container's CPU with
-four rules. Removing the KV cache key — which was silently replaying verdicts —
-means every call reprocesses the whole prompt, and prompt length now dominates.
-Mitigations applied: two few-shot examples per side instead of three,
-`WARDEN_TOP_K` bounds the rule count. A Metal machine should be several times
-faster, and **that number is what OPE-14 exists to find out.**
+**Latency is the real problem.** The 2026-08-23 Windows run measured 24.9–26.6 s
+cold and 7.1–23.9 s hot. One cold Codex check took 35.954 s, exceeded the hook's
+30 s deadline, failed open and reached the model. Every hot measurement exceeds
+the 2 s risk threshold. Full evidence is in `docs/HOOK-VERIFICATION.md`.
 
 If the demo machine is still slow: lower `WARDEN_TOP_K` to 2 and say so on
 camera as a measured trade-off. That is a better outcome than a demo with dead
@@ -44,7 +44,7 @@ number needs confirming on real hardware. Every failure is printed by id in
 | Who | What |
 |---|---|
 | Everyone | `npm run setup`, paste the report into OPE-14 |
-| Fede | OPE-19 — watch the hook block inside real Claude Code / Codex. Until someone sees it, the central claim is unverified. |
+| Fede | OPE-19 — re-authenticate Claude, resolve intermittent benign false positives, and retest Codex only after cold decisions stay below 30 s |
 | Jere | OPE-20 — improvised attacks + clean-clone check by someone who did not build it |
 | Martin | OPE-12 — `npm run benchmark` and `npm run redteam` on the demo machine, pin the permalinks to a SHA, record, submit |
 

@@ -19,7 +19,7 @@ tiene los modelos; las demás sólo bajan un archivo de 4 KB.
 ```bash
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
-npm install
+npm ci
 npm run setup
 npm run dev
 ```
@@ -106,12 +106,34 @@ Onboarding.
 
 Después abrí una terminal nueva, o `source ~/.zshrc`.
 
+El hook usa por defecto 2 segundos para comprobar disponibilidad y 30 segundos
+para una decisión completa. Sólo hace falta exportarlos si querés cambiarlos:
+
+```bash
+export WARDEN_HEALTH_TIMEOUT_MS=2000
+export WARDEN_TIMEOUT_MS=30000
+```
+
 > El hook es un archivo, sin dependencias. Lee el prompt, se lo pregunta al
 > gateway, y devuelve sí o no.
 
 > No hay nombre ni rol que configures: la key es toda tu identidad. Tu admin
 > decide qué significa. Y como el link del instalador lleva tu key adentro,
 > tratalo como un secreto.
+
+En Windows PowerShell, para la sesión actual:
+
+```powershell
+$env:WARDEN_URL = 'http://192.168.1.42:8080'
+$env:WARDEN_USER = 'fede'
+$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
+$env:WARDEN_TIMEOUT_MS = '30000'
+```
+
+El health check tiene 2 s y la decisión completa 30 s. El segundo timeout
+incluye headers, lectura y validación del body. Los valores deben ser positivos
+y finitos. Si la decisión supera 30 s, el diseño fail-open deja pasar el prompt
+con advertencia; por eso una máquina que cruza ese límite no está verificada.
 
 ## 3a. Conectar Claude Code
 
@@ -159,8 +181,10 @@ $ claude
    Audit: a7f3c2
 ```
 
-Un prompt normal pasa sin decir nada. Si no ves ninguna diferencia, el hook no
-está cargando — mirá "Cuando no anda" abajo.
+Un prompt normal debe pasar sin mensajes del hook. El 2026-08-23 este gate no
+fue reproducible: hubo falsos positivos benignos y una decisión Codex fría de
+35.954 s llegó al modelo. Ambos clientes siguen NOT VERIFIED; ver
+[`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
 
 ---
 

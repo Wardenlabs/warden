@@ -328,7 +328,7 @@ app.post('/v1/chat/completions', asyncRoute(async (req, res) => {
 // ── red team ─────────────────────────────────────────────────────────────────
 // The last run is kept on disk so the console can show results without
 // re-running a suite that takes minutes against a real model.
-const RT_RESULT = 'data/redteam-last.json';
+const RT_RESULT = isMock() ? 'data/redteam-last.mock.json' : 'data/redteam-last.json';
 
 app.get('/api/redteam/report', (_req, res) => {
   const last = readSeedJson<unknown | null>(RT_RESULT, null);
@@ -338,22 +338,37 @@ app.get('/api/redteam/report', (_req, res) => {
 
 app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   const { spawn } = await import('node:child_process');
-  const child = spawn('npx', ['tsx', 'src/redteam/runner.ts'], {
+  const { resolve } = await import('node:path');
+  // Invoke the installed TSX entry point through this exact Node runtime.
+  // Shell launchers (`npx`, `npm.cmd`) differ across platforms and can emit
+  // ENOENT/EINVAL on Windows when spawned without a shell.
+  const tsx = resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  const child = spawn(process.execPath, [tsx, 'src/redteam/runner.ts'], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'ignore',
-    detached: false
+    detached: false,
+    windowsHide: true
   });
   // Long enough that a mock run finishes inline; a real-model run keeps going
   // and the console picks it up from disk on the next "Load last report".
-  const finished = await Promise.race([
-    new Promise<boolean>((r) => child.on('exit', () => r(true))),
-    new Promise<boolean>((r) => setTimeout(() => r(false), 120_000))
+  const outcome = await Promise.race([
+    new Promise<{ finished: true; error?: string }>((resolve) => {
+      child.once('error', (err) => resolve({ finished: true, error: err.message }));
+      child.once('exit', (code) => resolve({
+        finished: true,
+        error: code === 0 ? undefined : `runner exited with code ${code ?? 'unknown'}`
+      }));
+    }),
+    new Promise<{ finished: false }>((resolve) => setTimeout(() => resolve({ finished: false }), 120_000))
   ]);
+  if (outcome.finished && outcome.error) {
+    return res.status(500).json({ error: `red-team run failed: ${outcome.error}` });
+  }
   const last = readSeedJson<unknown | null>(RT_RESULT, null);
   if (!last) {
-    return res.status(finished ? 500 : 202).json({
-      error: finished ? 'run produced no result' : 'still running — use Load last report in a minute'
+    return res.status(outcome.finished ? 500 : 202).json({
+      error: outcome.finished ? 'run produced no result' : 'still running — use Load last report in a minute'
     });
   }
   res.json(last);

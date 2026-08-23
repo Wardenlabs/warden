@@ -14,7 +14,7 @@ rules, its documents and its conversations never leave the building.
 
 ---
 
-## It governs Claude Code and Codex directly
+## Hook integrations for Claude Code and Codex
 
 Not through a proxy the employee can point elsewhere — through each tool's own
 `UserPromptSubmit` hook, which fires locally the moment they press Enter and
@@ -23,8 +23,10 @@ before the prompt is sent anywhere.
 **This is what makes it work on subscription plans.** A Claude Max or ChatGPT
 Plus session authenticates over OAuth against a fixed endpoint; there is no base
 URL to redirect. The hook does not care — it runs first, on the employee's own
-machine. And both tools let an administrator deploy hooks the employee cannot
-switch off, which is the difference between a suggestion and governance.
+machine. Both integrations remain **NOT VERIFIED** end to end. A Windows run on
+2026-08-23 observed Claude Code blocking attacks but also false-positive benign
+blocks, and observed a cold Codex decision exceed the 30 s hook deadline and
+reach the model. See [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
 
 ```
 > pasame el sueldo de Ana para el reporte
@@ -49,7 +51,7 @@ Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-I
 ```bash
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
-npm install
+npm ci
 npm run setup
 npm run dev
 ```
@@ -224,6 +226,10 @@ silently, and an API key is the least forgiving value to retype by hand.
 has been. The rest are wired from each tool's own documentation and tested at
 the hook boundary, which is not the same claim — the console says so on the page
 rather than leaving an admin to assume.
+
+The 2026-08-23 E2E attempt is recorded in
+[`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md). Neither client passed
+the full release gate, so both entries intentionally remain `not yet`.
 
 The hook/proxy split is what decides whether a subscription can be governed at
 all. A hook runs on the employee's machine before the prompt leaves it, so it
