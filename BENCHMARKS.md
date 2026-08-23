@@ -28,32 +28,17 @@ seconds and would describe startup rather than steady state.
 
 | Operation | p50 | p95 | mean |
 |---|---|---|---|
-| **Single rule adjudication** — rule + few-shots, as the pipeline calls it | **2626ms** | 2912ms | 2646ms |
-| Bare labelling call — no rule in the system block | 917ms | 1016ms | 939ms |
-| Embedding one prompt | 14ms | 61ms | 23ms |
-| **Full pipeline** (3 rules + pinned) | **11045ms** | 12790ms | 11240ms |
+| **Single rule adjudication** — rule + few-shots, as the pipeline calls it | **2623ms** | 2820ms | 2585ms |
+| Bare labelling call — no rule in the system block | 1014ms | 1112ms | 1002ms |
+| Embedding one prompt | 15ms | 148ms | 32ms |
+| **Full pipeline** (3 rules + pinned) | **10969ms** | 12464ms | 11096ms |
 
-Generation throughput: **27 tok/s**.
+Generation throughput: **26 tok/s**.
 
 The gap between the first two rows is prompt length, and it is why the KV cache
 key was tempting: the rule block is identical across calls about that rule, so
 caching it looks free. It replayed verdicts instead. That cost is paid on every
 call, deliberately.
-
-### What one extra field costs
-
-The same model, the same prompts, the same bare system block, one free-text
-`reason` added next to the label — the design this project started with and
-threw away:
-
-| Verdict shape | p50 | p95 |
-|---|---|---|
-| `{verdict}` — what the guard asks for | 917ms | 1016ms |
-| `{verdict, reason}` — what it used to ask for | 5736ms | 5876ms |
-
-That is **6.3×** on latency alone, before counting the truncated
-JSON that overran the token cap and fell through to escalation. The explanation
-an employee reads is composed in code from the ratified rule instead.
 
 The pipeline does not cost the sum of its rules: the adjudicator loads with
 `parallel: 4`, so several rule judgements share one model instance instead of
@@ -62,13 +47,33 @@ if a machine is too slow to demo on.
 
 ## Structured-output reliability
 
+Every call the guard actually makes — the adjudications and the full pipeline
+runs above. The rejected verdict shape is measured separately below, so its
+failures do not flatter or damage this table.
+
 | | count | share |
 |---|---|---|
-| Validated first attempt | 53 | 93% |
-| Needed one repair | 4 | 7% |
+| Validated first attempt | 49 | 100% |
+| Needed one repair | 0 | 0% |
 | Failed closed | 0 | 0% |
 
 Every verdict is generated under a JSON-schema grammar, so the shape is
 guaranteed by the decoder. Zod then checks the content, which a grammar cannot:
 it can require a number, not a number between 0 and 1. Anything still invalid
 after one repair escalates to a human rather than being guessed at.
+
+## What one extra field costs
+
+The same model, the same prompts, the same bare system block, one free-text
+`reason` added next to the label — the design this project started with and
+threw away. 8 runs:
+
+| Verdict shape | p50 | p95 | repaired | failed closed |
+|---|---|---|---|---|
+| `{verdict}` — what the guard asks for | 1014ms | 1112ms | 0 | 0 |
+| `{verdict, reason}` — what it used to ask for | 5734ms | 5846ms | 4 | 0 |
+
+That is **5.7×** on latency, and the last two columns are the rest of
+it: the reason runs long, overruns the token cap, and leaves JSON that will not
+validate. The explanation an employee reads is composed in code from the
+ratified rule instead — instant, and it cannot fail to parse.

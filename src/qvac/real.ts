@@ -16,6 +16,7 @@
 import { cancel, completion, embed, ocr } from '@qvac/sdk';
 import type { ZodType } from 'zod';
 import { modelFor, shutdown } from './client.js';
+import { withDeadline } from './deadline.js';
 import {
   FailClosedError,
   type CompleteRequest,
@@ -36,39 +37,18 @@ const CANCEL_GRACE_MS = 5_000;
  *
  * `completion()` had a hard stop and these did not, which is a distinction the
  * caller cannot see and an attacker can. Retrieval embeds the whole prompt, so
- * a long enough message parks the embedder — measured here at 13 minutes on one
+ * a long enough message parks the embedder — measured at 13 minutes on one
  * `volume-distraction` prompt, against a 14ms p50 for a normal one. The guard
  * request behind it waits, the hook hits its own 30s deadline, and it fails
  * open by design. That turns "send a very large prompt" into a bypass, which is
  * exactly what that corpus class is built to try.
  *
  * Both are generous — 700x the measured p50 for embedding — because the point
- * is to bound a hang, not to fail slow work.
+ * is to bound a hang, not to fail slow work. Loading the model is bounded
+ * separately in `client.ts`, since it happens before either call.
  */
 const EMBED_TIMEOUT_MS = 10_000;
 const OCR_TIMEOUT_MS = 30_000;
-
-/**
- * Reject once `ms` has passed, whatever the underlying call is doing.
- *
- * This frees the caller, not the worker: neither `embed()` nor `ocr()` takes a
- * request id, so there is nothing to cancel and the abandoned work keeps a core
- * busy until it finishes on its own. Bounding the guard's latency is worth that
- * — every caller resolves a throw here to a stricter verdict, and a pass that
- * never returns has no verdict at all.
- */
-async function withDeadline<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${what} did not return within ${ms}ms`)), ms);
-  });
-  work.catch(() => {});
-  try {
-    return await Promise.race([work, expired]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /**
  * Fixed seed and zero temperature by default.
