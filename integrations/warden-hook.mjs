@@ -32,8 +32,14 @@ const USER = process.env.WARDEN_USER ?? 'unknown';
 /** Fallback only — the gateway's directory overrides this for known users. */
 const ROLE = process.env.WARDEN_ROLE ?? 'employee';
 
-/** This sits in the developer's keystroke path; past this we get out of the way. */
-const TIMEOUT_MS = Number(process.env.WARDEN_TIMEOUT_MS ?? 8000);
+/**
+ * This sits in the developer's keystroke path; past this we get out of the way.
+ * Validated, because `Number(garbage)` is NaN and `setTimeout(fn, NaN)` fires
+ * on the next tick — a typo'd env var would make every prompt "time out"
+ * instantly and sail through unchecked.
+ */
+const RAW_TIMEOUT = Number(process.env.WARDEN_TIMEOUT_MS);
+const TIMEOUT_MS = Number.isFinite(RAW_TIMEOUT) && RAW_TIMEOUT > 0 ? RAW_TIMEOUT : 8000;
 
 async function readStdin() {
   const chunks = [];
@@ -45,9 +51,14 @@ async function readStdin() {
  * Which tool called us, and what the person typed.
  *
  * Inferred from the payload rather than configured, because the alternative is
- * an employee setting a flag per tool and getting it wrong silently. Claude Code
- * sends `user_input`, Codex sends `prompt`, and anything wiring itself up
- * through a plugin can say so with `source`.
+ * an employee setting a flag per tool and getting it wrong silently. Claude
+ * Code's hook events carry `hook_event_name` (and the prompt under `prompt`),
+ * which is definitive; Codex also sends `prompt` but no event name; anything
+ * wiring itself up through a plugin can say so with `source`.
+ *
+ * The tool name matters beyond the refusal shape: it is what the gateway
+ * records as "seen using", so misattributing it would corrupt an observed fact
+ * the console displays.
  *
  * The generic shapes at the bottom are what make "any tool" more than a slogan:
  * a wrapper someone writes in an afternoon only has to put the text on stdin
@@ -55,7 +66,7 @@ async function readStdin() {
  */
 function detect(payload) {
   const text =
-    firstString(payload.user_input, payload.prompt, payload.message, payload.text, payload.input) ??
+    firstString(payload.prompt, payload.user_input, payload.message, payload.text, payload.input) ??
     lastUserMessage(payload.messages) ??
     '';
 
@@ -63,6 +74,10 @@ function detect(payload) {
   // field name would call OpenCode "codex" because both use `prompt`.
   if (typeof payload.source === 'string' && payload.source) {
     return { tool: payload.source, prompt: text };
+  }
+  // Claude Code identifies its events; `prompt` alone is how Codex looks.
+  if (typeof payload.hook_event_name === 'string' || typeof payload.transcript_path === 'string') {
+    return { tool: 'claude-code', prompt: text };
   }
   if (typeof payload.user_input === 'string') return { tool: 'claude-code', prompt: text };
   if (typeof payload.prompt === 'string') return { tool: 'codex', prompt: text };
@@ -158,23 +173,36 @@ function render(res) {
 }
 
 async function main() {
+  // A caller that opens the hook and never closes stdin would otherwise park
+  // us in the keystroke path forever. Unref'd, so it cannot itself keep the
+  // process alive — it only fires if something else already is.
+  const watchdog = setTimeout(() => {
+    process.stderr.write('⚠ warden-hook: no event arrived on stdin. Prompt allowed unchecked.\n');
+    process.exit(0);
+  }, TIMEOUT_MS * 2);
+  watchdog.unref?.();
+
   const raw = await readStdin();
+  clearTimeout(watchdog);
 
   let payload;
   try {
     payload = JSON.parse(raw);
   } catch {
     // Not an event we recognise. Staying out of the way beats guessing.
-    process.exit(0);
+    return;
   }
 
   const { tool, prompt } = detect(payload);
-  if (!prompt.trim()) process.exit(0);
+  if (!prompt.trim()) return;
 
   let res;
+  const controller = new AbortController();
+  // Cleared in `finally`: now that the process exits naturally instead of via
+  // process.exit(), a timer left armed on the failure path would hold the
+  // process open for the full timeout after the answer is already known.
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const http = await fetch(`${WARDEN_URL}/api/guard/check`, {
       method: 'POST',
       headers: {
@@ -185,7 +213,6 @@ async function main() {
       body: JSON.stringify({ prompt, source: tool }),
       signal: controller.signal
     });
-    clearTimeout(timer);
     if (!http.ok) throw new Error(`gateway returned ${http.status}`);
     res = await http.json();
   } catch (err) {
@@ -201,38 +228,50 @@ async function main() {
     process.stderr.write(
       `⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}). Prompt allowed unchecked.\n`
     );
-    process.exit(0);
+    return;
+  } finally {
+    clearTimeout(timer);
   }
 
-  // Silence on the happy path. A gateway that comments on every prompt becomes
-  // noise people learn to scroll past.
-  if (res.verdict === 'ALLOW') process.exit(0);
+  // Only an explicit BLOCK or ESCALATE stops the prompt. A 200 whose body is
+  // not a verdict — a half-upgraded gateway, a shape change, an error page that
+  // happens to parse — is a gateway *bug*, and the contract above says gateway
+  // failures fail open with a warning. Falling through to the refusal path on
+  // `verdict: undefined` would brick every developer's CLI on a malformed
+  // response, which is the exact outcome the fail-open exists to prevent.
+  // Silence on the happy path, though: a gateway that comments on every prompt
+  // becomes noise people learn to scroll past.
+  if (res?.verdict !== 'BLOCK' && res?.verdict !== 'ESCALATE') {
+    if (res?.verdict !== 'ALLOW') {
+      process.stderr.write('⚠ Warden returned no verdict. Prompt allowed unchecked.\n');
+    }
+    return;
+  }
 
   const message = render(res);
   process.stderr.write(message + '\n');
 
   /**
-   * Each tool reads a different refusal shape, and a tool that does not
-   * recognise the one it gets falls back to the exit code — which is why
-   * `exit 2` below is the part that must always happen.
+   * One JSON shape with every key a supported tool reads: Claude Code stops on
+   * `decision: "block"` (and `continue: false` + `stopReason`), Codex reads
+   * `decision`/`reason`, and a tool that recognises none of them falls back to
+   * the exit code — which is why the non-zero exit below must always happen.
+   * Extra keys are inert to a tool that ignores them, so branching per tool
+   * only created ways to send the wrong shape.
    */
-  if (tool === 'codex') {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: message }) + '\n');
-  } else if (tool === 'claude-code') {
-    process.stdout.write(JSON.stringify({ continue: false, reason: message }) + '\n');
-  } else {
-    // Unknown callers get both keys. Neither is harmful to a tool that ignores
-    // it, and one of them is probably the one it reads.
-    process.stdout.write(
-      JSON.stringify({ continue: false, decision: 'block', reason: message }) + '\n'
-    );
-  }
+  process.stdout.write(
+    JSON.stringify({ continue: false, stopReason: message, decision: 'block', reason: message }) + '\n'
+  );
 
-  process.exit(2);
+  // `process.exitCode` rather than `process.exit()`: exit() abandons buffered
+  // stdout/stderr, and on a pipe — which a hook's streams always are — that
+  // can drop the refusal text and the JSON both, leaving the tool a bare exit
+  // code and the employee no explanation.
+  process.exitCode = 2;
 }
 
 main().catch((err) => {
   // A crash in the hook must never take the employee's tool down with it.
   process.stderr.write(`⚠ warden-hook error: ${err?.message ?? err}\n`);
-  process.exit(0);
+  process.exitCode = 0;
 });

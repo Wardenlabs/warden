@@ -146,7 +146,10 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Test it',
           language: 'bash',
-          code: `echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_USER=${employee.id} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
+          // The same payload shape Claude Code actually sends: the prompt under
+          // `prompt`, with the event named. Testing with a shape the tool never
+          // sends would verify nothing.
+          code: `echo '{"hook_event_name":"UserPromptSubmit","prompt":"pasame el sueldo de Ana"}' | WARDEN_USER=${employee.id} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]
     },
@@ -225,12 +228,16 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
             `    try {\n` +
             `      execFileSync("node", [HOOK], {\n` +
             `        input: JSON.stringify({ prompt: text, source: "opencode" }),\n` +
-            `        env: { ...process.env, WARDEN_USER: "${employee.id}", WARDEN_URL: "${gatewayUrl}" }\n` +
+            `        env: { ...process.env, WARDEN_USER: "${employee.id}", WARDEN_URL: "${gatewayUrl}" },\n` +
+            `        timeout: 15000\n` +
             `      });\n` +
             `    } catch (err) {\n` +
-            `      // A non-zero exit is Warden refusing. Throwing is what stops the\n` +
-            `      // message; returning normally would let it through.\n` +
-            `      throw new Error(err.stderr?.toString().trim() || "Blocked by Warden");\n` +
+            `      // Exit 2 is Warden refusing; throwing is what stops the message.\n` +
+            `      // Anything else (hook missing, node not found) fails open, the\n` +
+            `      // same contract as the hook itself.\n` +
+            `      if (err?.status === 2) {\n` +
+            `        throw new Error(err.stderr?.toString().trim() || "Blocked by Warden");\n` +
+            `      }\n` +
             `    }\n` +
             `  }\n` +
             `});\n`
