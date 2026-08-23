@@ -12,25 +12,22 @@
  * employee installs has to be something they can curl and forget. Anything
  * heavier does not get rolled out.
  *
- * Install:
- *   curl -o ~/.warden-hook.mjs https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs
- *   chmod +x ~/.warden-hook.mjs
+ * Install — your admin gives you the link, which already has your key in it:
+ *   curl -fsSL http://192.168.1.42:8080/install/<you> | sh
  *
- * Configure (in ~/.zshrc or ~/.bashrc):
+ * Or by hand, in ~/.zshrc or ~/.bashrc:
  *   export WARDEN_URL=http://192.168.1.42:8080   # the gateway machine
- *   export WARDEN_USER=fede
- *   export WARDEN_ROLE=analyst                   # only used if you are not in the directory
+ *   export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by your admin
  *
- * WARDEN_ROLE is a fallback, not a claim the gateway honours. Anyone the admin
- * has added to the directory is judged under the role set there, because a role
- * an employee can edit in their own shell profile is a role they could use to
- * pick which rules apply to them.
+ * The key is the whole identity. There is no name to set and no role to set:
+ * your admin decides what your key means and can change it without you touching
+ * anything here — and a role you could set yourself would be a role you could
+ * use to pick the rules that judge you. A key this gateway does not recognise is
+ * refused outright, which is also how revoking one works.
  */
 
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
-const USER = process.env.WARDEN_USER ?? 'unknown';
-/** Fallback only — the gateway's directory overrides this for known users. */
-const ROLE = process.env.WARDEN_ROLE ?? 'employee';
+const API_KEY = process.env.WARDEN_API_KEY ?? '';
 
 /** This sits in the developer's keystroke path; past this we get out of the way. */
 const TIMEOUT_MS = Number(process.env.WARDEN_TIMEOUT_MS ?? 8000);
@@ -112,6 +109,18 @@ function wrap(text, indent = '   ', width = 76) {
 }
 
 function render(res) {
+  // An unrecognised key is not a policy decision and must not read like one —
+  // the person needs to know it is their credential, not something they typed.
+  if (res.error === 'unknown_api_key' || res.auditId === 'no-key') {
+    return [
+      '🔑 Warden did not recognise your API key',
+      '',
+      ...wrap(res.explanation ?? 'Ask your administrator for a current key.'),
+      '',
+      '   Set it with: export WARDEN_API_KEY=wk-…'
+    ].join('\n');
+  }
+
   const lines = [res.verdict === 'BLOCK' ? '⛔ Blocked by Warden' : '⏸ Held for review by Warden'];
   const rule = res.firedRules?.[0];
 
@@ -179,15 +188,34 @@ async function main() {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-warden-user': USER,
-        'x-warden-role': ROLE
+        authorization: `Bearer ${API_KEY}`
       },
       body: JSON.stringify({ prompt, source: tool }),
       signal: controller.signal
     });
     clearTimeout(timer);
-    if (!http.ok) throw new Error(`gateway returned ${http.status}`);
-    res = await http.json();
+
+    /**
+     * A rejected credential is an answer, not a failure.
+     *
+     * This is the line that separates the two error paths, and getting it wrong
+     * either way is bad. A gateway that cannot be reached must not brick every
+     * developer's CLI — that is the fail-open case below. But a gateway that
+     * answered, and answered "I do not know this key", has governed the request:
+     * treating that as an outage would mean revoking somebody's key silently
+     * granted them unlimited access, which is the opposite of revocation.
+     */
+    if (http.status === 401 || http.status === 403) {
+      res = await http.json().catch(() => ({
+        verdict: 'BLOCK',
+        auditId: 'no-key',
+        explanation: 'This gateway did not recognise your Warden API key.'
+      }));
+    } else if (!http.ok) {
+      throw new Error(`gateway returned ${http.status}`);
+    } else {
+      res = await http.json();
+    }
   } catch (err) {
     /**
      * The one place this deliberately fails open.
@@ -197,6 +225,9 @@ async function main() {
      * gateway that can strand the whole team gets uninstalled the first morning
      * it does. Warn loudly, let the prompt through, and let the missing
      * heartbeat be the alert on the admin's side.
+     *
+     * Note this catch no longer swallows a rejected key: that is handled above
+     * as the answer it is.
      */
     process.stderr.write(
       `⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}). Prompt allowed unchecked.\n`

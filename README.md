@@ -209,8 +209,7 @@ step was where setup died, which is a poor look for a product whose claim is
 that nothing leaves the network.
 
 Every value an admin retypes is a value they can get wrong, and these fail
-silently: a mistyped `WARDEN_USER` does not error, it gets that person judged as
-a stranger.
+silently, and an API key is the least forgiving value to retype by hand.
 
 | Tool | How it is governed | On a subscription | Verified |
 |---|---|---|---|
@@ -251,11 +250,17 @@ locked to them: the admin already said who it was for by being on their page,
 and asking a 1.7B model to re-derive that from prose is a way to bind a personal
 rule to the whole company.
 
-**The directory decides the role, not the employee.** `WARDEN_ROLE` on someone's
-laptop is a fallback for people the directory has never seen. Anyone in it is
-judged under the role the admin set, because a role an employee can edit in
-their own shell profile is a role they could use to pick which rules apply to
-them.
+**An API key is the entire identity.** An employee sends no name and no role —
+nothing they can type says who they are. The admin issues a key, the directory
+records what it means, and the role behind it changes without the employee
+touching their machine.
+
+The earlier design let the caller send a name and a role. The name was checked
+against the directory, but anyone *not* in it kept the role they claimed, so an
+exempt role was one header away. A key cannot be forged into an identity that
+does not exist, and an unrecognised one is refused outright rather than judged
+under a default. Rotation is revocation: the old key stops working on the next
+prompt.
 
 The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays

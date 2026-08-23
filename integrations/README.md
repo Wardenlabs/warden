@@ -54,22 +54,29 @@ Warden  (adapter=real)
   network   http://192.168.1.42:8080   <- teammates point here
 ```
 
-Each employee sets these (in `~/.zshrc`, `~/.bashrc`, or their shell profile):
+Each employee sets two variables (in `~/.zshrc`, `~/.bashrc`, or their shell
+profile). The installer writes them for you:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
-export WARDEN_USER=fede
-export WARDEN_ROLE=analyst                   # fallback only, see below
+export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by the admin
 ```
 
-`WARDEN_USER` is the field that matters. The gateway looks it up in the
-directory the admin manages in the console's People tab, and the role recorded
-there decides which rules and which quota apply — including any rule written for
-that person by name.
+**The key is the whole identity.** No name, no role — nothing an employee can
+type says who they are. The admin issues the key, the directory records what it
+means, and the role behind it can change without the employee touching their
+machine.
 
-`WARDEN_ROLE` is only consulted for someone the directory has never seen. It is
-deliberately not authoritative: a role an employee can edit in their own shell
-profile is a role they could use to pick which rules judge them.
+That is the point of doing it this way. A role in a shell profile is a role the
+employee can edit, and editing it would let them choose which rules judge them;
+an exempt role was a header away. A key they cannot forge closes that, and gives
+revocation for free: rotate it in the console and the old one stops working on
+the next prompt.
+
+A key the gateway does not recognise is **refused**, not judged under some
+default identity. Note the asymmetry with the gateway being *unreachable*, which
+still lets prompts through — see "Behaviour worth knowing" below. A gateway that
+answered has governed the request; one that never answered has not.
 
 ## 3. Claude Code
 
@@ -198,8 +205,7 @@ does not use one, and a `curl | sh` with a credential in it leaves that
 credential in shell history.
 
 That matters because every value an admin retypes is a value they can get wrong,
-and the wrong ones fail silently — a mistyped `WARDEN_USER` does not error, it
-just gets that person judged as a stranger under whatever role they claim.
+and an API key is the least forgiving of them.
 
 ## Which tools, and how each one is governed
 

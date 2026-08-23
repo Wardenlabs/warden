@@ -15,7 +15,7 @@
 import type { Request, Response } from 'express';
 import { evaluate } from '../guard/pipeline.js';
 import type { Actor, Decision } from '../guard/types.js';
-import { findByApiKey, findEmployee } from '../policy/people.js';
+import { actorForCredential } from '../policy/people.js';
 import { loadPolicy, rulesForActor } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 
@@ -32,32 +32,17 @@ const UPSTREAM_MODEL = process.env['WARDEN_UPSTREAM_MODEL'] ?? 'warden';
 const MODE = process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden';
 
 /**
- * Resolve the caller.
+ * Resolve the caller — the API key, and nothing else.
  *
- * The bearer token is the primary signal because real clients send it. Headers
- * are a development convenience for the web console, which has a person
- * switcher and no keys to juggle.
- *
- * When the header names someone in the directory, the directory's role wins
- * over whatever role the header claims. The role is an admin decision, and a
- * client that could assert its own would be able to pick the rule set it is
- * judged against — which is the whole thing this gateway exists to prevent.
+ * There used to be a header fallback here for the web console's person
+ * switcher. It is gone: two ways to say who you are means the weaker one is the
+ * one that gets used, and the weaker one was a header any client could set. The
+ * console now sends the selected person's key, which has the useful side effect
+ * of exercising the same path an employee's tool does.
  */
 function resolveActor(req: Request): Actor | null {
-  const bearer = /^Bearer\s+(.+)$/i.exec(req.header('authorization') ?? '')?.[1]?.trim();
-  if (bearer) {
-    const match = findByApiKey(bearer);
-    return match ? { id: match.id, role: match.role } : null;
-  }
-
-  const headerUser = req.header('x-warden-user');
-  if (headerUser) {
-    const known = findEmployee(headerUser);
-    if (known) return { id: known.id, role: known.role };
-    return { id: headerUser, role: req.header('x-warden-role') ?? 'employee' };
-  }
-
-  return null;
+  const employee = actorForCredential(req.header('authorization'));
+  return employee ? { id: employee.id, role: employee.role } : null;
 }
 
 /** Rules folded into a system prompt — the baseline everyone else ships. */

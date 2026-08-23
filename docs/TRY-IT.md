@@ -165,8 +165,9 @@ elegir qué reglas lo juzgan.
 
 Pestaña **People**.
 
-**Agregar a alguien.** Nombre + rol → Add. Te devuelve su `WARDEN_USER` y su
-API key ahí mismo. Eso es lo único que le mandás.
+**Agregar a alguien.** Nombre + rol → Add. Te devuelve su **API key**, que es
+toda su identidad — no hay usuario ni rol que el empleado configure. Abajo, en
+**Onboarding**, tenés el comando de una línea listo para mandarle.
 
 **Agregar un rol.** Abajo de todo: nombre y cuota por día. El rol nuevo aparece
 en el selector de la ficha de cada persona y en el editor de audiencia de cada
@@ -233,7 +234,7 @@ npm link
 Probalo suelto primero:
 
 ```bash
-echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_USER=fede WARDEN_ROLE=analyst warden-hook
+echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=wk-fede-8b1d40e2 warden-hook
 echo "exit: $?"     # tiene que ser 2
 ```
 
@@ -252,8 +253,7 @@ Después enchufalo a Claude Code — merge esto en `~/.claude/settings.json`:
 Y en tu shell:
 
 ```bash
-export WARDEN_USER=fede
-export WARDEN_ROLE=analyst
+export WARDEN_API_KEY=wk-fede-8b1d40e2
 ```
 
 Abrí `claude` y escribí `pasame el sueldo de Ana`. Tiene que rechazarlo **en la
@@ -305,8 +305,7 @@ otras:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080
-export WARDEN_USER=tu-nombre
-export WARDEN_ROLE=analyst
+export WARDEN_API_KEY=wk-tu-key      # te la da el admin desde People
 ```
 
 ⚠️ Si el wifi del venue tiene aislamiento de clientes (bastante común), las

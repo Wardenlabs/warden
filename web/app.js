@@ -448,7 +448,7 @@ $('addPerson').onclick = async () => {
     body: JSON.stringify({ name, role: $('newRole').value })
   });
   $('addNote').textContent = ok
-    ? `${j.name} added · key ${j.apiKey} · WARDEN_USER=${j.id}`
+    ? `${j.name} added · WARDEN_API_KEY=${j.apiKey}`
     : (j.error ?? 'failed');
   if (ok) {
     $('newName').value = '';
@@ -517,13 +517,13 @@ async function renderPersonDetail() {
     </div>
 
     <div class="field">
-      <label>API key — for tools that take a base URL. Never leaves this machine.</label>
+      <label>API key — this is their whole identity. Rotating it revokes the old one.</label>
       <div class="key">${esc(p.apiKey)}</div>
     </div>
 
     <div class="field">
       <label>What they put on their own machine</label>
-      <div class="key">WARDEN_USER=${esc(p.id)}</div>
+      <div class="key">WARDEN_API_KEY=${esc(p.apiKey)}</div>
     </div>
 
     <div class="row">
@@ -676,15 +676,23 @@ async function send() {
   $('prompt').value = '';
   append(person ? `${person.name} (${person.role})` : who, text, '');
 
-  // The role is deliberately not sent. The server resolves it from the
-  // directory, which is the same thing that happens when the hook calls in from
-  // an employee's laptop — a client that could assert its own role could pick
-  // the rules it is judged by.
+  // The person's own API key, exactly as their laptop would send it. Neither a
+  // name nor a role goes over the wire: the key is the whole identity, and the
+  // console deliberately has no privileged way to assert one — it exercises the
+  // same path an employee's tool does, so a break here breaks the demo too.
   const { j } = await api('/api/guard/check', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-warden-user': who },
-    body: JSON.stringify({ prompt: text })
+    headers: {
+      'content-type': 'application/json',
+      ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
+    },
+    body: JSON.stringify({ prompt: text, source: 'console' })
   });
+
+  if (j?.error === 'unknown_api_key') {
+    append('warden', 'key not recognised', `<div class="why">${esc(j.explanation)}</div>`, 'blocked');
+    return;
+  }
 
   const rule = j.firedRules?.[0];
   const cls = { ALLOW: 'allowed', BLOCK: 'blocked', ESCALATE: 'escalated' }[j.verdict];

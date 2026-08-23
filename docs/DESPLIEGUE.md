@@ -40,7 +40,7 @@ Ahora abrí `http://localhost:8080`.
 escribís en castellano y las compila el modelo. Preview, Activate, listo.
 
 **Pestaña People** — cargá a tu gente. Nombre + rol → Add, y te devuelve el
-`WARDEN_USER` y la API key de esa persona. Si te falta un rol, lo creás abajo
+la API key de esa persona — que es toda su identidad. Si te falta un rol, lo creás abajo
 con su cuota diaria. Haciendo click en alguien ves todas las reglas que lo
 juzgan, podés escribirle una que aplique **sólo a él**, y abajo tenés su
 **Onboarding**: el comando de una línea listo para copiar y la config por
@@ -57,14 +57,19 @@ Abajo del botón está la misma cosa por herramienta —Claude Code, Codex, Curs
 OpenCode, cualquier otra— cada bloque con su botón de copiar.
 
 Por qué generado y no a mano: cada valor que retipeás es uno que podés errar, y
-estos fallan en silencio. Un `WARDEN_USER` mal escrito no da error, simplemente
-hace que a esa persona la juzguen como a un desconocido.
+una API key es el peor de todos para copiar a mano.
 
-El rol **no** se lo mandás: sale del directorio. Si el empleado pone
-`WARDEN_ROLE` en su máquina, el gateway lo ignora para cualquiera que esté
-cargado en People — un rol que el empleado puede editar en su `.zshrc` es un rol
-con el que podría elegir qué reglas lo juzgan. `WARDEN_ROLE` sólo se usa como
-fallback para alguien que no está en el directorio.
+**Sólo le mandás la key.** No hay nombre ni rol que el empleado configure: la
+key es toda su identidad. Vos decidís qué significa, y podés cambiarle el rol
+sin que toque nada en su máquina.
+
+Por qué así: un rol en el `.zshrc` es un rol que el empleado puede editar, y
+editándolo elegiría qué reglas lo juzgan. Con la key eso no existe. Y te da la
+revocación gratis — rotás la key en la consola y la vieja deja de andar en el
+próximo prompt.
+
+Una key que el gateway no conoce **no entra**. No la juzga con un rol por
+defecto: la rechaza.
 
 ## Quién está conectado de verdad
 
@@ -92,7 +97,7 @@ curl -fsSL http://192.168.1.42:8080/install/fede | sh
 ```
 
 Eso baja el hook **del gateway** (no de internet — funciona en una red sin
-salida) y escribe `WARDEN_URL` y `WARDEN_USER` en tu perfil de shell. Se puede
+salida) y escribe `WARDEN_URL` y `WARDEN_API_KEY` en tu perfil de shell. Se puede
 volver a correr las veces que quieras: reemplaza su propio bloque en vez de
 apilar otro.
 
@@ -104,9 +109,9 @@ Después abrí una terminal nueva, o `source ~/.zshrc`.
 > El hook es un archivo, sin dependencias. Lee el prompt, se lo pregunta al
 > gateway, y devuelve sí o no.
 
-> No lleva `WARDEN_ROLE`: tu rol sale del directorio. Si lo ponés a mano, el
-> gateway lo ignora — un rol que podés editar en tu `.zshrc` es un rol con el
-> que podrías elegir qué reglas te juzgan.
+> No hay nombre ni rol que configures: la key es toda tu identidad. Tu admin
+> decide qué significa. Y como el link del instalador lleva tu key adentro,
+> tratalo como un secreto.
 
 ## 3a. Conectar Claude Code
 
@@ -205,7 +210,7 @@ Lo que sí deja cambiar el `base_url` va por el proxy, sin hook:
 
 ```bash
 export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
-export OPENAI_API_KEY=wk-fede-8b1d40e2      # la key personal de Warden
+export OPENAI_API_KEY=wk-fede-8b1d40e2      # la misma key de Warden
 ```
 
 La key de cada empleado está en su ficha en la pestaña People (y se puede rotar

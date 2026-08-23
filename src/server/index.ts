@@ -22,7 +22,8 @@ import {
   removeRole,
   rotateApiKey,
   upsertEmployee,
-  findEmployee
+  findEmployee,
+  actorForCredential
 } from '../policy/people.js';
 import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
@@ -48,7 +49,7 @@ app.use(express.json({ limit: '4mb' }));
 // Local-first tool: allow the web console (a different dev port) to call the API.
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-warden-user, x-warden-role');
+  res.header('Access-Control-Allow-Headers', 'content-type, authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   next();
 });
@@ -61,6 +62,27 @@ try {
 } catch {
   /* seed file not present yet — the store stays empty, which is a valid state */
 }
+
+/**
+ * What an unrecognised key gets back.
+ *
+ * Shaped like a decision so the hook and the proxy can render it the same way
+ * they render any other refusal, and worded for the person reading it in their
+ * terminal — who is far more likely to have a stale key after a rotation than
+ * to be an intruder.
+ */
+const UNKNOWN_KEY = {
+  verdict: 'BLOCK' as const,
+  auditId: 'no-key',
+  error: 'unknown_api_key',
+  firedRules: [],
+  passes: [],
+  maskedPrompt: '',
+  maskedSpans: [],
+  explanation:
+    'Your Warden API key is not recognised by this gateway. ' +
+    'Ask your administrator for a current one — they can issue a new key from People.'
+};
 
 // ── Live decision stream (SSE) ───────────────────────────────────────────────
 // The console's right-hand trace subscribes here. Decisions are pushed as they
@@ -258,13 +280,13 @@ app.delete('/api/policy/rules/:id', asyncRoute(async (req, res) => {
 
 // ── Guard check (used by the hook CLI) ───────────────────────────────────────
 app.post('/api/guard/check', asyncRoute(async (req, res) => {
+  const actor = resolveActor(req);
+  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+
   const decision = await evaluateRequest(req);
   // The hook names the tool it came from; that sighting is what the console's
   // "connected" badges are built from.
-  recordActivity(
-    String(req.header('x-warden-user') ?? req.body?.actor?.id ?? ''),
-    typeof req.body?.source === 'string' ? req.body.source : undefined
-  );
+  recordActivity(actor.id, typeof req.body?.source === 'string' ? req.body.source : undefined);
   emitDecision(decision);
   res.json(decision);
 }));
@@ -339,8 +361,7 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
 
 // ── employee install ─────────────────────────────────────────────────────────
 // Three manual steps become one command. Every value an employee retypes is a
-// value they can get wrong, and these fail silently — a mistyped WARDEN_USER
-// does not error, it gets them judged as a stranger.
+// value they can get wrong, and an API key is the least forgiving of them.
 
 /**
  * The hook, served by the gateway itself.
@@ -374,9 +395,10 @@ app.get('/install/:employeeId', (req, res) => {
   }
 
   const url = gatewayUrl(req);
-  // Deliberately no API key. The hook does not use one, and a `curl | sh` that
-  // carries a credential leaves it in the shell history of every machine it
-  // touches.
+  // The key is the identity, so it has to be here. That makes this URL a
+  // credential: it is only ever shown to the admin, inside the console, for a
+  // person who already exists. The alternative — the employee pasting a key by
+  // hand — is the step that gets mistyped.
   res.type('text/plain').send(`#!/bin/sh
 # Warden setup for ${person.name} (${person.role})
 set -e
@@ -400,7 +422,7 @@ fi
 cat >> "$PROFILE" <<'WARDEN_BLOCK'
 # >>> warden >>>
 export WARDEN_URL=${url}
-export WARDEN_USER=${person.id}
+export WARDEN_API_KEY=${person.apiKey}
 # <<< warden <<<
 WARDEN_BLOCK
 
@@ -478,6 +500,7 @@ async function optional<T>(specifier: string): Promise<T | null> {
  */
 async function evaluateRequest(req: Request): Promise<unknown> {
   const actor = resolveActor(req);
+  if (!actor) return null;
   const prompt = extractPrompt(req.body);
 
   const mod = await optional<{ evaluate: (a: unknown, i: unknown, p: unknown) => Promise<unknown> }>('../guard/pipeline.js');
@@ -495,25 +518,21 @@ async function evaluateRequest(req: Request): Promise<unknown> {
 }
 
 /**
- * Who is asking.
+ * Who is asking. The API key is the entire answer.
  *
- * The directory has the last word on the role. An employee sets WARDEN_ROLE on
- * their own machine, so a claimed role is a request, not a fact — if the header
- * decided it, anyone could pick the rule set they are judged against by editing
- * their shell profile. A caller the directory has never seen keeps the role they
- * claim, because a visitor with no entry is better judged by a plausible role
- * than by none at all.
+ * Nothing an employee can type identifies them. They do not send a name and do
+ * not send a role, because both were things they could edit — and a role you
+ * can edit is a role you can use to pick the rules that judge you. The admin
+ * issues a key, decides what it means, and can change the role behind it
+ * without the employee touching their machine. Rotating the key revokes the
+ * old one.
+ *
+ * Null means refuse. There is no default identity and no assumed role: a caller
+ * nobody can identify is not a caller to guess about.
  */
-function resolveActor(req: Request): { id: string; role: string } {
-  const id = String(req.header('x-warden-user') ?? req.body?.actor?.id ?? 'anon');
-  const claimed = String(req.header('x-warden-role') ?? req.body?.actor?.role ?? 'employee');
-  try {
-    const known = findEmployee(id);
-    if (known) return { id: known.id, role: known.role };
-  } catch {
-    /* no directory on disk yet — fall through to the claimed role */
-  }
-  return { id, role: claimed };
+function resolveActor(req: Request): { id: string; role: string } | null {
+  const employee = actorForCredential(req.header('authorization'));
+  return employee ? { id: employee.id, role: employee.role } : null;
 }
 
 function extractPrompt(body: unknown): string {

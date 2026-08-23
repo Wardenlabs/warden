@@ -8,6 +8,12 @@
  * case — it would be a fail-open hole in the middle of a fail-closed design,
  * and it would look exactly like everything working.
  *
+ * The vote is off by default — measured at 50% false positives against 44%
+ * without it — so the npm script turns it on. The mechanism stays tested even
+ * though it stays disabled: it is one environment variable from being live
+ * again, and semantics that only break when someone re-enables them break at
+ * the worst possible moment.
+ *
  * Run: npm run test:vote
  */
 import { adjudicate } from '../src/guard/passes/adjudicate.js';
@@ -48,6 +54,11 @@ function check(name: string, ok: boolean, detail: string): void {
 }
 
 async function main(): Promise<void> {
+  if (process.env['WARDEN_CONFIRM_VOTES'] !== '2') {
+    // Read at module load, so it cannot be set from in here.
+    console.log('\nrun with WARDEN_CONFIRM_VOTES=2 (npm run test:vote does this)\n');
+    process.exit(1);
+  }
   const iso = isolate('cuánto gana Ana?');
   console.log('\nconfirmation vote');
 
