@@ -8,6 +8,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
+import { withDeadline } from './deadline.js';
 import { MODEL_SPECS, modelsDir } from './models.js';
 import type { ModelRole } from './types.js';
 
@@ -104,7 +105,32 @@ function modelTypeFor(role: ModelRole): string {
   return 'llm';
 }
 
+/**
+ * How long a model may take to load before the role is treated as unavailable.
+ *
+ * Generous against a local file — the 1 GB adjudicator loads in a few seconds —
+ * and short enough that a registry fetch which is never going to arrive gives
+ * up instead of parking every request behind it.
+ */
+const LOAD_TIMEOUT_MS = 90_000;
+
 const loaded = new Map<ModelRole, Promise<string>>();
+
+/**
+ * Roles whose load timed out, and when to stop holding it against them.
+ *
+ * Without this, every request that needs an unloadable role pays the full
+ * deadline again: the corpus spends 90s per document-borne prompt discovering
+ * the same thing about the same model, which is eighteen minutes of a run
+ * learning nothing. A model that did not arrive in 90s is not going to arrive
+ * in the next 90.
+ *
+ * It expires rather than being permanent because the cause is usually the
+ * network, and a gateway that has been up for a day should not still be
+ * refusing a role because the wifi was bad at breakfast.
+ */
+const unloadable = new Map<ModelRole, number>();
+const LOAD_RETRY_AFTER_MS = 5 * 60_000;
 
 /**
  * Resolve a role to a loaded model id, loading it on first use.
@@ -116,14 +142,44 @@ export function modelFor(role: ModelRole): Promise<string> {
   const cached = loaded.get(role);
   if (cached) return cached;
 
-  const loading = loadModel({
-    modelSrc: sourceFor(role) as never,
-    modelType: modelTypeFor(role) as never,
-    modelConfig: configFor(role) as never
-  }).catch((err: unknown) => {
+  const cooling = unloadable.get(role);
+  if (cooling !== undefined) {
+    if (Date.now() < cooling) {
+      return Promise.reject(
+        new Error(`the ${role} model failed to load and is not being retried yet`)
+      );
+    }
+    unloadable.delete(role);
+  }
+
+  /**
+   * Bounded, because this is where the guard actually hangs.
+   *
+   * A local GGUF loads in seconds. A role whose weights are not on disk falls
+   * back to the SDK registry constant, and the registry fetches over Hyperswarm
+   * — the path the README warns hangs indefinitely behind a restrictive
+   * network. `OCR_LATIN` has no HTTPS mirror, so it takes that path on every
+   * machine, and a corpus run stalled there for fifteen minutes with the
+   * download frozen partway.
+   *
+   * Bounding `ocr()` and `embed()` was not enough: those wrap the inference,
+   * and the load happens before either of them is called. This is the one place
+   * that covers all three.
+   */
+  const loading = withDeadline(
+    loadModel({
+      modelSrc: sourceFor(role) as never,
+      modelType: modelTypeFor(role) as never,
+      modelConfig: configFor(role) as never
+    }),
+    LOAD_TIMEOUT_MS,
+    `loading the ${role} model`
+  ).catch((err: unknown) => {
     // Drop the rejected promise so a later call can retry rather than
-    // permanently inheriting a transient failure.
+    // permanently inheriting a transient failure, and start the cooldown so
+    // that retry is not immediate.
     loaded.delete(role);
+    unloadable.set(role, Date.now() + LOAD_RETRY_AFTER_MS);
     throw err;
   });
 

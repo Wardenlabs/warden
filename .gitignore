@@ -65,3 +65,6 @@ data/redteam-last.mock.md
 data/redteam-last.mock.*.md
 # REPORT.md is the deliverable; a filtered real run writes REPORT.<class>.md
 REPORT.*.md
+
+# Mock benchmark output — never the real table.
+BENCHMARKS.mock.md
