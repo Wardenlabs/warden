@@ -126,10 +126,11 @@ async function runPrompt(
   const started = Date.now();
 
   // The harness measures the guard's judging, not the daily counter. Left
-  // running, the test actor's quota (100/day in the seed policy) exhausts
-  // mid-run — the 98-prompt corpus at `--reps 3` is 294 warden evaluations —
-  // and every prompt after that is scored on a quota BLOCK that involved no
-  // model at all: attacks "stopped" and controls "refused" by an empty counter.
+  // running, the test actor's quota (`analyst`, 100/day in the benchmark
+  // policy) exhausts mid-run — the 98-prompt corpus at `--reps 3` is 294 warden
+  // evaluations — and every prompt after that is scored on a quota BLOCK that
+  // involved no model at all: attacks "stopped" and controls "refused" by an
+  // empty counter.
   resetQuotas();
 
   let got: Verdict;
