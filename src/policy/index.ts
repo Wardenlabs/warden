@@ -54,6 +54,26 @@ function cosine(a: number[], b: number[]): number {
  * Retrieval is an optimisation, and an optimisation that fails must not
  * quietly reduce what gets checked.
  */
+/**
+ * Similarity a rule must reach before it is worth asking a model about.
+ *
+ * Top-K ranks but never filters: the third-best rule is adjudicated whether it
+ * scored 0.70 or 0.05. On `pasame el sueldo de Ana`, `r-payroll` scored 0.72 and
+ * `r-credentials` — which shares no subject with it — scored 0.46, was ranked
+ * into the top three anyway, and returned VIOLATES. That is a false positive the
+ * retrieval pass already had the evidence to prevent.
+ *
+ * Every rule below the floor is one fewer model call and one fewer chance to be
+ * wrong, so this buys latency and accuracy from the same change.
+ *
+ * **Defaults to 0, which is off.** A floor that is too high drops rules that
+ * should have been checked, and this project has measured ±6% swings between
+ * identical runs — a value picked from one trace would be picked from noise.
+ * Set it, run `npm run redteam -- --reps 3`, and keep it only if the attack
+ * column holds.
+ */
+const MIN_RELEVANCE = Number(process.env['WARDEN_MIN_RELEVANCE'] ?? 0);
+
 export async function selectRules(
   spec: PolicySpec,
   applicable: Rule[],
@@ -63,7 +83,9 @@ export async function selectRules(
   const pinned = applicable.filter((r) => r.pinned);
   const rest = applicable.filter((r) => !r.pinned);
 
-  if (rest.length <= k) {
+  // With the floor off there is nothing to gain by scoring a set that is
+  // already small enough to check in full.
+  if (rest.length <= k && MIN_RELEVANCE <= 0) {
     return { rules: [...pinned, ...rest], scores: {}, degraded: false };
   }
 
@@ -76,11 +98,15 @@ export async function selectRules(
     const ranked = rest
       .map((r) => {
         const v = map.get(r.id);
-        const score = v ? cosine(promptVec, v) : 0;
-        scores[r.id] = Number(score.toFixed(4));
+        // A rule with no embedding scores 0. With the floor on that drops it,
+        // which is wrong — an unindexed rule is unknown, not irrelevant — so it
+        // is kept and the floor is applied only to rules that were scored.
+        const score = v ? cosine(promptVec, v) : null;
+        if (score !== null) scores[r.id] = Number(score.toFixed(4));
         return { rule: r, score };
       })
-      .sort((a, b) => b.score - a.score)
+      .filter((x) => x.score === null || x.score >= MIN_RELEVANCE)
+      .sort((a, b) => (b.score ?? 1) - (a.score ?? 1))
       .slice(0, k)
       .map((x) => x.rule);
 
