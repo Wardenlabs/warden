@@ -412,6 +412,7 @@ npm run typecheck
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
+| `WARDEN_PUBLIC_URL` | — | The address employees should use, when it is not the one the gateway can infer — behind a tunnel or a VPN. |
 
 ---
 
@@ -433,11 +434,36 @@ path travels as a per-employee API key, which also keeps the company's upstream
 credential on the gateway: an employee cannot route around the guard, because
 they have nothing to route around it with.
 
+### Over the internet, not just a LAN
+
+The deployment model is one machine holding the models with everyone else
+pointing at it, which works unchanged over a private network — but not by
+opening a port. Warden speaks plain HTTP and its identity is a bearer key, so
+exposed directly, every prompt and every key travels in cleartext.
+
+Put something in front that terminates TLS. **Tailscale** is the recommended
+shape: a private mesh, nothing exposed, and the gateway reachable from anywhere
+its members are. **Cloudflare Tunnel** gives a public HTTPS hostname without
+opening a port — Warden detects it from `x-forwarded-proto` and generates
+onboarding URLs with the right scheme automatically. `WARDEN_PUBLIC_URL` pins
+the address explicitly when neither inference is right.
+
+Step by step, with what is still missing for a real deployment, in
+[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
+
 ---
 
 ## Limits
 
 Stated plainly, because a README that oversells is worse than one that undersells.
+
+**The gateway does not terminate TLS and the admin console has no login.** Both
+are fine on a trusted network and neither is fine on a public address, which is
+why the deployment notes push a private mesh rather than a port forward. API
+keys are stored in cleartext in `data/company.json` — hashing them would work for
+authentication but would stop the admin from ever showing a key again, and
+showing it is what makes onboarding a copy button instead of a support ticket.
+A deliberate trade for a gateway running on a company's own machine.
 
 - **The hook sees prompts, not the agent's actions.** Governing what an agent
   *does* — files it writes, commands it runs — is the `PreToolUse` hook, which

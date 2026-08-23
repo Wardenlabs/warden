@@ -459,8 +459,25 @@ app.listen(PORT, HOST, () => {
 function gatewayUrl(req: Request): string {
   const configured = process.env['WARDEN_PUBLIC_URL'];
   if (configured) return configured.replace(/\/$/, '');
+
   const host = req.header('host');
-  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) return `http://${host}`;
+  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) {
+    /**
+     * Behind a tunnel — Cloudflare, Tailscale Funnel, ngrok — the edge
+     * terminates TLS and forwards plain HTTP, so the scheme this process sees
+     * is not the scheme the employee needs. Hardcoding `http://` there produces
+     * an install command that fails on every machine except the one that
+     * generated it, which is the worst kind of wrong: it looks right in the
+     * console.
+     *
+     * `x-forwarded-proto` is set by the tunnel, not by the client, and it is
+     * only read to build a URL — nothing is authorised on it — so trusting it
+     * here costs nothing even if something else sets it.
+     */
+    const proto = req.header('x-forwarded-proto')?.split(',')[0]?.trim() ?? 'http';
+    return `${proto === 'https' ? 'https' : 'http'}://${host}`;
+  }
+
   // The console is open on the gateway machine itself, so localhost is what it
   // sees — but localhost is useless to everyone else. Prefer a LAN address.
   const lan = lanAddresses()[0];

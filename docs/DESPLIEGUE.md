@@ -242,8 +242,8 @@ Ojo: **el prompt pasa igual**, con la advertencia. Es a propósito: un gateway
 caído no puede dejar a todo el equipo sin poder trabajar.
 
 **El wifi del venue no deja que las laptops se vean**
-Bastante común. Alternativas: hotspot del celular, Tailscale, o que cada uno
-corra su propio Warden local (`WARDEN_URL=http://localhost:8080`).
+Bastante común. Alternativas: hotspot del celular, Tailscale (ver abajo), o que
+cada uno corra su propio Warden local (`WARDEN_URL=http://localhost:8080`).
 
 **Tarda mucho al apretar Enter**
 El gateway está en CPU. En la máquina del gateway: `WARDEN_TOP_K=1 npm run dev`
@@ -251,3 +251,76 @@ evalúa menos reglas por prompt y va bastante más rápido.
 
 **Sacar el hook**
 Borrá el bloque `hooks` del settings y listo. Nada más queda instalado.
+
+---
+
+# Por internet, no sólo por LAN
+
+Sí se puede, y para una empresa con gente remota es lo que corresponde. Pero
+**no abriendo el puerto en el router.**
+
+## Por qué no port-forward
+
+Warden habla **HTTP plano** y la identidad es una **bearer key**. Expuesto
+directo a internet, cada prompt de cada empleado y cada API key viajan en texto
+claro, y cualquiera que escanee el puerto encuentra un endpoint que responde.
+Eso convierte la puerta que instalaste para protegerte en el agujero más grande
+que tenés.
+
+Necesitás que algo termine TLS adelante. Dos formas, las dos gratis.
+
+## Opción A — Tailscale (la que recomiendo)
+
+Red privada entre las máquinas, cifrada, sin exponer nada a internet. El gateway
+y las laptops se ven como si estuvieran en la misma LAN, estén donde estén.
+
+```bash
+# en la máquina del gateway
+tailscale up
+tailscale ip -4          # p. ej. 100.101.102.103
+```
+
+Y arrancás Warden diciéndole cuál es su dirección, para que el onboarding la
+genere bien:
+
+```bash
+WARDEN_PUBLIC_URL=http://100.101.102.103:8080 npm run dev
+```
+
+Nada queda expuesto: sólo entran las máquinas que agregaste a tu tailnet.
+
+## Opción B — Cloudflare Tunnel (si necesitás una URL pública)
+
+Te da un hostname con HTTPS sin abrir ningún puerto. Sirve si tenés gente que no
+podés meter en una VPN.
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+# te devuelve https://algo-random.trycloudflare.com
+```
+
+Warden **detecta el túnel solo**: lee `x-forwarded-proto` y genera las URLs del
+onboarding con `https://`. No hace falta configurar nada. Si querés fijar el
+hostname:
+
+```bash
+WARDEN_PUBLIC_URL=https://warden.tuempresa.com npm run dev
+```
+
+⚠️ Con una URL pública, cualquiera puede llegar al endpoint. Lo que lo protege
+es que **una key desconocida se rechaza** — pero la consola de admin en `/`
+queda accesible también. Para uso real ponele Cloudflare Access adelante, o usá
+la opción A.
+
+## Lo que falta para producción de verdad
+
+Dicho derecho, porque el gateway todavía no lo hace solo:
+
+- **No termina TLS.** Depende de que el túnel o la VPN lo hagan.
+- **La consola de admin no tiene login.** Cualquiera que llegue al puerto la
+  abre y puede editar la política. En LAN de confianza es aceptable; expuesta,
+  no.
+- **Las keys se guardan en claro** en `data/company.json`. Un hash serviría para
+  autenticar, pero el admin no podría volver a mostrarlas, y mostrarlas es lo
+  que hace usable el onboarding. Es un intercambio consciente para un gateway
+  que corre en una máquina de la empresa, no una omisión.

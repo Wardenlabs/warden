@@ -517,13 +517,19 @@ async function renderPersonDetail() {
     </div>
 
     <div class="field">
-      <label>API key — this is their whole identity. Rotating it revokes the old one.</label>
-      <div class="key">${esc(p.apiKey)}</div>
+      <label>API key — their whole identity. Rotating it revokes the old one.</label>
+      <div class="codewrap">
+        <pre class="code">${esc(p.apiKey)}</pre>
+        <button class="ghost copy" data-copy="${encodeURIComponent(p.apiKey)}">Copy</button>
+      </div>
     </div>
 
     <div class="field">
       <label>What they put on their own machine</label>
-      <div class="key">WARDEN_API_KEY=${esc(p.apiKey)}</div>
+      <div class="codewrap">
+        <pre class="code">export WARDEN_API_KEY=${esc(p.apiKey)}</pre>
+        <button class="ghost copy" data-copy="${encodeURIComponent('export WARDEN_API_KEY=' + p.apiKey)}">Copy</button>
+      </div>
     </div>
 
     <div class="row">
@@ -578,6 +584,13 @@ async function renderPersonDetail() {
     compileInto('person', $('personRuleText').value, [`@${p.id}`], $('personCompileNote'), $('personCompile'));
 
   if (draft && draftHost === 'person') renderDraft();
+
+  // One delegated handler for every copy button on the page, including the ones
+  // renderOnboarding adds later. Binding per-button would miss those.
+  host.onclick = (e) => {
+    const btn = e.target.closest('[data-copy]');
+    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
+  };
 
   void renderOnboarding(p);
 }
@@ -648,10 +661,6 @@ async function renderOnboarding(person) {
   };
 
   $('copyAll').onclick = (e) => copyText(j.message, e.target);
-  host.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-copy]');
-    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
-  });
 }
 
 // ── employee chat ────────────────────────────────────────────────────────────
