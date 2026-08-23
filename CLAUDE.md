@@ -68,12 +68,14 @@ composed by code in `aggregate.ts`. Asking the adjudicator for prose per
 decision was measured at 16/16 false positives. If a refusal needs to say
 something new, add a field to `Rule` and have the compiler write it once.
 
-**A VIOLATES is confirmed before it stands.** The first sample is greedy and
-decides alone on COMPLIES; a VIOLATES draws `WARDEN_CONFIRM_VOTES` more samples
-at `WARDEN_CONFIRM_TEMP` and takes the majority. The confirmations must sample —
-greedy re-runs are identical, so a vote over them counts one answer three times.
-A minority VIOLATES records UNCLEAR, not COMPLIES; a confirmation that errors
-leaves the VIOLATES standing.
+**Self-consistency voting does not fix a biased model.** `WARDEN_CONFIRM_VOTES`
+exists and is tested, and it defaults to `0` because it was measured at 16/32
+false positives against 14/32 without, for 50 extra model calls. Majority voting
+only helps when errors are independent; these are systematic, so three samples
+return the same wrong answer three times. If you re-enable it: the confirmations
+must sample (greedy re-runs are identical), a minority VIOLATES records UNCLEAR
+rather than COMPLIES, and a confirmation that errors leaves the VIOLATES
+standing.
 
 **`rulesForActor()` is the only way to pick a rule set.** It resolves all three
 audience kinds at once — company-wide, role, and `@employeeId`. Anything that
@@ -186,6 +188,9 @@ reproducible with the harness in the repo.
 | Per-rule attribution of false positives | `r-instruction-override` caused 4 of 5, and it is pinned so it runs on every prompt |
 | Its three violating examples were all imperatives, its compliant ones all meta-questions | Taught "imperative = override"; refused "draft a reply to this vendor" |
 | Two identical runs, same policy, temp 0 | 44% and 31% — `parallel: 4` batching makes runs non-reproducible |
+| Rewriting that rule's compliant examples | No change: 44% before, 44% after |
+| Rewriting the rule text, three ways | 4/8, 3/8, 5/8 false positives — the best one also lost an attack |
+| Majority-of-3 self-consistency vote | **50% vs 44%**, for 50 extra calls. Voting amplifies a lean; this model has a lean, not noise |
 
 The pattern across all of them: **every field you ask a small model to fill is
 a chance for it to answer without deciding.** Ask for the minimum, derive the

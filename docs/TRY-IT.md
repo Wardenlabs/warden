@@ -112,9 +112,12 @@ que te pasa empezás a esquivar el gateway. Todo eso sale de la regla ratificada
 romper.
 
 A la derecha se llena la traza: `quota → sanitize → isolate → retrieve →
-adjudicate:… → aggregate`, con los milisegundos de cada pase. Si un
-`adjudicate:…` dice VIOLATES, en su `detail` vas a ver `votes` — las tres
-muestras que tuvieron que coincidir antes de bloquear.
+adjudicate:… → aggregate`, con los milisegundos de cada pase.
+
+> Existe un voto de confirmación (`WARDEN_CONFIRM_VOTES=2`) que hace que un
+> VIOLATES saque dos muestras más y decida por mayoría. Está **apagado por
+> defecto**: medido dio 50% de falsos positivos contra 44% sin él, gastando 50
+> llamadas extra. Si lo prendés vas a ver `votes` en el `detail` del pase.
 
 > ⏱ En CPU esto tarda **15–25 segundos**. No está colgado. En una Mac con Metal
 > debería ser bastante más rápido — ese número es justamente lo que queremos

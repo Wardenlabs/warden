@@ -114,22 +114,26 @@ goes through with a warning. A crashed daemon must not brick every developer's
 CLI at once, and a gateway that can strand the team gets uninstalled the first
 morning it does.
 
-### Confirming a block
+### What we tried on the false-positive rate, and what it cost
 
-Each prompt is judged against about four rules, and a single VIOLATES on any of
-them stops it. Per-rule error therefore compounds: a ~13% per-rule
-false-positive rate is exactly the 44% measured over four rules.
+Each prompt is judged against about four rules and a single VIOLATES stops it,
+so per-rule error compounds: a ~13% per-rule rate is exactly the 44% measured.
+That framing suggested a majority-of-three vote should take it to ~7%.
 
-So the first sample is greedy and decides on its own when it says COMPLIES —
-ordinary traffic still costs one model call. A VIOLATES is the answer that stops
-someone working, so it is the one that has to be paid for: two more samples at
-temperature, majority decides. Voting amplifies whichever way the model leans,
-which moves the false-positive rate and the catch rate in opposite directions at
-once.
+It did not. Measured at **50% against 44%**, for 50 extra model calls.
 
-A dissenting minority records UNCLEAR rather than COMPLIES, because the model
-did disagree with itself. A confirmation that errors leaves the VIOLATES
-standing — a call we could not make is never evidence that something is fine.
+The word carrying the argument was *independent*, and these errors are not.
+`r-instruction-override` does not misfire at random; it returns VIOLATES because
+something in the prompt pushes it there, and sampling that three times returns
+the same wrong answer three times. Voting amplifies a lean as readily as a
+signal. The mechanism is still in the code, tested, defaulted off.
+
+Rewriting that rule's few-shot examples changed nothing, and rewriting the rule
+text three ways gave 4/8, 3/8 and 5/8 — the best of them also lost an attack,
+which is a rule moved rather than improved.
+
+Three negative results in a row narrow it usefully: a systematic error means
+there is something in the prompt to find, not a model to swap.
 
 ### Isolation
 
@@ -395,7 +399,7 @@ npm run typecheck
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
-| `WARDEN_CONFIRM_VOTES` | `2` | Extra samples drawn before a VIOLATES stands. `0` restores single-shot. |
+| `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
 | `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
 | `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |

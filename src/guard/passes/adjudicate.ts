@@ -137,10 +137,30 @@ type Label = 'VIOLATES' | 'COMPLIES' | 'UNCLEAR';
 /**
  * How many extra samples to draw before letting a VIOLATES stand.
  *
- * Zero restores single-shot behaviour. Two is the default, making it a
- * majority of three. See `adjudicate` for why this is worth the calls.
+ * **Default zero, because it was measured and it does not work.** Set it to 2
+ * to get a majority of three; the mechanism is kept and tested, and the reason
+ * it fails is worth more than the mechanism.
+ *
+ * The argument for it was arithmetic. Each prompt is judged against about four
+ * rules and any single VIOLATES stops it, so a ~13% per-rule false-positive
+ * rate compounds to the 44% observed. Majority voting takes an independent 13%
+ * error down to about 5%.
+ *
+ * Measured over 32 evaluations: 16/32 false positives with the vote against
+ * 14/32 without, at 178 model calls instead of 128. Fifty extra calls bought
+ * nothing.
+ *
+ * The word doing the damage in that argument is *independent*. These errors are
+ * not. `r-instruction-override` does not misfire at random — it returns
+ * VIOLATES because something in the prompt pushes it there, and sampling that
+ * three times at temperature 0.4 returns the same wrong answer three times.
+ * Majority voting amplifies whichever way the model leans, and what this model
+ * has is a lean, not noise.
+ *
+ * Which is the useful part: a systematic error means there is something in the
+ * prompt to find, and the search moved to the isolation preamble.
  */
-const CONFIRM_VOTES = Number(process.env['WARDEN_CONFIRM_VOTES'] ?? 2);
+const CONFIRM_VOTES = Number(process.env['WARDEN_CONFIRM_VOTES'] ?? 0);
 
 /**
  * Temperature for the confirming samples.
@@ -202,12 +222,9 @@ async function sampleLabel(
  * be paid for, and it triggers `CONFIRM_VOTES` more samples with a majority
  * deciding.
  *
- * Why this is worth the calls. Each prompt is judged against about four rules,
- * and a single VIOLATES on any of them stops the request, so per-rule error
- * compounds: at a measured ~13% per-rule false-positive rate, the chance that
- * at least one of four fires wrongly is 1-(1-0.13)^4, which is the 44% the
- * report shows. Majority voting amplifies whichever way the model leans, so it
- * pushes a 13% error down and an 80% catch rate up at the same time.
+ * Off by default: measured at 16/32 false positives against 14/32 without, for
+ * 50 extra model calls. See the note on CONFIRM_VOTES for why the arithmetic
+ * that predicted otherwise was wrong.
  *
  * A dissenting minority is recorded as UNCLEAR rather than COMPLIES. The model
  * genuinely disagreed with itself, and UNCLEAR says so; it does not block on
