@@ -337,6 +337,80 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   res.json(last);
 }));
 
+// ── employee install ─────────────────────────────────────────────────────────
+// Three manual steps become one command. Every value an employee retypes is a
+// value they can get wrong, and these fail silently — a mistyped WARDEN_USER
+// does not error, it gets them judged as a stranger.
+
+/**
+ * The hook, served by the gateway itself.
+ *
+ * Until now the onboarding pack told employees to curl it from GitHub, which
+ * quietly made a public-internet round trip a prerequisite for a product whose
+ * entire claim is that nothing leaves the network. On conference wifi behind a
+ * captive portal, or in a demo with egress blocked, that step is where the
+ * setup dies. The gateway already has the file.
+ */
+app.get('/warden-hook.mjs', (_req, res) => {
+  try {
+    res.type('application/javascript').send(readFileSync('integrations/warden-hook.mjs', 'utf8'));
+  } catch {
+    res.status(404).json({ error: 'hook file not found next to the server' });
+  }
+});
+
+app.get('/install/:employeeId', (req, res) => {
+  const id = String(req.params['employeeId']);
+  // Resolved against the directory rather than echoed back. A made-up id must
+  // not produce a script that configures somebody the gateway has never heard
+  // of — that account would be judged as a stranger, which is the exact failure
+  // this route exists to prevent.
+  const person = findEmployee(id);
+  if (!person) {
+    return res
+      .status(404)
+      .type('text/plain')
+      .send(`# No employee "${id}" in the directory. Ask your admin for the right link.\nexit 1\n`);
+  }
+
+  const url = gatewayUrl(req);
+  // Deliberately no API key. The hook does not use one, and a `curl | sh` that
+  // carries a credential leaves it in the shell history of every machine it
+  // touches.
+  res.type('text/plain').send(`#!/bin/sh
+# Warden setup for ${person.name} (${person.role})
+set -e
+
+HOOK="$HOME/.warden-hook.mjs"
+echo "Downloading the Warden hook…"
+curl -fsSL "${url}/warden-hook.mjs" -o "$HOOK"
+chmod +x "$HOOK"
+
+PROFILE="$HOME/.zshrc"
+[ -n "$BASH_VERSION" ] && PROFILE="$HOME/.bashrc"
+[ -f "$PROFILE" ] || PROFILE="$HOME/.profile"
+
+# Idempotent: re-running after a role change or a new gateway address replaces
+# the old block instead of stacking a second, contradictory one.
+if grep -q "# >>> warden >>>" "$PROFILE" 2>/dev/null; then
+  echo "Updating the existing Warden block in $PROFILE"
+  sed -i.warden-bak '/# >>> warden >>>/,/# <<< warden <<</d' "$PROFILE"
+fi
+
+cat >> "$PROFILE" <<'WARDEN_BLOCK'
+# >>> warden >>>
+export WARDEN_URL=${url}
+export WARDEN_USER=${person.id}
+# <<< warden <<<
+WARDEN_BLOCK
+
+echo ""
+echo "Done. Hook at $HOOK, environment in $PROFILE."
+echo "Open a new terminal (or: source $PROFILE), then wire up your tool."
+echo "Setup per tool: ${url}  ->  People  ->  ${person.name}  ->  Onboarding"
+`);
+});
+
 // ── static console ───────────────────────────────────────────────────────────
 app.use(express.static('web'));
 

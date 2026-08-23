@@ -193,6 +193,17 @@ Onboarding** — with their id, their key and this gateway's reachable address
 already filled in, tabbed by tool, one button per block and one that copies the
 whole thing as a message to paste into a chat.
 
+For the employee it is one command:
+
+```bash
+curl -fsSL http://192.168.1.42:8080/install/fede | sh
+```
+
+The gateway serves the script and the hook itself, so nobody needs a route to
+the public internet to be onboarded — on a network with no egress the GitHub
+step was where setup died, which is a poor look for a product whose claim is
+that nothing leaves the network.
+
 Every value an admin retypes is a value they can get wrong, and these fail
 silently: a mistyped `WARDEN_USER` does not error, it gets that person judged as
 a stranger.

@@ -42,7 +42,9 @@ escribís en castellano y las compila el modelo. Preview, Activate, listo.
 **Pestaña People** — cargá a tu gente. Nombre + rol → Add, y te devuelve el
 `WARDEN_USER` y la API key de esa persona. Si te falta un rol, lo creás abajo
 con su cuota diaria. Haciendo click en alguien ves todas las reglas que lo
-juzgan y podés escribirle una que aplique **sólo a él**.
+juzgan, podés escribirle una que aplique **sólo a él**, y abajo tenés su
+**Onboarding**: el comando de una línea listo para copiar y la config por
+herramienta.
 
 ## Qué le mandás a cada uno
 
@@ -83,29 +85,28 @@ El registro es el audit log.)
 
 **No clona el repo. No baja modelos. No instala nada de Node.**
 
-## 1. Bajar el hook
+## 1 y 2. Un comando
 
 ```bash
-curl -o ~/.warden-hook.mjs \
-  https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs
-chmod +x ~/.warden-hook.mjs
+curl -fsSL http://192.168.1.42:8080/install/fede | sh
 ```
 
-Un archivo, sin dependencias. Sólo lee el prompt, se lo pregunta al gateway, y
-devuelve sí o no.
+Eso baja el hook **del gateway** (no de internet — funciona en una red sin
+salida) y escribe `WARDEN_URL` y `WARDEN_USER` en tu perfil de shell. Se puede
+volver a correr las veces que quieras: reemplaza su propio bloque en vez de
+apilar otro.
 
-## 2. Configurar (en `~/.zshrc` o `~/.bashrc`)
+El link exacto te lo da el admin desde la consola: People → tu ficha →
+Onboarding.
 
-```bash
-export WARDEN_URL=http://192.168.1.42:8080
-export WARDEN_USER=fede
-export WARDEN_ROLE=analyst
-```
+Después abrí una terminal nueva, o `source ~/.zshrc`.
 
-`WARDEN_ROLE` es opcional y sólo sirve si no estás en el directorio; para todos
-los demás manda lo que el admin puso en People.
+> El hook es un archivo, sin dependencias. Lee el prompt, se lo pregunta al
+> gateway, y devuelve sí o no.
 
-Después `source ~/.zshrc` o abrí una terminal nueva.
+> No lleva `WARDEN_ROLE`: tu rol sale del directorio. Si lo ponés a mano, el
+> gateway lo ignora — un rol que podés editar en tu `.zshrc` es un rol con el
+> que podrías elegir qué reglas te juzgan.
 
 ## 3a. Conectar Claude Code
 

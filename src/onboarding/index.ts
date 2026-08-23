@@ -69,8 +69,15 @@ export type OnboardingPack = {
 
 const HOOK_PATH = '~/.warden-hook.mjs';
 
-/** Where employees curl the hook from. Overridable for a fork or a mirror. */
-function hookSource(): string {
+/**
+ * The public copy of the hook.
+ *
+ * No longer used by the generated setup — the gateway serves its own copy at
+ * `/warden-hook.mjs`, so an employee never needs to reach the public internet
+ * to be onboarded. Kept for the docs, which describe installing from a clone
+ * that has no gateway running yet.
+ */
+export function publicHookUrl(): string {
   return (
     process.env['WARDEN_HOOK_URL'] ??
     'https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs'
@@ -80,22 +87,31 @@ function hookSource(): string {
 function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
   return [
     {
-      title: 'Download the hook — one file, no dependencies',
+      title: 'One command — downloads the hook and sets your environment',
       language: 'bash',
-      code: `curl -o ${HOOK_PATH} ${hookSource()}\nchmod +x ${HOOK_PATH}`
+      note:
+        'Served by the gateway itself, so this works on a network with no way out ' +
+        'to the internet. Safe to re-run: it replaces its own block rather than ' +
+        'stacking a second one.',
+      code: `curl -fsSL ${gatewayUrl}/install/${employee.id} | sh`
     },
     {
-      title: 'Add to your shell profile (~/.zshrc or ~/.bashrc)',
+      title: 'Then open a new terminal, and check it reaches the gateway',
+      language: 'bash',
+      code: `curl -s $WARDEN_URL/health`
+    },
+    {
+      title: 'Prefer to do it by hand? These are the same two steps',
       language: 'bash',
       note:
         'WARDEN_ROLE is deliberately absent. Your role comes from the company ' +
         'directory, so a role set here would have no effect — which is the point.',
-      code: `export WARDEN_URL=${gatewayUrl}\nexport WARDEN_USER=${employee.id}`
-    },
-    {
-      title: 'Check it reaches the gateway',
-      language: 'bash',
-      code: `curl -s $WARDEN_URL/health`
+      code:
+        `curl -fsSL ${gatewayUrl}/warden-hook.mjs -o ${HOOK_PATH}\n` +
+        `chmod +x ${HOOK_PATH}\n\n` +
+        `# in ~/.zshrc or ~/.bashrc\n` +
+        `export WARDEN_URL=${gatewayUrl}\n` +
+        `export WARDEN_USER=${employee.id}`
     }
   ];
 }

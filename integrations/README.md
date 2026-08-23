@@ -15,7 +15,17 @@ checks, and prompt policy checks."*
 
 ## 1. Install the hook
 
-One file, no dependencies, nothing else to install:
+One file, no dependencies, nothing else to install. If a gateway is already
+running, take it from there — no internet needed, and the console gives you a
+one-liner that also sets the environment (see the bottom of this file):
+
+```bash
+curl -o ~/.warden-hook.mjs http://<gateway>:8080/warden-hook.mjs
+chmod +x ~/.warden-hook.mjs
+```
+
+Before any gateway exists — the first machine, setting one up — take it from
+the repo:
 
 ```bash
 curl -o ~/.warden-hook.mjs \
@@ -171,6 +181,21 @@ the employee's id, key and this gateway's address already substituted:
 **People → pick a person → Onboarding.** Tabs per tool, a copy button on every
 block, and one button that copies the whole setup as a message you can paste
 into a chat.
+
+The first step is one command:
+
+```bash
+curl -fsSL http://<gateway>/install/<employee-id> | sh
+```
+
+The gateway serves both the script and the hook, so onboarding does not need a
+route to the public internet — which matters on conference wifi behind a captive
+portal, and matters more for a product whose claim is that nothing leaves the
+network. The script is idempotent: it replaces its own block in the shell
+profile rather than stacking a second, contradictory one, so it can be re-run
+after a role change or a new gateway address. It carries no API key — the hook
+does not use one, and a `curl | sh` with a credential in it leaves that
+credential in shell history.
 
 That matters because every value an admin retypes is a value they can get wrong,
 and the wrong ones fail silently — a mistyped `WARDEN_USER` does not error, it
