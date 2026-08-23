@@ -447,22 +447,22 @@ searching for the call rather than trusting a number, and refuses to emit links
 for a commit that has not been pushed.
 
 <!-- permalinks:start -->
-Pinned to [`adf68d694d44`](https://github.com/MartinPuli/operations-aleph/tree/adf68d694d446854b7c3f4c46112b86d6e266a64). Line numbers move; a commit does not.
+Pinned to [`5cac1e20b97d`](https://github.com/MartinPuli/operations-aleph/tree/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed). Line numbers move; a commit does not.
 
 | Where | What runs there |
 |---|---|
-| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
-| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
-| [`src/qvac/real.ts L127-L152`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/real.ts#L127-L152) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
-| [`src/qvac/real.ts L96`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/real.ts#L96) | `embed()` — the vectors behind rule retrieval. |
-| [`src/qvac/real.ts L107`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/real.ts#L107) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
-| [`src/qvac/client.ts L119-L128`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/client.ts#L119-L128) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator. |
-| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
-| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
-| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
-| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
-| [`src/guard/pipeline.ts L68`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/guard/pipeline.ts#L68) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
-| [`src/guard/aggregate.ts L47`](https://github.com/MartinPuli/operations-aleph/blob/adf68d694d446854b7c3f4c46112b86d6e266a64/src/guard/aggregate.ts#L47) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
+| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
+| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
+| [`src/qvac/real.ts L130-L155`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L130-L155) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
+| [`src/qvac/real.ts L99`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L99) | `embed()` — the vectors behind rule retrieval. |
+| [`src/qvac/real.ts L110`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L110) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
+| [`src/qvac/client.ts L119-L128`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/client.ts#L119-L128) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator. |
+| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
+| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
+| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
+| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
+| [`src/guard/pipeline.ts L76`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
+| [`src/guard/aggregate.ts L47`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/aggregate.ts#L47) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
 <!-- permalinks:end -->
 
 ### Models and capabilities used
