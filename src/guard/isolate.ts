@@ -50,15 +50,34 @@ export type Isolated = {
 };
 
 /**
+ * NFKC-normalise and strip invisible characters.
+ *
+ * Exported so the pipeline can normalise *before* secret masking: a credential
+ * written with full-width homoglyphs or zero-width joints matches no sanitizer
+ * pattern in its raw form, and normalising after masking would hand the
+ * un-masked secret to every later stage. Tamper evidence is not lost by
+ * normalising early — `isolate` computes its flags against whatever original
+ * text it is given.
+ */
+export function normalizeUntrusted(text: string): string {
+  return text.normalize('NFKC').replace(INVISIBLE, '');
+}
+
+/**
  * Normalise and fence untrusted text.
  *
  * Nothing is rejected here — flags are evidence for later passes, and a
  * suspicious-looking prompt may still be legitimate. Deciding is pass 4's job.
+ *
+ * `original` is the text as the caller first received it. It defaults to
+ * `text`, and the pipeline passes the pre-normalisation, pre-masking form so
+ * the tampering flags describe what the sender actually wrote rather than what
+ * survived the earlier passes.
  */
-export function isolate(text: string): Isolated {
-  const nfkc = text.normalize('NFKC');
-  const stripped = nfkc.replace(INVISIBLE, '');
+export function isolate(text: string, original: string = text): Isolated {
+  const stripped = normalizeUntrusted(text);
 
+  INVISIBLE.lastIndex = 0;
   ROLE_MARKER.lastIndex = 0;
   META_INSTRUCTION.lastIndex = 0;
 
@@ -67,14 +86,14 @@ export function isolate(text: string): Isolated {
 
   return {
     clean: stripped,
-    original: text,
+    original,
     nonce,
     envelope: buildEnvelope(stripped, nonce),
     flags: {
-      hadInvisibleChars: INVISIBLE.test(text),
+      hadInvisibleChars: INVISIBLE.test(original),
       hadRoleMarkers: ROLE_MARKER.test(stripped),
       hadMetaInstructions: META_INSTRUCTION.test(stripped),
-      normalizationChanged: nfkc !== text,
+      normalizationChanged: original.normalize('NFKC') !== original,
       nonAsciiRatio: stripped.length === 0 ? 0 : nonAscii / stripped.length,
       length: stripped.length
     }

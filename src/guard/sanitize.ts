@@ -17,8 +17,10 @@ type Pattern = { kind: MaskedSpan['kind']; re: RegExp; label: string };
  * string, and naming it precisely produces a better message for the employee.
  */
 const PATTERNS: Pattern[] = [
-  { kind: 'api-key', label: 'OpenAI key',    re: /\bsk-[A-Za-z0-9_-]{20,}\b/g },
+  // Anthropic before OpenAI: `sk-ant-…` also matches the generic `sk-…`
+  // pattern, and whichever runs first claims the span and names the mask.
   { kind: 'api-key', label: 'Anthropic key', re: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g },
+  { kind: 'api-key', label: 'OpenAI key',    re: /\bsk-[A-Za-z0-9_-]{20,}\b/g },
   { kind: 'api-key', label: 'GitHub token',  re: /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g },
   { kind: 'api-key', label: 'AWS key id',    re: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g },
   { kind: 'api-key', label: 'Slack token',   re: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g },
