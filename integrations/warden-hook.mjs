@@ -26,6 +26,8 @@
  * refused outright, which is also how revoking one works.
  */
 
+import { readFileSync, statSync } from 'node:fs';
+
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const API_KEY = process.env.WARDEN_API_KEY ?? '';
 
@@ -60,6 +62,70 @@ async function readStdin() {
  * a wrapper someone writes in an afternoon only has to put the text on stdin
  * under one of the obvious names.
  */
+/**
+ * What this session has cost so far, read off the tool's own transcript.
+ *
+ * Claude Code hands the hook a `transcript_path`, and every assistant turn in
+ * that file carries the provider's own `usage` block. So these are real counts
+ * rather than an estimate of the prompt — which matters, because the thing an
+ * admin wants capped is what the provider bills, and Warden never sees the
+ * provider on this path.
+ *
+ * It is also a file on the employee's machine, which they can edit. That is the
+ * honest limit of this control and it is documented where the gateway reads it.
+ *
+ * Measured at 149 ms over a 44 MB, 2724-turn transcript — the largest on the
+ * machine this was written on. That is noise against the decision deadline, but
+ * the bound below exists so a pathological file cannot put the employee's
+ * keystroke path behind a disk read.
+ *
+ * Never throws. A transcript that cannot be read means Warden cannot see the
+ * spend, and the gateway is told nothing rather than told zero — the two are
+ * different, and only one of them is a lie.
+ */
+const MAX_TRANSCRIPT_BYTES = 256 * 1024 * 1024;
+
+function readUsage(payload, tool) {
+  const path = typeof payload?.transcript_path === 'string' ? payload.transcript_path : '';
+  if (!path) return undefined;
+
+  try {
+    if (statSync(path).size > MAX_TRANSCRIPT_BYTES) return undefined;
+
+    let outputTokens = 0;
+    let last = null;
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      // Most lines are user turns and tool results. Skipping them before
+      // JSON.parse is what keeps this in the tens of milliseconds.
+      if (!line || line.indexOf('"usage"') === -1) continue;
+      let entry;
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue; // a half-written trailing line is normal on a live session
+      }
+      const u = entry?.type === 'assistant' ? entry?.message?.usage : null;
+      if (!u) continue;
+      outputTokens += u.output_tokens ?? 0;
+      last = u;
+    }
+
+    if (!last) return undefined;
+
+    // Context is the last turn, not a sum: it is how full the window is now.
+    // Summing it would count the same cached prefix once per turn and produce a
+    // number in the tens of millions that means nothing.
+    const contextTokens =
+      (last.input_tokens ?? 0) +
+      (last.cache_read_input_tokens ?? 0) +
+      (last.cache_creation_input_tokens ?? 0);
+
+    return { outputTokens, contextTokens, source: tool };
+  } catch {
+    return undefined;
+  }
+}
+
 function detect(payload) {
   const text =
     firstString(payload.prompt, payload.user_input, payload.message, payload.text, payload.input) ??
@@ -432,6 +498,10 @@ async function main() {
   const { tool, prompt } = detect(payload);
   if (!prompt.trim()) return;
 
+  // Read before the gateway call so a slow disk shows up in our own timing
+  // rather than eating into the decision deadline.
+  const usage = readUsage(payload, tool);
+
   let res;
   try {
     await requestJson(
@@ -448,7 +518,7 @@ async function main() {
           'content-type': 'application/json',
           authorization: `Bearer ${API_KEY}`
         },
-        body: JSON.stringify({ prompt, source: tool })
+        body: JSON.stringify({ prompt, source: tool, usage })
       },
       decisionTimeoutMs,
       validateDecision,
