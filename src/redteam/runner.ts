@@ -18,7 +18,8 @@ import { join } from 'node:path';
 import { evaluate } from '../guard/pipeline.js';
 import { resetQuotas } from '../guard/quota.js';
 import type { Verdict } from '../guard/types.js';
-import { loadPolicy, rulesForRole, seedIfEmpty } from '../policy/store.js';
+import { hashPolicy, rulesForRole } from '../policy/store.js';
+import type { PolicySpec, Quota, Rule } from '../policy/types.js';
 import { adapter, isMock } from '../qvac/index.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
@@ -69,14 +70,57 @@ function loadCorpus(filter?: string): CorpusFile[] {
 }
 
 /**
+ * The policy the benchmark measures against.
+ *
+ * Read from the committed seed and materialised in memory — never from
+ * `data/policies.json`, which is the live store an admin edits through the
+ * console. That file used to be the source here, guarded by `seedIfEmpty`, so
+ * the numbers silently measured whatever rules happened to exist: anyone who
+ * wrote a rule while trying the console changed what the corpus meant, and
+ * REPORT.md still claimed the run was reproducible.
+ *
+ * Nothing is written to disk. A benchmark that mutates the machine it runs on
+ * is a benchmark you can only trust the first time.
+ *
+ * It is a file of its own rather than the shipped seed because the two answer
+ * different questions. The seed is what a fresh install starts with, and that
+ * set is deliberately small — the admin writes the policy, so shipping a
+ * company's worth of invented rules would be shipping our guesses as their
+ * policy. The corpus, meanwhile, needs enough rules to be worth attacking, and
+ * its 98 prompts were written against these eight. Tying them together would
+ * mean every product decision about defaults silently rewrites the benchmark.
+ */
+function benchmarkPolicy(): PolicySpec {
+  const path = process.env['WARDEN_BENCHMARK_POLICY'] ?? 'data/seed/benchmark-policy.json';
+  const seed = JSON.parse(readFileSync(path, 'utf8')) as {
+    rules?: Rule[];
+    quotas?: Quota[];
+    exemptRoles?: string[];
+  };
+  const rules = seed.rules ?? [];
+  const quotas = seed.quotas ?? [];
+  const exemptRoles = seed.exemptRoles ?? ['admin'];
+  return {
+    version: hashPolicy(rules, quotas, exemptRoles),
+    updatedAt: new Date(0).toISOString(),
+    rules,
+    quotas,
+    exemptRoles
+  };
+}
+
+/**
  * Judge one prompt.
  *
  * Multi-turn entries are flattened with their earlier turns as context: the
  * attack depends on the conversation that preceded it, so judging the last
  * message alone would measure something easier than the real thing.
  */
-async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<Outcome> {
-  const policy = loadPolicy();
+async function runPrompt(
+  prompt: Prompt,
+  mode: 'warden' | 'baseline',
+  policy: PolicySpec
+): Promise<Outcome> {
   const actor = { id: 'redteam', role: 'analyst' };
   const text = prompt.turns ? prompt.turns.join('\n') : (prompt.text ?? '');
   const started = Date.now();
@@ -139,8 +183,7 @@ async function main(): Promise<void> {
     ? ['warden']
     : ['warden', 'baseline'];
 
-  seedIfEmpty('data/seed/policies.seed.json');
-  const policy = loadPolicy();
+  const policy = benchmarkPolicy();
   const corpus = loadCorpus(only);
   if (corpus.length === 0) {
     // A typo'd --class must not overwrite REPORT.md with a report about nothing.
@@ -163,7 +206,7 @@ async function main(): Promise<void> {
       const outcomes: Outcome[] = [];
       for (let rep = 0; rep < reps; rep++) {
         for (const prompt of file.prompts) {
-          const outcome = await runPrompt(prompt, mode);
+          const outcome = await runPrompt(prompt, mode, policy);
           outcomes.push({ ...outcome, class: file.class });
           done++;
           // Carriage-return progress only makes sense on a terminal; piped to a
