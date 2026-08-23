@@ -81,6 +81,29 @@ from LLM adjudication entirely and leaving the attack class to the deterministic
 detector, which already matches 5 of 8 direct-override attacks at zero cost on
 benign traffic.
 
+## What the pinned rule is actually worth
+
+Removing `r-instruction-override` from the policy entirely, leaving the attack
+class to the deterministic detector. Same code, same corpus.
+
+| | With the rule | Without it |
+|---|---|---|
+| Attacks stopped | 70/80 (88%) | 63/80 (79%) |
+| False positives | 8/18 (44%) | 5/18 (28%) |
+
+The first movement in the false-positive rate that is larger than one prompt,
+and the first result all day that is not inside the noise band. It is also a
+bad trade: seven attacks lost to save three refusals.
+
+Where the attacks went is the useful part. `multi-turn-escalation` fell from
+100% to 63%, `roleplay-fiction` and `obfuscation` from 88% to 75%. Those are
+attacks spread across a conversation or wrapped in fiction — exactly the shapes
+a regex cannot see and a rule reading for intent can.
+
+So the rule is not a broken component to be removed. It is a priced trade:
+**seven attacks for three false positives.** Anything that improves this number
+has to keep the seven.
+
 ## Ideas measured and rejected
 
 Kept because the reason a thing failed is worth more than the thing.
