@@ -69,11 +69,36 @@ export type MaskedSpan = {
 
 export type Actor = { id: string; role: string };
 
+/**
+ * What the client says the session it is prompting from has consumed.
+ *
+ * Reported, not measured, and the distinction is the whole caveat. Through the
+ * hook Warden never talks to the provider and never sees an answer, so these
+ * numbers are read by the hook off the tool's own transcript on the employee's
+ * machine and sent here. They are real provider counts rather than estimates —
+ * and they are also a file the employee can edit. Against someone working
+ * within the policy this is a spend control; against someone attacking it, it
+ * is not, exactly like the hook itself, which they could also uninstall.
+ *
+ * The only place Warden could count tokens authoritatively is the proxy, which
+ * is the one path a Max or Plus subscription cannot be pointed down. Say
+ * "reported" wherever this is described.
+ */
+export type ReportedUsage = {
+  /** Tokens the assistant generated in this session so far. */
+  outputTokens?: number;
+  /** How full the session's context was on the last turn. */
+  contextTokens?: number;
+  /** Which tool reported it, for the trace. Never used to pick rules. */
+  source?: string;
+};
+
 export type GuardInput = {
   actor: Actor;
   prompt: string;
   /** Local file paths for attachments; their OCR text is screened too. */
   attachments?: string[];
+  usage?: ReportedUsage;
 };
 
 export type Decision = {
@@ -87,6 +112,18 @@ export type Decision = {
   maskedPrompt: string;
   maskedSpans: MaskedSpan[];
   quota?: { used: number; limit: number };
+  /** Session consumption against the role's ceilings, when the client reported any. */
+  budget?: BudgetStatus;
   /** Human-readable summary of why, shown to the employee on a block. */
   explanation: string;
+};
+
+/** One ceiling and where this session sits against it. `limit: null` means unmetered. */
+export type BudgetGauge = { used: number; limit: number | null; over: boolean; warn: boolean };
+
+export type BudgetStatus = {
+  output: BudgetGauge;
+  context: BudgetGauge;
+  /** True when the client sent nothing to measure — not the same as being under. */
+  unreported: boolean;
 };

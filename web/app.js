@@ -886,13 +886,43 @@ function rulesBody() {
       : '<div class="empty"><b>Nothing is being enforced</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
 
     <div class="section">
-      <div class="label">Daily limits by role</div>
+      <div class="label">Limits by role</div>
       ${state.policy.quotas.length
-        ? `<div class="quota-grid">${state.policy.quotas.map((q) => `
-            <div class="quota"><span>${esc(q.role)}</span><b>${q.maxRequestsPerDay}/day</b></div>`).join('')}</div>`
+        ? `<div class="quota-grid">${state.policy.quotas.map(quotaCard).join('')}</div>`
         : '<div class="note">No limits set — every role is unmetered.</div>'}
+      <div class="note">Token ceilings are per session and are read from the tool's
+        own transcript on the employee's machine — reported, not measured. Warden
+        never sees the provider on the hook path.</div>
     </div>
   </div>`;
+}
+
+/** Compact number for a ceiling: 500000 -> 500k. Ceilings are round by nature. */
+function tokens(n) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
+/**
+ * One role's ceilings.
+ *
+ * A role with no token ceiling says so rather than showing a bar at zero — an
+ * empty bar reads as "plenty left", which is the opposite of "nobody is
+ * counting".
+ */
+function quotaCard(q) {
+  const rows = [`<div class="quota-row"><span>requests</span><b>${q.maxRequestsPerDay}/day</b></div>`];
+  if (q.maxSessionOutputTokens) {
+    rows.push(`<div class="quota-row"><span>output</span><b>${tokens(q.maxSessionOutputTokens)}/session</b></div>`);
+  }
+  if (q.maxContextTokens) {
+    rows.push(`<div class="quota-row"><span>context</span><b>${tokens(q.maxContextTokens)}</b></div>`);
+  }
+  if (!q.maxSessionOutputTokens && !q.maxContextTokens) {
+    rows.push('<div class="quota-row unmetered"><span>tokens</span><b>unmetered</b></div>');
+  }
+  return `<div class="quota"><span class="quota-role">${esc(q.role)}</span>${rows.join('')}</div>`;
 }
 
 /** The conversation before it starts: tabs pinned at the top, the composer

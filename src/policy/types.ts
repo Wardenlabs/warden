@@ -70,7 +70,29 @@ export type Rule = z.infer<typeof ruleSchema>;
 export const quotaSchema = z.object({
   role: z.string().min(1),
   maxRequestsPerDay: z.number().int().positive(),
-  maxTokensPerDay: z.number().int().positive().optional()
+  /**
+   * Ceiling on tokens the assistant has generated in the session this person
+   * is prompting from.
+   *
+   * Per session, not per day, and the name has to keep saying so: the hook
+   * reads one transcript, and one transcript is one session. A field called
+   * `...PerDay` fed by a per-session number would be a console that reports a
+   * daily total nobody is counting.
+   *
+   * Absolute, not a fraction of anything, and that is deliberate: a fraction
+   * needs a denominator, the denominator is the model's context window, and
+   * Warden does not know it. Guessing one would put a number nobody ratified
+   * underneath a decision. An admin who knows their team runs a 200k model
+   * writes 100k here and has said exactly what they meant.
+   */
+  maxSessionOutputTokens: z.number().int().positive().optional(),
+  /** Ceiling on how full the session's context may get. Absolute, for the same reason. */
+  maxContextTokens: z.number().int().positive().optional(),
+  /**
+   * Fraction of either ceiling at which the console warns without holding
+   * anything. Warning is not a verdict and never reaches the employee's tool.
+   */
+  warnAtFraction: z.number().gt(0).lte(1).optional()
 });
 export type Quota = z.infer<typeof quotaSchema>;
 
