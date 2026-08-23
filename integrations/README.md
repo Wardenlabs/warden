@@ -256,9 +256,7 @@ and an API key is the least forgiving of them.
 
 "Verified" means somebody watched that tool refuse a prompt because of Warden.
 Only the last row has been. Everything else is wired from the tools' own
-documentation and tested at the hook boundary, which is not the same thing —
-[OPE-19](https://linear.app/operations-aleph/issue/OPE-19) is the card for
-closing that gap.
+documentation and tested at the hook boundary, which is not the same thing.
 
 The 2026-08-23 attempt did not close it. Claude Code blocked the six malicious
 cases but intermittently blocked benign traffic and its OAuth session had

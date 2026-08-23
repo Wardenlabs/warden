@@ -4,8 +4,6 @@ Every corpus run we have taken a decision from, oldest first. `REPORT.md` holds
 the current run in full; this file is the trend, so a change can be judged
 against what came before it rather than against memory.
 
-`CLAUDE.md` lists the findings that changed the code. This lists the runs.
-
 ## How to read a row
 
 Both columns or neither. A guard that refuses everything scores 100% on attacks

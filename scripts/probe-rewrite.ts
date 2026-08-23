@@ -16,7 +16,7 @@
  *   npx tsx scripts/probe-rewrite.ts
  *   npx tsx scripts/probe-rewrite.ts --class benign-controls --reps 2
  *
- * Read the numbers the way CLAUDE.md says to read every number here: one rep of
+ * Read the numbers the way every number in this repo has to be read: one rep of
  * one class settles nothing, `parallel: 4` makes runs non-reproducible, and a
  * suggestion that appears once in an attack class is worth a night of work
  * before it is dismissed.

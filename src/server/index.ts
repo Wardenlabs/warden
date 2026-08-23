@@ -139,7 +139,7 @@ app.get('/api/policy', (_req, res) => {
 });
 
 app.get('/api/policy/presets', (_req, res) => {
-  // Served from Fede's catalog (OPE-18) once present; empty array until then so
+  // Served from the preset catalog once present; empty array until then so
   // the console renders an empty catalog rather than erroring.
   res.json(readSeedJson('data/seed/presets.json', []));
 });
@@ -151,7 +151,7 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
     compileRule: (a: unknown, t: string, p: unknown, o?: unknown) => Promise<unknown>;
   }>('../policy/compile.js');
   const compileRule = mod?.compileRule;
-  if (!compileRule) return res.status(503).json({ error: 'compiler not wired yet (OPE-7)' });
+  if (!compileRule) return res.status(503).json({ error: 'compiler not available' });
   // `lockTo` is set when the admin writes a rule from inside one person's page.
   // They already said who it is for by being there.
   const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
@@ -163,7 +163,7 @@ app.post('/api/policy/preview', asyncRoute(async (req, res) => {
     previewRule: (a: unknown, r: unknown, p: unknown, x?: unknown) => Promise<unknown>;
   }>('../policy/compile.js');
   const previewRule = mod?.previewRule;
-  if (!previewRule) return res.status(503).json({ error: 'preview not wired yet (OPE-7)' });
+  if (!previewRule) return res.status(503).json({ error: 'preview not available' });
   // `against` carries prompts the gateway already ruled on, so a candidate rule
   // can be checked for regressions against real traffic and not only against
   // the examples its own compiler invented. Capped: every case is a full
@@ -183,7 +183,7 @@ app.post('/api/policy/preview', asyncRoute(async (req, res) => {
 app.post('/api/policy/ratify', asyncRoute(async (req, res) => {
   const mod = await optional<{ ratifyRule: (r: unknown) => Promise<unknown> }>('../policy/compile.js');
   const ratifyRule = mod?.ratifyRule;
-  if (!ratifyRule) return res.status(503).json({ error: 'ratify not wired yet (OPE-7)' });
+  if (!ratifyRule) return res.status(503).json({ error: 'ratify not available' });
   res.json(await ratifyRule(req.body?.rule));
 }));
 
@@ -582,7 +582,7 @@ app.post('/v1/chat/completions', asyncRoute(async (req, res) => {
     }
     return res.json({
       id: 'stub', object: 'chat.completion',
-      choices: [{ message: { role: 'assistant', content: '[stub] allowed — proxy not wired yet (OPE-9)' } }]
+      choices: [{ message: { role: 'assistant', content: '[stub] allowed — proxy not available' } }]
     });
   }
   await handleChatCompletion(req, res, emitDecision);
@@ -885,7 +885,7 @@ async function optional<T>(specifier: string): Promise<T | null> {
 
 /**
  * Run the guard for a request, whatever shape it arrived in. Falls back to a
- * shape-correct stub while the pipeline (OPE-8) is being built, so dependents
+ * shape-correct stub while the pipeline is unavailable, so dependents
  * see the real contract immediately.
  */
 async function evaluateRequest(req: Request): Promise<unknown> {

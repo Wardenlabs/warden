@@ -52,8 +52,8 @@ Adapter    : real
 === END REPORT ===
 ```
 
-**Pegá ese bloque en Linear OPE-14.** Con eso decidimos en qué máquina se graba
-el video — gana la de mejor `tok/s`.
+Ese bloque describe la máquina: modelos, backend y `tok/s` reales. Guardalo — es
+lo que hay que citar cuando se comparan números entre equipos.
 
 Si dice `Adapter: mock`, la inferencia local no arrancó. No pelees con eso
 ahora: todo lo demás funciona igual, sólo agregá `WARDEN_ADAPTER=mock` adelante
@@ -320,8 +320,8 @@ en su `.zshrc` sería un rol con el que elegiría qué reglas lo juzgan.
 
 ## 5. El hook: gobernar Claude Code de verdad
 
-Esto es lo más importante del producto y lo que **todavía nadie verificó**
-(Linear OPE-19).
+Esto es lo más importante del producto y lo que **todavía no está verificado end
+to end** — ver [`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
 
 ```bash
 npm link

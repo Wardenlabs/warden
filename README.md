@@ -443,9 +443,9 @@ stops none of these, because a system prompt is a request, not a control. The
 second is the honest cost, and it is **not shippable** — a gateway that refuses
 58% of honest work gets uninstalled in a week.
 
-That number is the open problem, and the investigation into it — including four
-hypotheses measured and rejected, and the lead that is still live — is written up
-in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
+That number is the open problem, and the investigation into it — every idea
+measured, including the six that failed — is written up in
+[`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md) rather than smoothed over here.
 
 Three caveats that qualify every number above.
 
