@@ -40,6 +40,12 @@ function structuralConcerns(flags: IsolationFlags): string[] {
   // accident, so they are worth a human look even when no rule fired.
   if (flags.hadInvisibleChars) concerns.push('invisible characters');
   if (flags.hadRoleMarkers) concerns.push('embedded conversation-role markers');
+  // Computed on every request since pass 0 was written, and until now thrown
+  // away — the one deterministic signal aimed squarely at instruction override
+  // was the only flag that never reached a decision. It costs nothing, cannot be
+  // argued down by anything in the message, and measured 0 false positives
+  // across all 16 benign controls while matching 5 of 8 direct-override attacks.
+  if (flags.hadMetaInstructions) concerns.push('phrasing aimed at the instruction layer');
   if (flags.nonAsciiRatio > 0.4 && flags.length > 40) concerns.push('unusual character mix');
   return concerns;
 }
