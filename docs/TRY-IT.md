@@ -189,7 +189,7 @@ En la misma burbuja. Escribí una nota y mandá.
 
 Aparece abajo a la izquierda en **Reported as wrong**, con el nombre de quien la
 mandó y **la regla que disparó** al lado — que es el objeto que el admin tiene
-que ir a editar. Con 44% de falsos positivos medidos, ésta es la única pantalla
+que ir a editar. Con 58% de falsos positivos medidos, ésta es la única pantalla
 donde un bloqueo equivocado se distingue de uno correcto.
 
 ### c) La cola de revisión
