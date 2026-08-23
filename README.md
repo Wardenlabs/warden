@@ -408,13 +408,21 @@ benign-controls class caught all of them. Nothing else would have.
 Every model call in the project goes through one directory. Nothing else imports
 `@qvac/sdk`.
 
-| File | What runs there |
+Every link below is pinned to a commit, so it shows the code as it was when this
+was written rather than whatever the branch drifted to. Regenerate with
+`npm run permalinks -- --write` after the last commit; it resolves each line by
+searching for the call rather than trusting a number, and refuses to emit links
+for a commit that has not been pushed.
+
+<!-- permalinks:start -->
+| Where | What runs there |
 |---|---|
 | [`src/qvac/real.ts`](src/qvac/real.ts) | `completion()` with `responseFormat: json_schema`, zod validation, one repair attempt, fail-closed. `embed()` and `ocr()`. |
 | [`src/qvac/client.ts`](src/qvac/client.ts) | `loadModel()` per role, `parallel: 4` on the adjudicator so pass 3 judges several rules against one loaded instance. |
 | [`src/guard/passes/adjudicate.ts`](src/guard/passes/adjudicate.ts) | The per-rule judgement, and the enum-vs-boolean finding above. |
 | [`src/policy/compile.ts`](src/policy/compile.ts) | Natural language → structured rule, plus the preview pass. |
 | [`src/policy/index.ts`](src/policy/index.ts) | Embedding-based rule retrieval. |
+<!-- permalinks:end -->
 
 ### Models and capabilities used
 
