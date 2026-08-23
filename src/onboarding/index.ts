@@ -30,7 +30,7 @@ export type IntegrationKind = 'hook' | 'proxy';
 
 export type SetupStep = {
   title: string;
-  /** Syntax hint for the console's code block: `bash`, `json`, `toml`, `js`. */
+  /** Syntax hint for the console's code block: `bash`, `powershell`, `json`, `toml`, `js`. */
   language: string;
   code: string;
   /** Rendered above the block when the step needs a caveat. */
@@ -90,8 +90,21 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
       note:
         'Served by the gateway itself, so this works on a network with no way out ' +
         'to the internet. It carries your API key, so treat the link as a secret. ' +
-        'Safe to re-run: it replaces its own block rather than stacking a second one.',
+        'Safe to re-run: it replaces its own block rather than stacking a second one. ' +
+        'Availability checks default to 2 seconds and full decisions to 30 seconds.',
       code: `curl -fsSL ${gatewayUrl}/install/${employee.id} | sh`
+    },
+    {
+      title: 'Windows PowerShell alternative (current session)',
+      language: 'powershell',
+      note:
+        'The API key is your identity. The 30 second decision deadline is fail-open; a machine whose cold decisions exceed it is not verified.',
+      code:
+        `Invoke-WebRequest -Uri '${gatewayUrl}/warden-hook.mjs' -OutFile "$HOME\\.warden-hook.mjs"\n` +
+        `$env:WARDEN_URL = '${gatewayUrl}'\n` +
+        `$env:WARDEN_API_KEY = '${employee.apiKey}'\n` +
+        `$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'\n` +
+        `$env:WARDEN_TIMEOUT_MS = '30000'`
     },
     {
       title: 'Then open a new terminal, and check it reaches the gateway',
@@ -110,7 +123,9 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
         `chmod +x ${HOOK_PATH}\n\n` +
         `# in ~/.zshrc or ~/.bashrc\n` +
         `export WARDEN_URL=${gatewayUrl}\n` +
-        `export WARDEN_API_KEY=${employee.apiKey}`
+        `export WARDEN_API_KEY=${employee.apiKey}\n` +
+        `export WARDEN_HEALTH_TIMEOUT_MS=2000\n` +
+        `export WARDEN_TIMEOUT_MS=30000`
     }
   ];
 }
@@ -145,6 +160,8 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Test it',
           language: 'bash',
+          note:
+            'This checks the hook boundary only. Claude Code remains NOT VERIFIED until the full E2E gate passes.',
           code: `echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]
@@ -166,7 +183,8 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Confirm Codex picked it up',
           language: 'bash',
-          note: 'Run /hooks inside Codex — it lists the hooks it loaded.',
+          note:
+            'Run /hooks inside Codex — it lists the hooks it loaded. Loading is not verification: a decision over 30 seconds fails open.',
           code: `echo '{"prompt":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]

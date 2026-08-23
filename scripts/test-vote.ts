@@ -16,7 +16,6 @@
  *
  * Run: npm run test:vote
  */
-import { adjudicate } from '../src/guard/passes/adjudicate.js';
 import { isolate } from '../src/guard/isolate.js';
 import type { CompleteRequest, QvacAdapter, StructuredResult } from '../src/qvac/types.js';
 import type { Rule } from '../src/policy/types.js';
@@ -54,11 +53,10 @@ function check(name: string, ok: boolean, detail: string): void {
 }
 
 async function main(): Promise<void> {
-  if (process.env['WARDEN_CONFIRM_VOTES'] !== '2') {
-    // Read at module load, so it cannot be set from in here.
-    console.log('\nrun with WARDEN_CONFIRM_VOTES=2 (npm run test:vote does this)\n');
-    process.exit(1);
-  }
+  // Set before importing the pass: it reads this flag at module load. Keeping
+  // the setup here makes `npm run test:vote` portable across Unix and Windows.
+  process.env['WARDEN_CONFIRM_VOTES'] = '2';
+  const { adjudicate } = await import('../src/guard/passes/adjudicate.js');
   const iso = isolate('cuánto gana Ana?');
   console.log('\nconfirmation vote');
 

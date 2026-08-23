@@ -29,8 +29,18 @@
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const API_KEY = process.env.WARDEN_API_KEY ?? '';
 
-/** This sits in the developer's keystroke path; past this we get out of the way. */
-const TIMEOUT_MS = Number(process.env.WARDEN_TIMEOUT_MS ?? 8000);
+const DEFAULT_HEALTH_TIMEOUT_MS = 2000;
+const DEFAULT_DECISION_TIMEOUT_MS = 30_000;
+
+function timeoutFromEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive finite number, got "${raw}"`);
+  }
+  return value;
+}
 
 async function readStdin() {
   const chunks = [];
@@ -166,7 +176,59 @@ function render(res) {
   return lines.join('\n');
 }
 
+async function requestJson(url, init, timeoutMs, validate, recoverHttpError) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const http = await fetch(url, { ...init, signal: controller.signal });
+    // Keep the controller live through body consumption and validation. A
+    // server that sends headers and then stalls must not bypass the deadline.
+    const raw = await http.text();
+    let value;
+    let invalidJson = false;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      invalidJson = true;
+    }
+    if (!http.ok) {
+      const recovered = recoverHttpError?.(http, invalidJson ? undefined : value);
+      if (recovered !== undefined) return validate(recovered);
+      throw new Error(`gateway returned ${http.status}`);
+    }
+    if (invalidJson) throw new Error('gateway returned invalid JSON');
+    return validate(value);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function validateHealth(value) {
+  if (!value || typeof value !== 'object' || value.ok !== true) {
+    throw new Error('gateway health response is invalid');
+  }
+  return value;
+}
+
+function validateDecision(value) {
+  if (!value || typeof value !== 'object') {
+    throw new Error('gateway decision is not an object');
+  }
+  if (!['ALLOW', 'ESCALATE', 'BLOCK'].includes(value.verdict)) {
+    throw new Error('gateway decision has an invalid verdict');
+  }
+  if (typeof value.auditId !== 'string' || !value.auditId.trim()) {
+    throw new Error('gateway decision has no audit id');
+  }
+  if (value.firedRules !== undefined && !Array.isArray(value.firedRules)) {
+    throw new Error('gateway decision has invalid fired rules');
+  }
+  return value;
+}
+
 async function main() {
+  const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
+  const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
   const raw = await readStdin();
 
   let payload;
@@ -174,48 +236,47 @@ async function main() {
     payload = JSON.parse(raw);
   } catch {
     // Not an event we recognise. Staying out of the way beats guessing.
-    process.exit(0);
+    return;
   }
 
   const { tool, prompt } = detect(payload);
-  if (!prompt.trim()) process.exit(0);
+  if (!prompt.trim()) return;
 
   let res;
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const http = await fetch(`${WARDEN_URL}/api/guard/check`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${API_KEY}`
+    await requestJson(
+      `${WARDEN_URL}/health`,
+      { method: 'GET' },
+      healthTimeoutMs,
+      validateHealth
+    );
+    res = await requestJson(
+      `${WARDEN_URL}/api/guard/check`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${API_KEY}`
+        },
+        body: JSON.stringify({ prompt, source: tool })
       },
-      body: JSON.stringify({ prompt, source: tool }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-
-    /**
-     * A rejected credential is an answer, not a failure.
-     *
-     * This is the line that separates the two error paths, and getting it wrong
-     * either way is bad. A gateway that cannot be reached must not brick every
-     * developer's CLI — that is the fail-open case below. But a gateway that
-     * answered, and answered "I do not know this key", has governed the request:
-     * treating that as an outage would mean revoking somebody's key silently
-     * granted them unlimited access, which is the opposite of revocation.
-     */
-    if (http.status === 401 || http.status === 403) {
-      res = await http.json().catch(() => ({
-        verdict: 'BLOCK',
-        auditId: 'no-key',
-        explanation: 'This gateway did not recognise your Warden API key.'
-      }));
-    } else if (!http.ok) {
-      throw new Error(`gateway returned ${http.status}`);
-    } else {
-      res = await http.json();
-    }
+      decisionTimeoutMs,
+      validateDecision,
+      (http, value) => {
+        if (http.status !== 401 && http.status !== 403) return undefined;
+        const body = value && typeof value === 'object' ? value : {};
+        return {
+          ...body,
+          verdict: 'BLOCK',
+          auditId: typeof body.auditId === 'string' && body.auditId ? body.auditId : 'no-key',
+          error: typeof body.error === 'string' ? body.error : 'unknown_api_key',
+          explanation:
+            typeof body.explanation === 'string'
+              ? body.explanation
+              : 'This gateway did not recognise your Warden API key.'
+        };
+      }
+    );
   } catch (err) {
     /**
      * The one place this deliberately fails open.
@@ -232,12 +293,12 @@ async function main() {
     process.stderr.write(
       `⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}). Prompt allowed unchecked.\n`
     );
-    process.exit(0);
+    return;
   }
 
   // Silence on the happy path. A gateway that comments on every prompt becomes
   // noise people learn to scroll past.
-  if (res.verdict === 'ALLOW') process.exit(0);
+  if (res.verdict === 'ALLOW') return;
 
   const message = render(res);
   process.stderr.write(message + '\n');
@@ -259,11 +320,11 @@ async function main() {
     );
   }
 
-  process.exit(2);
+  process.exitCode = 2;
 }
 
 main().catch((err) => {
   // A crash in the hook must never take the employee's tool down with it.
   process.stderr.write(`⚠ warden-hook error: ${err?.message ?? err}\n`);
-  process.exit(0);
+  process.exitCode = 0;
 });

@@ -377,10 +377,9 @@ function renderRules() {
 
 function renderQuotas() {
   $('quotas').innerHTML = policy.quotas.length
-    ? policy.quotas.map((q) => `<div style="font-size:12.5px;margin-bottom:7px;display:flex">
-        <span style="color:var(--dim)">${esc(q.role)}</span>
-        <span style="margin-left:auto;font-family:var(--mono);color:var(--faint)">${q.maxRequestsPerDay}/day</span>
-      </div>`).join('')
+    ? `<div class="quota-grid">${policy.quotas.map((q) => `<div class="quota">
+        <span>${esc(q.role)}</span><b>${q.maxRequestsPerDay}/day</b>
+      </div>`).join('')}</div>`
     : '<div class="note">No quotas set — every role is unmetered.</div>';
 }
 
@@ -484,7 +483,7 @@ $('addRole').onclick = async () => {
 async function renderPersonDetail() {
   const host = $('personDetail');
   if (!selectedPerson) {
-    host.innerHTML = '<div class="empty">Pick someone to see their rules and write one just for them.</div>';
+    host.innerHTML = '<div class="empty-state"><div><div class="signal">ID</div><b>No person selected</b><span>Choose someone from the directory to manage their setup and rules.</span></div></div>';
     return;
   }
   const p = selectedPerson;
@@ -738,7 +737,7 @@ function append(who, text, extra, cls = '') {
   el.className = `msg ${cls}`;
   el.innerHTML = `<div class="who">${esc(who)}</div><div class="txt">${esc(text)}</div>${extra}`;
   const chat = $('chat');
-  if (chat.querySelector('.empty')) chat.innerHTML = '';
+  if (chat.querySelector('.empty, .empty-state')) chat.innerHTML = '';
   chat.append(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -772,7 +771,7 @@ function renderTrace(d) {
         <span class="ms">${p.ms}ms</span>
       </div>`).join('')}`;
   const trace = $('trace');
-  if (trace.querySelector('.empty')) trace.innerHTML = '';
+  if (trace.querySelector('.empty, .empty-state')) trace.innerHTML = '';
   trace.prepend(el);
   while (trace.children.length > 25) trace.lastChild.remove();
 }
@@ -784,7 +783,11 @@ const TABS = { console: 'grid3', people: 'grid2', redteam: 'single' };
 document.querySelector('nav').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));
+  document.querySelectorAll('nav button').forEach((x) => {
+    const active = x === b;
+    x.classList.toggle('on', active);
+    x.setAttribute('aria-selected', String(active));
+  });
   for (const [tab, layout] of Object.entries(TABS)) {
     const el = $(`tab-${tab}`);
     el.style.display = tab === b.dataset.tab ? (layout === 'single' ? 'block' : 'grid') : 'none';

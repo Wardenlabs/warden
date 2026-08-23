@@ -98,39 +98,49 @@ async function download(spec: ModelSpec, dir: string): Promise<void> {
     return;
   }
 
-  const existing = existsSync(dest) ? statSync(dest).size : 0;
-  const expectedMin = spec.approxMB * 0.9 * 1e6;
-
-  if (existing > expectedMin) {
-    report.models.push({
-      role: spec.role, file: spec.filename,
-      sizeMB: Math.round(existing / 1e6), ok: true, note: 'cached'
-    });
-    console.log(`  ${green('✓')} ${spec.role.padEnd(12)} ${dim('already downloaded')}`);
-    return;
-  }
-
-  process.stdout.write(`  ${dim('↓')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`~${spec.approxMB} MB`)}`);
+  let existing = existsSync(dest) ? statSync(dest).size : 0;
 
   try {
+    const head = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+    if (!head.ok) throw new Error(`metadata HTTP ${head.status}`);
+    const expected = Number(head.headers.get('content-length'));
+    if (!Number.isFinite(expected) || expected <= 0) {
+      throw new Error('model server did not provide a valid content-length');
+    }
+
+    if (existing === expected) {
+      report.models.push({
+        role: spec.role, file: spec.filename,
+        sizeMB: Math.round(existing / 1e6), ok: true, note: 'cached'
+      });
+      console.log(`  ${green('✓')} ${spec.role.padEnd(12)} ${dim('already downloaded')}`);
+      return;
+    }
+
+    // A larger file cannot be resumed safely. A smaller one is a genuine
+    // partial download even when it happens to exceed the approximate size.
+    if (existing > expected) existing = 0;
+
+    process.stdout.write(`  ${dim('↓')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`~${spec.approxMB} MB`)}`);
+
     const headers: Record<string, string> = {};
     if (existing > 0) headers['Range'] = `bytes=${existing}-`;
 
     const res = await fetch(url, { headers, redirect: 'follow' });
-    if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (!res.body) throw new Error('empty response body');
 
-    const resuming = res.status === 206;
+    const resuming = existing > 0 && res.status === 206;
     await pipeline(
       Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
       createWriteStream(dest, resuming ? { flags: 'a' } : {})
     );
 
     const size = statSync(dest).size;
-    const ok = size > expectedMin;
+    const ok = size === expected;
     report.models.push({
       role: spec.role, file: spec.filename, sizeMB: Math.round(size / 1e6), ok,
-      ...(ok ? {} : { note: 'file smaller than expected — delete it and re-run' })
+      ...(ok ? {} : { note: `expected ${expected} bytes, received ${size}` })
     });
     console.log(`\r  ${ok ? green('✓') : yellow('!')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`${Math.round(size / 1e6)} MB`)}          `);
   } catch (err) {
@@ -299,6 +309,7 @@ async function main(): Promise<void> {
 
   if (report.adapter === 'mock') {
     console.log(yellow('Running in mock mode. Start with:  WARDEN_ADAPTER=mock npm run dev\n'));
+    process.exitCode = 1;
   } else {
     console.log(green('Ready. Start with:  npm run dev\n'));
   }

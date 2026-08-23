@@ -19,14 +19,41 @@ working state, including the parts that are not working.
 | Exempt roles | ✅ `exemptRoles` in the policy — the admin who ratifies is not judged by it |
 | Audit log | ✅ hash-chained, `npm run verify-audit` passes |
 | OpenAI proxy | ✅ 401 / 403 / 429 / 502 all correct |
-| Hook CLI | ✅ six payload shapes, blocks with exit 2, fails open only when the gateway is unreachable |
+| Hook CLI, at the boundary | ✅ `npm run test:hook`: six payload shapes, silent ALLOW, BLOCK with exit 2, health/decision timeout, gateway down, invalid response |
+| **Claude Code end to end** | ❌ **NOT VERIFIED** — attacks were blocked, but benign traffic produced an intermittent false positive and OAuth had expired |
+| **Codex end to end** | ❌ **NOT VERIFIED** — a cold decision took 35.954 s, exceeded the 30 s hook timeout, failed open, and the prompt reached the model |
 | Web console | ✅ Console / People / Red team, verified in a browser |
 | Red-team corpus | ✅ 98 prompts, 12 classes |
 | Runner + REPORT.md | ✅ both modes, every failure by id, false positives attributed per rule |
-| Setup script | ✅ diagnoses, downloads over HTTPS, proves inference. `--model adjudicator-large` for Qwen3-8B. |
+| Setup script | ✅ exact-size resumable HTTPS downloads, exits non-zero unless real inference succeeds. `--model adjudicator-large` for Qwen3-8B. |
 | Benchmark generator | ⚠️ written, not yet run on real hardware |
 
-## The open problem: 44% false positives
+## Open problem 1: latency defeats the guard
+
+**This is the one that breaks the product claim**, and it was found by running
+the thing rather than reasoning about it — Fede's 2026-08-23 Windows run,
+written up in [`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
+
+Decisions measured 24.9–26.6 s cold and 7.1–23.9 s hot. **One cold Codex check
+took 35.954 s, passed the hook's 30 s deadline, failed open, and the prompt
+reached the model.**
+
+The fail-open on timeout is deliberate and still right — a gateway that can
+strand every developer's CLI gets uninstalled the first morning it does. But
+combined with these latencies it means the guard can be defeated by being slow,
+which is not a property anyone should have to discover in production. Every hot
+measurement is also over the 2 s threshold at which a hook stops feeling like
+part of the tool.
+
+Two levers exist and neither has been measured on a fast machine yet:
+`WARDEN_TOP_K` bounds how many rules are adjudicated, and the timeout itself is
+a trade between a hole and an outage.
+
+Claude Code did block attacks in that run. It is still marked NOT VERIFIED
+because benign traffic produced an intermittent false positive and the session's
+OAuth had expired, so the run does not clear the gate it was meant to clear.
+
+## Open problem 2: 44% false positives
 
 **Gastón is on this.** Everything below is what the investigation has already
 ruled out, so nobody spends the night re-running it.
@@ -129,7 +156,7 @@ port forward. Stated in the README's Limits.
 | Who | What |
 |---|---|
 | Everyone | `npm run setup`, paste the report into OPE-14 |
-| Fede | OPE-19 — watch the hook block inside real Claude Code / Codex. Until someone sees it, the central claim is unverified and the console says so on every tool. |
+| Fede | OPE-19 — re-authenticate Claude, and retest Codex only once cold decisions stay under 30 s. Until a run clears the gate, `verified: false` stands and the console says so on every tool. |
 | Jere | OPE-20 — improvised attacks + clean-clone check by someone who did not build it |
 | Gastón | The false-positive investigation above |
 | Martin | OPE-12 — `npm run benchmark` and `npm run redteam` on the demo machine, pin the permalinks to a SHA, record, submit |
