@@ -35,6 +35,16 @@ const state = {
   chain: null,
   mock: false,
 
+  /**
+   * Blocks an employee said were wrong.
+   *
+   * The only place a false positive is visible. In the audit log a correct
+   * block and an incorrect one are the same record — nothing distinguishes
+   * them — so without this the admin has no way to find the rule that is
+   * costing the company work.
+   */
+  appeals: [],
+
   /** One draft at a time, deliberately. Two half-written rules is a way to
    *  activate the wrong one. `draftFor` locks the audience when it was started
    *  from a person's page. */
@@ -205,7 +215,7 @@ async function boot() {
     return;
   }
 
-  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain()]);
+  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals()]);
   window.addEventListener('hashchange', route);
   route();
   subscribe();
@@ -236,6 +246,11 @@ async function refreshChain() {
 async function loadPresets() {
   const { j } = await api('/api/policy/presets');
   state.presets = Array.isArray(j) ? j : [];
+}
+
+async function refreshAppeals() {
+  const { ok, j } = await api('/api/appeals');
+  state.appeals = ok && Array.isArray(j) ? j : [];
 }
 
 /**
@@ -365,7 +380,7 @@ function disclosure(key, label, body) {
 // nav item land on the tab you are most likely to have come for.
 const NAV = [
   { view: 'activity', label: 'Activity' },
-  { view: 'inbox', label: 'Inbox', count: () => escalated().length },
+  { view: 'inbox', label: 'Inbox', count: () => escalated().length + state.appeals.length },
   { sep: true },
   { view: 'policy', label: 'Rules', sel: 'new' },
   { view: 'people', label: 'Team' }
@@ -628,12 +643,81 @@ VIEWS.activity = {
   }
 };
 
+/**
+ * Everything waiting on a person, in two kinds.
+ *
+ * A held request is Warden declining to decide. An appeal is Warden having
+ * decided wrong, according to the person it landed on. Both need a human and
+ * neither belongs in the log, where a correct block and an incorrect one look
+ * identical — which is the whole reason appeals exist as a separate record.
+ */
 VIEWS.inbox = {
-  body: () => `<div class="sheet">
-    ${decisionRows(escalated(),
-      '<div class="empty"><b>Nothing waiting</b><span>When Warden holds a request instead of deciding it, it lands here for someone to approve or refuse.</span></div>')}
-  </div>`
+  onEnter: () => { void refreshAppeals().then(render); },
+  body: () => {
+    const held = escalated();
+    if (!state.appeals.length && !held.length) {
+      return `<div class="sheet"><div class="empty">
+        <b>Nothing waiting</b>
+        <span>Two things land here: requests Warden held instead of deciding, and blocks an employee said were wrong.</span>
+      </div></div>`;
+    }
+    return `<div class="sheet">
+      ${state.appeals.length ? `
+        <div class="day">Reported as wrong<span class="n">${state.appeals.length}</span></div>
+        ${state.appeals.map(appealRow).join('')}` : ''}
+      ${held.length ? `
+        <div class="day">Held for a person<span class="n">${held.length}</span></div>
+        ${decisionRows(held, '')}` : ''}
+    </div>`;
+  }
 };
+
+function appealRow(a) {
+  const open = state.sel === a.auditId;
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(a.auditId)}" aria-expanded="${open}">
+      <span class="dot BLOCK"></span>
+      <span class="col">
+        <span class="t">${a.note ? esc(a.note) : `${esc(a.employeeName)} said this block was wrong`}</span>
+        <span class="m">
+          <span>${esc(a.employeeName)}</span>
+          ${a.ruleId ? `<span>${esc(ruleName(a.ruleId))}</span>` : '<span>no rule fired</span>'}
+          <span class="mono">${esc(String(a.at).slice(0, 16).replace('T', ' '))}</span>
+        </span>
+      </span>
+    </button>
+    ${open ? appealDetail(a) : ''}`;
+}
+
+function appealDetail(a) {
+  const entry = state.audit.find((x) => x.auditId === a.auditId);
+  // The decision itself carries everything, so show it — but lead with what the
+  // person said, because that is the part the log cannot tell you.
+  const head = `<div class="group">
+      <div class="label">${esc(a.employeeName)} reported this</div>
+      ${a.note
+        ? `<div class="banner">“${esc(a.note)}”</div>`
+        : '<div class="note">No note — just that it was wrong.</div>'}
+    </div>
+    ${a.ruleId ? `<div class="group">
+      <div class="label">The rule that stopped them</div>
+      <button type="button" class="ruleref" data-go="policy" data-sel="${attr(a.ruleId)}">
+        <span class="dot block"></span>
+        <span class="col">
+          <span class="t">${esc(ruleName(a.ruleId))}</span>
+          <span class="m">${esc(clip(a.ruleText, 130))}</span>
+        </span>
+      </button>
+    </div>` : ''}`;
+
+  if (!entry) {
+    return `<div class="detail">
+      ${head}
+      <div class="note">The decision itself is older than the log this console loaded, so only what they reported is shown.</div>
+    </div>`;
+  }
+  // Splice the report into the decision's own detail, above everything else.
+  return decisionDetail(entry, head);
+}
 
 // ═══ RULES ═══════════════════════════════════════════════════════════════════
 
