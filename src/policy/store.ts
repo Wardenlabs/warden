@@ -115,9 +115,12 @@ export function rulesForActor(spec: PolicySpec, actor: { id: string; role: strin
   // written for everyone — including the pinned injection rule — does not
   // quietly re-capture them.
   //
-  // Note this is only as strong as the identity behind `actor.role`. While the
-  // role arrives on an unauthenticated header, exemption is a claim anyone can
-  // make; see `warden.exemptRoles` in the README.
+  // This is only ever as strong as the identity behind `actor.role`, which is
+  // why it is safe now and was not when it was written: the role no longer
+  // arrives on a header a caller can set. It is read from the directory entry
+  // behind an API key the gateway issued, so exemption is something an admin
+  // grants rather than something a caller claims. If a header path is ever
+  // reintroduced, this line becomes a bypass again.
   if (isExempt(spec, actor.role)) return [];
   return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
 }
