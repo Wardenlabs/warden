@@ -115,10 +115,24 @@ Kept because the reason a thing failed is worth more than the thing.
 | Majority-of-3 self-consistency vote | 50% vs 44%, for 50 extra model calls |
 | Dropping the preamble's "object of your analysis" clause | Probe said 4/8 → 2/8; the corpus said 10/14 → 10/15. The probe was reading noise |
 | A relevance floor on retrieval (`MIN_RELEVANCE=0.5`) | False positives 7/16 → 8/16, attacks flat, one document-borne attack lost. Every difference was a single prompt, inside the ±6 band |
+| Requiring a quoted span with every VIOLATES | False positives 8/18 → 10/18, attacks 70/80 → 69/80. Both worse |
 | Unpinning `r-instruction-override` | Attacks identical (70/80 both), false positives 8/18 → 7/18. Retrieval selects the rule anyway, because the work imperatives it refuses genuinely resemble its violating examples |
 
 The pattern: voting and rewording both assume the errors are random. They are
 not. This model leans, and averaging more samples of a lean returns the lean.
+
+The span attempt is worth reading twice, because it was argued as different in
+kind — not "answer better" but "answer something we can check", where an
+invented quote would be a false positive pure code could catch. It failed
+anyway, and the reason was already written down here: a model can always copy
+*something* out of the message, so the check almost never fires, while the extra
+field costs what every extra field has cost. `{boolean, confidence}`, `reason`
+and `span` are three versions of one mistake.
+
+**Every field you ask a small model to fill is a chance for it to answer without
+deciding.** Eight attempts, and the only two that moved anything were the ones
+that asked the model for *less*, not more: the deterministic detector, which
+asks it nothing, and removing a rule, which asks it one question fewer.
 
 ## Open
 
