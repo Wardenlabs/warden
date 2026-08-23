@@ -28,6 +28,9 @@ import {
 const DEFAULT_MAX_TOKENS = 256;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/** How long after asking a generation to cancel we wait before giving up on it. */
+const CANCEL_GRACE_MS = 5_000;
+
 /**
  * Fixed seed and zero temperature by default.
  *
@@ -151,11 +154,12 @@ export class RealQvacAdapter implements QvacAdapter {
         : {})
     });
 
+    const timeoutMs = req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const timeout = setTimeout(() => {
       void cancel({ requestId: run.requestId }).catch(() => {});
-    }, req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    }, timeoutMs);
 
-    try {
+    const consume = async () => {
       for await (const _event of run.events) {
         // Drained for its side effect; the aggregate arrives via `final`.
       }
@@ -171,8 +175,29 @@ export class RealQvacAdapter implements QvacAdapter {
           ...(final.stats?.backendDevice !== undefined && { backend: final.stats.backendDevice })
         }
       };
+    };
+
+    // `cancel()` is a request, not a guarantee: if the worker never ends the
+    // stream, `run.final` would park this call — and the guard request behind
+    // it — forever. The hard deadline turns that hang into a thrown error,
+    // which every caller already resolves to ESCALATE. Stricter, never stuck.
+    let deadline: NodeJS.Timeout | undefined;
+    const hardStop = new Promise<never>((_, reject) => {
+      deadline = setTimeout(
+        () => reject(new Error(`generation did not end within ${timeoutMs + CANCEL_GRACE_MS}ms of starting`)),
+        timeoutMs + CANCEL_GRACE_MS
+      );
+    });
+
+    try {
+      const pending = consume();
+      // If the deadline wins, the abandoned generation may still settle later;
+      // swallow that so it cannot surface as an unhandled rejection.
+      pending.catch(() => {});
+      return await Promise.race([pending, hardStop]);
     } finally {
       clearTimeout(timeout);
+      if (deadline) clearTimeout(deadline);
     }
   }
 
