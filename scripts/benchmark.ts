@@ -13,6 +13,7 @@ import { evaluate } from '../src/guard/pipeline.js';
 import { adjudicate } from '../src/guard/passes/adjudicate.js';
 import { loadPolicy, seedIfEmpty } from '../src/policy/store.js';
 import { adapter, isMock } from '../src/qvac/index.js';
+import { provenanceLabel } from '../src/provenance.js';
 
 const RUNS = Number(process.env['BENCH_RUNS'] ?? 8);
 
@@ -164,10 +165,26 @@ async function main(): Promise<void> {
 `
     : '';
 
+  /**
+   * When, and from which commit.
+   *
+   * This file had neither, which meant a reader could not tell a measurement
+   * taken this morning from one taken on a machine nobody has touched in a
+   * week — and `REPORT.md` has already been caught carrying numbers produced by
+   * a harness that had since been fixed. A latency table is a claim about code
+   * plus hardware, so it has to say which code.
+   */
+  const code = provenanceLabel();
   const md = `# Warden — benchmarks
 ${mockBanner}
-Measured by \`npm run benchmark\` on the machine below. Regenerate on whichever
-machine records the demo; these numbers describe this one only.
+Measured by \`npm run benchmark\` on ${new Date().toISOString()}${code ? `, from commit \`${code}\`` : ''}.
+
+These numbers describe the machine below and nothing else — regenerate on
+whichever one records the demo.${
+    code
+      ? ` To find out whether the code has moved since, \`git log ${code.split(' ')[0]}..HEAD -- src/guard src/qvac\`; anything listed means this table is describing something that no longer runs.`
+      : ''
+  }
 
 ## Machine
 
@@ -245,8 +262,28 @@ validate. The explanation an employee reads is composed in code from the
 ratified rule instead — instant, and it cannot fail to parse.
 `;
 
-  writeFileSync('BENCHMARKS.md', md);
-  console.log('\nwrote BENCHMARKS.md\n');
+  /**
+   * A mock run never overwrites the real table.
+   *
+   * `BENCHMARKS.md` is a measurement of a machine running real models, and the
+   * mock's latencies measure neither — a full mock pass here reports the
+   * pipeline at 20ms against the 11,045ms the Xeon actually took. Writing that
+   * to the same path replaces a real result with a number three orders of
+   * magnitude out, and the banner at the top is no defence: by the time anyone
+   * reads it the real measurement is gone and only re-running on the demo
+   * machine brings it back.
+   *
+   * Hit by hand, not reasoned about: one `WARDEN_ADAPTER=mock npm run benchmark`
+   * to check a formatting change clobbered the committed table. `runner.ts`
+   * already keeps mock output on its own path for exactly this reason; this is
+   * the same rule, arriving late.
+   */
+  const path = isMock() ? 'BENCHMARKS.mock.md' : 'BENCHMARKS.md';
+  writeFileSync(path, md);
+  console.log(`\nwrote ${path}\n`);
+  if (isMock()) {
+    console.log('  (mock run — BENCHMARKS.md left untouched)\n');
+  }
   await qvac.dispose();
 }
 
