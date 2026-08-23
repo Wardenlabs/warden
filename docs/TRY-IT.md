@@ -222,6 +222,38 @@ querés arrancar de algo hecho en vez de una página en blanco.
 
 ---
 
+## 4.5. La key es la identidad
+
+Pestaña **People** → hacé click en alguien. Ahí está su **API key**, con botón de
+copiar, y abajo el **Onboarding**: un comando que se lo mandás y listo.
+
+```bash
+curl -fsSL http://localhost:8080/install/fede | sh
+```
+
+Baja el hook **del gateway** (no de internet) y le escribe `WARDEN_URL` y
+`WARDEN_API_KEY` en el perfil de shell. Se puede correr de nuevo: reemplaza su
+bloque en vez de apilar otro.
+
+**Probá que una key desconocida no entra:**
+
+```bash
+echo '{"user_input":"hola"}' | WARDEN_API_KEY=wk-cualquier-cosa node ~/.warden-hook.mjs
+echo "exit: $?"     # 2 — y dice que el problema es la key, no la política
+```
+
+**Y que rotarla revoca la vieja:** en la ficha, **New key**. La anterior deja de
+andar en el próximo prompt.
+
+El empleado no configura nombre ni rol. Vos decidís qué significa su key y
+podés cambiarle el rol sin que toque nada. Un rol que el empleado pudiera editar
+en su `.zshrc` sería un rol con el que elegiría qué reglas lo juzgan.
+
+> Esa secuencia —agregar a alguien, mandarle un comando, verlo bloquear, rotarle
+> la key— es la escena de "esto es un producto y no un demo".
+
+---
+
 ## 5. El hook: gobernar Claude Code de verdad
 
 Esto es lo más importante del producto y lo que **todavía nadie verificó**
@@ -311,6 +343,16 @@ export WARDEN_API_KEY=wk-tu-key      # te la da el admin desde People
 ⚠️ Si el wifi del venue tiene aislamiento de clientes (bastante común), las
 laptops no se ven entre sí. Fallback: hotspot del celular, o cada uno corre lo
 suyo local. Para el video con una sola máquina alcanza.
+
+**Por internet también anda**, sin abrir puertos:
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+Warden detecta el túnel solo (lee `x-forwarded-proto`) y genera las URLs del
+onboarding con `https://`. El detalle, y por qué **no** hay que hacer
+port-forward, está en [`DESPLIEGUE.md`](DESPLIEGUE.md).
 
 ---
 

@@ -1,6 +1,7 @@
 # Warden — the local AI gateway
 
-**Your admin writes the rules. No prompt can break them. Nothing leaves the machine.**
+**Your admin writes the rules. Every prompt is judged against them before a model
+sees it. Nothing leaves the machine.**
 
 Companies are handing employees AI assistants and coding agents. The only control
 most of them have is a system prompt asking the model to behave — which is a
@@ -236,6 +237,23 @@ from the tool name every hook call carries. What someone was told to install and
 what they installed are different things, and the difference is a directory that
 looks deployed while governing nobody.
 
+### Who the policy does not govern
+
+`exemptRoles` in the policy names roles that are measured against nothing. The
+person who ratifies the rules should not be tripping over them: five of the
+eight seed rules bind `*`, including the pinned injection rule, so without this
+there was no role an operator could hold and still work.
+
+It lives inside `PolicySpec` rather than in an environment variable because "who
+is exempt" is the most security-relevant sentence in the whole spec — it belongs
+in the version hash, where changing it is detectable, next to the rules it
+overrides. The check runs in `rulesForActor()` before `appliesTo`, so a rule
+written for everyone cannot quietly re-capture an exempt role.
+
+This is only ever as strong as the identity behind the role, which is why it is
+safe now and would not have been a day ago: the role comes from a directory
+entry behind an issued API key, not from anything the caller can set.
+
 ### People
 
 The People tab is the directory: add someone, assign their role, create a role
@@ -299,6 +317,31 @@ Two classes carry most of the weight:
 
 The report lists every failure by id. If a run comes back all-green, that means
 the corpus is too easy, not that the guard is airtight.
+
+### The numbers
+
+Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition:
+
+| | Warden | Baseline |
+|---|---|---|
+| Attacks stopped | **66/82 · 80%** | 2/82 · 2% |
+| False positives on legitimate traffic | **7/16 · 44%** | 0/16 · 0% |
+| Structured output | 294 first-try · 0 repaired · 0 failed | |
+
+Both rows, together, on purpose. The first is the argument: a system prompt
+stops 2% of these because a system prompt is a request, not a control. The
+second is the honest cost, and it is **not shippable** — a gateway that refuses
+44% of honest work gets uninstalled in a week.
+
+That number is the open problem, and the investigation into it — including three
+hypotheses measured and rejected, and the lead that is still live — is written up
+in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
+
+Two caveats that qualify every number above. Runs are **not reproducible**: two
+identical runs of the same policy at temperature 0 gave 44% and 31%, because
+`parallel: 4` batches concurrent adjudications and batch composition changes the
+numerics. And n=16 on the control class means one prompt is six points. Use
+`--reps 2` at minimum before believing a difference.
 
 ### What we learned about small models
 
@@ -392,8 +435,18 @@ npm run smoke            # structured-output reliability over N runs
 npm run redteam          # full corpus → REPORT.md
 npm run redteam -- --class guard-targeted --reps 5
 npm run verify-audit     # recompute the audit hash chain
+npm run test:vote        # semantics of the confirmation vote
 npm run typecheck
+
+npx tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
+npx tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
 ```
+
+The last two are diagnostics, not tests. `probe-rule` is fast enough to form a
+hypothesis with and too small to confirm one — thirteen prompts cannot resolve a
+two-prompt difference, and it has already produced a convincing result the
+corpus flatly contradicted. Confirm with `--reps 2` on the corpus before
+believing anything either of them says.
 
 ### Configuration
 
