@@ -513,11 +513,14 @@ believing anything either of them says.
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
+| `WARDEN_MIN_RELEVANCE` | `0.25` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. |
+| `WARDEN_WARMUP` | — | `0` skips loading the models at boot. On by default: the first prompt used to pay for the model load inside the decision it was waiting on, which is how a cold check passed the hook's deadline. |
 | `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
 | `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
 | `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
+| `WARDEN_API_KEY` | — | Read by the hook, on the employee's machine. Their whole identity: no name, no role. Issued from the console's People tab. |
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
