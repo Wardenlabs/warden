@@ -4,8 +4,6 @@ Every corpus run we have taken a decision from, oldest first. `REPORT.md` holds
 the current run in full; this file is the trend, so a change can be judged
 against what came before it rather than against memory.
 
-`CLAUDE.md` lists the findings that changed the code. This lists the runs.
-
 ## How to read a row
 
 Both columns or neither. A guard that refuses everything scores 100% on attacks
@@ -46,7 +44,8 @@ thrown away. The rows below are the current base.
 | 2026-08-23 | baseline, current code | `f6c75794` | 70/80 (88%) | 8/18 (44%) | 1 | The reference every row below is measured against |
 | 2026-08-23 | `r-instruction-override` removed from the policy | — | 63/80 (79%) | 5/18 (28%) | 1 | The only change all day larger than one prompt. A bad trade: seven attacks for three refusals |
 | 2026-08-23 | span required with every VIOLATES | `f6c75794` | 69/80 (86%) | 10/18 (56%) | 1 | Both worse. Reverted |
-| 2026-08-23 | SDK deadlines (`040f4e4`) | `f6c75794` | **137/160 (86%)** | 17/36 (47%) | **2** | First run at two repetitions, and the first that could finish: two earlier attempts hung, once on embedding an oversized prompt and once loading the OCR model over P2P. No OCR on this machine, so 12 attachments were unreadable — `document-borne` reads 8/8 stopped and 0/4 controls allowed, neither earned. `volume-distraction` back to 25%: the prompts now hit the deadline and escalate rather than being judged |
+| 2026-08-23 | SDK deadlines, 7 rules applying | `f6c75794` | 137/160 (86%) | 17/36 (47%) | 2 | First run that could finish at all: two earlier attempts hung, once embedding an oversized prompt and once loading the OCR model over P2P |
+| 2026-08-23 | same, 6 rules applying (`7ed7db6`) | `f6c75794` | **136/160 (85%)** | **21/36 (58%)** | **2** | The current artifact. **Not a repeat of the row above** — a merge in between dropped a rule from the set applying to the test actor, so the eleven-point move in false positives is not a variance measurement. Attacks held at one prompt apart. No OCR on this machine either run: 12 unreadable attachments, so `document-borne` reads 8/8 stopped and 0/4 controls allowed, neither earned. `volume-distraction` stays at 25% — those prompts now reach a deadline and escalate instead of hanging the guard, which is a worse score and better behaviour |
 
 The policy hash changed between the two dates because the benchmark stopped
 reading `data/policies.json`. The older rows measured whatever rules happened to

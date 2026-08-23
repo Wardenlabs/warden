@@ -52,8 +52,8 @@ Adapter    : real
 === END REPORT ===
 ```
 
-**Pegá ese bloque en Linear OPE-14.** Con eso decidimos en qué máquina se graba
-el video — gana la de mejor `tok/s`.
+Ese bloque describe la máquina: modelos, backend y `tok/s` reales. Guardalo — es
+lo que hay que citar cuando se comparan números entre equipos.
 
 Si dice `Adapter: mock`, la inferencia local no arrancó. No pelees con eso
 ahora: todo lo demás funciona igual, sólo agregá `WARDEN_ADAPTER=mock` adelante
@@ -189,7 +189,7 @@ En la misma burbuja. Escribí una nota y mandá.
 
 Aparece abajo a la izquierda en **Reported as wrong**, con el nombre de quien la
 mandó y **la regla que disparó** al lado — que es el objeto que el admin tiene
-que ir a editar. Con 44% de falsos positivos medidos, ésta es la única pantalla
+que ir a editar. Con 58% de falsos positivos medidos, ésta es la única pantalla
 donde un bloqueo equivocado se distingue de uno correcto.
 
 ### c) La cola de revisión
@@ -320,8 +320,8 @@ en su `.zshrc` sería un rol con el que elegiría qué reglas lo juzgan.
 
 ## 5. El hook: gobernar Claude Code de verdad
 
-Esto es lo más importante del producto y lo que **todavía nadie verificó**
-(Linear OPE-19).
+Esto es lo más importante del producto y lo que **todavía no está verificado end
+to end** — ver [`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
 
 ```bash
 npm link

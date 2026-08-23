@@ -243,7 +243,7 @@ function printReport(): void {
   L.push('=== END REPORT ===');
 
   console.log('\n' + L.join('\n') + '\n');
-  console.log(dim('Paste that block into Linear OPE-14 so we can pick the recording machine.\n'));
+  console.log(dim('That block describes this machine — quote it when comparing numbers.\n'));
 }
 
 async function main(): Promise<void> {
