@@ -15,6 +15,12 @@
  * the worst possible moment.
  *
  * Run: npm run test:vote
+ *
+ * `main()` sets WARDEN_CONFIRM_VOTES and then imports the pass dynamically.
+ * That order is the whole trick: adjudicate.ts reads the variable at module
+ * load, and a static import would be hoisted above the assignment — so the vote
+ * would be off, only one call would ever be made, and every check about
+ * confirmations would pass vacuously by never running.
  */
 import { isolate } from '../src/guard/isolate.js';
 import type { CompleteRequest, QvacAdapter, StructuredResult } from '../src/qvac/types.js';
@@ -106,7 +112,10 @@ async function main(): Promise<void> {
   }
 
   console.log(failures === 0 ? '\nall good\n' : `\n${failures} check(s) failed\n`);
-  process.exit(failures === 0 ? 0 : 1);
+  process.exitCode = failures === 0 ? 0 : 1;
 }
 
-void main();
+main().catch((err: unknown) => {
+  console.error('test-vote failed:', err);
+  process.exitCode = 1;
+});

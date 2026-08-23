@@ -88,8 +88,18 @@ async function main(): Promise<void> {
   const structuredTotal = s.firstTry + s.repaired + s.failed;
   const topK = Number(process.env['WARDEN_TOP_K'] ?? 3);
 
-  const md = `# Warden — benchmarks
+  const mockBanner = isMock()
+    ? `
+> **These numbers are from the mock adapter, not a real model.** The mock is a
+> deterministic stand-in used so the harness runs without a GPU; every latency
+> below measures the harness, not inference, and no model in the Models table
+> was actually loaded. Re-run on a machine with the models installed before
+> quoting anything here.
+`
+    : '';
 
+  const md = `# Warden — benchmarks
+${mockBanner}
 Measured by \`npm run benchmark\` on the machine below. Regenerate on whichever
 machine records the demo; these numbers describe this one only.
 

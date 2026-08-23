@@ -130,6 +130,14 @@ export function isExempt(spec: PolicySpec, role: string): boolean {
   return (spec.exemptRoles ?? DEFAULT_EXEMPT_ROLES).includes(role);
 }
 
+/*
+ * `claimableRole()` lived here: it demoted a claimed exempt role so a stranger
+ * could not opt out of the policy with a header. It is gone because the header
+ * path is gone — a caller supplies a key and nothing else, so there is no
+ * claimed role left to demote. Kept as a note rather than dead code, because
+ * the hazard it existed for is one line away from returning.
+ */
+
 /**
  * Rules for a role, with no particular person in mind.
  *

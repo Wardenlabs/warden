@@ -9,8 +9,32 @@
  */
 
 const $ = (id) => document.getElementById(id);
-const api = (path, opts) => fetch(path, opts).then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, j })));
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/**
+ * Every server call goes through here, and it never throws.
+ *
+ * Express answers some errors with HTML, and a crashed route answers with
+ * nothing parseable at all. The old `r.json()` rejected on those, which took
+ * down whatever function was mid-await — boot() dying on a bad policy file
+ * rendered a blank console with no message anywhere, which is the worst
+ * possible way to learn the policy file is bad.
+ */
+const api = async (path, opts) => {
+  try {
+    const r = await fetch(path, opts);
+    const text = await r.text();
+    let j;
+    try {
+      j = text ? JSON.parse(text) : {};
+    } catch {
+      j = { error: text.slice(0, 200) || `HTTP ${r.status}` };
+    }
+    return { ok: r.ok, status: r.status, j };
+  } catch (err) {
+    return { ok: false, status: 0, j: { error: err?.message ?? 'network error' } };
+  }
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 let policy = { rules: [], quotas: [], version: '' };
 let company = { name: '', roles: [], employees: [] };
@@ -29,15 +53,23 @@ let draftHost = 'admin';
 // ── boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
-  const health = await api('/health').catch(() => null);
+  const health = await api('/health');
   const pill = $('adapter');
-  if (!health?.ok) {
+  if (!health.ok) {
     pill.textContent = 'server down';
     pill.className = 'pill mock';
     return;
   }
-  pill.textContent = health.j.mock ? 'mock adapter' : 'local model';
-  pill.className = `pill ${health.j.mock ? 'mock' : 'live'}`;
+  // A gateway running in baseline mode is not enforcing anything, and a green
+  // console over a disabled guard would be a lie in the one place an admin
+  // looks to check.
+  if (health.j.mode === 'baseline') {
+    pill.textContent = 'GUARD OFF — baseline mode';
+    pill.className = 'pill mock';
+  } else {
+    pill.textContent = health.j.mock ? 'mock adapter' : 'local model';
+    pill.className = `pill ${health.j.mock ? 'mock' : 'live'}`;
+  }
 
   await refreshPolicy();
   await refreshPeople();
@@ -46,7 +78,11 @@ async function boot() {
 }
 
 async function refreshPolicy() {
-  const { j } = await api('/api/policy');
+  const { ok, j } = await api('/api/policy');
+  if (!ok) {
+    $('rules').innerHTML = `<div class="empty">Could not load the policy: ${esc(j.error ?? 'error')}</div>`;
+    return;
+  }
   policy = j;
   $('ver').textContent = j.version.slice(0, 8);
   $('policyPill').textContent = `${j.rules.length} rules`;
@@ -55,7 +91,11 @@ async function refreshPolicy() {
 }
 
 async function refreshPeople() {
-  const { j } = await api('/api/people');
+  const { ok, j } = await api('/api/people');
+  if (!ok) {
+    $('peopleGrid').innerHTML = `<div class="empty">Could not load the directory: ${esc(j.error ?? 'error')}</div>`;
+    return;
+  }
   company = j;
   $('companyName').textContent = j.name || 'local AI gateway';
   $('headcount').textContent = `${j.employees.length} people · ${j.roles.length} roles`;
@@ -148,7 +188,7 @@ function showPresets(i) {
   $('presetList').innerHTML = cat.rules
     .map((r, k) => `<div class="rule pick" data-cat="${i}" data-r="${k}">
         <div class="t">${esc(r.text)}</div>
-        <div class="m"><span class="tag ${r.severity}">${r.severity}</span> ${esc(audienceLabel(r.appliesTo))}</div>
+        <div class="m"><span class="tag ${esc(r.severity)}">${esc(r.severity)}</span> ${esc(audienceLabel(r.appliesTo))}</div>
       </div>`)
     .join('');
   $('presetList').onclick = (e) => {
@@ -213,8 +253,8 @@ function renderDraft() {
     <div class="rule draft" style="margin-top:12px">
       <div class="t">${esc(draft.text)}</div>
       <div class="m">
-        <span class="tag ${draft.severity}">${draft.severity}</span>
-        <span class="tag">${draft.scope}</span>
+        <span class="tag ${esc(draft.severity)}">${esc(draft.severity)}</span>
+        <span class="tag">${esc(draft.scope)}</span>
       </div>
 
       <div class="sub" style="margin:13px 0 7px">Applies to</div>
@@ -244,10 +284,19 @@ function renderDraft() {
   $('dropBtn').onclick = () => { draft = null; renderDraft(); };
   $('ratifyBtn').onclick = async () => {
     $('ratifyBtn').disabled = true;
-    await api('/api/policy/ratify', {
+    const { ok, j } = await api('/api/policy/ratify', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ rule: draft })
     });
+    // Activation is the most consequential click in the product; a failure
+    // that silently discarded the draft looked exactly like success. Keep the
+    // draft, say what went wrong, let the admin fix and retry.
+    if (!ok) {
+      $('ratifyBtn').disabled = false;
+      $('previewOut').innerHTML =
+        `<div class="banner" style="margin-top:11px;background:var(--block-soft);color:var(--block)">Not activated: ${esc(j.error ?? 'the server refused')}</div>`;
+      return;
+    }
     draft = null;
     $('ruleText').value = '';
     const pt = $('personRuleText');
@@ -315,7 +364,7 @@ async function runPreview() {
     <div style="margin-top:11px;font-size:12px">
       ${j.rows.map((r) => `
         <div style="padding:4px 0;display:flex;gap:9px;align-items:baseline">
-          <span class="v ${r.verdict}" style="min-width:66px;font-family:var(--mono)">${r.verdict}</span>
+          <span class="v ${esc(r.verdict)}" style="min-width:66px;font-family:var(--mono)">${esc(r.verdict)}</span>
           <span style="flex:1;color:${r.isFalsePositive ? 'var(--block)' : 'var(--dim)'}">${esc(r.prompt.slice(0, 70))}</span>
           ${r.isFalsePositive ? '<b style="color:var(--block)">false positive</b>' : ''}
           ${r.isMiss ? '<b style="color:var(--escalate)">missed</b>' : ''}
@@ -358,7 +407,7 @@ function renderRules() {
     ? policy.rules.map((r) => `<div class="rule">
         <div class="t" style="padding-right:64px">${esc(r.text)}</div>
         <div class="m">
-          <span class="tag ${r.severity}">${r.severity}</span>
+          <span class="tag ${esc(r.severity)}">${esc(r.severity)}</span>
           <span class="tag${isPersonal(r) ? ' personal' : ''}">${esc(audienceLabel(r.appliesTo))}</span>
           ${r.pinned ? '<span class="tag">always checked</span>' : ''}
         </div>
@@ -369,7 +418,14 @@ function renderRules() {
   $('rules').onclick = async (e) => {
     const btn = e.target.closest('[data-del]');
     if (!btn) return;
-    await api(`/api/policy/rules/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
+    const { ok, j } = await api(`/api/policy/rules/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
+    if (!ok) {
+      $('rules').insertAdjacentHTML(
+        'afterbegin',
+        `<div class="note" style="color:var(--block)">Could not remove the rule: ${esc(j.error ?? 'failed')}</div>`
+      );
+      return;
+    }
     await refreshPolicy();
     await refreshPeople();
   };
@@ -398,7 +454,7 @@ function renderPeople() {
           }</div>
           <div class="tools">${
             e.connected?.length
-              ? e.connected.map((c) => `<span class="tool on" title="${c.count} request(s), last ${esc(c.at)}">${esc(TOOL_NAMES[c.tool] ?? c.tool)}</span>`).join('')
+              ? e.connected.map((c) => `<span class="tool on" title="${c.count} request(s), last ${esc(c.at)}">${esc(Object.hasOwn(TOOL_NAMES, c.tool) ? TOOL_NAMES[c.tool] : c.tool)}</span>`).join('')
               : '<span class="tool">not connected yet</span>'
           }</div>
         </div>
@@ -487,7 +543,16 @@ async function renderPersonDetail() {
     return;
   }
   const p = selectedPerson;
-  const { j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
+  const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
+  // Clicking A then B leaves two of these in flight; whichever answers last
+  // would paint the pane. On a screen whose whole point is "which rules judge
+  // this person", showing A's rules under B's name is worse than a spinner —
+  // so a response for anyone but the currently selected person is dropped.
+  if (selectedPerson?.id !== p.id) return;
+  if (!ok) {
+    host.innerHTML = `<div class="empty">Could not load their rules: ${esc(j.error ?? 'error')}</div>`;
+    return;
+  }
   const rules = j?.rules ?? [];
   const group = (kind) => rules.filter((r) => r.binding === kind);
 
@@ -496,7 +561,7 @@ async function renderPersonDetail() {
     ${list.length
       ? list.map((r) => `<div class="rule">
           <div class="t">${esc(r.text)}</div>
-          <div class="m"><span class="tag ${r.severity}">${r.severity}</span>
+          <div class="m"><span class="tag ${esc(r.severity)}">${esc(r.severity)}</span>
             <span class="tag${r.binding === 'personal' ? ' personal' : ''}">${esc(r.audience)}</span></div>
         </div>`).join('')
       : `<div class="note">${note}</div>`}`;
@@ -562,8 +627,13 @@ async function renderPersonDetail() {
   };
 
   $('rotateKey').onclick = async () => {
-    await api(`/api/people/${encodeURIComponent(p.id)}/key`, { method: 'POST' });
-    await refreshPeople();
+    const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}/key`, { method: 'POST' });
+    // Rotation invalidates the old key the moment it works — so failing to say
+    // whether it worked leaves the admin unsure which key is now real.
+    $('personNote').textContent = ok
+      ? 'New key issued. Update every tool that used the old one.'
+      : (j.error ?? 'could not rotate the key');
+    if (ok) await refreshPeople();
   };
 
   $('removePerson').onclick = async () => {
@@ -576,6 +646,11 @@ async function renderPersonDetail() {
     if (j.orphanedRules?.length) {
       $('personDetail').innerHTML =
         `<div class="banner">${j.orphanedRules.length} rule(s) were written only for ${esc(j.removed.name)} and now apply to nobody. Retarget or remove them in the Policy panel.</div>`;
+    } else {
+      // refreshPeople only repaints the detail pane while someone is selected,
+      // so without this the removed person's card — key, buttons and all —
+      // stayed on screen looking alive.
+      renderPersonDetail();
     }
   };
 
@@ -605,6 +680,9 @@ async function renderOnboarding(person) {
   const host = $('onboarding');
   if (!host) return;
   const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`);
+  // Same in-flight race as the rules pane — this one would put person A's API
+  // key and install command under person B's name.
+  if (selectedPerson?.id !== person.id) return;
   if (!ok) { host.innerHTML = `<div class="note">${esc(j.error ?? 'failed')}</div>`; return; }
 
   const tools = j.integrations;
@@ -688,7 +766,7 @@ async function send() {
   // name nor a role goes over the wire: the key is the whole identity, and the
   // console deliberately has no privileged way to assert one — it exercises the
   // same path an employee's tool does, so a break here breaks the demo too.
-  const { j } = await api('/api/guard/check', {
+  const { ok, j } = await api('/api/guard/check', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -699,6 +777,19 @@ async function send() {
 
   if (j?.error === 'unknown_api_key') {
     append('warden', 'key not recognised', `<div class="why">${esc(j.explanation)}</div>`, 'blocked');
+    return;
+  }
+
+  // Any other failure is not a check that allowed. Rendering it as an empty
+  // bubble read as "nothing happened" — in a demo of a blocking gateway, the
+  // one thing this pane must never do is dress a failure as calm.
+  if (!ok || !j?.verdict) {
+    append(
+      'warden',
+      'the guard could not be reached — this prompt was not judged',
+      `<div class="why">${esc(j?.error ?? 'no response from the gateway')}</div>`,
+      'escalated'
+    );
     return;
   }
 
@@ -760,14 +851,14 @@ function renderTrace(d) {
   el.className = 'decision';
   el.innerHTML = `
     <div class="top">
-      <span class="badge ${d.verdict}">${d.verdict}</span>
+      <span class="badge ${esc(d.verdict)}">${esc(d.verdict)}</span>
       <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)">${d.totalMs}ms</span>
     </div>
     <div class="prompt">${esc((d.maskedPrompt ?? '').slice(0, 110))}</div>
     ${(d.passes ?? []).map((p) => `
       <div class="pass">
         <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
-        <span class="v ${p.verdict ?? ''}">${p.verdict ?? ''}</span>
+        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
         <span class="ms">${p.ms}ms</span>
       </div>`).join('')}`;
   const trace = $('trace');
@@ -812,11 +903,15 @@ $('runRt').onclick = async () => {
 };
 
 function renderRedteam(s) {
-  const attacks = (s.warden ?? []).filter((c) => !c.isControl);
-  const controls = (s.warden ?? []).filter((c) => c.isControl);
-  const sum = (rows, k) => rows.reduce((n, c) => n + c[k], 0);
-  const caught = sum(attacks, 'correct'), atotal = sum(attacks, 'total');
-  const fp = sum(controls, 'falsePositives'), ctotal = sum(controls, 'total');
+  // Headline numbers come from the per-prompt tallies: a class can mix attacks
+  // and controls, and bucketing whole classes counted a correctly-allowed
+  // control as a stopped attack. The fallbacks keep an old redteam-last.json
+  // (from before those fields existed) rendering.
+  const rows = s.warden ?? [];
+  const caught = rows.reduce((n, c) => n + (c.attacksStopped ?? (c.isControl ? 0 : c.correct)), 0);
+  const atotal = rows.reduce((n, c) => n + (c.attacks ?? (c.isControl ? 0 : c.total)), 0);
+  const fp = rows.reduce((n, c) => n + (c.falsePositives ?? 0), 0);
+  const ctotal = rows.reduce((n, c) => n + (c.controls ?? (c.isControl ? c.total : 0)), 0);
   const p = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
   $('rtOut').innerHTML = `

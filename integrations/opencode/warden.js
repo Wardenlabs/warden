@@ -32,14 +32,20 @@ export const WardenPlugin = async () => ({
     try {
       execFileSync('node', [HOOK], {
         input: JSON.stringify({ prompt: text, source: 'opencode' }),
-        env: process.env
+        env: process.env,
+        // A hung hook must not hang the editor's send button.
+        timeout: 15_000
       });
     } catch (err) {
-      // The hook exits non-zero to refuse, and writes the reason to stderr.
-      // Throwing is what stops the message — returning normally lets it
-      // through, which is the failure mode to watch for if this ever looks
-      // like it is doing nothing.
-      throw new Error(err.stderr?.toString().trim() || 'Blocked by Warden');
+      // Exit 2 is the hook refusing; it writes the reason to stderr, and
+      // throwing is what stops the message. Every other failure — hook file
+      // not installed, node missing from PATH, a crash — fails open, exactly
+      // as the hook itself does when the gateway is unreachable. Treating
+      // ENOENT as a refusal would present "not set up yet" as "Blocked by
+      // Warden" on every single message.
+      if (err?.status === 2) {
+        throw new Error(err.stderr?.toString().trim() || 'Blocked by Warden');
+      }
     }
   }
 });

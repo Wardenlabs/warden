@@ -11,12 +11,23 @@ import { writeFileSync } from 'node:fs';
 export type ClassResult = {
   class: string;
   goal: string;
-  /** Legitimate traffic: correct means allowed, not blocked. */
+  /** Every prompt in the class is legitimate traffic: correct means allowed. */
   isControl: boolean;
   total: number;
   correct: number;
   missed: number;
   falsePositives: number;
+  /**
+   * Per-prompt tallies. A class can mix attacks and controls — document-borne
+   * carries two clean invoices among its poisoned ones — so headline numbers
+   * are summed from these, never from bucketing whole classes: that bucketing
+   * once counted a correctly-allowed control as a stopped attack, and dropped
+   * a mixed class's false positives from every table.
+   */
+  attacks: number;
+  attacksStopped: number;
+  controls: number;
+  controlsAllowed: number;
   p50: number;
   p95: number;
   failures: {
@@ -47,13 +58,13 @@ export type RunSummary = {
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
 
 export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
-  const attacks = s.warden.filter((c) => !c.isControl);
-  const controls = s.warden.filter((c) => c.isControl);
+  const attackClasses = s.warden.filter((c) => c.attacks > 0);
+  const controlClasses = s.warden.filter((c) => c.controls > 0);
 
-  const caught = attacks.reduce((n, c) => n + c.correct, 0);
-  const attackTotal = attacks.reduce((n, c) => n + c.total, 0);
-  const fp = controls.reduce((n, c) => n + c.falsePositives, 0);
-  const controlTotal = controls.reduce((n, c) => n + c.total, 0);
+  const caught = s.warden.reduce((n, c) => n + c.attacksStopped, 0);
+  const attackTotal = s.warden.reduce((n, c) => n + c.attacks, 0);
+  const fp = s.warden.reduce((n, c) => n + c.falsePositives, 0);
+  const controlTotal = s.warden.reduce((n, c) => n + c.controls, 0);
 
   const structuredTotal = s.structured.firstTry + s.structured.repaired + s.structured.failed;
 
@@ -78,7 +89,7 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w();
   w('| | Warden | Baseline |');
   w('|---|---|---|');
-  w(`| Attacks stopped | **${caught}/${attackTotal}** (${pct(caught, attackTotal)}) | ${baselineRate(s, false)} |`);
+  w(`| Attacks stopped | **${caught}/${attackTotal}** (${pct(caught, attackTotal)}) | ${baselineRate(s)} |`);
   w(`| False positives on legitimate traffic | **${fp}/${controlTotal}** (${pct(fp, controlTotal)}) | ${baselineFp(s)} |`);
   w();
   w('Baseline is the same policy written into the model\'s system prompt with the');
@@ -95,15 +106,18 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w();
   w('| Class | Stopped | Missed | p50 | p95 |');
   w('|---|---|---|---|---|');
-  for (const c of attacks) {
-    w(`| ${c.class} | ${c.correct}/${c.total} (${pct(c.correct, c.total)}) | ${c.missed} | ${c.p50}ms | ${c.p95}ms |`);
+  for (const c of attackClasses) {
+    w(`| ${c.class} | ${c.attacksStopped}/${c.attacks} (${pct(c.attacksStopped, c.attacks)}) | ${c.missed} | ${c.p50}ms | ${c.p95}ms |`);
   }
   w();
 
   w('## Legitimate traffic');
   w();
-  for (const c of controls) {
-    w(`**${c.class}** — ${c.correct}/${c.total} allowed correctly, ${c.falsePositives} wrongly blocked.`);
+  w('Every prompt whose correct answer is a clean ALLOW, wherever it lives — the');
+  w('benign-controls class, plus the control prompts embedded in attack classes.');
+  w();
+  for (const c of controlClasses) {
+    w(`**${c.class}** — ${c.controlsAllowed}/${c.controls} allowed correctly, ${c.falsePositives} wrongly blocked.`);
     w();
     w(`> ${c.goal}`);
     w();
@@ -255,18 +269,16 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   writeFileSync(path, out.join('\n'));
 }
 
-function baselineRate(s: RunSummary, control: boolean): string {
-  const rows = s.baseline.filter((c) => c.isControl === control);
-  if (rows.length === 0) return 'not run';
-  const correct = rows.reduce((n, c) => n + c.correct, 0);
-  const total = rows.reduce((n, c) => n + c.total, 0);
-  return `${correct}/${total} (${pct(correct, total)})`;
+function baselineRate(s: RunSummary): string {
+  if (s.baseline.length === 0) return 'not run';
+  const caught = s.baseline.reduce((n, c) => n + c.attacksStopped, 0);
+  const total = s.baseline.reduce((n, c) => n + c.attacks, 0);
+  return `${caught}/${total} (${pct(caught, total)})`;
 }
 
 function baselineFp(s: RunSummary): string {
-  const rows = s.baseline.filter((c) => c.isControl);
-  if (rows.length === 0) return 'not run';
-  const fp = rows.reduce((n, c) => n + c.falsePositives, 0);
-  const total = rows.reduce((n, c) => n + c.total, 0);
+  if (s.baseline.length === 0) return 'not run';
+  const fp = s.baseline.reduce((n, c) => n + c.falsePositives, 0);
+  const total = s.baseline.reduce((n, c) => n + c.controls, 0);
   return `${fp}/${total} (${pct(fp, total)})`;
 }

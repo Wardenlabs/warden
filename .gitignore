@@ -17,6 +17,7 @@ models/
 
 # Runtime data — regenerated, never committed
 data/audit.jsonl
+data/audit-redteam.jsonl
 data/policies.json
 # the live directory; data/seed/company.json is the committed starting point
 data/company.json
@@ -48,3 +49,7 @@ warden.local.json
 data/redteam-last.json
 data/redteam-last.mock.json
 data/redteam-last.mock.md
+# a --class run appends the class to either name
+data/redteam-last.mock.*.md
+# REPORT.md is the deliverable; a filtered real run writes REPORT.<class>.md
+REPORT.*.md

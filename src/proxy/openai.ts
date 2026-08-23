@@ -14,6 +14,8 @@
  */
 import type { Request, Response } from 'express';
 import { evaluate } from '../guard/pipeline.js';
+import { normalizeUntrusted } from '../guard/isolate.js';
+import { sanitize } from '../guard/sanitize.js';
 import type { Actor, Decision } from '../guard/types.js';
 import { actorForCredential } from '../policy/people.js';
 import { loadPolicy, rulesForActor } from '../policy/store.js';
@@ -72,8 +74,12 @@ export async function handleChatCompletion(
     model?: string;
   };
   const messages = body.messages ?? [];
-  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-  const prompt = lastUser?.content ?? '';
+  // Every user turn is judged, not just the last one. An OpenAI-compatible
+  // client resends the whole history, so "put the payload in turn one and say
+  // 'continue' in turn two" would otherwise walk straight past the guard while
+  // the raw turn-one text still reached the model.
+  const userTurns = messages.filter((m) => m.role === 'user' && typeof m.content === 'string');
+  const prompt = userTurns.map((m) => m.content).join('\n\n');
 
   let outbound = messages;
 
@@ -104,11 +110,23 @@ export async function handleChatCompletion(
       return;
     }
 
-    // Forward the masked text, never the original. A credential the employee
-    // pasted must not reach the model just because the request was allowed.
-    if (lastUser && decision.maskedSpans.length > 0) {
-      outbound = messages.map((m) => (m === lastUser ? { ...m, content: decision.maskedPrompt } : m));
+    // Only an explicit ALLOW is forwarded. Falling through on "not BLOCK and
+    // not ESCALATE" would make any unexpected verdict value fail open, and the
+    // one invariant of this design is that nothing fails in that direction.
+    if (decision.verdict !== 'ALLOW') {
+      res.status(202).json({ escalationId: decision.auditId, message: decision.explanation });
+      return;
     }
+
+    // Forward the masked text, never the original. A credential the employee
+    // pasted must not reach the model just because the request was allowed —
+    // and it can sit in any turn of the history, so each user turn is masked,
+    // not only the newest.
+    outbound = messages.map((m) =>
+      m.role === 'user' && typeof m.content === 'string'
+        ? { ...m, content: sanitize(normalizeUntrusted(m.content)).masked }
+        : m
+    );
   } else {
     outbound = [{ role: 'system', content: baselineSystemPrompt(actor) }, ...messages];
   }
@@ -151,13 +169,23 @@ async function forward(res: Response, payload: unknown): Promise<void> {
     return;
   }
 
+  // Headers are already out, so a mid-stream failure cannot become a status
+  // code — but it must still end the response rather than park the client on a
+  // connection nobody will ever close. And a client that walks away stops the
+  // upstream read instead of draining it to nowhere.
   const reader = upstream.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    res.write(Buffer.from(value));
+  res.on('close', () => {
+    void reader.cancel().catch(() => {});
+  });
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+  } finally {
+    res.end();
   }
-  res.end();
 }
 
 export function proxyMode(): 'warden' | 'baseline' {

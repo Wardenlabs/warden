@@ -62,7 +62,7 @@ async function readStdin() {
  */
 function detect(payload) {
   const text =
-    firstString(payload.user_input, payload.prompt, payload.message, payload.text, payload.input) ??
+    firstString(payload.prompt, payload.user_input, payload.message, payload.text, payload.input) ??
     lastUserMessage(payload.messages) ??
     '';
 
@@ -70,6 +70,13 @@ function detect(payload) {
   // field name would call OpenCode "codex" because both use `prompt`.
   if (typeof payload.source === 'string' && payload.source) {
     return { tool: payload.source, prompt: text };
+  }
+  // Claude Code names its own events, and carries the text under `prompt` —
+  // the same field Codex uses. Keying on `user_input` first sent every real
+  // Claude Code prompt down the Codex branch, which put the wrong tool on
+  // somebody's page in a console that reports these as observed facts.
+  if (typeof payload.hook_event_name === 'string' || typeof payload.transcript_path === 'string') {
+    return { tool: 'claude-code', prompt: text };
   }
   if (typeof payload.user_input === 'string') return { tool: 'claude-code', prompt: text };
   if (typeof payload.prompt === 'string') return { tool: 'codex', prompt: text };
@@ -229,7 +236,19 @@ function validateDecision(value) {
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
+
+  // Both timeouts above bound a request; neither bounds the wait for the event
+  // itself. A caller that opens the hook and never closes stdin would park us
+  // in the developer's keystroke path indefinitely. Unref'd, so it cannot keep
+  // the process alive on its own — it only fires if something else already is.
+  const watchdog = setTimeout(() => {
+    process.stderr.write('⚠ warden-hook: no event arrived on stdin. Prompt allowed unchecked.\n');
+    process.exit(0);
+  }, decisionTimeoutMs);
+  watchdog.unref?.();
+
   const raw = await readStdin();
+  clearTimeout(watchdog);
 
   let payload;
   try {
@@ -304,21 +323,16 @@ async function main() {
   process.stderr.write(message + '\n');
 
   /**
-   * Each tool reads a different refusal shape, and a tool that does not
-   * recognise the one it gets falls back to the exit code — which is why
-   * `exit 2` below is the part that must always happen.
+   * One object carrying every key a supported tool is documented to read, sent
+   * whatever the tool. Branching per tool only created ways to send the wrong
+   * shape — the `claude-code` branch omitted `decision` and `stopReason`, which
+   * are what that tool actually stops on — while an extra key is inert to a
+   * tool that ignores it. The non-zero exit below is still the part that must
+   * always happen, because it is the one signal every caller understands.
    */
-  if (tool === 'codex') {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: message }) + '\n');
-  } else if (tool === 'claude-code') {
-    process.stdout.write(JSON.stringify({ continue: false, reason: message }) + '\n');
-  } else {
-    // Unknown callers get both keys. Neither is harmful to a tool that ignores
-    // it, and one of them is probably the one it reads.
-    process.stdout.write(
-      JSON.stringify({ continue: false, decision: 'block', reason: message }) + '\n'
-    );
-  }
+  process.stdout.write(
+    JSON.stringify({ continue: false, stopReason: message, decision: 'block', reason: message }) + '\n'
+  );
 
   process.exitCode = 2;
 }

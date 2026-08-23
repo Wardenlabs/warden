@@ -15,7 +15,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Decision } from '../guard/types.js';
-import type { AuditEntry } from '../guard/types-audit.js';
+import type { AuditedDecision, AuditEntry } from '../guard/types-audit.js';
 
 const AUDIT_PATH = process.env['WARDEN_AUDIT_PATH'] ?? 'data/audit.jsonl';
 
@@ -32,7 +32,12 @@ function tailHash(): string {
   try {
     lastHash = (JSON.parse(last) as AuditEntry).entryHash;
   } catch {
-    lastHash = GENESIS;
+    // Restarting from GENESIS here would quietly fork a second chain on top of
+    // a corrupt one — the writer would be papering over exactly the state the
+    // verifier exists to catch. Refuse to append instead.
+    throw new Error(
+      `audit log at ${AUDIT_PATH} has an unparseable final entry — run \`npm run verify-audit\` and repair it before recording new decisions`
+    );
   }
   return lastHash ?? GENESIS;
 }
@@ -46,12 +51,18 @@ export function recordDecision(
   const prevHash = tailHash();
   const auditId = randomUUID().slice(0, 8);
 
+  // The prompt is persisted as a hash and nothing else. The live decision the
+  // caller holds keeps `maskedPrompt` — the console's live trace and the proxy
+  // forward both need it — but writing it here would make the log a transcript
+  // of everything employees typed, which its own header promises it is not.
+  const { maskedPrompt: _neverPersisted, ...audited } = { ...decision, auditId };
+
   const body = {
     auditId,
     ts: new Date().toISOString(),
     actor,
     promptHash: createHash('sha256').update(prompt).digest('hex'),
-    decision: { ...decision, auditId } as Decision,
+    decision: audited as AuditedDecision,
     prevHash
   };
 
@@ -89,7 +100,14 @@ export function verifyChain(): { ok: boolean; entries: number; brokenAt?: number
   let prev = GENESIS;
 
   for (let i = 0; i < lines.length; i++) {
-    const entry = JSON.parse(lines[i]!) as AuditEntry;
+    // A line that no longer parses is the most ordinary way to tamper with a
+    // JSONL file, so it is a verification finding, not a crash.
+    let entry: AuditEntry;
+    try {
+      entry = JSON.parse(lines[i]!) as AuditEntry;
+    } catch {
+      return { ok: false, entries: lines.length, brokenAt: i };
+    }
     const { entryHash, ...body } = entry;
     const expected = createHash('sha256').update(prev + JSON.stringify(body)).digest('hex');
     if (entry.prevHash !== prev || entryHash !== expected) {

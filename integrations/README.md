@@ -103,8 +103,11 @@ Merge `claude-code/settings.json` into `~/.claude/settings.json`:
 }
 ```
 
-Claude Code blocks on exit code 2 and on `{"continue": false, "reason": "..."}`.
-The hook emits both.
+Claude Code blocks on exit code 2. The hook also writes
+`{"continue": false, "stopReason": …, "decision": "block", "reason": …}` to
+stdout — every key any supported tool is documented to read, in one object,
+because extra keys are inert to a tool that ignores them while a missing one is
+a refusal that does not land. The exit code is the part that always works.
 
 ## 4. Codex
 
@@ -121,8 +124,9 @@ type = "command"
 command = "node ~/.warden-hook.mjs"
 ```
 
-Codex blocks on `{"decision": "block", "reason": "..."}` and on exit code 2.
-The hook emits both. Run `/hooks` inside Codex to confirm it is loaded.
+Codex blocks on `{"decision": "block", "reason": "..."}` and on exit code 2,
+both of which are in the object above. Run `/hooks` inside Codex to confirm it
+is loaded.
 
 ## 5. Try it
 
@@ -268,8 +272,9 @@ hooks not firing. If it silently does nothing, that is the failure to report.
 ## Anything else
 
 The hook reads the prompt from whichever of these the payload carries:
-`user_input`, `prompt`, `message`, `text`, `input`, or the last user turn of an
+`prompt`, `user_input`, `message`, `text`, `input`, or the last user turn of an
 OpenAI-shaped `messages` array. A wrapper for a tool not listed here only has to
 put JSON on stdin and check the exit code — `2` means refused, and the reason is
 on stderr. Pass `source` to have the tool named in the console's connected
-badges.
+badges: without it the hook guesses from the payload shape, and a guess is what
+puts the wrong tool on somebody's page.
