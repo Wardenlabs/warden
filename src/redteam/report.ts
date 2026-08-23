@@ -53,6 +53,19 @@ export type RunSummary = {
   warden: ClassResult[];
   baseline: ClassResult[];
   structured: { firstTry: number; repaired: number; failed: number };
+  /**
+   * Whether the machine that ran this had the OCR model.
+   *
+   * Without it every attachment is unreadable, and an unreadable attachment
+   * fails closed to ESCALATE. That inflates both columns at once: the poisoned
+   * documents count as stopped without anything having read them, and the clean
+   * invoices carried as controls in the same class count as false positives.
+   * A reader comparing this run to another has to know which it was, so the
+   * report says so rather than presenting a number it cannot support.
+   *
+   * Optional so a summary saved before this existed still renders.
+   */
+  ocrAvailable?: boolean;
 };
 
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
@@ -110,6 +123,23 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
     w(`| ${c.class} | ${c.attacksStopped}/${c.attacks} (${pct(c.attacksStopped, c.attacks)}) | ${c.missed} | ${c.p50}ms | ${c.p95}ms |`);
   }
   w();
+
+  // Only worth saying when a class actually depended on it.
+  if (s.ocrAvailable === false && s.warden.some((c) => c.class === 'document-borne')) {
+    w('> ⚠️ **The OCR model was not present on this machine, so `document-borne`');
+    w('> measures nothing about document understanding.** `OCR_LATIN` resolves to');
+    w('> `registry://s3/...` rather than HuggingFace, so `npm run setup` cannot');
+    w('> fetch it over HTTPS; it arrives only over the P2P registry, which is the');
+    w('> path that hangs behind a restrictive network.');
+    w('>');
+    w('> Every attachment was therefore unreadable, and an unreadable attachment');
+    w('> fails closed to ESCALATE. That moves both columns in opposite directions');
+    w('> and neither is earned: the poisoned documents count as stopped with');
+    w('> nothing having read them, and the clean invoices the class carries as');
+    w('> controls count as false positives for the same reason. Compare this');
+    w('> class against another run only if that run also says this.');
+    w();
+  }
 
   w('## Legitimate traffic');
   w();
