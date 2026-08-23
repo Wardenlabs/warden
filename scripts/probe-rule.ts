@@ -12,6 +12,13 @@
  * Both sides matter. A rule reworded until it never fires is not an improvement,
  * it is a rule that has been switched off, and only the attack column shows it.
  *
+ * **This cannot confirm anything on its own.** Thirteen prompts cannot resolve a
+ * two-prompt difference, and it has already produced a convincing false positive
+ * — it reported the isolation preamble halving false positives on a change that
+ * 32 corpus evaluations showed doing nothing. Use it to form a hypothesis, then
+ * confirm with `npx tsx src/redteam/runner.ts --class benign-controls --reps 2`
+ * before believing it.
+ *
  *   npx tsx scripts/probe-rule.ts <ruleId>
  */
 import { readFileSync } from 'node:fs';

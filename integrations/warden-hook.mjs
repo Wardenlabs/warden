@@ -12,34 +12,35 @@
  * employee installs has to be something they can curl and forget. Anything
  * heavier does not get rolled out.
  *
- * Install:
- *   curl -o ~/.warden-hook.mjs https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs
- *   chmod +x ~/.warden-hook.mjs
+ * Install — your admin gives you the link, which already has your key in it:
+ *   curl -fsSL http://192.168.1.42:8080/install/<you> | sh
  *
- * Configure (in ~/.zshrc or ~/.bashrc):
+ * Or by hand, in ~/.zshrc or ~/.bashrc:
  *   export WARDEN_URL=http://192.168.1.42:8080   # the gateway machine
- *   export WARDEN_USER=fede
- *   export WARDEN_ROLE=analyst                   # only used if you are not in the directory
+ *   export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by your admin
  *
- * WARDEN_ROLE is a fallback, not a claim the gateway honours. Anyone the admin
- * has added to the directory is judged under the role set there, because a role
- * an employee can edit in their own shell profile is a role they could use to
- * pick which rules apply to them.
+ * The key is the whole identity. There is no name to set and no role to set:
+ * your admin decides what your key means and can change it without you touching
+ * anything here — and a role you could set yourself would be a role you could
+ * use to pick the rules that judge you. A key this gateway does not recognise is
+ * refused outright, which is also how revoking one works.
  */
 
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
-const USER = process.env.WARDEN_USER ?? 'unknown';
-/** Fallback only — the gateway's directory overrides this for known users. */
-const ROLE = process.env.WARDEN_ROLE ?? 'employee';
+const API_KEY = process.env.WARDEN_API_KEY ?? '';
 
-/**
- * This sits in the developer's keystroke path; past this we get out of the way.
- * Validated, because `Number(garbage)` is NaN and `setTimeout(fn, NaN)` fires
- * on the next tick — a typo'd env var would make every prompt "time out"
- * instantly and sail through unchecked.
- */
-const RAW_TIMEOUT = Number(process.env.WARDEN_TIMEOUT_MS);
-const TIMEOUT_MS = Number.isFinite(RAW_TIMEOUT) && RAW_TIMEOUT > 0 ? RAW_TIMEOUT : 8000;
+const DEFAULT_HEALTH_TIMEOUT_MS = 2000;
+const DEFAULT_DECISION_TIMEOUT_MS = 30_000;
+
+function timeoutFromEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive finite number, got "${raw}"`);
+  }
+  return value;
+}
 
 async function readStdin() {
   const chunks = [];
@@ -51,14 +52,9 @@ async function readStdin() {
  * Which tool called us, and what the person typed.
  *
  * Inferred from the payload rather than configured, because the alternative is
- * an employee setting a flag per tool and getting it wrong silently. Claude
- * Code's hook events carry `hook_event_name` (and the prompt under `prompt`),
- * which is definitive; Codex also sends `prompt` but no event name; anything
- * wiring itself up through a plugin can say so with `source`.
- *
- * The tool name matters beyond the refusal shape: it is what the gateway
- * records as "seen using", so misattributing it would corrupt an observed fact
- * the console displays.
+ * an employee setting a flag per tool and getting it wrong silently. Claude Code
+ * sends `user_input`, Codex sends `prompt`, and anything wiring itself up
+ * through a plugin can say so with `source`.
  *
  * The generic shapes at the bottom are what make "any tool" more than a slogan:
  * a wrapper someone writes in an afternoon only has to put the text on stdin
@@ -75,7 +71,10 @@ function detect(payload) {
   if (typeof payload.source === 'string' && payload.source) {
     return { tool: payload.source, prompt: text };
   }
-  // Claude Code identifies its events; `prompt` alone is how Codex looks.
+  // Claude Code names its own events, and carries the text under `prompt` —
+  // the same field Codex uses. Keying on `user_input` first sent every real
+  // Claude Code prompt down the Codex branch, which put the wrong tool on
+  // somebody's page in a console that reports these as observed facts.
   if (typeof payload.hook_event_name === 'string' || typeof payload.transcript_path === 'string') {
     return { tool: 'claude-code', prompt: text };
   }
@@ -127,6 +126,18 @@ function wrap(text, indent = '   ', width = 76) {
 }
 
 function render(res) {
+  // An unrecognised key is not a policy decision and must not read like one —
+  // the person needs to know it is their credential, not something they typed.
+  if (res.error === 'unknown_api_key' || res.auditId === 'no-key') {
+    return [
+      '🔑 Warden did not recognise your API key',
+      '',
+      ...wrap(res.explanation ?? 'Ask your administrator for a current key.'),
+      '',
+      '   Set it with: export WARDEN_API_KEY=wk-…'
+    ].join('\n');
+  }
+
   const lines = [res.verdict === 'BLOCK' ? '⛔ Blocked by Warden' : '⏸ Held for review by Warden'];
   const rule = res.firedRules?.[0];
 
@@ -172,14 +183,68 @@ function render(res) {
   return lines.join('\n');
 }
 
+async function requestJson(url, init, timeoutMs, validate, recoverHttpError) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const http = await fetch(url, { ...init, signal: controller.signal });
+    // Keep the controller live through body consumption and validation. A
+    // server that sends headers and then stalls must not bypass the deadline.
+    const raw = await http.text();
+    let value;
+    let invalidJson = false;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      invalidJson = true;
+    }
+    if (!http.ok) {
+      const recovered = recoverHttpError?.(http, invalidJson ? undefined : value);
+      if (recovered !== undefined) return validate(recovered);
+      throw new Error(`gateway returned ${http.status}`);
+    }
+    if (invalidJson) throw new Error('gateway returned invalid JSON');
+    return validate(value);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function validateHealth(value) {
+  if (!value || typeof value !== 'object' || value.ok !== true) {
+    throw new Error('gateway health response is invalid');
+  }
+  return value;
+}
+
+function validateDecision(value) {
+  if (!value || typeof value !== 'object') {
+    throw new Error('gateway decision is not an object');
+  }
+  if (!['ALLOW', 'ESCALATE', 'BLOCK'].includes(value.verdict)) {
+    throw new Error('gateway decision has an invalid verdict');
+  }
+  if (typeof value.auditId !== 'string' || !value.auditId.trim()) {
+    throw new Error('gateway decision has no audit id');
+  }
+  if (value.firedRules !== undefined && !Array.isArray(value.firedRules)) {
+    throw new Error('gateway decision has invalid fired rules');
+  }
+  return value;
+}
+
 async function main() {
-  // A caller that opens the hook and never closes stdin would otherwise park
-  // us in the keystroke path forever. Unref'd, so it cannot itself keep the
-  // process alive — it only fires if something else already is.
+  const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
+  const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
+
+  // Both timeouts above bound a request; neither bounds the wait for the event
+  // itself. A caller that opens the hook and never closes stdin would park us
+  // in the developer's keystroke path indefinitely. Unref'd, so it cannot keep
+  // the process alive on its own — it only fires if something else already is.
   const watchdog = setTimeout(() => {
     process.stderr.write('⚠ warden-hook: no event arrived on stdin. Prompt allowed unchecked.\n');
     process.exit(0);
-  }, TIMEOUT_MS * 2);
+  }, decisionTimeoutMs);
   watchdog.unref?.();
 
   const raw = await readStdin();
@@ -197,24 +262,40 @@ async function main() {
   if (!prompt.trim()) return;
 
   let res;
-  const controller = new AbortController();
-  // Cleared in `finally`: now that the process exits naturally instead of via
-  // process.exit(), a timer left armed on the failure path would hold the
-  // process open for the full timeout after the answer is already known.
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const http = await fetch(`${WARDEN_URL}/api/guard/check`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-warden-user': USER,
-        'x-warden-role': ROLE
+    await requestJson(
+      `${WARDEN_URL}/health`,
+      { method: 'GET' },
+      healthTimeoutMs,
+      validateHealth
+    );
+    res = await requestJson(
+      `${WARDEN_URL}/api/guard/check`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${API_KEY}`
+        },
+        body: JSON.stringify({ prompt, source: tool })
       },
-      body: JSON.stringify({ prompt, source: tool }),
-      signal: controller.signal
-    });
-    if (!http.ok) throw new Error(`gateway returned ${http.status}`);
-    res = await http.json();
+      decisionTimeoutMs,
+      validateDecision,
+      (http, value) => {
+        if (http.status !== 401 && http.status !== 403) return undefined;
+        const body = value && typeof value === 'object' ? value : {};
+        return {
+          ...body,
+          verdict: 'BLOCK',
+          auditId: typeof body.auditId === 'string' && body.auditId ? body.auditId : 'no-key',
+          error: typeof body.error === 'string' ? body.error : 'unknown_api_key',
+          explanation:
+            typeof body.explanation === 'string'
+              ? body.explanation
+              : 'This gateway did not recognise your Warden API key.'
+        };
+      }
+    );
   } catch (err) {
     /**
      * The one place this deliberately fails open.
@@ -224,49 +305,35 @@ async function main() {
      * gateway that can strand the whole team gets uninstalled the first morning
      * it does. Warn loudly, let the prompt through, and let the missing
      * heartbeat be the alert on the admin's side.
+     *
+     * Note this catch no longer swallows a rejected key: that is handled above
+     * as the answer it is.
      */
     process.stderr.write(
       `⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}). Prompt allowed unchecked.\n`
     );
     return;
-  } finally {
-    clearTimeout(timer);
   }
 
-  // Only an explicit BLOCK or ESCALATE stops the prompt. A 200 whose body is
-  // not a verdict — a half-upgraded gateway, a shape change, an error page that
-  // happens to parse — is a gateway *bug*, and the contract above says gateway
-  // failures fail open with a warning. Falling through to the refusal path on
-  // `verdict: undefined` would brick every developer's CLI on a malformed
-  // response, which is the exact outcome the fail-open exists to prevent.
-  // Silence on the happy path, though: a gateway that comments on every prompt
-  // becomes noise people learn to scroll past.
-  if (res?.verdict !== 'BLOCK' && res?.verdict !== 'ESCALATE') {
-    if (res?.verdict !== 'ALLOW') {
-      process.stderr.write('⚠ Warden returned no verdict. Prompt allowed unchecked.\n');
-    }
-    return;
-  }
+  // Silence on the happy path. A gateway that comments on every prompt becomes
+  // noise people learn to scroll past.
+  if (res.verdict === 'ALLOW') return;
 
   const message = render(res);
   process.stderr.write(message + '\n');
 
   /**
-   * One JSON shape with every key a supported tool reads: Claude Code stops on
-   * `decision: "block"` (and `continue: false` + `stopReason`), Codex reads
-   * `decision`/`reason`, and a tool that recognises none of them falls back to
-   * the exit code — which is why the non-zero exit below must always happen.
-   * Extra keys are inert to a tool that ignores them, so branching per tool
-   * only created ways to send the wrong shape.
+   * One object carrying every key a supported tool is documented to read, sent
+   * whatever the tool. Branching per tool only created ways to send the wrong
+   * shape — the `claude-code` branch omitted `decision` and `stopReason`, which
+   * are what that tool actually stops on — while an extra key is inert to a
+   * tool that ignores it. The non-zero exit below is still the part that must
+   * always happen, because it is the one signal every caller understands.
    */
   process.stdout.write(
     JSON.stringify({ continue: false, stopReason: message, decision: 'block', reason: message }) + '\n'
   );
 
-  // `process.exitCode` rather than `process.exit()`: exit() abandons buffered
-  // stdout/stderr, and on a pipe — which a hook's streams always are — that
-  // can drop the refusal text and the JSON both, leaving the tool a bare exit
-  // code and the employee no explanation.
   process.exitCode = 2;
 }
 

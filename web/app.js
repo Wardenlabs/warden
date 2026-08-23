@@ -433,10 +433,9 @@ function renderRules() {
 
 function renderQuotas() {
   $('quotas').innerHTML = policy.quotas.length
-    ? policy.quotas.map((q) => `<div style="font-size:12.5px;margin-bottom:7px;display:flex">
-        <span style="color:var(--dim)">${esc(q.role)}</span>
-        <span style="margin-left:auto;font-family:var(--mono);color:var(--faint)">${q.maxRequestsPerDay}/day</span>
-      </div>`).join('')
+    ? `<div class="quota-grid">${policy.quotas.map((q) => `<div class="quota">
+        <span>${esc(q.role)}</span><b>${q.maxRequestsPerDay}/day</b>
+      </div>`).join('')}</div>`
     : '<div class="note">No quotas set — every role is unmetered.</div>';
 }
 
@@ -504,7 +503,7 @@ $('addPerson').onclick = async () => {
     body: JSON.stringify({ name, role: $('newRole').value })
   });
   $('addNote').textContent = ok
-    ? `${j.name} added · key ${j.apiKey} · WARDEN_USER=${j.id}`
+    ? `${j.name} added · WARDEN_API_KEY=${j.apiKey}`
     : (j.error ?? 'failed');
   if (ok) {
     $('newName').value = '';
@@ -540,7 +539,7 @@ $('addRole').onclick = async () => {
 async function renderPersonDetail() {
   const host = $('personDetail');
   if (!selectedPerson) {
-    host.innerHTML = '<div class="empty">Pick someone to see their rules and write one just for them.</div>';
+    host.innerHTML = '<div class="empty-state"><div><div class="signal">ID</div><b>No person selected</b><span>Choose someone from the directory to manage their setup and rules.</span></div></div>';
     return;
   }
   const p = selectedPerson;
@@ -582,13 +581,19 @@ async function renderPersonDetail() {
     </div>
 
     <div class="field">
-      <label>API key — for tools that take a base URL. Never leaves this machine.</label>
-      <div class="key">${esc(j.person?.apiKey ?? p.apiKey ?? '—')}</div>
+      <label>API key — their whole identity. Rotating it revokes the old one.</label>
+      <div class="codewrap">
+        <pre class="code">${esc(p.apiKey)}</pre>
+        <button class="ghost copy" data-copy="${encodeURIComponent(p.apiKey)}">Copy</button>
+      </div>
     </div>
 
     <div class="field">
       <label>What they put on their own machine</label>
-      <div class="key">WARDEN_USER=${esc(p.id)}</div>
+      <div class="codewrap">
+        <pre class="code">export WARDEN_API_KEY=${esc(p.apiKey)}</pre>
+        <button class="ghost copy" data-copy="${encodeURIComponent('export WARDEN_API_KEY=' + p.apiKey)}">Copy</button>
+      </div>
     </div>
 
     <div class="row">
@@ -653,6 +658,13 @@ async function renderPersonDetail() {
     compileInto('person', $('personRuleText').value, [`@${p.id}`], $('personCompileNote'), $('personCompile'));
 
   if (draft && draftHost === 'person') renderDraft();
+
+  // One delegated handler for every copy button on the page, including the ones
+  // renderOnboarding adds later. Binding per-button would miss those.
+  host.onclick = (e) => {
+    const btn = e.target.closest('[data-copy]');
+    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
+  };
 
   void renderOnboarding(p);
 }
@@ -726,10 +738,6 @@ async function renderOnboarding(person) {
   };
 
   $('copyAll').onclick = (e) => copyText(j.message, e.target);
-  host.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-copy]');
-    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
-  });
 }
 
 // ── employee chat ────────────────────────────────────────────────────────────
@@ -754,17 +762,25 @@ async function send() {
   $('prompt').value = '';
   append(person ? `${person.name} (${person.role})` : who, text, '');
 
-  // The role is deliberately not sent. The server resolves it from the
-  // directory, which is the same thing that happens when the hook calls in from
-  // an employee's laptop — a client that could assert its own role could pick
-  // the rules it is judged by.
+  // The person's own API key, exactly as their laptop would send it. Neither a
+  // name nor a role goes over the wire: the key is the whole identity, and the
+  // console deliberately has no privileged way to assert one — it exercises the
+  // same path an employee's tool does, so a break here breaks the demo too.
   const { ok, j } = await api('/api/guard/check', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-warden-user': who },
-    body: JSON.stringify({ prompt: text })
+    headers: {
+      'content-type': 'application/json',
+      ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
+    },
+    body: JSON.stringify({ prompt: text, source: 'console' })
   });
 
-  // A check that errored is not a check that allowed. Rendering it as an empty
+  if (j?.error === 'unknown_api_key') {
+    append('warden', 'key not recognised', `<div class="why">${esc(j.explanation)}</div>`, 'blocked');
+    return;
+  }
+
+  // Any other failure is not a check that allowed. Rendering it as an empty
   // bubble read as "nothing happened" — in a demo of a blocking gateway, the
   // one thing this pane must never do is dress a failure as calm.
   if (!ok || !j?.verdict) {
@@ -812,7 +828,7 @@ function append(who, text, extra, cls = '') {
   el.className = `msg ${cls}`;
   el.innerHTML = `<div class="who">${esc(who)}</div><div class="txt">${esc(text)}</div>${extra}`;
   const chat = $('chat');
-  if (chat.querySelector('.empty')) chat.innerHTML = '';
+  if (chat.querySelector('.empty, .empty-state')) chat.innerHTML = '';
   chat.append(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -846,7 +862,7 @@ function renderTrace(d) {
         <span class="ms">${p.ms}ms</span>
       </div>`).join('')}`;
   const trace = $('trace');
-  if (trace.querySelector('.empty')) trace.innerHTML = '';
+  if (trace.querySelector('.empty, .empty-state')) trace.innerHTML = '';
   trace.prepend(el);
   while (trace.children.length > 25) trace.lastChild.remove();
 }
@@ -858,7 +874,11 @@ const TABS = { console: 'grid3', people: 'grid2', redteam: 'single' };
 document.querySelector('nav').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));
+  document.querySelectorAll('nav button').forEach((x) => {
+    const active = x === b;
+    x.classList.toggle('on', active);
+    x.setAttribute('aria-selected', String(active));
+  });
   for (const [tab, layout] of Object.entries(TABS)) {
     const el = $(`tab-${tab}`);
     el.style.display = tab === b.dataset.tab ? (layout === 'single' ? 'block' : 'grid') : 'none';

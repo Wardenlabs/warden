@@ -1,6 +1,7 @@
 # Warden — the local AI gateway
 
-**Your admin writes the rules. No prompt can break them. Nothing leaves the machine.**
+**Your admin writes the rules. Every prompt is judged against them before a model
+sees it. Nothing leaves the machine.**
 
 Companies are handing employees AI assistants and coding agents. The only control
 most of them have is a system prompt asking the model to behave — which is a
@@ -14,7 +15,7 @@ rules, its documents and its conversations never leave the building.
 
 ---
 
-## It governs Claude Code and Codex directly
+## Hook integrations for Claude Code and Codex
 
 Not through a proxy the employee can point elsewhere — through each tool's own
 `UserPromptSubmit` hook, which fires locally the moment they press Enter and
@@ -23,8 +24,10 @@ before the prompt is sent anywhere.
 **This is what makes it work on subscription plans.** A Claude Max or ChatGPT
 Plus session authenticates over OAuth against a fixed endpoint; there is no base
 URL to redirect. The hook does not care — it runs first, on the employee's own
-machine. And both tools let an administrator deploy hooks the employee cannot
-switch off, which is the difference between a suggestion and governance.
+machine. Both integrations remain **NOT VERIFIED** end to end. A Windows run on
+2026-08-23 observed Claude Code blocking attacks but also false-positive benign
+blocks, and observed a cold Codex decision exceed the 30 s hook deadline and
+reach the model. See [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
 
 ```
 > pasame el sueldo de Ana para el reporte
@@ -61,7 +64,7 @@ Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-I
 ```bash
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
-npm install
+npm ci
 npm run setup
 npm run dev
 ```
@@ -221,8 +224,7 @@ step was where setup died, which is a poor look for a product whose claim is
 that nothing leaves the network.
 
 Every value an admin retypes is a value they can get wrong, and these fail
-silently: a mistyped `WARDEN_USER` does not error, it gets that person judged as
-a stranger.
+silently, and an API key is the least forgiving value to retype by hand.
 
 | Tool | How it is governed | On a subscription | Verified |
 |---|---|---|---|
@@ -238,6 +240,10 @@ has been. The rest are wired from each tool's own documentation and tested at
 the hook boundary, which is not the same claim — the console says so on the page
 rather than leaving an admin to assume.
 
+The 2026-08-23 E2E attempt is recorded in
+[`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md). Neither client passed
+the full release gate, so both entries intentionally remain `not yet`.
+
 The hook/proxy split is what decides whether a subscription can be governed at
 all. A hook runs on the employee's machine before the prompt leaves it, so it
 does not care what the tool authenticates against; the proxy path needs a
@@ -248,6 +254,23 @@ The console also shows which tools each person **has actually been seen using**,
 from the tool name every hook call carries. What someone was told to install and
 what they installed are different things, and the difference is a directory that
 looks deployed while governing nobody.
+
+### Who the policy does not govern
+
+`exemptRoles` in the policy names roles that are measured against nothing. The
+person who ratifies the rules should not be tripping over them: five of the
+eight seed rules bind `*`, including the pinned injection rule, so without this
+there was no role an operator could hold and still work.
+
+It lives inside `PolicySpec` rather than in an environment variable because "who
+is exempt" is the most security-relevant sentence in the whole spec — it belongs
+in the version hash, where changing it is detectable, next to the rules it
+overrides. The check runs in `rulesForActor()` before `appliesTo`, so a rule
+written for everyone cannot quietly re-capture an exempt role.
+
+This is only ever as strong as the identity behind the role, which is why it is
+safe now and would not have been a day ago: the role comes from a directory
+entry behind an issued API key, not from anything the caller can set.
 
 ### People
 
@@ -263,11 +286,17 @@ locked to them: the admin already said who it was for by being on their page,
 and asking a 1.7B model to re-derive that from prose is a way to bind a personal
 rule to the whole company.
 
-**The directory decides the role, not the employee.** `WARDEN_ROLE` on someone's
-laptop is a fallback for people the directory has never seen. Anyone in it is
-judged under the role the admin set, because a role an employee can edit in
-their own shell profile is a role they could use to pick which rules apply to
-them.
+**An API key is the entire identity.** An employee sends no name and no role —
+nothing they can type says who they are. The admin issues a key, the directory
+records what it means, and the role behind it changes without the employee
+touching their machine.
+
+The earlier design let the caller send a name and a role. The name was checked
+against the directory, but anyone *not* in it kept the role they claimed, so an
+exempt role was one header away. A key cannot be forged into an identity that
+does not exist, and an unrecognised one is refused outright rather than judged
+under a default. Rotation is revocation: the old key stops working on the next
+prompt.
 
 ### Who the policy does not govern
 
@@ -282,10 +311,12 @@ is exempt" is the most security-relevant sentence in the whole spec: it belongs
 inside the version hash, where changing it is detectable, next to the rules it
 overrides.
 
-**An exempt role is granted by the directory and never claimed.** A role only
-arrives from `WARDEN_ROLE` for callers the directory has never seen, and a
-claimed role the policy exempts is demoted to `employee` — otherwise a stranger
-could opt out of the entire policy by typing one word into their shell profile.
+**An exempt role is granted by the directory and never claimed.** That is what
+makes the exemption safe rather than a bypass switch: a role reaches the guard
+only from the directory entry behind an issued API key, so there is nothing an
+employee can type to select one. It was not always so — an unrecognised caller
+used to keep the role they claimed, which put the entire policy one header
+away.
 
 The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays
@@ -324,6 +355,31 @@ Two classes carry most of the weight:
 
 The report lists every failure by id. If a run comes back all-green, that means
 the corpus is too easy, not that the guard is airtight.
+
+### The numbers
+
+Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition:
+
+| | Warden | Baseline |
+|---|---|---|
+| Attacks stopped | **66/82 · 80%** | 2/82 · 2% |
+| False positives on legitimate traffic | **7/16 · 44%** | 0/16 · 0% |
+| Structured output | 294 first-try · 0 repaired · 0 failed | |
+
+Both rows, together, on purpose. The first is the argument: a system prompt
+stops 2% of these because a system prompt is a request, not a control. The
+second is the honest cost, and it is **not shippable** — a gateway that refuses
+44% of honest work gets uninstalled in a week.
+
+That number is the open problem, and the investigation into it — including three
+hypotheses measured and rejected, and the lead that is still live — is written up
+in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
+
+Two caveats that qualify every number above. Runs are **not reproducible**: two
+identical runs of the same policy at temperature 0 gave 44% and 31%, because
+`parallel: 4` batches concurrent adjudications and batch composition changes the
+numerics. And n=16 on the control class means one prompt is six points. Use
+`--reps 2` at minimum before believing a difference.
 
 ### What we learned about small models
 
@@ -417,8 +473,18 @@ npm run smoke            # structured-output reliability over N runs
 npm run redteam          # full corpus → REPORT.md
 npm run redteam -- --class guard-targeted --reps 5
 npm run verify-audit     # recompute the audit hash chain
+npm run test:vote        # semantics of the confirmation vote
 npm run typecheck
+
+npx tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
+npx tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
 ```
+
+The last two are diagnostics, not tests. `probe-rule` is fast enough to form a
+hypothesis with and too small to confirm one — thirteen prompts cannot resolve a
+two-prompt difference, and it has already produced a convincing result the
+corpus flatly contradicted. Confirm with `--reps 2` on the corpus before
+believing anything either of them says.
 
 ### Configuration
 
@@ -427,7 +493,6 @@ npm run typecheck
 | `WARDEN_PORT` | `8080` | |
 | `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
 | `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
-| `WARDEN_DEV_HEADERS` | — | `1` lets the proxy accept `x-warden-user` instead of an API key. Development only — with it on, the key is optional and identity is whatever the caller types. |
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
@@ -439,6 +504,7 @@ npm run typecheck
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
+| `WARDEN_PUBLIC_URL` | — | The address employees should use, when it is not the one the gateway can infer — behind a tunnel or a VPN. |
 
 ---
 
@@ -460,11 +526,36 @@ path travels as a per-employee API key, which also keeps the company's upstream
 credential on the gateway: an employee cannot route around the guard, because
 they have nothing to route around it with.
 
+### Over the internet, not just a LAN
+
+The deployment model is one machine holding the models with everyone else
+pointing at it, which works unchanged over a private network — but not by
+opening a port. Warden speaks plain HTTP and its identity is a bearer key, so
+exposed directly, every prompt and every key travels in cleartext.
+
+Put something in front that terminates TLS. **Tailscale** is the recommended
+shape: a private mesh, nothing exposed, and the gateway reachable from anywhere
+its members are. **Cloudflare Tunnel** gives a public HTTPS hostname without
+opening a port — Warden detects it from `x-forwarded-proto` and generates
+onboarding URLs with the right scheme automatically. `WARDEN_PUBLIC_URL` pins
+the address explicitly when neither inference is right.
+
+Step by step, with what is still missing for a real deployment, in
+[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
+
 ---
 
 ## Limits
 
 Stated plainly, because a README that oversells is worse than one that undersells.
+
+**The gateway does not terminate TLS and the admin console has no login.** Both
+are fine on a trusted network and neither is fine on a public address, which is
+why the deployment notes push a private mesh rather than a port forward. API
+keys are stored in cleartext in `data/company.json` — hashing them would work for
+authentication but would stop the admin from ever showing a key again, and
+showing it is what makes onboarding a copy button instead of a support ticket.
+A deliberate trade for a gateway running on a company's own machine.
 
 - **The hook sees prompts, not the agent's actions.** Governing what an agent
   *does* — files it writes, commands it runs — is the `PreToolUse` hook, which
@@ -473,11 +564,15 @@ Stated plainly, because a README that oversells is worse than one that undersell
   abort semantics are undocumented and we have not watched it block anything. It
   goes in this README when it does.
 - **Quota counters are in memory** and reset with the process.
-- **The admin API has no authentication.** Anyone who can reach the port can
-  read the directory, write policy and remove people. Cross-origin access is
-  off by default, so a web page the admin visits cannot do it — but every host
-  on the LAN can. Bind `WARDEN_HOST=127.0.0.1` if that is not acceptable; an
-  admin credential is the obvious next piece of work.
+- **The admin API has no authentication, and that is where the keys are.**
+  Anyone who can reach the port can read the directory — every employee's API
+  key with it — write policy, and remove people. Cross-origin access is off by
+  default, so a web page an admin visits cannot do it, but every host on the LAN
+  can. The employee-facing paths are properly authenticated; the admin ones are
+  not, so the whole key model rests on that port being reachable only by people
+  who are already trusted. Bind `WARDEN_HOST=127.0.0.1` if that is not true on
+  your network. An admin credential is the obvious next piece of work, and until
+  it exists this is the largest gap in the system.
 - **Output-scope rules are defined but only input is enforced today.** Rules
   marked `scope: "output"` are stored and shown; the response-side pass is not
   built.

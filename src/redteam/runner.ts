@@ -192,16 +192,24 @@ async function main(): Promise<void> {
   };
 
   printConsole(summary);
-  // A filtered run is a probe, not the project's headline artifact: it writes
-  // its own file and leaves REPORT.md — and the console's last full run — as
-  // they were. `npm run redteam -- --class benign-controls` used to replace
-  // both with a report whose attack table was empty.
-  const reportPath = only ? `REPORT.${only}.md` : 'REPORT.md';
+  // Two kinds of run must not overwrite the project's evidence, for two
+  // different reasons. A mock run measures the harness rather than a model. A
+  // filtered run covers part of the corpus — `--class benign-controls` used to
+  // replace REPORT.md with a report whose attack table was empty. Each gets its
+  // own file, and the two compose.
+  const isMockRun = summary.adapter === 'mock';
+  const slice = only ? `.${only}` : '';
+  const reportPath = isMockRun ? `data/redteam-last.mock${slice}.md` : `REPORT${slice}.md`;
   writeReport(summary, reportPath);
+  // Persist the structured result too, so the console can render it without
+  // parsing markdown or re-running the suite. Only from a full run: a filtered
+  // one describes part of the corpus and the console would render it as all of
+  // it.
   if (!only) {
-    // Persist the structured result too, so the console can render it without
-    // parsing markdown or re-running the suite.
-    writeFileSync('data/redteam-last.json', JSON.stringify(summary, null, 2));
+    writeFileSync(
+      isMockRun ? 'data/redteam-last.mock.json' : 'data/redteam-last.json',
+      JSON.stringify(summary, null, 2)
+    );
   }
   console.log(`\nwrote ${reportPath}\n`);
   await adapter().dispose();

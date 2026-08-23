@@ -17,8 +17,8 @@ import { evaluate } from '../guard/pipeline.js';
 import { normalizeUntrusted } from '../guard/isolate.js';
 import { sanitize } from '../guard/sanitize.js';
 import type { Actor, Decision } from '../guard/types.js';
-import { findByApiKey, findEmployee } from '../policy/people.js';
-import { claimableRole, loadPolicy, rulesForActor } from '../policy/store.js';
+import { actorForCredential } from '../policy/people.js';
+import { loadPolicy, rulesForActor } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 
 /** The local model that answers allowed prompts. Cloud is out by track rules. */
@@ -34,42 +34,17 @@ const UPSTREAM_MODEL = process.env['WARDEN_UPSTREAM_MODEL'] ?? 'warden';
 const MODE = process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden';
 
 /**
- * Header identity on the proxy is opt-in, for serving web/ from a separate dev
- * port. Left on by default it made the API key decorative: any caller could
- * skip `Authorization` entirely and be judged under whatever role they typed.
- */
-const DEV_HEADERS = process.env['WARDEN_DEV_HEADERS'] === '1';
-
-/**
- * Resolve the caller.
+ * Resolve the caller — the API key, and nothing else.
  *
- * The bearer token is the only identity in normal operation — the README's
- * claim that an employee "cannot go around the gateway" rests on the key being
- * mandatory, not one of several options. Headers exist behind
- * `WARDEN_DEV_HEADERS=1` for development against a console on another port.
- *
- * When a header names someone in the directory, the directory's role wins
- * over whatever role the header claims. The role is an admin decision, and a
- * client that could assert its own would be able to pick the rule set it is
- * judged against — which is the whole thing this gateway exists to prevent.
+ * There used to be a header fallback here for the web console's person
+ * switcher. It is gone: two ways to say who you are means the weaker one is the
+ * one that gets used, and the weaker one was a header any client could set. The
+ * console now sends the selected person's key, which has the useful side effect
+ * of exercising the same path an employee's tool does.
  */
 function resolveActor(req: Request): Actor | null {
-  const bearer = /^Bearer\s+(.+)$/i.exec(req.header('authorization') ?? '')?.[1]?.trim();
-  if (bearer) {
-    const match = findByApiKey(bearer);
-    return match ? { id: match.id, role: match.role } : null;
-  }
-
-  const headerUser = DEV_HEADERS ? req.header('x-warden-user') : undefined;
-  if (headerUser) {
-    const known = findEmployee(headerUser);
-    if (known) return { id: known.id, role: known.role };
-    // A stranger keeps the role they claim — except an exempt one, which would
-    // let them opt out of the whole policy with a header.
-    return { id: headerUser, role: claimableRole(loadPolicy(), req.header('x-warden-role') ?? 'employee') };
-  }
-
-  return null;
+  const employee = actorForCredential(req.header('authorization'));
+  return employee ? { id: employee.id, role: employee.role } : null;
 }
 
 /** Rules folded into a system prompt — the baseline everyone else ships. */

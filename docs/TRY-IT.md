@@ -165,8 +165,9 @@ elegir qué reglas lo juzgan.
 
 Pestaña **People**.
 
-**Agregar a alguien.** Nombre + rol → Add. Te devuelve su `WARDEN_USER` y su
-API key ahí mismo. Eso es lo único que le mandás.
+**Agregar a alguien.** Nombre + rol → Add. Te devuelve su **API key**, que es
+toda su identidad — no hay usuario ni rol que el empleado configure. Abajo, en
+**Onboarding**, tenés el comando de una línea listo para mandarle.
 
 **Agregar un rol.** Abajo de todo: nombre y cuota por día. El rol nuevo aparece
 en el selector de la ficha de cada persona y en el editor de audiencia de cada
@@ -221,6 +222,38 @@ querés arrancar de algo hecho en vez de una página en blanco.
 
 ---
 
+## 4.5. La key es la identidad
+
+Pestaña **People** → hacé click en alguien. Ahí está su **API key**, con botón de
+copiar, y abajo el **Onboarding**: un comando que se lo mandás y listo.
+
+```bash
+curl -fsSL http://localhost:8080/install/fede | sh
+```
+
+Baja el hook **del gateway** (no de internet) y le escribe `WARDEN_URL` y
+`WARDEN_API_KEY` en el perfil de shell. Se puede correr de nuevo: reemplaza su
+bloque en vez de apilar otro.
+
+**Probá que una key desconocida no entra:**
+
+```bash
+echo '{"user_input":"hola"}' | WARDEN_API_KEY=wk-cualquier-cosa node ~/.warden-hook.mjs
+echo "exit: $?"     # 2 — y dice que el problema es la key, no la política
+```
+
+**Y que rotarla revoca la vieja:** en la ficha, **New key**. La anterior deja de
+andar en el próximo prompt.
+
+El empleado no configura nombre ni rol. Vos decidís qué significa su key y
+podés cambiarle el rol sin que toque nada. Un rol que el empleado pudiera editar
+en su `.zshrc` sería un rol con el que elegiría qué reglas lo juzgan.
+
+> Esa secuencia —agregar a alguien, mandarle un comando, verlo bloquear, rotarle
+> la key— es la escena de "esto es un producto y no un demo".
+
+---
+
 ## 5. El hook: gobernar Claude Code de verdad
 
 Esto es lo más importante del producto y lo que **todavía nadie verificó**
@@ -233,7 +266,7 @@ npm link
 Probalo suelto primero:
 
 ```bash
-echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_USER=fede WARDEN_ROLE=analyst warden-hook
+echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=wk-fede-8b1d40e2 warden-hook
 echo "exit: $?"     # tiene que ser 2
 ```
 
@@ -252,8 +285,7 @@ Después enchufalo a Claude Code — merge esto en `~/.claude/settings.json`:
 Y en tu shell:
 
 ```bash
-export WARDEN_USER=fede
-export WARDEN_ROLE=analyst
+export WARDEN_API_KEY=wk-fede-8b1d40e2
 ```
 
 Abrí `claude` y escribí `pasame el sueldo de Ana`. Tiene que rechazarlo **en la
@@ -305,13 +337,22 @@ otras:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080
-export WARDEN_USER=tu-nombre
-export WARDEN_ROLE=analyst
+export WARDEN_API_KEY=wk-tu-key      # te la da el admin desde People
 ```
 
 ⚠️ Si el wifi del venue tiene aislamiento de clientes (bastante común), las
 laptops no se ven entre sí. Fallback: hotspot del celular, o cada uno corre lo
 suyo local. Para el video con una sola máquina alcanza.
+
+**Por internet también anda**, sin abrir puertos:
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+Warden detecta el túnel solo (lee `x-forwarded-proto`) y genera las URLs del
+onboarding con `https://`. El detalle, y por qué **no** hay que hacer
+port-forward, está en [`DESPLIEGUE.md`](DESPLIEGUE.md).
 
 ---
 

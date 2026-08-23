@@ -115,9 +115,12 @@ export function rulesForActor(spec: PolicySpec, actor: { id: string; role: strin
   // written for everyone — including the pinned injection rule — does not
   // quietly re-capture them.
   //
-  // This is only as strong as the identity behind `actor.role`, which is why
-  // both actor resolvers pass claimed roles through `claimableRole` first: an
-  // exempt role reaches here only from the directory, never from a header.
+  // This is only ever as strong as the identity behind `actor.role`, which is
+  // why it is safe now and was not when it was written: the role no longer
+  // arrives on a header a caller can set. It is read from the directory entry
+  // behind an API key the gateway issued, so exemption is something an admin
+  // grants rather than something a caller claims. If a header path is ever
+  // reintroduced, this line becomes a bypass again.
   if (isExempt(spec, actor.role)) return [];
   return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
 }
@@ -127,20 +130,13 @@ export function isExempt(spec: PolicySpec, role: string): boolean {
   return (spec.exemptRoles ?? DEFAULT_EXEMPT_ROLES).includes(role);
 }
 
-/**
- * The role a caller the directory has never seen is allowed to claim.
- *
- * Exemption is granted by the directory, never claimed. A claimed role arrives
- * from an environment variable on the caller's own machine, and an exempt role
- * is measured against nothing at all — so accepting the claim would let any
- * stranger opt out of the entire policy by typing `admin` into their shell
- * profile. A claimed role the policy exempts is therefore demoted to the same
- * default an absent claim gets. Anyone actually in the directory resolves to
- * their directory role first and never reaches this.
+/*
+ * `claimableRole()` lived here: it demoted a claimed exempt role so a stranger
+ * could not opt out of the policy with a header. It is gone because the header
+ * path is gone — a caller supplies a key and nothing else, so there is no
+ * claimed role left to demote. Kept as a note rather than dead code, because
+ * the hazard it existed for is one line away from returning.
  */
-export function claimableRole(spec: PolicySpec, claimed: string): string {
-  return isExempt(spec, claimed) ? 'employee' : claimed;
-}
 
 /**
  * Rules for a role, with no particular person in mind.

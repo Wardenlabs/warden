@@ -22,9 +22,10 @@ import {
   removeRole,
   rotateApiKey,
   upsertEmployee,
-  findEmployee
+  findEmployee,
+  actorForCredential
 } from '../policy/people.js';
-import { claimableRole, loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
+import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
 import { onboardingFor, supportedTools } from '../onboarding/index.js';
@@ -47,16 +48,17 @@ app.use(express.json({ limit: '4mb' }));
 
 /**
  * The console is served by this same process, so same-origin needs no CORS at
- * all. The wildcard that used to sit here let any web page an admin or employee
- * happened to visit read the directory — API keys included — and post policy
- * changes cross-origin. Serving web/ from a separate dev port is the one case
+ * all. The wildcard that used to sit here let any web page an admin happened to
+ * visit read the directory and post policy changes cross-origin — the admin API
+ * has no authentication, so the browser's origin check was the only thing
+ * standing in the way. Serving web/ from a separate dev port is the one case
  * that needs an exception, and it is opt-in and explicit.
  */
 const CORS_ORIGIN = process.env['WARDEN_CORS_ORIGIN'];
 if (CORS_ORIGIN) {
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', CORS_ORIGIN);
-    res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-warden-user, x-warden-role');
+    res.header('Access-Control-Allow-Headers', 'content-type, authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     next();
   });
@@ -70,6 +72,27 @@ try {
 } catch {
   /* seed file not present yet — the store stays empty, which is a valid state */
 }
+
+/**
+ * What an unrecognised key gets back.
+ *
+ * Shaped like a decision so the hook and the proxy can render it the same way
+ * they render any other refusal, and worded for the person reading it in their
+ * terminal — who is far more likely to have a stale key after a rotation than
+ * to be an intruder.
+ */
+const UNKNOWN_KEY = {
+  verdict: 'BLOCK' as const,
+  auditId: 'no-key',
+  error: 'unknown_api_key',
+  firedRules: [],
+  passes: [],
+  maskedPrompt: '',
+  maskedSpans: [],
+  explanation:
+    'Your Warden API key is not recognised by this gateway. ' +
+    'Ask your administrator for a current one — they can issue a new key from People.'
+};
 
 // ── Live decision stream (SSE) ───────────────────────────────────────────────
 // The console's right-hand trace subscribes here. Decisions are pushed as they
@@ -157,13 +180,8 @@ app.get('/api/people', (_req, res) => {
     // rules apply to this person" — the same one the guard uses.
     employees: dir.employees.map((e) => {
       const applicable = rulesForActor(policy, e);
-      // The key is deliberately not in the list. This response is the console's
-      // most-fetched endpoint and it was handing out every employee's proxy
-      // credential at once; one person's key is served by their own detail
-      // route, where the admin actually asked for it.
-      const { apiKey: _withheld, ...listed } = e;
       return {
-        ...listed,
+        ...e,
         ruleCount: applicable.length,
         personalRuleCount: applicable.filter((r) => r.appliesTo.includes(`@${e.id}`)).length,
         quota: policy.quotas.find((q) => q.role === e.role)?.maxRequestsPerDay ?? null,
@@ -279,21 +297,15 @@ app.delete('/api/policy/rules/:id', asyncRoute(async (req, res) => {
 
 // ── Guard check (used by the hook CLI) ───────────────────────────────────────
 app.post('/api/guard/check', asyncRoute(async (req, res) => {
+  const actor = resolveActor(req);
+  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+
   const decision = await evaluateRequest(req);
   // The hook names the tool it came from; that sighting is what the console's
-  // "connected" badges are built from. Only recorded for people the directory
-  // knows: the hook's default id is the literal string "unknown", and counting
-  // strangers would inflate "connected" — a number CLAUDE.md insists stays an
-  // observed fact — with identities that are not employees.
-  const claimedId = String(req.header('x-warden-user') ?? req.body?.actor?.id ?? '');
-  try {
-    const known = findEmployee(claimedId);
-    if (known) {
-      recordActivity(known.id, typeof req.body?.source === 'string' ? req.body.source : undefined);
-    }
-  } catch {
-    /* no directory yet — nothing to record against */
-  }
+  // "connected" badges are built from. `actor.id` comes from the key the
+  // gateway issued, so it is an employee by construction — the id no longer
+  // arrives on a header that could inflate the count with strangers.
+  recordActivity(actor.id, typeof req.body?.source === 'string' ? req.body.source : undefined);
   emitDecision(decision);
   res.json(decision);
 }));
@@ -339,7 +351,7 @@ app.post('/v1/chat/completions', asyncRoute(async (req, res) => {
 // ── red team ─────────────────────────────────────────────────────────────────
 // The last run is kept on disk so the console can show results without
 // re-running a suite that takes minutes against a real model.
-const RT_RESULT = 'data/redteam-last.json';
+const RT_RESULT = isMock() ? 'data/redteam-last.mock.json' : 'data/redteam-last.json';
 
 app.get('/api/redteam/report', (_req, res) => {
   const last = readSeedJson<unknown | null>(RT_RESULT, null);
@@ -359,34 +371,51 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   }
   redteamRunning = true;
   const { spawn } = await import('node:child_process');
-  const child = spawn('npx', ['tsx', 'src/redteam/runner.ts'], {
+  const { resolve } = await import('node:path');
+  // Invoke the installed TSX entry point through this exact Node runtime.
+  // Shell launchers (`npx`, `npm.cmd`) differ across platforms and can emit
+  // ENOENT/EINVAL on Windows when spawned without a shell.
+  const tsx = resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  const child = spawn(process.execPath, [tsx, 'src/redteam/runner.ts'], {
     cwd: process.cwd(),
     // The runner is a second process; sharing the server's audit file would
     // interleave two hash chains and "break" the log from ordinary use.
     env: { ...process.env, WARDEN_AUDIT_PATH: 'data/audit-redteam.jsonl' },
     stdio: 'ignore',
-    detached: false
+    detached: false,
+    windowsHide: true
   });
-  const done = new Promise<boolean>((r) => {
-    child.on('exit', () => { redteamRunning = false; r(true); });
-    // A missing npx emits 'error' with no listener, which would crash the
-    // whole gateway rather than failing this one request.
-    child.on('error', () => { redteamRunning = false; r(true); });
-  });
+  // The slot is released by the child ending, not by this request returning, so
+  // a run that outlives the response window still holds it. Registered once,
+  // before the race, because an 'error' with no listener at all — a missing
+  // runtime — would take down the whole gateway rather than failing this one
+  // request.
+  child.once('error', () => { redteamRunning = false; });
+  child.once('exit', () => { redteamRunning = false; });
+
   // Long enough that a mock run finishes inline; a real-model run keeps going
   // and the console picks it up from disk on the next "Load last report".
   let timer: NodeJS.Timeout | undefined;
-  const finished = await Promise.race([
-    done,
-    new Promise<boolean>((r) => {
-      timer = setTimeout(() => r(false), 120_000);
+  const outcome = await Promise.race([
+    new Promise<{ finished: true; error?: string }>((resolve) => {
+      child.once('error', (err) => resolve({ finished: true, error: err.message }));
+      child.once('exit', (code) => resolve({
+        finished: true,
+        error: code === 0 ? undefined : `runner exited with code ${code ?? 'unknown'}`
+      }));
+    }),
+    new Promise<{ finished: false }>((resolve) => {
+      timer = setTimeout(() => resolve({ finished: false }), 120_000);
     })
   ]);
   if (timer) clearTimeout(timer);
+  if (outcome.finished && outcome.error) {
+    return res.status(500).json({ error: `red-team run failed: ${outcome.error}` });
+  }
   const last = readSeedJson<unknown | null>(RT_RESULT, null);
   if (!last) {
-    return res.status(finished ? 500 : 202).json({
-      error: finished ? 'run produced no result' : 'still running — use Load last report in a minute'
+    return res.status(outcome.finished ? 500 : 202).json({
+      error: outcome.finished ? 'run produced no result' : 'still running — use Load last report in a minute'
     });
   }
   res.json(last);
@@ -394,8 +423,7 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
 
 // ── employee install ─────────────────────────────────────────────────────────
 // Three manual steps become one command. Every value an employee retypes is a
-// value they can get wrong, and these fail silently — a mistyped WARDEN_USER
-// does not error, it gets them judged as a stranger.
+// value they can get wrong, and an API key is the least forgiving of them.
 
 /**
  * The hook, served by the gateway itself.
@@ -432,13 +460,16 @@ app.get('/install/:employeeId', (req, res) => {
   }
 
   const url = gatewayUrl(req);
-  // The name appears in a script comment and an echo. It is admin-authored,
-  // but "admin-authored" reaches here through an API — strip anything that
-  // could close the comment or open a substitution rather than trusting it.
+  // The key is the identity, so it has to be here. That makes this URL a
+  // credential: it is only ever shown to the admin, inside the console, for a
+  // person who already exists. The alternative — the employee pasting a key by
+  // hand — is the step that gets mistyped.
+  //
+  // The name appears in a script comment and an echo, and this whole response
+  // is piped into `sh`. It is admin-authored, but "admin-authored" reaches here
+  // through an API, so anything that could close the comment or open a command
+  // substitution is stripped rather than trusted.
   const safeName = person.name.replace(/[^\p{L}\p{N} .,()-]/gu, '');
-  // Deliberately no API key. The hook does not use one, and a `curl | sh` that
-  // carries a credential leaves it in the shell history of every machine it
-  // touches.
   res.type('text/plain').send(`#!/bin/sh
 # Warden setup for ${safeName} (${person.role})
 set -e
@@ -462,7 +493,7 @@ fi
 cat >> "$PROFILE" <<'WARDEN_BLOCK'
 # >>> warden >>>
 export WARDEN_URL=${url}
-export WARDEN_USER=${person.id}
+export WARDEN_API_KEY=${person.apiKey}
 # <<< warden <<<
 WARDEN_BLOCK
 
@@ -508,12 +539,29 @@ app.listen(PORT, HOST, () => {
 function gatewayUrl(req: Request): string {
   const configured = process.env['WARDEN_PUBLIC_URL'];
   if (configured) return configured.replace(/\/$/, '');
-  // The Host header is attacker-writable and this URL is interpolated into
-  // shell scripts and generated configs, so only a plain host[:port] shape is
-  // accepted; anything else falls through to an interface address.
+  // The Host header is written by the caller, and this URL is interpolated into
+  // shell scripts and generated configs — so only a plain host[:port] shape is
+  // accepted here. Anything else falls through to an interface address rather
+  // than reaching a file somebody runs.
   const rawHost = req.header('host');
   const host = rawHost && /^[A-Za-z0-9.-]+(:\d+)?$/.test(rawHost) ? rawHost : undefined;
-  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) return `http://${host}`;
+  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) {
+    /**
+     * Behind a tunnel — Cloudflare, Tailscale Funnel, ngrok — the edge
+     * terminates TLS and forwards plain HTTP, so the scheme this process sees
+     * is not the scheme the employee needs. Hardcoding `http://` there produces
+     * an install command that fails on every machine except the one that
+     * generated it, which is the worst kind of wrong: it looks right in the
+     * console.
+     *
+     * `x-forwarded-proto` is set by the tunnel, not by the client, and it is
+     * only read to build a URL — nothing is authorised on it — so trusting it
+     * here costs nothing even if something else sets it.
+     */
+    const proto = req.header('x-forwarded-proto')?.split(',')[0]?.trim() ?? 'http';
+    return `${proto === 'https' ? 'https' : 'http'}://${host}`;
+  }
+
   // The console is open on the gateway machine itself, so localhost is what it
   // sees — but localhost is useless to everyone else. Prefer a LAN address.
   const lan = lanAddresses()[0];
@@ -563,6 +611,7 @@ async function optional<T>(specifier: string): Promise<T | null> {
  */
 async function evaluateRequest(req: Request): Promise<unknown> {
   const actor = resolveActor(req);
+  if (!actor) return null;
   const prompt = extractPrompt(req.body);
 
   const mod = await optional<{ evaluate: (a: unknown, i: unknown, p: unknown) => Promise<unknown> }>('../guard/pipeline.js');
@@ -586,26 +635,21 @@ async function evaluateRequest(req: Request): Promise<unknown> {
 }
 
 /**
- * Who is asking.
+ * Who is asking. The API key is the entire answer.
  *
- * The directory has the last word on the role. An employee sets WARDEN_ROLE on
- * their own machine, so a claimed role is a request, not a fact — if the header
- * decided it, anyone could pick the rule set they are judged against by editing
- * their shell profile. A caller the directory has never seen keeps the role they
- * claim, because a visitor with no entry is better judged by a plausible role
- * than by none at all — except an exempt role, which is measured against
- * nothing and is therefore never accepted on someone's own say-so.
+ * Nothing an employee can type identifies them. They do not send a name and do
+ * not send a role, because both were things they could edit — and a role you
+ * can edit is a role you can use to pick the rules that judge you. The admin
+ * issues a key, decides what it means, and can change the role behind it
+ * without the employee touching their machine. Rotating the key revokes the
+ * old one.
+ *
+ * Null means refuse. There is no default identity and no assumed role: a caller
+ * nobody can identify is not a caller to guess about.
  */
-function resolveActor(req: Request): { id: string; role: string } {
-  const id = String(req.header('x-warden-user') ?? req.body?.actor?.id ?? 'anon');
-  const claimed = String(req.header('x-warden-role') ?? req.body?.actor?.role ?? 'employee');
-  try {
-    const known = findEmployee(id);
-    if (known) return { id: known.id, role: known.role };
-  } catch {
-    /* no directory on disk yet — fall through to the claimed role */
-  }
-  return { id, role: claimableRole(loadPolicy(), claimed) };
+function resolveActor(req: Request): { id: string; role: string } | null {
+  const employee = actorForCredential(req.header('authorization'));
+  return employee ? { id: employee.id, role: employee.role } : null;
 }
 
 function extractPrompt(body: unknown): string {

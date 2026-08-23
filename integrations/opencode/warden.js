@@ -2,7 +2,7 @@
  * OpenCode plugin — route each chat message through Warden first.
  *
  * Install to ~/.config/opencode/plugin/warden.js and set WARDEN_URL and
- * WARDEN_USER in your shell profile, the same two variables every other
+ * WARDEN_API_KEY in your shell profile, the same two variables every other
  * integration reads.
  *
  * ⚠ UNVERIFIED. Nobody on this team has yet watched OpenCode refuse a prompt

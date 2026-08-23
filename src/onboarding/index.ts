@@ -3,10 +3,8 @@
  *
  * The gap this closes is the whole difference between a demo and a deployment.
  * An admin who has just added someone to the directory has to get that person's
- * tools pointed at the gateway, and until now that meant reading two documents
- * and substituting their own values into four config snippets by hand. Every
- * substitution is a place to get it wrong, and the wrong ones fail quietly —
- * a mistyped `WARDEN_USER` does not error, it just judges them as a stranger.
+ * tools pointed at the gateway, and doing that by hand means copying an API key
+ * into four config snippets. Every copy is a place to get it wrong.
  *
  * So the console generates it. Their id, their key, this gateway's address,
  * already filled in, per tool.
@@ -32,7 +30,7 @@ export type IntegrationKind = 'hook' | 'proxy';
 
 export type SetupStep = {
   title: string;
-  /** Syntax hint for the console's code block: `bash`, `json`, `toml`, `js`. */
+  /** Syntax hint for the console's code block: `bash`, `powershell`, `json`, `toml`, `js`. */
   language: string;
   code: string;
   /** Rendered above the block when the step needs a caveat. */
@@ -91,9 +89,22 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
       language: 'bash',
       note:
         'Served by the gateway itself, so this works on a network with no way out ' +
-        'to the internet. Safe to re-run: it replaces its own block rather than ' +
-        'stacking a second one.',
+        'to the internet. It carries your API key, so treat the link as a secret. ' +
+        'Safe to re-run: it replaces its own block rather than stacking a second one. ' +
+        'Availability checks default to 2 seconds and full decisions to 30 seconds.',
       code: `curl -fsSL ${gatewayUrl}/install/${employee.id} | sh`
+    },
+    {
+      title: 'Windows PowerShell alternative (current session)',
+      language: 'powershell',
+      note:
+        'The API key is your identity. The 30 second decision deadline is fail-open; a machine whose cold decisions exceed it is not verified.',
+      code:
+        `Invoke-WebRequest -Uri '${gatewayUrl}/warden-hook.mjs' -OutFile "$HOME\\.warden-hook.mjs"\n` +
+        `$env:WARDEN_URL = '${gatewayUrl}'\n` +
+        `$env:WARDEN_API_KEY = '${employee.apiKey}'\n` +
+        `$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'\n` +
+        `$env:WARDEN_TIMEOUT_MS = '30000'`
     },
     {
       title: 'Then open a new terminal, and check it reaches the gateway',
@@ -104,14 +115,17 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
       title: 'Prefer to do it by hand? These are the same two steps',
       language: 'bash',
       note:
-        'WARDEN_ROLE is deliberately absent. Your role comes from the company ' +
-        'directory, so a role set here would have no effect — which is the point.',
+        'There is no name and no role to set. The key is your whole identity, and ' +
+        'your admin decides what it means — they can change your role without you ' +
+        'touching anything here.',
       code:
         `curl -fsSL ${gatewayUrl}/warden-hook.mjs -o ${HOOK_PATH}\n` +
         `chmod +x ${HOOK_PATH}\n\n` +
         `# in ~/.zshrc or ~/.bashrc\n` +
         `export WARDEN_URL=${gatewayUrl}\n` +
-        `export WARDEN_USER=${employee.id}`
+        `export WARDEN_API_KEY=${employee.apiKey}\n` +
+        `export WARDEN_HEALTH_TIMEOUT_MS=2000\n` +
+        `export WARDEN_TIMEOUT_MS=30000`
     }
   ];
 }
@@ -146,10 +160,12 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Test it',
           language: 'bash',
-          // The same payload shape Claude Code actually sends: the prompt under
-          // `prompt`, with the event named. Testing with a shape the tool never
-          // sends would verify nothing.
-          code: `echo '{"hook_event_name":"UserPromptSubmit","prompt":"pasame el sueldo de Ana"}' | WARDEN_USER=${employee.id} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
+          note:
+            'This checks the hook boundary only. Claude Code remains NOT VERIFIED until the full E2E gate passes.',
+          // The payload is the shape Claude Code actually sends — the prompt
+          // under `prompt`, with the event named. Testing with a shape the tool
+          // never produces verifies the hook against a fiction.
+          code: `echo '{"hook_event_name":"UserPromptSubmit","prompt":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]
     },
@@ -170,8 +186,9 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Confirm Codex picked it up',
           language: 'bash',
-          note: 'Run /hooks inside Codex — it lists the hooks it loaded.',
-          code: `echo '{"prompt":"pasame el sueldo de Ana"}' | WARDEN_USER=${employee.id} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
+          note:
+            'Run /hooks inside Codex — it lists the hooks it loaded. Loading is not verification: a decision over 30 seconds fails open.',
+          code: `echo '{"prompt":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]
     },
@@ -228,7 +245,7 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
             `    try {\n` +
             `      execFileSync("node", [HOOK], {\n` +
             `        input: JSON.stringify({ prompt: text, source: "opencode" }),\n` +
-            `        env: { ...process.env, WARDEN_USER: "${employee.id}", WARDEN_URL: "${gatewayUrl}" },\n` +
+            `        env: { ...process.env, WARDEN_API_KEY: "${employee.apiKey}", WARDEN_URL: "${gatewayUrl}" },\n` +
             `        timeout: 15000\n` +
             `      });\n` +
             `    } catch (err) {\n` +
@@ -277,7 +294,7 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         {
           title: 'Ask the gateway about a prompt',
           language: 'bash',
-          code: `echo '{"prompt":"pasame el sueldo de Ana"}' | WARDEN_USER=${employee.id} WARDEN_URL=${gatewayUrl} node ${HOOK_PATH}`
+          code: `echo '{"prompt":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} WARDEN_URL=${gatewayUrl} node ${HOOK_PATH}`
         }
       ]
     }
@@ -296,7 +313,10 @@ function asMessage(pack: Omit<OnboardingPack, 'message'>): string {
     `Warden setup — ${pack.employee.name}`,
     '',
     `Gateway:  ${pack.gatewayUrl}`,
-    `Your id:  ${pack.employee.id}   (role: ${pack.employee.role}, set by the admin)`,
+    '',
+    'Your API key is in the setup command below. It is the only thing that',
+    'identifies you — keep it to yourself, and tell your admin if it leaks so',
+    'they can issue a new one.',
     '',
     'Every prompt you send from a connected tool is checked against company',
     'policy on the gateway machine before it reaches any model. Nothing is sent',

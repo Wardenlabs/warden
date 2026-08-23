@@ -54,22 +54,40 @@ Warden  (adapter=real)
   network   http://192.168.1.42:8080   <- teammates point here
 ```
 
-Each employee sets these (in `~/.zshrc`, `~/.bashrc`, or their shell profile):
+Each employee sets two variables (in `~/.zshrc`, `~/.bashrc`, or their shell
+profile). The installer writes them for you:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
-export WARDEN_USER=fede
-export WARDEN_ROLE=analyst                   # fallback only, see below
+export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by the admin
+export WARDEN_HEALTH_TIMEOUT_MS=2000
+export WARDEN_TIMEOUT_MS=30000
 ```
 
-`WARDEN_USER` is the field that matters. The gateway looks it up in the
-directory the admin manages in the console's People tab, and the role recorded
-there decides which rules and which quota apply — including any rule written for
-that person by name.
+PowerShell (current session):
 
-`WARDEN_ROLE` is only consulted for someone the directory has never seen. It is
-deliberately not authoritative: a role an employee can edit in their own shell
-profile is a role they could use to pick which rules judge them.
+```powershell
+$env:WARDEN_URL = 'http://192.168.1.42:8080'
+$env:WARDEN_API_KEY = 'wk-fede-8b1d40e2'
+$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
+$env:WARDEN_TIMEOUT_MS = '30000'
+```
+
+**The key is the whole identity.** No name, no role — nothing an employee can
+type says who they are. The admin issues the key, the directory records what it
+means, and the role behind it can change without the employee touching their
+machine.
+
+That is the point of doing it this way. A role in a shell profile is a role the
+employee can edit, and editing it would let them choose which rules judge them;
+an exempt role was a header away. A key they cannot forge closes that, and gives
+revocation for free: rotate it in the console and the old one stops working on
+the next prompt.
+
+A key the gateway does not recognise is **refused**, not judged under some
+default identity. Note the asymmetry with the gateway being *unreachable*, which
+still lets prompts through — see "Behaviour worth knowing" below. A gateway that
+answered has governed the request; one that never answered has not.
 
 ## 3. Claude Code
 
@@ -94,6 +112,9 @@ a refusal that does not land. The exit code is the part that always works.
 ## 4. Codex
 
 Merge `codex/config.toml` into `~/.codex/config.toml`:
+
+The format and exit-code behavior follow the official
+[`UserPromptSubmit` hook documentation](https://developers.openai.com/codex/hooks).
 
 ```toml
 [[hooks.UserPromptSubmit]]
@@ -154,6 +175,13 @@ bricking every developer's CLI at once, and a gateway that can strand the team
 gets uninstalled the first morning it does. The missing heartbeat in the admin
 console is the alert.
 
+Availability and inference use separate deadlines. `/health` gets 2 seconds by
+default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets 30 seconds
+(`WARDEN_TIMEOUT_MS`). Both values must be positive and finite. The decision
+deadline includes reading and validating the complete HTTP body. A decision
+that exceeds 30 seconds still fails open; on 2026-08-23 one cold Windows Codex
+check took 35.954 seconds and reached the model, so Codex remains NOT VERIFIED.
+
 **Secrets are masked before the guard sees them.** An API key pasted into a
 prompt is replaced with `[REDACTED:OpenAI key]` before any model runs, and only
 a short fragment (`sk-p…kL`) reaches the audit log. The raw value is never
@@ -202,8 +230,7 @@ does not use one, and a `curl | sh` with a credential in it leaves that
 credential in shell history.
 
 That matters because every value an admin retypes is a value they can get wrong,
-and the wrong ones fail silently — a mistyped `WARDEN_USER` does not error, it
-just gets that person judged as a stranger under whatever role they claim.
+and an API key is the least forgiving of them.
 
 ## Which tools, and how each one is governed
 
@@ -221,6 +248,11 @@ Only the last row has been. Everything else is wired from the tools' own
 documentation and tested at the hook boundary, which is not the same thing —
 [OPE-19](https://linear.app/operations-aleph/issue/OPE-19) is the card for
 closing that gap.
+
+The 2026-08-23 attempt did not close it. Claude Code blocked the six malicious
+cases but intermittently blocked benign traffic and its OAuth session had
+expired. Codex loaded the hook, but a cold decision exceeded 30 seconds and the
+prompt reached the model. See [`../docs/HOOK-VERIFICATION.md`](../docs/HOOK-VERIFICATION.md).
 
 **Hook or proxy** is the distinction that decides whether a tool can be governed
 on a subscription at all. A hook runs on the employee's machine before the

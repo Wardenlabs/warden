@@ -107,6 +107,32 @@ function keyMatches(stored: string, presented: string): boolean {
 }
 
 /**
+ * Who is calling, from an `Authorization: Bearer …` header.
+ *
+ * The key is the whole identity. An employee does not send a name and does not
+ * send a role — they do not need to know either, and anything they can type is
+ * something they can change. The admin decides what a key means, and can change
+ * the role behind it without the employee touching their machine.
+ *
+ * Returns null for a missing, malformed, or unrecognised key, and callers must
+ * refuse rather than fall back to a default identity. A caller nobody can
+ * identify is not a caller to guess about: an unknown actor allowed through
+ * under some assumed role is exactly the hole this replaced.
+ */
+export function actorForCredential(authorization: string | undefined): Employee | null {
+  const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1]?.trim();
+  if (!bearer) return null;
+  try {
+    return findByApiKey(bearer);
+  } catch {
+    // No directory on disk yet. Nobody is known, so nobody is admitted — the
+    // safe direction, and it surfaces as a clear refusal rather than as a
+    // gateway quietly admitting everyone.
+    return null;
+  }
+}
+
+/**
  * Add someone, or update them if the id already exists.
  *
  * The role is checked against the known list rather than accepted as typed. A

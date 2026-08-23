@@ -19,7 +19,7 @@ tiene los modelos; las demás sólo bajan un archivo de 4 KB.
 ```bash
 git clone https://github.com/MartinPuli/operations-aleph
 cd operations-aleph
-npm install
+npm ci
 npm run setup
 npm run dev
 ```
@@ -40,7 +40,7 @@ Ahora abrí `http://localhost:8080`.
 escribís en castellano y las compila el modelo. Preview, Activate, listo.
 
 **Pestaña People** — cargá a tu gente. Nombre + rol → Add, y te devuelve el
-`WARDEN_USER` y la API key de esa persona. Si te falta un rol, lo creás abajo
+la API key de esa persona — que es toda su identidad. Si te falta un rol, lo creás abajo
 con su cuota diaria. Haciendo click en alguien ves todas las reglas que lo
 juzgan, podés escribirle una que aplique **sólo a él**, y abajo tenés su
 **Onboarding**: el comando de una línea listo para copiar y la config por
@@ -57,14 +57,19 @@ Abajo del botón está la misma cosa por herramienta —Claude Code, Codex, Curs
 OpenCode, cualquier otra— cada bloque con su botón de copiar.
 
 Por qué generado y no a mano: cada valor que retipeás es uno que podés errar, y
-estos fallan en silencio. Un `WARDEN_USER` mal escrito no da error, simplemente
-hace que a esa persona la juzguen como a un desconocido.
+una API key es el peor de todos para copiar a mano.
 
-El rol **no** se lo mandás: sale del directorio. Si el empleado pone
-`WARDEN_ROLE` en su máquina, el gateway lo ignora para cualquiera que esté
-cargado en People — un rol que el empleado puede editar en su `.zshrc` es un rol
-con el que podría elegir qué reglas lo juzgan. `WARDEN_ROLE` sólo se usa como
-fallback para alguien que no está en el directorio.
+**Sólo le mandás la key.** No hay nombre ni rol que el empleado configure: la
+key es toda su identidad. Vos decidís qué significa, y podés cambiarle el rol
+sin que toque nada en su máquina.
+
+Por qué así: un rol en el `.zshrc` es un rol que el empleado puede editar, y
+editándolo elegiría qué reglas lo juzgan. Con la key eso no existe. Y te da la
+revocación gratis — rotás la key en la consola y la vieja deja de andar en el
+próximo prompt.
+
+Una key que el gateway no conoce **no entra**. No la juzga con un rol por
+defecto: la rechaza.
 
 ## Quién está conectado de verdad
 
@@ -92,7 +97,7 @@ curl -fsSL http://192.168.1.42:8080/install/fede | sh
 ```
 
 Eso baja el hook **del gateway** (no de internet — funciona en una red sin
-salida) y escribe `WARDEN_URL` y `WARDEN_USER` en tu perfil de shell. Se puede
+salida) y escribe `WARDEN_URL` y `WARDEN_API_KEY` en tu perfil de shell. Se puede
 volver a correr las veces que quieras: reemplaza su propio bloque en vez de
 apilar otro.
 
@@ -101,12 +106,34 @@ Onboarding.
 
 Después abrí una terminal nueva, o `source ~/.zshrc`.
 
+El hook usa por defecto 2 segundos para comprobar disponibilidad y 30 segundos
+para una decisión completa. Sólo hace falta exportarlos si querés cambiarlos:
+
+```bash
+export WARDEN_HEALTH_TIMEOUT_MS=2000
+export WARDEN_TIMEOUT_MS=30000
+```
+
 > El hook es un archivo, sin dependencias. Lee el prompt, se lo pregunta al
 > gateway, y devuelve sí o no.
 
-> No lleva `WARDEN_ROLE`: tu rol sale del directorio. Si lo ponés a mano, el
-> gateway lo ignora — un rol que podés editar en tu `.zshrc` es un rol con el
-> que podrías elegir qué reglas te juzgan.
+> No hay nombre ni rol que configures: la key es toda tu identidad. Tu admin
+> decide qué significa. Y como el link del instalador lleva tu key adentro,
+> tratalo como un secreto.
+
+En Windows PowerShell, para la sesión actual:
+
+```powershell
+$env:WARDEN_URL = 'http://192.168.1.42:8080'
+$env:WARDEN_USER = 'fede'
+$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
+$env:WARDEN_TIMEOUT_MS = '30000'
+```
+
+El health check tiene 2 s y la decisión completa 30 s. El segundo timeout
+incluye headers, lectura y validación del body. Los valores deben ser positivos
+y finitos. Si la decisión supera 30 s, el diseño fail-open deja pasar el prompt
+con advertencia; por eso una máquina que cruza ese límite no está verificada.
 
 ## 3a. Conectar Claude Code
 
@@ -154,8 +181,10 @@ $ claude
    Audit: a7f3c2
 ```
 
-Un prompt normal pasa sin decir nada. Si no ves ninguna diferencia, el hook no
-está cargando — mirá "Cuando no anda" abajo.
+Un prompt normal debe pasar sin mensajes del hook. El 2026-08-23 este gate no
+fue reproducible: hubo falsos positivos benignos y una decisión Codex fría de
+35.954 s llegó al modelo. Ambos clientes siguen NOT VERIFIED; ver
+[`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
 
 ---
 
@@ -205,7 +234,7 @@ Lo que sí deja cambiar el `base_url` va por el proxy, sin hook:
 
 ```bash
 export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
-export OPENAI_API_KEY=wk-fede-8b1d40e2      # la key personal de Warden
+export OPENAI_API_KEY=wk-fede-8b1d40e2      # la misma key de Warden
 ```
 
 La key de cada empleado está en su ficha en la pestaña People (y se puede rotar
@@ -237,8 +266,8 @@ Ojo: **el prompt pasa igual**, con la advertencia. Es a propósito: un gateway
 caído no puede dejar a todo el equipo sin poder trabajar.
 
 **El wifi del venue no deja que las laptops se vean**
-Bastante común. Alternativas: hotspot del celular, Tailscale, o que cada uno
-corra su propio Warden local (`WARDEN_URL=http://localhost:8080`).
+Bastante común. Alternativas: hotspot del celular, Tailscale (ver abajo), o que
+cada uno corra su propio Warden local (`WARDEN_URL=http://localhost:8080`).
 
 **Tarda mucho al apretar Enter**
 El gateway está en CPU. En la máquina del gateway: `WARDEN_TOP_K=1 npm run dev`
@@ -246,3 +275,76 @@ evalúa menos reglas por prompt y va bastante más rápido.
 
 **Sacar el hook**
 Borrá el bloque `hooks` del settings y listo. Nada más queda instalado.
+
+---
+
+# Por internet, no sólo por LAN
+
+Sí se puede, y para una empresa con gente remota es lo que corresponde. Pero
+**no abriendo el puerto en el router.**
+
+## Por qué no port-forward
+
+Warden habla **HTTP plano** y la identidad es una **bearer key**. Expuesto
+directo a internet, cada prompt de cada empleado y cada API key viajan en texto
+claro, y cualquiera que escanee el puerto encuentra un endpoint que responde.
+Eso convierte la puerta que instalaste para protegerte en el agujero más grande
+que tenés.
+
+Necesitás que algo termine TLS adelante. Dos formas, las dos gratis.
+
+## Opción A — Tailscale (la que recomiendo)
+
+Red privada entre las máquinas, cifrada, sin exponer nada a internet. El gateway
+y las laptops se ven como si estuvieran en la misma LAN, estén donde estén.
+
+```bash
+# en la máquina del gateway
+tailscale up
+tailscale ip -4          # p. ej. 100.101.102.103
+```
+
+Y arrancás Warden diciéndole cuál es su dirección, para que el onboarding la
+genere bien:
+
+```bash
+WARDEN_PUBLIC_URL=http://100.101.102.103:8080 npm run dev
+```
+
+Nada queda expuesto: sólo entran las máquinas que agregaste a tu tailnet.
+
+## Opción B — Cloudflare Tunnel (si necesitás una URL pública)
+
+Te da un hostname con HTTPS sin abrir ningún puerto. Sirve si tenés gente que no
+podés meter en una VPN.
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+# te devuelve https://algo-random.trycloudflare.com
+```
+
+Warden **detecta el túnel solo**: lee `x-forwarded-proto` y genera las URLs del
+onboarding con `https://`. No hace falta configurar nada. Si querés fijar el
+hostname:
+
+```bash
+WARDEN_PUBLIC_URL=https://warden.tuempresa.com npm run dev
+```
+
+⚠️ Con una URL pública, cualquiera puede llegar al endpoint. Lo que lo protege
+es que **una key desconocida se rechaza** — pero la consola de admin en `/`
+queda accesible también. Para uso real ponele Cloudflare Access adelante, o usá
+la opción A.
+
+## Lo que falta para producción de verdad
+
+Dicho derecho, porque el gateway todavía no lo hace solo:
+
+- **No termina TLS.** Depende de que el túnel o la VPN lo hagan.
+- **La consola de admin no tiene login.** Cualquiera que llegue al puerto la
+  abre y puede editar la política. En LAN de confianza es aceptable; expuesta,
+  no.
+- **Las keys se guardan en claro** en `data/company.json`. Un hash serviría para
+  autenticar, pero el admin no podría volver a mostrarlas, y mostrarlas es lo
+  que hace usable el onboarding. Es un intercambio consciente para un gateway
+  que corre en una máquina de la empresa, no una omisión.
