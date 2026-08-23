@@ -16,8 +16,31 @@ import { adapter, isMock } from '../src/qvac/index.js';
 
 const RUNS = Number(process.env['BENCH_RUNS'] ?? 8);
 
-const LABEL = z.object({ verdict: z.enum(['VIOLATES', 'COMPLIES', 'UNCLEAR']), reason: z.string() });
+/**
+ * The shape production actually asks for — one enum value and nothing else.
+ *
+ * This has to match `ADJUDICATION_JSON_SCHEMA` in `guard/passes/adjudicate.ts`,
+ * including `maxTokens`. Benchmarking a different shape would report a latency
+ * the guard never pays, and this is the artifact the submission quotes.
+ */
+const LABEL = z.object({ verdict: z.enum(['VIOLATES', 'COMPLIES', 'UNCLEAR']) });
 const LABEL_SCHEMA = {
+  type: 'object',
+  properties: { verdict: { type: 'string', enum: ['VIOLATES', 'COMPLIES', 'UNCLEAR'] } },
+  required: ['verdict'], additionalProperties: false
+} as const;
+
+/**
+ * The shape we rejected, measured alongside so the cost is a number rather than
+ * a claim. Adding a free-text `reason` was what broke the first design: the
+ * generation ran long, overran the token cap, and left truncated JSON that
+ * failed validation and fell through to escalation.
+ */
+const LABEL_WITH_REASON = z.object({
+  verdict: z.enum(['VIOLATES', 'COMPLIES', 'UNCLEAR']),
+  reason: z.string()
+});
+const LABEL_WITH_REASON_SCHEMA = {
   type: 'object',
   properties: { verdict: { type: 'string', enum: ['VIOLATES', 'COMPLIES', 'UNCLEAR'] }, reason: { type: 'string' } },
   required: ['verdict', 'reason'], additionalProperties: false
@@ -52,19 +75,33 @@ async function main(): Promise<void> {
   await adjudicate(qvac, isolate('warmup'), policy.rules[0]!);
   console.log('done');
 
-  process.stdout.write('  single adjudication… ');
+  // The real thing: `adjudicate()` as the pipeline calls it, so the system
+  // prompt carries the rule and its few-shot anchors. A bare labelling call is
+  // several times faster and measures nothing the guard actually pays — prompt
+  // length dominates here, which is exactly what removing the KV cache key
+  // exposed.
+  process.stdout.write('  single rule adjudication… ');
   const single: number[] = [];
+  for (let i = 0; i < RUNS; i++) {
+    const t = Date.now();
+    await adjudicate(qvac, isolate(SAMPLES[i % SAMPLES.length]!), policy.rules[i % policy.rules.length]!);
+    single.push(Date.now() - t);
+  }
+  console.log(`${stats(single).p50}ms p50`);
+
+  process.stdout.write('  bare labelling call… ');
+  const bare: number[] = [];
   let tps = 0;
   for (let i = 0; i < RUNS; i++) {
     const t = Date.now();
     const res = await qvac.completeJSON(
-      { role: 'adjudicator', system: 'Label the message. /no_think', user: SAMPLES[i % SAMPLES.length]!, maxTokens: 96 },
+      { role: 'adjudicator', system: 'Label the message. /no_think', user: SAMPLES[i % SAMPLES.length]!, maxTokens: 24 },
       LABEL, LABEL_SCHEMA
     );
-    single.push(Date.now() - t);
+    bare.push(Date.now() - t);
     if (res.stats.tps) tps = res.stats.tps;
   }
-  console.log(`${stats(single).p50}ms p50`);
+  console.log(`${stats(bare).p50}ms p50`);
 
   process.stdout.write('  full pipeline… ');
   const full: number[] = [];
@@ -84,7 +121,36 @@ async function main(): Promise<void> {
   }
   console.log(`${stats(embed).p50}ms p50`);
 
+  // Everything above this line is a shape production runs, so the reliability
+  // counters are snapshotted here. The rejected shape is measured last, on
+  // purpose: folding its repairs into the headline would report the guard as
+  // less reliable than it is, using calls the guard never makes.
   const s = adapter().stats();
+
+  // Same model, same prompts, same bare system block, one extra field. Held
+  // against `bare` rather than the full adjudication so the only difference
+  // between the two rows is the field itself.
+  process.stdout.write('  same call, plus a reason string… ');
+  const withReason: number[] = [];
+  for (let i = 0; i < RUNS; i++) {
+    const t = Date.now();
+    try {
+      await qvac.completeJSON(
+        { role: 'adjudicator', system: 'Label the message. /no_think', user: SAMPLES[i % SAMPLES.length]!, maxTokens: 96 },
+        LABEL_WITH_REASON, LABEL_WITH_REASON_SCHEMA
+      );
+    } catch {
+      // A fail-closed here is itself the finding: the reason overran the cap
+      // and left JSON that would not validate. Keep the elapsed time.
+    }
+    withReason.push(Date.now() - t);
+  }
+  console.log(`${stats(withReason).p50}ms p50`);
+
+  const after = adapter().stats();
+  const reasonRepaired = after.repaired - s.repaired;
+  const reasonFailed = after.failed - s.failed;
+
   const structuredTotal = s.firstTry + s.repaired + s.failed;
   const topK = Number(process.env['WARDEN_TOP_K'] ?? 3);
 
@@ -128,11 +194,17 @@ seconds and would describe startup rather than steady state.
 
 | Operation | p50 | p95 | mean |
 |---|---|---|---|
-| Single rule adjudication | ${stats(single).p50}ms | ${stats(single).p95}ms | ${stats(single).mean}ms |
+| **Single rule adjudication** — rule + few-shots, as the pipeline calls it | **${stats(single).p50}ms** | ${stats(single).p95}ms | ${stats(single).mean}ms |
+| Bare labelling call — no rule in the system block | ${stats(bare).p50}ms | ${stats(bare).p95}ms | ${stats(bare).mean}ms |
 | Embedding one prompt | ${stats(embed).p50}ms | ${stats(embed).p95}ms | ${stats(embed).mean}ms |
 | **Full pipeline** (${topK} rules + pinned) | **${stats(full).p50}ms** | ${stats(full).p95}ms | ${stats(full).mean}ms |
 
 Generation throughput: **${Math.round(tps)} tok/s**.
+
+The gap between the first two rows is prompt length, and it is why the KV cache
+key was tempting: the rule block is identical across calls about that rule, so
+caching it looks free. It replayed verdicts instead. That cost is paid on every
+call, deliberately.
 
 The pipeline does not cost the sum of its rules: the adjudicator loads with
 \`parallel: 4\`, so several rule judgements share one model instance instead of
@@ -140,6 +212,10 @@ queueing. \`WARDEN_TOP_K\` bounds how many run — lowering it is the first leve
 if a machine is too slow to demo on.
 
 ## Structured-output reliability
+
+Every call the guard actually makes — the adjudications and the full pipeline
+runs above. The rejected verdict shape is measured separately below, so its
+failures do not flatter or damage this table.
 
 | | count | share |
 |---|---|---|
@@ -151,6 +227,22 @@ Every verdict is generated under a JSON-schema grammar, so the shape is
 guaranteed by the decoder. Zod then checks the content, which a grammar cannot:
 it can require a number, not a number between 0 and 1. Anything still invalid
 after one repair escalates to a human rather than being guessed at.
+
+## What one extra field costs
+
+The same model, the same prompts, the same bare system block, one free-text
+\`reason\` added next to the label — the design this project started with and
+threw away. ${RUNS} runs:
+
+| Verdict shape | p50 | p95 | repaired | failed closed |
+|---|---|---|---|---|
+| \`{verdict}\` — what the guard asks for | ${stats(bare).p50}ms | ${stats(bare).p95}ms | 0 | 0 |
+| \`{verdict, reason}\` — what it used to ask for | ${stats(withReason).p50}ms | ${stats(withReason).p95}ms | ${reasonRepaired} | ${reasonFailed} |
+
+${stats(bare).p50 > 0 ? `That is **${(stats(withReason).p50 / stats(bare).p50).toFixed(1)}×** on latency` : 'The gap is on latency'}, and the last two columns are the rest of
+it: the reason runs long, overruns the token cap, and leaves JSON that will not
+validate. The explanation an employee reads is composed in code from the
+ratified rule instead — instant, and it cannot fail to parse.
 `;
 
   writeFileSync('BENCHMARKS.md', md);

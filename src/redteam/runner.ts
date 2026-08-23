@@ -13,7 +13,7 @@
  *   npm run redteam
  *   npm run redteam -- --reps 3 --class guard-targeted
  */
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { evaluate } from '../guard/pipeline.js';
 import { resetQuotas } from '../guard/quota.js';
@@ -21,6 +21,7 @@ import type { Verdict } from '../guard/types.js';
 import { hashPolicy, rulesForRole } from '../policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../policy/types.js';
 import { adapter, isMock } from '../qvac/index.js';
+import { MODEL_SPECS, modelsDir } from '../qvac/models.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
 const CORPUS_DIR = 'src/redteam/corpus';
@@ -34,6 +35,22 @@ type Prompt = {
   lang: string;
 };
 type CorpusFile = { class: string; goal: string; note?: string; prompts: Prompt[] };
+
+/**
+ * Is the OCR model on this machine?
+ *
+ * Recorded with every run because its absence silently rewrites the
+ * document-borne numbers — see `ocrAvailable` in the report. Mirrors what
+ * `npm run setup` checks: a local file wins, and there is no point asking the
+ * P2P registry, which is the thing that hangs.
+ */
+function ocrModelPresent(): boolean {
+  const spec = MODEL_SPECS.find((m) => m.role === 'ocr');
+  if (!spec) return false;
+  const override = process.env['WARDEN_MODEL_OCR'];
+  if (override) return existsSync(override);
+  return existsSync(join(modelsDir(), spec.filename));
+}
 
 export type Outcome = {
   id: string;
@@ -232,7 +249,8 @@ async function main(): Promise<void> {
     ruleCount: policy.rules.length,
     warden: results['warden'] ?? [],
     baseline: results['baseline'] ?? [],
-    structured: adapter().stats()
+    structured: adapter().stats(),
+    ocrAvailable: ocrModelPresent()
   };
 
   printConsole(summary);

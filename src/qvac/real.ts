@@ -32,6 +32,45 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const CANCEL_GRACE_MS = 5_000;
 
 /**
+ * Deadlines for the two SDK calls that are not generations.
+ *
+ * `completion()` had a hard stop and these did not, which is a distinction the
+ * caller cannot see and an attacker can. Retrieval embeds the whole prompt, so
+ * a long enough message parks the embedder — measured here at 13 minutes on one
+ * `volume-distraction` prompt, against a 14ms p50 for a normal one. The guard
+ * request behind it waits, the hook hits its own 30s deadline, and it fails
+ * open by design. That turns "send a very large prompt" into a bypass, which is
+ * exactly what that corpus class is built to try.
+ *
+ * Both are generous — 700x the measured p50 for embedding — because the point
+ * is to bound a hang, not to fail slow work.
+ */
+const EMBED_TIMEOUT_MS = 10_000;
+const OCR_TIMEOUT_MS = 30_000;
+
+/**
+ * Reject once `ms` has passed, whatever the underlying call is doing.
+ *
+ * This frees the caller, not the worker: neither `embed()` nor `ocr()` takes a
+ * request id, so there is nothing to cancel and the abandoned work keeps a core
+ * busy until it finishes on its own. Bounding the guard's latency is worth that
+ * — every caller resolves a throw here to a stricter verdict, and a pass that
+ * never returns has no verdict at all.
+ */
+async function withDeadline<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} did not return within ${ms}ms`)), ms);
+  });
+  work.catch(() => {});
+  try {
+    return await Promise.race([work, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Fixed seed and zero temperature by default.
  *
  * Guard verdicts should not vary run to run, and the red-team numbers are only
@@ -96,7 +135,7 @@ export class RealQvacAdapter implements QvacAdapter {
   async embed(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     const modelId = await modelFor('embedder');
-    const res = await embed({ modelId, text: texts });
+    const res = await withDeadline(embed({ modelId, text: texts }), EMBED_TIMEOUT_MS, 'embed');
 
     // The SDK returns a bare vector for one input and a matrix for many.
     const raw = res.embedding as number[] | number[][];
@@ -108,7 +147,8 @@ export class RealQvacAdapter implements QvacAdapter {
     const modelId = await modelFor('ocr');
     // `ocr()` returns synchronously with promises inside; the blocks arrive later.
     const { blocks } = ocr({ modelId, image: imagePath, options: { paragraph: true } });
-    return (await blocks).map((b) => b.text).join('\n');
+    const read = await withDeadline(blocks, OCR_TIMEOUT_MS, 'ocr');
+    return read.map((b) => b.text).join('\n');
   }
 
   stats(): { firstTry: number; repaired: number; failed: number } {

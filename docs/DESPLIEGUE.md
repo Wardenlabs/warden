@@ -234,7 +234,7 @@ Lo que sí deja cambiar el `base_url` va por el proxy, sin hook:
 
 ```bash
 export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
-export OPENAI_API_KEY=wk-fede-8b1d40e2      # la misma key de Warden
+export OPENAI_API_KEY=wk-fede-PEGA-LA-TUYA      # la misma key de Warden
 ```
 
 La key de cada empleado está en su ficha en la pestaña People (y se puede rotar

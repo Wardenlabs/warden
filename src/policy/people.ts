@@ -12,6 +12,10 @@
  * once from `data/seed/company.json` and then owned by the admin console —
  * the seed file stays pristine so a fresh clone always demonstrates the same
  * company, and so `git status` stays quiet while someone plays with the app.
+ *
+ * The seed names people and roles; it carries no keys. Those are issued on the
+ * first run — see `loadDirectory()` for why a committed key is a published
+ * credential rather than a convenience.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -58,8 +62,37 @@ export function loadDirectory(): Directory {
   }
 
   const seeded = readIfPresent(SEED_PATH);
-  cached = seeded ?? EMPTY;
-  return cached;
+  if (!seeded) {
+    cached = EMPTY;
+    return cached;
+  }
+
+  /**
+   * Every key is issued here, on first run, and never shipped.
+   *
+   * The seed is a committed file in a public repository, so a key written into
+   * it is a published credential: the same string would authenticate on every
+   * install that had not rotated it. That is sharpest for the seeded admin,
+   * whose role sits in `exemptRoles` and is therefore measured against no rules
+   * at all — a working bypass, printed in the repo, for a product whose whole
+   * claim is that prompts are judged.
+   *
+   * So the seed carries placeholders and this issues the real ones, which also
+   * means no two installs share a key and the demo company can stay committed.
+   */
+  const issued: Directory = {
+    ...seeded,
+    employees: seeded.employees.map((e) => ({ ...e, apiKey: newApiKey(e.id) }))
+  };
+
+  try {
+    return save(issued);
+  } catch {
+    // A read-only checkout still gets a working directory for this process;
+    // the keys simply do not survive a restart.
+    cached = issued;
+    return cached;
+  }
 }
 
 function readIfPresent(path: string): Directory | null {

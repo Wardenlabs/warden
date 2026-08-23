@@ -363,6 +363,12 @@ The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays
 pristine, so a fresh clone always demonstrates the same company.
 
+**The seed names people and roles, and carries no keys.** Those are issued on
+the first run, so no two installs share one. A key committed to a public
+repository is a published credential rather than a convenience — and the
+sharpest case is the seeded admin, whose role is in `exemptRoles` and is
+therefore measured against no rules at all.
+
 ---
 
 ## What else the gateway does
