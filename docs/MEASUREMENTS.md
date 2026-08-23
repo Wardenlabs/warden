@@ -12,6 +12,13 @@ Both columns or neither. A guard that refuses everything scores 100% on attacks
 and is unusable, and every idea that lowered the false-positive rate here was
 also capable of lowering it by switching a rule off.
 
+**Do not put the false-positive percentage on a screen.** Every row here is one
+repetition, n is 16 to 18, and two identical runs of `benign-controls` at
+temperature 0 gave 44% and 31%. The number that survives repetition is the
+attribution, not the rate: one pinned rule refuses eight of every nine
+legitimate requests, and that held before and after the deterministic detector
+was wired.
+
 **A single repetition is not a result.** Two identical runs of `benign-controls`
 against the same policy at temperature 0 gave 44% and 31%: `parallel: 4` batches
 concurrent adjudications and the batch composition moves the numerics. With
@@ -27,6 +34,18 @@ difference bigger than that, and mostly they support none.
 | 2026-08-23 | `MIN_RELEVANCE=0` | `f6c75794` | **70/82 (85%)** | **7/16 (44%)** | 1 | First run against the pinned benchmark policy. The floor exists but is off, so this is the reference point for it |
 | 2026-08-23 | `MIN_RELEVANCE=0.5` | `f6c75794` | ~flat (+1 authority-spoofing, −1 document-borne) | 8/16 (50%) | 1 | No measurable effect, and it lost an attack. Floor stays off |
 | 2026-08-23 | `hadMetaInstructions` wired + Spanish in the pattern | `f6c75794` | **74/82 (90%)** | 8/16 (50%) | 1 | +4 attacks. `volume-distraction` 25% → 75%, `direct-override` 88% → 100%. False positives moved by one prompt and none is attributed to a structural concern — `r-instruction-override` still causes 8 of 9 |
+
+**Everything above this line counts prompts differently from everything below.**
+`Count attacks and controls per prompt` landed in between and moved the
+denominators from 82 and 16 to 80 and 18. Rows cannot be compared across it —
+an earlier attempt to measure the pin straddled that commit and had to be
+thrown away. The rows below are the current base.
+
+| Date | Config | Policy | Attacks stopped | False positives | Reps | Note |
+|---|---|---|---|---|---|---|
+| 2026-08-23 | baseline, current code | `f6c75794` | 70/80 (88%) | 8/18 (44%) | 1 | The reference every row below is measured against |
+| 2026-08-23 | `r-instruction-override` removed from the policy | — | 63/80 (79%) | 5/18 (28%) | 1 | The only change all day larger than one prompt. A bad trade: seven attacks for three refusals |
+| 2026-08-23 | span required with every VIOLATES | `f6c75794` | 69/80 (86%) | 10/18 (56%) | 1 | Both worse. Reverted |
 
 The policy hash changed between the two dates because the benchmark stopped
 reading `data/policies.json`. The older rows measured whatever rules happened to
