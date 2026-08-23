@@ -33,19 +33,36 @@ export type AggregateResult = {
   explanation: string;
 };
 
-/** Structural signals strong enough to escalate on their own. */
-function structuralConcerns(flags: IsolationFlags): string[] {
+/**
+ * Structural signals strong enough to escalate on their own.
+ *
+ * The first three are tamper evidence: invisible characters, faked conversation
+ * turns, homoglyph mixes. Nobody types those by accident and no rule has to
+ * authorise noticing them, so they stand on their own.
+ *
+ * `hadMetaInstructions` is different, and the difference was found by an admin
+ * deleting a rule and watching the behaviour survive it. That signal is *about*
+ * something — instruction override — and the policy is where the company says
+ * whether it cares. A guard that keeps enforcing a rule after the admin removed
+ * it has quietly stopped being governed by the policy, and the admin has no
+ * object left to point at: the refusal names no rule, because there is none.
+ *
+ * So it is admitted only while a pinned rule is in force. `pinned` is the marker
+ * for a rule that must be judged on every prompt regardless of similarity, which
+ * is the always-on security class this signal serves. Remove those rules and the
+ * signal goes quiet with them — which is what the admin asked for by removing
+ * them.
+ *
+ * An admin who pins an unrelated rule keeps the detector on. That is harmless:
+ * it only ever adds evidence, and never blocks on its own.
+ */
+function structuralConcerns(flags: IsolationFlags, rules: Rule[]): string[] {
   const concerns: string[] = [];
-  // Each of these is a deliberate act, not something ordinary text does by
-  // accident, so they are worth a human look even when no rule fired.
   if (flags.hadInvisibleChars) concerns.push('invisible characters');
   if (flags.hadRoleMarkers) concerns.push('embedded conversation-role markers');
-  // Computed on every request since pass 0 was written, and until now thrown
-  // away — the one deterministic signal aimed squarely at instruction override
-  // was the only flag that never reached a decision. It costs nothing, cannot be
-  // argued down by anything in the message, and measured 0 false positives
-  // across all 16 benign controls while matching 5 of 8 direct-override attacks.
-  if (flags.hadMetaInstructions) concerns.push('phrasing aimed at the instruction layer');
+  if (flags.hadMetaInstructions && rules.some((r) => r.pinned)) {
+    concerns.push('phrasing aimed at the instruction layer');
+  }
   if (flags.nonAsciiRatio > 0.4 && flags.length > 40) concerns.push('unusual character mix');
   return concerns;
 }
@@ -118,7 +135,7 @@ export function aggregate(input: AggregateInput): AggregateResult {
     });
   }
 
-  const concerns = structuralConcerns(flags);
+  const concerns = structuralConcerns(flags, rules);
   if (concerns.length > 0) verdict = tighten(verdict, 'ESCALATE');
 
   // Doubt plus a structural signal is worth a human; either alone is not.
@@ -192,7 +209,13 @@ function explain(verdict: Verdict, fired: FiredRule[], concerns: string[]): stri
     lines.push(`(${fired.length - 1} other rule${fired.length > 2 ? 's' : ''} also matched.)`);
   }
   if (verdict === 'ESCALATE') {
-    lines.push('Held for an administrator to review — you have not been refused, just queued.');
+    // Now a description of something that happens. The queue this refers to was
+    // an empty array and a stub for most of this project's life, which made
+    // this the most confident sentence in the product and the least true one.
+    lines.push(
+      'Held for an administrator to review — you have not been refused, just queued. ' +
+        'When they answer, ask again: an approved request goes through on its own merits.'
+    );
   }
 
   return lines.join('\n');

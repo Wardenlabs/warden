@@ -343,6 +343,12 @@
       <div class="sub">Quotas by role</div>
       <div id="quotas"></div>
 
+      <!-- Prompts the policy held for a person to answer. Half the severity
+           model ends here, so it sits with the rules rather than in a tab
+           nobody opens. -->
+      <div class="sub">Held for review <span id="escalationCount" class="tag"></span></div>
+      <div id="escalations"></div>
+
       <!-- Employees who said a block was wrong. It sits here, under the rules,
            because the rule that fired is what an admin has to come and edit. -->
       <div class="sub">Reported as wrong</div>

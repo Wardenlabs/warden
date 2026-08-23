@@ -75,7 +75,98 @@ async function boot() {
   await refreshPeople();
   await loadPresets();
   await refreshAppeals();
+  await refreshEscalations();
   subscribe();
+}
+
+/**
+ * The review queue — the destination `ESCALATE` always claimed to have.
+ *
+ * An escalation is not a refusal and must not read like one. The person was
+ * not told no; they were told to wait, and this is the screen where somebody
+ * ends that wait. What an answer here does and does not do is spelled out on
+ * the card, because "approved" is the word most likely to be read as "and it
+ * went through", which is not what happens.
+ */
+async function refreshEscalations() {
+  const el = $('escalations');
+  if (!el) return;
+
+  const { ok, j } = await api('/api/escalations');
+  const badge = $('escalationCount');
+  if (!ok || !Array.isArray(j)) {
+    el.innerHTML = `<div class="note">Could not load the queue: ${esc(j?.error ?? 'error')}</div>`;
+    if (badge) badge.textContent = '';
+    return;
+  }
+
+  const pending = j.filter((e) => !e.review);
+  if (badge) {
+    badge.textContent = pending.length ? `${pending.length} waiting` : '';
+    badge.className = pending.length ? 'tag escalate' : '';
+    badge.style.display = pending.length ? '' : 'none';
+  }
+
+  if (j.length === 0) {
+    el.innerHTML = '<div class="note">Nothing held. Rules with severity “escalate” land here.</div>';
+    return;
+  }
+
+  // Pending first: this is a work queue, and the answered ones are history.
+  const ordered = [...pending, ...j.filter((e) => e.review)];
+  el.innerHTML = ordered
+    .map(
+      (e) => `
+      <div class="rule" style="margin-top:8px">
+        <div class="t">${e.ruleText ? esc(e.ruleText) : '<span class="note">held without a named rule</span>'}</div>
+        <div class="m">
+          <span class="tag">${esc(e.employeeName ?? e.employeeId)} · ${esc(e.role)}</span>
+          ${e.review
+            ? `<span class="tag ${e.review.outcome === 'approved' ? '' : 'block'}">${esc(e.review.outcome)}</span>`
+            : '<span class="tag escalate">waiting</span>'}
+          <span class="note">audit ${esc(e.auditId)} · ${esc(String(e.at).slice(0, 16).replace('T', ' '))}</span>
+        </div>
+        ${e.employeeNote ? `<div class="note" style="margin-top:7px"><b>They added:</b> ${esc(e.employeeNote)}</div>` : ''}
+        ${e.review?.note ? `<div class="note" style="margin-top:7px"><b>Answer:</b> ${esc(e.review.note)}</div>` : ''}
+        ${e.review
+          ? ''
+          : `<div class="row">
+               <button class="act" data-approve="${esc(e.auditId)}">Approve</button>
+               <button class="ghost danger" data-refuse="${esc(e.auditId)}">Refuse</button>
+             </div>
+             <div class="note" style="margin-top:6px">Approving does not release the original prompt — their tool moved on seconds after they pressed Enter. It answers them, and the next ask is judged on its own merits.</div>`}
+      </div>`
+    )
+    .join('');
+
+  for (const btn of el.querySelectorAll('[data-approve], [data-refuse]')) {
+    btn.onclick = () => answerEscalation(btn);
+  }
+}
+
+async function answerEscalation(btn) {
+  const approved = btn.hasAttribute('data-approve');
+  const auditId = btn.getAttribute(approved ? 'data-approve' : 'data-refuse');
+  const note = window.prompt(
+    approved
+      ? 'Anything to tell them? (optional — they see this)'
+      : 'Why is it refused? (optional — they see this)'
+  );
+  // Cancel means cancel. An empty string is a deliberate "no note".
+  if (note === null) return;
+
+  btn.disabled = true;
+  const { ok, j } = await api(`/api/escalations/${encodeURIComponent(auditId)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ outcome: approved ? 'approved' : 'refused', ...(note ? { note } : {}) })
+  });
+  if (!ok) {
+    btn.disabled = false;
+    alert(j?.error ?? 'could not record that');
+    return;
+  }
+  await refreshEscalations();
 }
 
 /**
@@ -862,7 +953,12 @@ async function send() {
 
   const el = append('warden', label, why, cls);
   if (j.verdict !== 'ALLOW') {
-    wireFeedback(el, { prompt: text, auditId: j.auditId, hasRule: Boolean(rule) });
+    wireFeedback(el, {
+      prompt: text,
+      auditId: j.auditId,
+      hasRule: Boolean(rule),
+      verdict: j.verdict
+    });
   }
 }
 
@@ -875,7 +971,7 @@ async function send() {
  * and because a measured share of them are simply wrong and only the person
  * who was stopped knows which.
  */
-function wireFeedback(el, { prompt, auditId, hasRule }) {
+function wireFeedback(el, { prompt, auditId, hasRule, verdict }) {
   const row = el.querySelector('[data-actions]');
   const out = el.querySelector('[data-feedback]');
   if (!row) return;
@@ -890,10 +986,16 @@ function wireFeedback(el, { prompt, auditId, hasRule }) {
     row.append(rewrite);
   }
 
+  // A held prompt was not refused, and offering "this block was wrong" for one
+  // would be arguing with a decision nobody has made yet. What helps there is
+  // the context the reviewer does not have — the audit log kept the prompt's
+  // hash, not the prompt, so their own words are the only way it reaches the
+  // person answering.
+  const held = verdict === 'ESCALATE';
   const appeal = document.createElement('button');
   appeal.className = 'ghost';
-  appeal.textContent = 'This block was wrong';
-  appeal.onclick = () => openAppeal(appeal, out, auditId);
+  appeal.textContent = held ? 'Add context for the reviewer' : 'This block was wrong';
+  appeal.onclick = () => openAppeal(appeal, out, auditId, held);
   row.append(appeal);
 }
 
@@ -964,11 +1066,11 @@ async function requestRewrite(btn, out, { prompt, auditId }) {
 }
 
 /** Say the block was wrong, with an optional note for whoever owns the rule. */
-function openAppeal(btn, out, auditId) {
+function openAppeal(btn, out, auditId, held = false) {
   btn.disabled = true;
   const box = document.createElement('div');
   box.innerHTML = `
-    <div class="why" style="margin-top:9px"><b>What was this for?</b></div>
+    <div class="why" style="margin-top:9px"><b>${held ? 'What should the reviewer know?' : 'What was this for?'}</b></div>
     <textarea data-note rows="2" placeholder="optional — e.g. it was the aggregate forecast, not one person's pay"></textarea>
     <div class="note">This note is stored and shown to your administrator. Your prompt is not — the log keeps its hash, not its text.</div>
     <div class="row"><button class="act" data-send-appeal>Send</button></div>`;
@@ -986,9 +1088,9 @@ function openAppeal(btn, out, auditId) {
       body: JSON.stringify({ auditId, ...(note ? { note } : {}) })
     });
     box.innerHTML = ok
-      ? '<div class="why" style="margin-top:9px">Reported. Your administrator sees this next to the rule that fired.</div>'
+      ? `<div class="why" style="margin-top:9px">${held ? 'Sent. It shows up beside your request in the review queue.' : 'Reported. Your administrator sees this next to the rule that fired.'}</div>`
       : `<div class="why" style="margin-top:9px">${esc(j?.error ?? 'could not report it')}</div>`;
-    if (ok) await refreshAppeals();
+    if (ok) { await refreshAppeals(); await refreshEscalations(); }
   };
 }
 
@@ -1013,6 +1115,9 @@ function subscribe() {
     let payload; try { payload = JSON.parse(e.data); } catch { return; }
     if (payload.type !== 'decision') return;
     renderTrace(payload.decision);
+    // A queue that only fills on reload looks broken in the one demo where
+    // somebody is watching it fill.
+    if (payload.decision?.verdict === 'ESCALATE') void refreshEscalations();
   };
 }
 
