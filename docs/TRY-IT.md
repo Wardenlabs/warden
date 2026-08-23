@@ -266,7 +266,7 @@ npm link
 Probalo suelto primero:
 
 ```bash
-echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=wk-fede-8b1d40e2 warden-hook
+echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=wk-fede-PEGA-LA-TUYA warden-hook
 echo "exit: $?"     # tiene que ser 2
 ```
 
@@ -285,7 +285,7 @@ Después enchufalo a Claude Code — merge esto en `~/.claude/settings.json`:
 Y en tu shell:
 
 ```bash
-export WARDEN_API_KEY=wk-fede-8b1d40e2
+export WARDEN_API_KEY=wk-fede-PEGA-LA-TUYA
 ```
 
 Abrí `claude` y escribí `pasame el sueldo de Ana`. Tiene que rechazarlo **en la
