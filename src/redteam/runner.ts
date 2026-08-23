@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { evaluate } from '../guard/pipeline.js';
+import { resetQuotas } from '../guard/quota.js';
 import type { Verdict } from '../guard/types.js';
 import { loadPolicy, rulesForRole, seedIfEmpty } from '../policy/store.js';
 import { adapter, isMock } from '../qvac/index.js';
@@ -80,6 +81,13 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
   const text = prompt.turns ? prompt.turns.join('\n') : (prompt.text ?? '');
   const started = Date.now();
 
+  // The harness measures the guard's judging, not the daily counter. Left
+  // running, the test actor's quota (100/day in the seed policy) exhausts
+  // mid-run — the 98-prompt corpus at `--reps 3` is 294 warden evaluations —
+  // and every prompt after that is scored on a quota BLOCK that involved no
+  // model at all: attacks "stopped" and controls "refused" by an empty counter.
+  resetQuotas();
+
   let got: Verdict;
   let firedRule: string | undefined;
   let firedRules: string[] = [];
@@ -124,7 +132,8 @@ async function runPrompt(prompt: Prompt, mode: 'warden' | 'baseline'): Promise<O
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const reps = Number(argValue(args, '--reps') ?? 1);
+  const repsRaw = Number(argValue(args, '--reps') ?? 1);
+  const reps = Number.isFinite(repsRaw) && repsRaw >= 1 ? Math.floor(repsRaw) : 1;
   const only = argValue(args, '--class');
   const modes: ('warden' | 'baseline')[] = args.includes('--no-baseline')
     ? ['warden']
@@ -133,6 +142,12 @@ async function main(): Promise<void> {
   seedIfEmpty('data/seed/policies.seed.json');
   const policy = loadPolicy();
   const corpus = loadCorpus(only);
+  if (corpus.length === 0) {
+    // A typo'd --class must not overwrite REPORT.md with a report about nothing.
+    console.error(`no corpus class matches ${only ? `"${only}"` : 'the filter'} — nothing run, nothing written`);
+    process.exitCode = 1;
+    return;
+  }
   const total = corpus.reduce((n, c) => n + c.prompts.length, 0) * reps * modes.length;
 
   console.log(`\nred team — ${corpus.length} classes, ${total} evaluations, adapter=${isMock() ? 'mock' : 'real'}`);
@@ -177,17 +192,30 @@ async function main(): Promise<void> {
   };
 
   printConsole(summary);
-  writeReport(summary);
-  // Persist the structured result too, so the console can render it without
-  // parsing markdown or re-running the suite.
-  writeFileSync('data/redteam-last.json', JSON.stringify(summary, null, 2));
-  console.log('\nwrote REPORT.md\n');
+  // A filtered run is a probe, not the project's headline artifact: it writes
+  // its own file and leaves REPORT.md — and the console's last full run — as
+  // they were. `npm run redteam -- --class benign-controls` used to replace
+  // both with a report whose attack table was empty.
+  const reportPath = only ? `REPORT.${only}.md` : 'REPORT.md';
+  writeReport(summary, reportPath);
+  if (!only) {
+    // Persist the structured result too, so the console can render it without
+    // parsing markdown or re-running the suite.
+    writeFileSync('data/redteam-last.json', JSON.stringify(summary, null, 2));
+  }
+  console.log(`\nwrote ${reportPath}\n`);
   await adapter().dispose();
 }
 
 function summarise(file: CorpusFile, outcomes: Outcome[]): ClassResult {
-  const isControl = file.class === 'benign-controls' || outcomes.every((o) => o.expect === 'ALLOW');
+  const isControl = outcomes.every((o) => o.expect === 'ALLOW');
   const times = outcomes.map((o) => o.ms).sort((a, b) => a - b);
+  // Attack and control tallies are per prompt, not per file: a class can mix
+  // both (document-borne carries two clean invoices among its attacks), and
+  // bucketing whole files miscounted a correctly-allowed control as a stopped
+  // attack while its false positives fell out of every table.
+  const attacks = outcomes.filter((o) => o.expect !== 'ALLOW');
+  const controls = outcomes.filter((o) => o.expect === 'ALLOW');
   return {
     class: file.class,
     goal: file.goal,
@@ -196,6 +224,10 @@ function summarise(file: CorpusFile, outcomes: Outcome[]): ClassResult {
     correct: outcomes.filter((o) => o.correct).length,
     missed: outcomes.filter((o) => o.missed).length,
     falsePositives: outcomes.filter((o) => o.falsePositive).length,
+    attacks: attacks.length,
+    attacksStopped: attacks.filter((o) => o.correct).length,
+    controls: controls.length,
+    controlsAllowed: controls.filter((o) => o.correct).length,
     p50: times[Math.floor(times.length * 0.5)] ?? 0,
     p95: times[Math.floor(times.length * 0.95)] ?? 0,
     failures: outcomes.filter((o) => !o.correct).map((o) => ({
@@ -211,9 +243,10 @@ function summarise(file: CorpusFile, outcomes: Outcome[]): ClassResult {
 }
 
 function printConsole(s: RunSummary): void {
+  const pct = (n: number, d: number) => (d === 0 ? '  —' : `${Math.round((n / d) * 100)}%`);
   const row = (c: ClassResult, b?: ClassResult) => {
-    const rate = (r: ClassResult) => `${Math.round((r.correct / r.total) * 100)}%`;
-    const label = c.isControl ? 'allowed' : 'stopped';
+    const rate = (r: ClassResult) => pct(r.correct, r.total);
+    const label = c.isControl ? 'allowed' : 'correct';
     return `  ${c.class.padEnd(24)} ${rate(c).padStart(5)} ${label}` +
            (b ? `   baseline ${rate(b).padStart(5)}` : '');
   };
@@ -223,16 +256,14 @@ function printConsole(s: RunSummary): void {
     console.log(row(c, s.baseline.find((x) => x.class === c.class)));
   }
 
-  const attacks = s.warden.filter((c) => !c.isControl);
-  const controls = s.warden.filter((c) => c.isControl);
-  const caught = attacks.reduce((n, c) => n + c.correct, 0);
-  const attackTotal = attacks.reduce((n, c) => n + c.total, 0);
-  const fp = controls.reduce((n, c) => n + c.falsePositives, 0);
-  const controlTotal = controls.reduce((n, c) => n + c.total, 0);
+  const caught = s.warden.reduce((n, c) => n + c.attacksStopped, 0);
+  const attackTotal = s.warden.reduce((n, c) => n + c.attacks, 0);
+  const fp = s.warden.reduce((n, c) => n + c.falsePositives, 0);
+  const controlTotal = s.warden.reduce((n, c) => n + c.controls, 0);
 
   console.log(`
-  attacks stopped        ${caught}/${attackTotal}  (${Math.round((caught / attackTotal) * 100)}%)
-  false positives        ${fp}/${controlTotal}  (${controlTotal ? Math.round((fp / controlTotal) * 100) : 0}%)
+  attacks stopped        ${caught}/${attackTotal}  (${pct(caught, attackTotal)})
+  false positives        ${fp}/${controlTotal}  (${pct(fp, controlTotal)})
   structured output      ${s.structured.firstTry} first-try · ${s.structured.repaired} repaired · ${s.structured.failed} failed
   wall clock             ${(s.durationMs / 1000).toFixed(1)}s`);
 }
