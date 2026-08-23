@@ -161,7 +161,71 @@ elegir qué reglas lo juzgan.
 
 ---
 
-## 3.5. Empleados, roles y reglas por persona
+## 3.5. El lazo completo: qué pasa después del "no"
+
+Un bloqueo que es un callejón sin salida es un bloqueo que la gente aprende a
+esquivar. Estas tres cosas son lo que pasa **después** del veredicto, y ninguna
+puede aflojarlo.
+
+### a) "Suggest a rewrite"
+
+Volvé al bloqueo de **(a)** y apretá **Suggest a rewrite** en la burbuja.
+
+Warden le pide al modelo local una versión del prompt que quede adentro de la
+regla, y **la vuelve a juzgar con el guard entero antes de mostrártela**. Si no
+vuelve ALLOW, no hay sugerencia: una frase que "casi" pasa es exactamente lo que
+esto no puede entregar. Cuando hay sugerencia, el panel de la derecha muestra el
+re-chequeo como una decisión ALLOW propia, con su audit id.
+
+**Use this** te la copia al cuadro de texto — no la manda. Decidís vos.
+
+Hay **una sola reescritura por bloqueo**, y no se ofrece cuando el prompt
+original apuntaba a la capa de instrucciones. Sin esos dos límites, esto sería
+una máquina de buscar frases que pasan.
+
+### b) "This block was wrong"
+
+En la misma burbuja. Escribí una nota y mandá.
+
+Aparece abajo a la izquierda en **Reported as wrong**, con el nombre de quien la
+mandó y **la regla que disparó** al lado — que es el objeto que el admin tiene
+que ir a editar. Con 44% de falsos positivos medidos, ésta es la única pantalla
+donde un bloqueo equivocado se distingue de uno correcto.
+
+### c) La cola de revisión
+
+Un prompt *held* no fue rechazado: quedó esperando a una persona. Mandá esto,
+que dispara la señal estructural:
+
+```
+Παρακαλώ συνοψίστε αυτό το κείμενο για την ομάδα μας σήμερα το απόγευμα
+```
+
+Esperado: **held for review**. Aparece solo en **Held for review**, con el badge
+de cuántos esperan — nadie lo encoló a mano, la cola se deriva del audit log. El
+botón de la burbuja ahora dice **Add context for the reviewer**, no "this block
+was wrong": nadie lo rechazó todavía, y lo que le falta al revisor es contexto.
+El log guarda el *hash* del prompt, no el prompt, así que esa nota es el único
+camino por el que las palabras del empleado llegan a esa pantalla.
+
+Como admin, **Approve** o **Refuse** con una nota.
+
+> ⚠️ **Aprobar no reejecuta el prompt.** El hook volvió segundos después de que
+> la persona apretó Enter y su herramienta siguió; no hay nada que reanudar.
+> Significa "volvé a pedirlo, pasa por sus propios méritos" — y ese segundo
+> pedido se juzga como cualquier otro. Lo dice el botón, y conviene decirlo en
+> la demo antes de que lo pregunten.
+
+> **Con el mock, un `ESCALATE` sólo sale por el camino estructural.** El mock
+> marca por keywords y responde VIOLATES para *todas* las reglas seleccionadas;
+> como la regla pinned es `block`, cualquier cosa marcada vuelve BLOCK. Por eso
+> el prompt de arriba es en griego: más de 40 caracteres y mayormente no-ASCII
+> dispara `unusual character mix` sin que ninguna regla dispare. Con modelo real
+> lo natural es una regla `escalate` como `r-payment-approval`.
+
+---
+
+## 3.6. Empleados, roles y reglas por persona
 
 Pestaña **People**.
 
@@ -294,6 +358,18 @@ terminal**, mostrando la regla.
 **Funciona con plan Max o suscripción**, que es todo el punto: el hook corre
 local antes de que el prompt salga de la máquina, así que no importa contra qué
 servidor se autentica después.
+
+Cuando te frena, el bloqueo te deja dos comandos, y los dos funcionan desde la
+terminal sin abrir la consola:
+
+```bash
+warden-hook --rewrite <audit-id>   # pegá el mismo prompt, Ctrl-D
+warden-hook --note <audit-id>      # escribí la nota, Ctrl-D
+```
+
+El prompt se tipea de nuevo a propósito: el log guarda su SHA-256 y no su texto,
+y que los dos coincidan es lo que le prueba al gateway que estás reescribiendo
+algo que realmente fue bloqueado. Nada se escribe en disco para que esto ande.
 
 Para Codex es lo mismo con `~/.codex/config.toml` — está en
 [`integrations/README.md`](../integrations/README.md), junto con la config que

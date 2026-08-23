@@ -85,6 +85,14 @@ appears in the console under the rule that fired — which is the thing an admin
 has to edit, and the only view where a false positive is distinguishable from a
 correct block.
 
+Both land somewhere. A reported block shows up in the admin console **under the
+rule that fired**, which is the object they have to edit — and at the measured
+false-positive rate, that screen is the only place where a wrong block is
+distinguishable from a right one. A held prompt lands in a review queue the
+admin answers from the same page. That is the whole loop: a refusal the employee
+can act on, a signal the admin can act on, and a rule that gets better because
+somebody was stopped by it.
+
 > **Observed against the mock adapter, end to end** — console, hook, gate and
 > re-check — and **not yet with a real model**, so nothing here claims what a
 > real rewrite proposes. `npx tsx scripts/probe-rewrite.ts` is the harness that
@@ -389,6 +397,9 @@ therefore measured against no rules at all.
 | | |
 |---|---|
 | **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
+| **Held for review** | `ESCALATE` is half the severity model, and it now has somewhere to go. The queue is *derived from the audit log*, so every held prompt appears without the employee doing anything, and the admin answers it — approve or refuse, with a note — from the console. Approving does **not** replay the original prompt: the hook returned seconds after the employee pressed Enter and their tool moved on. It means "ask again, and it is judged on its own merits", which is the only version of this that does not smuggle an un-judged ALLOW into the pipeline. |
+| **Reported as wrong** | An employee can mark a block as a mistake and it reaches the admin next to the rule that produced it. The audit log keeps a prompt's hash and not its text, so their note is the only path by which their own words reach that screen — and it is the only place a false positive is visible as one. |
+| **Answers judged too** | Rules scoped `output` are enforced against what the model *says*, through the same isolate → retrieve → adjudicate → aggregate. On the proxy only: through the hook, Warden runs before the prompt is sent and never sees the response. A policy with output rules buffers the answer instead of streaming it, because a token cannot be recalled. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
 | **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
@@ -418,28 +429,50 @@ the corpus is too easy, not that the guard is airtight.
 
 ### The numbers
 
-Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition:
+Full corpus, real model (Qwen3-1.7B Q4_0 on CPU), policy `f6c75794`, **two
+repetitions** — 392 evaluations, 38 minutes:
 
 | | Warden | Baseline |
 |---|---|---|
-| Attacks stopped | **66/82 · 80%** | 2/82 · 2% |
-| False positives on legitimate traffic | **7/16 · 44%** | 0/16 · 0% |
-| Structured output | 294 first-try · 0 repaired · 0 failed | |
+| Attacks stopped | **137/160 · 86%** | 0/160 · 0% |
+| False positives on legitimate traffic | **17/36 · 47%** | 0/36 · 0% |
+| Structured output | 784 first-try · 0 repaired · 0 failed | |
 
 Both rows, together, on purpose. The first is the argument: a system prompt
-stops 2% of these because a system prompt is a request, not a control. The
+stops none of these, because a system prompt is a request, not a control. The
 second is the honest cost, and it is **not shippable** — a gateway that refuses
-44% of honest work gets uninstalled in a week.
+47% of honest work gets uninstalled in a week.
 
-That number is the open problem, and the investigation into it — including three
+That number is the open problem, and the investigation into it — including four
 hypotheses measured and rejected, and the lead that is still live — is written up
 in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
 
-Two caveats that qualify every number above. Runs are **not reproducible**: two
-identical runs of the same policy at temperature 0 gave 44% and 31%, because
-`parallel: 4` batches concurrent adjudications and batch composition changes the
-numerics. And n=16 on the control class means one prompt is six points. Use
-`--reps 2` at minimum before believing a difference.
+Three caveats that qualify every number above.
+
+Runs are **not reproducible**: two identical runs of the same policy at
+temperature 0 gave 44% and 31%, because `parallel: 4` batches concurrent
+adjudications and batch composition changes the numerics. This run is two
+repetitions for that reason; treat a difference smaller than a few points as
+noise.
+
+The OCR model **was not available on the machine that ran this**, so twelve
+attachments could not be read. An unreadable attachment fails closed, which
+moves both columns and earns neither — `document-borne` shows 8/8 stopped with
+nothing having read the documents, and its clean invoices count as false
+positives for the same reason. [`REPORT.md`](REPORT.md) says so where the number
+appears; `OCR_LATIN` has no HTTPS mirror and arrives only over the P2P registry.
+
+And every generated number carries the commit that produced it. If
+`git log <that sha>..HEAD -- src/redteam` lists anything, the harness has moved
+and the table is describing something that no longer runs.
+
+One thing that check does not catch yet, so it is stated here. This run was
+measured **before `Rule.scope` was read by anything**, when a rule scoped to
+*outputs* was still being adjudicated against every *input*. The report says so
+in its own attribution table without knowing it: `r-legal-commitment`, the only
+`output` rule in the policy, blocked 2 of 17 legitimate requests. It cannot do
+that any more — it no longer sees an input at all. What that is worth against
+the headline is unmeasured and needs `--reps 3` on a machine with the models.
 
 ### What we learned about small models
 
@@ -507,22 +540,24 @@ searching for the call rather than trusting a number, and refuses to emit links
 for a commit that has not been pushed.
 
 <!-- permalinks:start -->
-Pinned to [`5cac1e20b97d`](https://github.com/MartinPuli/operations-aleph/tree/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed). Line numbers move; a commit does not.
+Pinned to [`38a4b8174abb`](https://github.com/MartinPuli/operations-aleph/tree/38a4b8174abb765653756c33688ebe7abad612dc). Line numbers move; a commit does not.
 
 | Where | What runs there |
 |---|---|
-| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
-| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
-| [`src/qvac/real.ts L130-L155`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L130-L155) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
-| [`src/qvac/real.ts L99`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L99) | `embed()` — the vectors behind rule retrieval. |
-| [`src/qvac/real.ts L110`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L110) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
-| [`src/qvac/client.ts L119-L128`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/client.ts#L119-L128) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator. |
-| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
-| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
-| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
-| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
-| [`src/guard/pipeline.ts L76`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
-| [`src/guard/aggregate.ts L47`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/aggregate.ts#L47) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
+| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
+| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
+| [`src/qvac/real.ts L150-L175`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/real.ts#L150-L175) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
+| [`src/qvac/real.ts L118`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/real.ts#L118) | `embed()` — the vectors behind rule retrieval, under a hard deadline. |
+| [`src/qvac/real.ts L129-L130`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/real.ts#L129-L130) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
+| [`src/qvac/client.ts L169-L176`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/client.ts#L169-L176) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator — under the deadline that covers the download too. |
+| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
+| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
+| [`src/guard/output.ts L83`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/guard/output.ts#L83) | The same judgement, applied to what the model *answered*. Output-scoped rules only, on the proxy path. |
+| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
+| [`src/guard/rewrite.ts L233-L247`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/guard/rewrite.ts#L233-L247) | The one generation an employee reads — off the decision path, on request, and re-judged by the full guard before it is shown. |
+| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
+| [`src/guard/pipeline.ts L76`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
+| [`src/guard/aggregate.ts L70`](https://github.com/MartinPuli/operations-aleph/blob/38a4b8174abb765653756c33688ebe7abad612dc/src/guard/aggregate.ts#L70) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
 <!-- permalinks:end -->
 
 ### Models and capabilities used

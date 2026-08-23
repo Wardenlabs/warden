@@ -58,19 +58,23 @@ const ANCHORS: Anchor[] = [
   },
   {
     file: 'src/qvac/real.ts',
-    from: /const res = await embed\(\{/,
-    what: '`embed()` — the vectors behind rule retrieval.'
+    // Anchored on the SDK call itself rather than the assignment: `withDeadline`
+    // wrapped it mid-project and the old pattern stopped matching, which broke
+    // the one table the track's judges are told to look at first.
+    from: /await withDeadline\(embed\(\{/,
+    what: '`embed()` — the vectors behind rule retrieval, under a hard deadline.'
   },
   {
     file: 'src/qvac/real.ts',
     from: /const \{ blocks \} = ocr\(\{/,
+    through: /await withDeadline\(blocks, OCR_TIMEOUT_MS, 'ocr'\);/,
     what: '`ocr()` — text out of an attachment, before it is treated as untrusted input.'
   },
   {
     file: 'src/qvac/client.ts',
-    from: /const loading = loadModel\(\{/,
-    through: /^\s*\}\);/,
-    what: '`loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator.'
+    from: /const loading = withDeadline\($/,
+    through: /`loading the \$\{role\} model`/,
+    what: '`loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator — under the deadline that covers the download too.'
   },
   {
     file: 'src/qvac/models.ts',
@@ -85,10 +89,21 @@ const ANCHORS: Anchor[] = [
     what: 'The per-rule judgement: one narrow question, one enum label. The measured core of the project.'
   },
   {
+    file: 'src/guard/output.ts',
+    from: /const \{ verdicts, traces \} = await adjudicateAll\(qvac, iso, selected\.rules\);/,
+    what: 'The same judgement, applied to what the model *answered*. Output-scoped rules only, on the proxy path.'
+  },
+  {
     file: 'src/policy/compile.ts',
     from: /const res = await qvac\.completeJSON<RuleDraft>\(/,
     through: /^\s*\);/,
     what: 'Plain language → structured rule. The model drafts; ratifying stays a human step.'
+  },
+  {
+    file: 'src/guard/rewrite.ts',
+    from: /const res = await qvac\.completeJSON\(/,
+    through: /^\s*\);/,
+    what: 'The one generation an employee reads — off the decision path, on request, and re-judged by the full guard before it is shown.'
   },
   {
     file: 'src/policy/index.ts',

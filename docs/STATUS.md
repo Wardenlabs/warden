@@ -190,6 +190,19 @@ behind a restrictive network.
 on a public address — which is why the deployment notes push Tailscale over a
 port forward. Stated in the README's Limits.
 
+## La entrega
+
+Cierra **domingo 23, 12:00 ART**. Lo que pide la página, contra lo que hay:
+
+| Requisito | Estado |
+|---|---|
+| Código open source + README | ✅ el repo es público, el README es el documento |
+| Ventana de commits (todo escrito durante el hackathon) | ✅ primer commit 22-Ago 16:21 ART, con el evento abierto desde las 12:00 |
+| Contratos desplegados | N/A — no hay |
+| Track seleccionada en el form | ⬜ **QVAC**, acordarse al enviar |
+| **Video de 3 minutos** | ⬜ guion listo en [`DEMO.md`](DEMO.md), falta grabarlo |
+| Permalinks del README pineados al commit final | ⬜ `npm run permalinks -- --write`, **después** del último push |
+
 ## Needs a human
 
 | Who | What |
@@ -198,6 +211,7 @@ port forward. Stated in the README's Limits.
 | Fede | OPE-19 — re-authenticate Claude, and retest Codex only once cold decisions stay under 30 s. Until a run clears the gate, `verified: false` stands and the console says so on every tool. |
 | Jere | OPE-20 — improvised attacks + clean-clone check by someone who did not build it |
 | Gastón | The false-positive investigation above — start with `--reps 3` on `benign-controls` before and after the `scope` filter, which is a candidate cause nobody had counted |
+| Quien corrió el corpus | `REPORT.md` quedó sellado con `539a544`, que es el commit que lo **renderizó** a las 08:44 — el run fue a las 07:59. `7ed7db6` arregló el sello; falta re-renderizar desde `data/redteam-last.json`, que sólo está en esa máquina. Hasta entonces el sello dice 45 minutos de más, y el run es anterior al filtro de `scope`. |
 | Whoever has a model | `npx tsx scripts/probe-rewrite.ts` and one proxy call with an `output` rule in force. Both paths are verified against the mock only. |
 | Martin | OPE-12 — `npm run benchmark` and `npm run redteam` on the demo machine, pin the permalinks to a SHA, record, submit |
 

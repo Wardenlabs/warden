@@ -69,6 +69,19 @@ export type RunSummary = {
    * Optional so a summary saved before this existed still renders.
    */
   unreadableAttachments?: number;
+  /**
+   * The commit the corpus actually ran under.
+   *
+   * Recorded at run time rather than read at render time, because those are not
+   * the same moment: `npm run report` rebuilds this file from saved results, and
+   * stamping the rebuild would name a commit the measurement never saw. The
+   * whole point of the stamp is `git log <sha>..HEAD -- src/redteam`, and that
+   * check is worthless if the sha is from after the run.
+   *
+   * Optional so a summary saved before this existed still renders — as unknown,
+   * which is the honest answer for those.
+   */
+  codeCommit?: string | null;
 };
 
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
@@ -91,10 +104,14 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w();
   // The commit is here so a reader can tell whether the harness has changed
   // since these numbers were taken — see `Reproducing this` for the command.
-  const code = provenanceLabel();
+  // Only ever the run's own commit. Falling back to this render's would name a
+  // commit the measurement never saw — `npm run report` rebuilds this file long
+  // after the fact — and a stamp pointing past the run is worse than none, since
+  // the whole use of it is to diff forward from the run.
+  const code = s.codeCommit;
   w(`Generated ${s.startedAt} · policy \`${s.policyVersion.slice(0, 12)}\` (${s.ruleCount} rules) · `
     + `${s.reps} repetition${s.reps === 1 ? '' : 's'} · adapter \`${s.adapter}\``
-    + (code ? ` · code \`${code}\`` : ''));
+    + (code ? ` · code \`${code}\`` : ' · code not recorded'));
   w();
 
   if (s.adapter === 'mock') {

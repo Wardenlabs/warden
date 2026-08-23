@@ -20,6 +20,7 @@ import { resetQuotas } from '../guard/quota.js';
 import type { Verdict } from '../guard/types.js';
 import { hashPolicy, rulesForRole } from '../policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../policy/types.js';
+import { provenanceLabel } from '../provenance.js';
 import { adapter, isMock } from '../qvac/index.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
@@ -255,7 +256,8 @@ async function main(): Promise<void> {
     warden: results['warden'] ?? [],
     baseline: results['baseline'] ?? [],
     structured: adapter().stats(),
-    unreadableAttachments
+    unreadableAttachments,
+    codeCommit: provenanceLabel()
   };
 
   printConsole(summary);

@@ -1,7 +1,9 @@
 # Warden — benchmarks
 
-Measured by `npm run benchmark` on the machine below. Regenerate on whichever
-machine records the demo; these numbers describe this one only.
+Measured by `npm run benchmark` on 2026-08-23T08:42:42.363Z, from commit `040f4e4`.
+
+These numbers describe the machine below and nothing else — regenerate on
+whichever one records the demo. To find out whether the code has moved since, `git log 040f4e4..HEAD -- src/guard src/qvac`; anything listed means this table is describing something that no longer runs.
 
 ## Machine
 
@@ -28,10 +30,10 @@ seconds and would describe startup rather than steady state.
 
 | Operation | p50 | p95 | mean |
 |---|---|---|---|
-| **Single rule adjudication** — rule + few-shots, as the pipeline calls it | **2623ms** | 2820ms | 2585ms |
-| Bare labelling call — no rule in the system block | 1014ms | 1112ms | 1002ms |
-| Embedding one prompt | 15ms | 148ms | 32ms |
-| **Full pipeline** (3 rules + pinned) | **10969ms** | 12464ms | 11096ms |
+| **Single rule adjudication** — rule + few-shots, as the pipeline calls it | **2720ms** | 2928ms | 2710ms |
+| Bare labelling call — no rule in the system block | 1014ms | 1117ms | 1013ms |
+| Embedding one prompt | 15ms | 57ms | 22ms |
+| **Full pipeline** (3 rules + pinned) | **11382ms** | 13411ms | 11518ms |
 
 Generation throughput: **26 tok/s**.
 
@@ -70,8 +72,8 @@ threw away. 8 runs:
 
 | Verdict shape | p50 | p95 | repaired | failed closed |
 |---|---|---|---|---|
-| `{verdict}` — what the guard asks for | 1014ms | 1112ms | 0 | 0 |
-| `{verdict, reason}` — what it used to ask for | 5734ms | 5846ms | 4 | 0 |
+| `{verdict}` — what the guard asks for | 1014ms | 1117ms | 0 | 0 |
+| `{verdict, reason}` — what it used to ask for | 5760ms | 5967ms | 4 | 0 |
 
 That is **5.7×** on latency, and the last two columns are the rest of
 it: the reason runs long, overruns the token cap, and leaves JSON that will not

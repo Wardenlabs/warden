@@ -13,6 +13,7 @@
     "smoke": "tsx scripts/smoke.ts",
     "dev": "tsx watch src/server/index.ts",
     "redteam": "tsx src/redteam/runner.ts",
+    "report": "tsx scripts/rerender-report.ts",
     "typecheck": "tsc --noEmit",
     "verify-audit": "tsx scripts/verify-audit.ts",
     "permalinks": "tsx scripts/permalinks.ts",
