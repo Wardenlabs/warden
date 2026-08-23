@@ -14,9 +14,11 @@
  */
 import type { Request, Response } from 'express';
 import { evaluate } from '../guard/pipeline.js';
+import { normalizeUntrusted } from '../guard/isolate.js';
+import { sanitize } from '../guard/sanitize.js';
 import type { Actor, Decision } from '../guard/types.js';
 import { findByApiKey, findEmployee } from '../policy/people.js';
-import { loadPolicy, rulesForActor } from '../policy/store.js';
+import { claimableRole, loadPolicy, rulesForActor } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 
 /** The local model that answers allowed prompts. Cloud is out by track rules. */
@@ -32,13 +34,21 @@ const UPSTREAM_MODEL = process.env['WARDEN_UPSTREAM_MODEL'] ?? 'warden';
 const MODE = process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden';
 
 /**
+ * Header identity on the proxy is opt-in, for serving web/ from a separate dev
+ * port. Left on by default it made the API key decorative: any caller could
+ * skip `Authorization` entirely and be judged under whatever role they typed.
+ */
+const DEV_HEADERS = process.env['WARDEN_DEV_HEADERS'] === '1';
+
+/**
  * Resolve the caller.
  *
- * The bearer token is the primary signal because real clients send it. Headers
- * are a development convenience for the web console, which has a person
- * switcher and no keys to juggle.
+ * The bearer token is the only identity in normal operation — the README's
+ * claim that an employee "cannot go around the gateway" rests on the key being
+ * mandatory, not one of several options. Headers exist behind
+ * `WARDEN_DEV_HEADERS=1` for development against a console on another port.
  *
- * When the header names someone in the directory, the directory's role wins
+ * When a header names someone in the directory, the directory's role wins
  * over whatever role the header claims. The role is an admin decision, and a
  * client that could assert its own would be able to pick the rule set it is
  * judged against — which is the whole thing this gateway exists to prevent.
@@ -50,11 +60,13 @@ function resolveActor(req: Request): Actor | null {
     return match ? { id: match.id, role: match.role } : null;
   }
 
-  const headerUser = req.header('x-warden-user');
+  const headerUser = DEV_HEADERS ? req.header('x-warden-user') : undefined;
   if (headerUser) {
     const known = findEmployee(headerUser);
     if (known) return { id: known.id, role: known.role };
-    return { id: headerUser, role: req.header('x-warden-role') ?? 'employee' };
+    // A stranger keeps the role they claim — except an exempt one, which would
+    // let them opt out of the whole policy with a header.
+    return { id: headerUser, role: claimableRole(loadPolicy(), req.header('x-warden-role') ?? 'employee') };
   }
 
   return null;
@@ -87,8 +99,12 @@ export async function handleChatCompletion(
     model?: string;
   };
   const messages = body.messages ?? [];
-  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-  const prompt = lastUser?.content ?? '';
+  // Every user turn is judged, not just the last one. An OpenAI-compatible
+  // client resends the whole history, so "put the payload in turn one and say
+  // 'continue' in turn two" would otherwise walk straight past the guard while
+  // the raw turn-one text still reached the model.
+  const userTurns = messages.filter((m) => m.role === 'user' && typeof m.content === 'string');
+  const prompt = userTurns.map((m) => m.content).join('\n\n');
 
   let outbound = messages;
 
@@ -119,11 +135,23 @@ export async function handleChatCompletion(
       return;
     }
 
-    // Forward the masked text, never the original. A credential the employee
-    // pasted must not reach the model just because the request was allowed.
-    if (lastUser && decision.maskedSpans.length > 0) {
-      outbound = messages.map((m) => (m === lastUser ? { ...m, content: decision.maskedPrompt } : m));
+    // Only an explicit ALLOW is forwarded. Falling through on "not BLOCK and
+    // not ESCALATE" would make any unexpected verdict value fail open, and the
+    // one invariant of this design is that nothing fails in that direction.
+    if (decision.verdict !== 'ALLOW') {
+      res.status(202).json({ escalationId: decision.auditId, message: decision.explanation });
+      return;
     }
+
+    // Forward the masked text, never the original. A credential the employee
+    // pasted must not reach the model just because the request was allowed —
+    // and it can sit in any turn of the history, so each user turn is masked,
+    // not only the newest.
+    outbound = messages.map((m) =>
+      m.role === 'user' && typeof m.content === 'string'
+        ? { ...m, content: sanitize(normalizeUntrusted(m.content)).masked }
+        : m
+    );
   } else {
     outbound = [{ role: 'system', content: baselineSystemPrompt(actor) }, ...messages];
   }
@@ -166,13 +194,23 @@ async function forward(res: Response, payload: unknown): Promise<void> {
     return;
   }
 
+  // Headers are already out, so a mid-stream failure cannot become a status
+  // code — but it must still end the response rather than park the client on a
+  // connection nobody will ever close. And a client that walks away stops the
+  // upstream read instead of draining it to nowhere.
   const reader = upstream.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    res.write(Buffer.from(value));
+  res.on('close', () => {
+    void reader.cancel().catch(() => {});
+  });
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+  } finally {
+    res.end();
   }
-  res.end();
 }
 
 export function proxyMode(): 'warden' | 'baseline' {

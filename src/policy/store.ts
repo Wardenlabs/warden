@@ -115,9 +115,9 @@ export function rulesForActor(spec: PolicySpec, actor: { id: string; role: strin
   // written for everyone — including the pinned injection rule — does not
   // quietly re-capture them.
   //
-  // Note this is only as strong as the identity behind `actor.role`. While the
-  // role arrives on an unauthenticated header, exemption is a claim anyone can
-  // make; see `warden.exemptRoles` in the README.
+  // This is only as strong as the identity behind `actor.role`, which is why
+  // both actor resolvers pass claimed roles through `claimableRole` first: an
+  // exempt role reaches here only from the directory, never from a header.
   if (isExempt(spec, actor.role)) return [];
   return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
 }
@@ -125,6 +125,21 @@ export function rulesForActor(spec: PolicySpec, actor: { id: string; role: strin
 /** Whether the policy declines to govern this role at all. */
 export function isExempt(spec: PolicySpec, role: string): boolean {
   return (spec.exemptRoles ?? DEFAULT_EXEMPT_ROLES).includes(role);
+}
+
+/**
+ * The role a caller the directory has never seen is allowed to claim.
+ *
+ * Exemption is granted by the directory, never claimed. A claimed role arrives
+ * from an environment variable on the caller's own machine, and an exempt role
+ * is measured against nothing at all — so accepting the claim would let any
+ * stranger opt out of the entire policy by typing `admin` into their shell
+ * profile. A claimed role the policy exempts is therefore demoted to the same
+ * default an absent claim gets. Anyone actually in the directory resolves to
+ * their directory role first and never reaches this.
+ */
+export function claimableRole(spec: PolicySpec, claimed: string): string {
+  return isExempt(spec, claimed) ? 'employee' : claimed;
 }
 
 /**
