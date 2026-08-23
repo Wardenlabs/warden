@@ -18,17 +18,25 @@ import { policySpecSchema, type PolicySpec, type Rule, type Quota } from './type
 
 const POLICY_PATH = process.env['WARDEN_POLICY_PATH'] ?? 'data/policies.json';
 
+/** Used when a policy file predates `exemptRoles`, and by `hashPolicy` callers. */
+const DEFAULT_EXEMPT_ROLES = ['admin'];
+
 /**
  * Hash the meaningful content of a policy — rules and quotas — independent of
  * ordering and of the version/timestamp fields themselves. Two policies with
  * the same rules in a different order are the same policy and hash alike.
  */
-export function hashPolicy(rules: Rule[], quotas: Quota[]): string {
+export function hashPolicy(
+  rules: Rule[],
+  quotas: Quota[],
+  exemptRoles: string[] = DEFAULT_EXEMPT_ROLES
+): string {
   const canonical = JSON.stringify({
     rules: [...rules]
       .map((r) => ({ ...r, embedding: undefined }))
       .sort((a, b) => a.id.localeCompare(b.id)),
-    quotas: [...quotas].sort((a, b) => a.role.localeCompare(b.role))
+    quotas: [...quotas].sort((a, b) => a.role.localeCompare(b.role)),
+    exemptRoles: [...exemptRoles].sort()
   });
   return createHash('sha256').update(canonical).digest('hex');
 }
@@ -40,7 +48,13 @@ export function loadPolicy(): PolicySpec {
   if (cached) return cached;
 
   if (!existsSync(POLICY_PATH)) {
-    cached = { version: hashPolicy([], []), updatedAt: nowIso(), rules: [], quotas: [] };
+    cached = {
+      version: hashPolicy([], [], DEFAULT_EXEMPT_ROLES),
+      updatedAt: nowIso(),
+      rules: [],
+      quotas: [],
+      exemptRoles: DEFAULT_EXEMPT_ROLES
+    };
     return cached;
   }
 
@@ -58,12 +72,17 @@ export function loadPolicy(): PolicySpec {
  * This is the only path that changes what employees are judged against. It
  * returns the stored spec so a caller can surface the new version immediately.
  */
-export function savePolicy(rules: Rule[], quotas: Quota[]): PolicySpec {
+export function savePolicy(
+  rules: Rule[],
+  quotas: Quota[],
+  exemptRoles: string[] = loadPolicy().exemptRoles ?? DEFAULT_EXEMPT_ROLES
+): PolicySpec {
   const spec: PolicySpec = {
-    version: hashPolicy(rules, quotas),
+    version: hashPolicy(rules, quotas, exemptRoles),
     updatedAt: nowIso(),
     rules,
-    quotas
+    quotas,
+    exemptRoles
   };
   mkdirSync(dirname(POLICY_PATH), { recursive: true });
   writeFileSync(POLICY_PATH, JSON.stringify(spec, null, 2) + '\n');
@@ -91,7 +110,21 @@ export function seedIfEmpty(seedPath: string): PolicySpec {
  * that looks complete and is missing a rule.
  */
 export function rulesForActor(spec: PolicySpec, actor: { id: string; role: string }): Rule[] {
+  // An exempt role is measured against nothing: the person who ratifies the
+  // policy is not governed by it. Checked before `appliesTo` so that a rule
+  // written for everyone — including the pinned injection rule — does not
+  // quietly re-capture them.
+  //
+  // Note this is only as strong as the identity behind `actor.role`. While the
+  // role arrives on an unauthenticated header, exemption is a claim anyone can
+  // make; see `warden.exemptRoles` in the README.
+  if (isExempt(spec, actor.role)) return [];
   return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
+}
+
+/** Whether the policy declines to govern this role at all. */
+export function isExempt(spec: PolicySpec, role: string): boolean {
+  return (spec.exemptRoles ?? DEFAULT_EXEMPT_ROLES).includes(role);
 }
 
 /**

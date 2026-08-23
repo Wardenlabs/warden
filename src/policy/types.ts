@@ -83,7 +83,20 @@ export const policySpecSchema = z.object({
   version: z.string().length(64),
   updatedAt: z.string(),
   rules: z.array(ruleSchema),
-  quotas: z.array(quotaSchema)
+  quotas: z.array(quotaSchema),
+  /**
+   * Roles the policy does not govern — whoever authors the rules rather than
+   * lives under them.
+   *
+   * This is deliberately part of the audited policy and not a deployment flag:
+   * "who is exempt" is the single most security-relevant sentence in the whole
+   * spec, so it belongs inside the version hash where a change to it is
+   * detectable, next to the rules it overrides.
+   *
+   * Defaulted rather than required so policy files written before this existed
+   * still load.
+   */
+  exemptRoles: z.array(z.string()).default(['admin'])
 });
 export type PolicySpec = z.infer<typeof policySpecSchema>;
 
