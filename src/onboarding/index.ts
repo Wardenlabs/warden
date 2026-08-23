@@ -345,7 +345,13 @@ function asMessage(pack: Omit<OnboardingPack, 'message'>): string {
   lines.push(
     '',
     'If a prompt is refused you get the rule, what to do instead, and an audit',
-    'id. Quote that id to the admin if you think the refusal was wrong.'
+    'id. Two things you can do with that id, both printed on the block itself:',
+    '',
+    `  warden-hook --rewrite <audit-id>   ask for a version that goes through`,
+    '  report it as wrong                 from the console, next to the rule',
+    '',
+    'A rewrite is checked against the same policy before you see it, and there',
+    'is one per block. Nothing is suggested if nothing legitimate is left.'
   );
   return lines.join('\n');
 }

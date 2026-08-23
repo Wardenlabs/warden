@@ -164,6 +164,27 @@ function render(res) {
       lines.push('');
       lines.push(`   ${others} other rule${others > 1 ? 's' : ''} also matched.`);
     }
+
+    /**
+     * The way out of the dead end.
+     *
+     * "Can try" and not "will": the gateway refuses to rewrite anything whose
+     * phrasing reached for the assistant's own instructions, and it shows a
+     * suggestion only if that suggestion passes the same check. Promising one
+     * here and then not producing it would be the second refusal in a row,
+     * which is worse than not offering.
+     *
+     * Nothing is written to disk to make this work. The prompt is typed again
+     * on stdin, which is also what proves to the gateway that this is the
+     * request that was blocked — it matches what you send against the hash in
+     * the audit entry, the only form of it that was ever stored.
+     */
+    if (res.auditId) {
+      lines.push('');
+      lines.push('   Warden can try to rewrite this so it goes through:');
+      lines.push(`     warden-hook --rewrite ${res.auditId}`);
+      lines.push('     (paste the same prompt, then Ctrl-D)');
+    }
   } else if (res.explanation) {
     lines.push('');
     for (const part of String(res.explanation).split('\n')) lines.push(...wrap(part));
@@ -233,9 +254,99 @@ function validateDecision(value) {
   return value;
 }
 
+/**
+ * Why there is no suggestion, in the terminal.
+ *
+ * The same set the console renders, composed from the code the gateway sent.
+ * Nothing here is generated: these are a fixed handful of outcomes, and a
+ * sentence per outcome written once beats a sentence per refusal written by a
+ * model that is slower and less accurate than this object.
+ */
+const REWRITE_REFUSALS = {
+  'no-honest-rewrite':
+    "There is no honest rewrite of this one — the phrasing reached for the assistant's own instructions.",
+  'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
+  'too-long': 'Too long to restate. Ask for the part you actually need.',
+  'model-unavailable': 'The local model could not answer. Nothing is suggested rather than guessed.',
+  'nothing-left': 'Nothing legitimate was left once the part the rule prohibits was taken out.',
+  'still-blocked': 'What it came up with did not pass the same check, so it is not being shown.',
+  quota: 'Daily limit reached, so the suggestion could not be re-checked.',
+  'already-rewritten': 'This block has already been rewritten once.'
+};
+
+/**
+ * `warden-hook --rewrite <auditId>` — ask for a version that would go through.
+ *
+ * Run by hand, never by a tool: this is the employee choosing to follow up on a
+ * refusal they just read. It prints to stdout and exits 0 whatever the answer,
+ * because it is not judging anything — the decision it is about was made and
+ * recorded some seconds ago.
+ */
+async function rewriteMode(auditId, decisionTimeoutMs) {
+  const prompt = (await readStdin()).trim();
+  if (!prompt) {
+    process.stderr.write('⚠ warden-hook --rewrite: paste the blocked prompt on stdin, then Ctrl-D.\n');
+    return;
+  }
+
+  let res;
+  try {
+    res = await requestJson(
+      `${WARDEN_URL}/api/guard/rewrite`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify({ prompt, auditId }),
+      },
+      decisionTimeoutMs,
+      (value) => {
+        if (!value || typeof value !== 'object') throw new Error('gateway returned a non-object');
+        return value;
+      },
+      // A refusal here is an answer, not a transport failure: the gateway says
+      // 403 for a decision that is not yours and 409 for a second rewrite, and
+      // both deserve their own sentence rather than "unreachable".
+      (_http, value) => (value && typeof value === 'object' ? value : undefined)
+    );
+  } catch (err) {
+    process.stderr.write(`⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}).\n`);
+    return;
+  }
+
+  if (res.suggestion) {
+    process.stdout.write(
+      [
+        '',
+        '✎ Warden suggests:',
+        '',
+        ...wrap(res.suggestion),
+        '',
+        `   Checked against the same policy before being shown — it came back ALLOW${res.auditId ? ` (audit ${res.auditId})` : ''}.`,
+        ''
+      ].join('\n') + '\n'
+    );
+    return;
+  }
+
+  const why = REWRITE_REFUSALS[res.reason] ?? res.error ?? 'No suggestion.';
+  process.stdout.write(['', '✎ No suggestion.', '', ...wrap(why), ''].join('\n') + '\n');
+}
+
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
+
+  // Run by a person, not by a tool, so it takes its input as a prompt on stdin
+  // rather than a hook event — and it never blocks anything.
+  const rewriteArg = process.argv.indexOf('--rewrite');
+  if (rewriteArg !== -1) {
+    const auditId = process.argv[rewriteArg + 1];
+    if (!auditId) {
+      process.stderr.write('⚠ warden-hook --rewrite needs the audit id from the block.\n');
+      return;
+    }
+    return rewriteMode(auditId, decisionTimeoutMs);
+  }
 
   // Both timeouts above bound a request; neither bounds the wait for the event
   // itself. A caller that opens the hook and never closes stdin would park us
