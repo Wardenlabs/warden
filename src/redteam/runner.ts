@@ -13,7 +13,7 @@
  *   npm run redteam
  *   npm run redteam -- --reps 3 --class guard-targeted
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { evaluate } from '../guard/pipeline.js';
 import { resetQuotas } from '../guard/quota.js';
@@ -21,7 +21,6 @@ import type { Verdict } from '../guard/types.js';
 import { hashPolicy, rulesForRole } from '../policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../policy/types.js';
 import { adapter, isMock } from '../qvac/index.js';
-import { MODEL_SPECS, modelsDir } from '../qvac/models.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
 const CORPUS_DIR = 'src/redteam/corpus';
@@ -37,19 +36,24 @@ type Prompt = {
 type CorpusFile = { class: string; goal: string; note?: string; prompts: Prompt[] };
 
 /**
- * Is the OCR model on this machine?
+ * Attachments the guard could not read, counted across the whole run.
  *
- * Recorded with every run because its absence silently rewrites the
- * document-borne numbers — see `ocrAvailable` in the report. Mirrors what
- * `npm run setup` checks: a local file wins, and there is no point asking the
- * P2P registry, which is the thing that hangs.
+ * Asked of the run rather than of the filesystem, because the filesystem cannot
+ * answer it. A first attempt checked whether the OCR model sat in `models/` and
+ * would have reported "missing" on this machine while the model was, at that
+ * moment, arriving over the P2P registry into QVAC's own cache — halfway
+ * through the document-borne class, so some of its prompts were read and some
+ * were not. Guessing at a cache layout to describe what happened is how a
+ * report ends up confidently wrong.
+ *
+ * The pipeline already records the count per decision. This just adds it up.
  */
-function ocrModelPresent(): boolean {
-  const spec = MODEL_SPECS.find((m) => m.role === 'ocr');
-  if (!spec) return false;
-  const override = process.env['WARDEN_MODEL_OCR'];
-  if (override) return existsSync(override);
-  return existsSync(join(modelsDir(), spec.filename));
+let unreadableAttachments = 0;
+
+function countUnreadable(passes: { pass: string; detail?: unknown }[]): void {
+  const ocrPass = passes.find((p) => p.pass === 'ocr');
+  const detail = ocrPass?.detail as { unreadable?: number } | undefined;
+  unreadableAttachments += Number(detail?.unreadable ?? 0);
 }
 
 export type Outcome = {
@@ -166,6 +170,7 @@ async function runPrompt(
       policy
     );
     got = decision.verdict;
+    countUnreadable(decision.passes);
     firedRule = decision.firedRules[0]?.ruleId;
     firedRules = decision.firedRules.map((r) => r.ruleId);
   }
@@ -250,7 +255,7 @@ async function main(): Promise<void> {
     warden: results['warden'] ?? [],
     baseline: results['baseline'] ?? [],
     structured: adapter().stats(),
-    ocrAvailable: ocrModelPresent()
+    unreadableAttachments
   };
 
   printConsole(summary);
