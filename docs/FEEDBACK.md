@@ -4,7 +4,9 @@ Revisión externa del estado del repo. `STATUS.md` ya cubre los dos problemas
 abiertos (latencia y falsos positivos); esto es lo que encontré **además** de
 eso, leyendo el código contra los artefactos que se entregan.
 
-Ordenado por lo que rompe la entrega primero.
+Ordenado por lo que rompe la entrega primero. Leído contra `main` a la altura de
+`eb60ef8` (reescritura de prompt + apelación); si algo de acá se arregla después,
+el commit que lo arregla es la respuesta, no este archivo.
 
 ---
 
@@ -70,31 +72,45 @@ mirar antes de correr nada. Cambiarlo por lo que midieron es más fuerte, no má
 débil: "las corridas varían ±6% con n=16, por eso el reporte se saca con
 `--reps 3`" es la frase de un equipo que midió.
 
-### 3. La cola de escalación no existe, pero el producto la promete
+### 3. `ESCALATE` sigue sin cola, y el admin todavía no puede soltar nada
 
-`src/server/index.ts:325-326`:
+`eb60ef8` ("Give a refusal somewhere to go") agregó la apelación y está bien
+hecha: `POST /api/guard/appeal` valida que la decisión sea del que apela contra
+el `auditId`, `recordAppeal` deduplica, y `GET /api/appeals` la muestra unida a
+la regla que disparó — que es el objeto que el admin tiene que editar. Eso llena
+la promesa de *"quote this if you think it is wrong"*, que efectivamente no
+tenía a dónde ir.
+
+Pero llena esa promesa, no la otra. Quedan dos huecos:
+
+**La apelación la inicia el empleado; el `ESCALATE` no encola nada.** El único
+llamador de `recordAppeal` es la ruta de apelación. El camino de `ESCALATE` está
+igual que antes — `openai.ts:104` devuelve `202` con un `escalationId`, y ahí
+termina. Mientras tanto `aggregate.ts:195` sigue diciendo *"Held for an
+administrator to review — you have not been refused, just queued"* y el hook
+sigue imprimiendo *"Queued for an administrator"*. Nadie encola. Si el empleado
+no apela por su cuenta, el admin nunca se entera.
+
+Eso importa más de lo que parece: `ESCALATE` es **21 de los 98 prompts** del
+corpus, y en el reporte cuenta como ataque detenido. Un `ESCALATE` que nadie ve
+es un `BLOCK` que el reporte anota como éxito.
+
+**No hay acción, sólo lectura.** `/api/appeals` es `GET`. No hay aprobar, no hay
+soltar, no hay cerrar. El admin ve la apelación y su única salida es ir a editar
+la regla — que es lo correcto a largo plazo y no sirve para el empleado que está
+frenado ahora.
+
+**Y quedaron dos stubs muertos contradiciendo lo nuevo.**
+`src/server/index.ts:488-489`:
 
 ```js
 app.get('/api/escalations', (_req, res) => res.json([]));
 app.post('/api/escalations/:id', (req, res) => res.json({ id: req.params.id, ok: true }));
 ```
 
-Dos stubs. No hay store, no hay pestaña en la consola, el admin no puede
-aprobar nada. Mientras tanto:
-
-- `aggregate.ts` le dice al empleado *"Held for an administrator to review — you
-  have not been refused, just queued."*
-- `warden-hook.mjs:172` imprime *"Queued for an administrator."*
-- `openai.ts:104` devuelve `202` con un `escalationId`.
-
-Tres superficies prometiendo una cola que no recibe nada. Hoy `ESCALATE` es un
-`BLOCK` con mejor redacción, y `ESCALATE` es **21 de los 98 prompts** del corpus
-— más de un quinto del corpus mide un camino que termina en un array vacío.
-
-Bajo la regla de honestidad del propio repo ("nada va al README hasta que se lo
-vio funcionar"), esto está del lado equivocado.
-
----
+El `POST` devuelve `{ ok: true }` sin hacer nada. Cualquiera que lo encuentre
+antes que `/api/appeals` va a creer que la aprobación existe y está rota, en vez
+de que no existe. Borrarlos es una línea y saca la ambigüedad.
 
 ## P1 — un campo muerto en el modelo de política
 
@@ -149,14 +165,21 @@ regla elástica.
 Mismo argumento, más chico: `volume-distraction` tiene **n=4**. El 25% de esa
 fila no significa nada.
 
-### 2. Cola de escalación de verdad
+### 2. Cerrar el lazo de la escalación
 
-~150 líneas, riesgo cero sobre el guard (es post-decisión), y es la mejor escena
-del video: el empleado manda algo, le dice "queda en revisión", el admin lo ve
-aparecer en la consola por SSE — que ya existe — lo aprueba, el empleado sigue.
+La apelación ya está. Falta lo que la convierte en un lazo cerrado, y es poco:
 
-Convierte `ESCALATE` de "block con mejor tono" en el diferencial del producto, y
-saca la promesa falsa del punto 3 de arriba.
+- Que un `ESCALATE` **se encole solo**, sin depender de que el empleado apele.
+  `recordAppeal` ya existe y ya deduplica por `auditId`; es llamarlo desde el
+  camino del veredicto con origen `escalate` en vez de `appeal`.
+- Un `POST /api/appeals/:id/release` que suelte el pedido, escriba en el audit
+  quién lo soltó, y lo empuje por el SSE que ya está.
+- Borrar los dos stubs de `/api/escalations`.
+
+Riesgo cero sobre el guard — todo es post-decisión — y es la mejor escena del
+video: el empleado manda algo, le dice "queda en revisión", el admin lo ve
+aparecer solo en la consola, lo suelta, el empleado sigue. Hoy esa escena se
+corta en el medio porque el empleado tiene que acordarse de apelar.
 
 ### 3. Calificadores estructurados en las reglas (`appliesWhen`)
 
@@ -258,3 +281,9 @@ Corto a propósito, pero vale decirlo porque parte de esto no es común:
   el repo no repita sus propios errores, y es raro verlo.
 - El baseline en el reporte. Medir contra "la misma política en el system
   prompt" es lo que convierte el número en un argumento.
+- El `rewriteGate()` de `eb60ef8`. Una función que le pide al modelo una frase
+  que pase el guard es, descrita con honestidad, una máquina de buscar bypasses
+  — y lo que la acota es estructural y no un prompt bien redactado: hash del
+  audit, una sola reescritura, veto si `isolate()` marcó la original, y la
+  sugerencia pasa por el guard completo antes de mostrarse. Es el mismo criterio
+  que el resto del repo aplicado a una feature que era fácil hacer mal.
