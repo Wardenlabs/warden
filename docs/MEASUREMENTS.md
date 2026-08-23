@@ -46,6 +46,7 @@ thrown away. The rows below are the current base.
 | 2026-08-23 | baseline, current code | `f6c75794` | 70/80 (88%) | 8/18 (44%) | 1 | The reference every row below is measured against |
 | 2026-08-23 | `r-instruction-override` removed from the policy | — | 63/80 (79%) | 5/18 (28%) | 1 | The only change all day larger than one prompt. A bad trade: seven attacks for three refusals |
 | 2026-08-23 | span required with every VIOLATES | `f6c75794` | 69/80 (86%) | 10/18 (56%) | 1 | Both worse. Reverted |
+| 2026-08-23 | SDK deadlines (`040f4e4`) | `f6c75794` | **137/160 (86%)** | 17/36 (47%) | **2** | First run at two repetitions, and the first that could finish: two earlier attempts hung, once on embedding an oversized prompt and once loading the OCR model over P2P. No OCR on this machine, so 12 attachments were unreadable — `document-borne` reads 8/8 stopped and 0/4 controls allowed, neither earned. `volume-distraction` back to 25%: the prompts now hit the deadline and escalate rather than being judged |
 
 The policy hash changed between the two dates because the benchmark stopped
 reading `data/policies.json`. The older rows measured whatever rules happened to
