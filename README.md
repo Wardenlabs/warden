@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/warden-lockup-dark.svg">
+    <img src="brand/warden-lockup-light.svg" alt="Warden" width="300">
+  </picture>
+</p>
+
 # Warden — the local AI gateway
 
 **Your admin writes the rules. Every prompt is judged against them before a model
@@ -405,6 +412,74 @@ therefore measured against no rules at all.
 | **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
 
 ---
+
+## Capping what a coding agent costs
+
+A rule answers "may this be asked". It cannot answer "has this person spent
+enough today", because a rule is a statement judged against one prompt in
+isolation — it has no counter and no memory of the morning. Counting is what
+code does perfectly and what a 1.7B model does terribly, so consumption lives
+beside the quota counters, before any model runs.
+
+Policy is written per role, in absolute numbers the admin chooses:
+
+```json
+{ "role": "engineer",
+  "maxRequestsPerDay": 200,
+  "maxSessionOutputTokens": 500000,
+  "maxContextTokens": 200000 }
+```
+
+Over either ceiling, the next prompt is **held, not refused**. Being told "no"
+with nowhere to go when you are mid-task is what makes people route around a
+gateway rather than stop working, so a budget hold goes to a person:
+
+```
+⏸ Held for review by Warden
+
+   Held on budget: this session has generated 600,000 tokens, over the
+   500,000 allowed for role "engineer". Start a new session, or ask an
+   administrator to raise the ceiling.
+
+   Queued for an administrator. You have not been refused —
+   when they answer, ask again and it is judged on its merits.
+```
+
+Held is not the ceiling of the lattice, so the budget can only ever make a
+verdict stricter, never looser. A prompt that is over budget *and* reaches for
+the assistant's instructions comes back BLOCK, not held — verified in the
+pipeline, not asserted here.
+
+### Where the number comes from, and why it is "reported"
+
+Claude Code hands the hook a `transcript_path`, and every assistant turn in that
+file carries the provider's own `usage` block. So these are real billed counts,
+not an estimate of the prompt. Reading the largest transcript on the machine
+this was built on — 44 MB, 2724 turns — measured **149 ms**, against a 30 s
+decision deadline.
+
+It is also a file on the employee's machine, which they can edit. **Against
+someone working within the policy this is a spend control; against someone
+attacking it, it is not** — exactly like the hook itself, which they could
+uninstall. The only place Warden could count authoritatively is the proxy, and
+the proxy is the one path a Max or Plus subscription cannot be pointed down.
+That is the honest shape of the feature and it is not worth dressing up.
+
+Two more limits, both structural:
+
+- `UserPromptSubmit` fires **before** the answer, so the hook sees usage through
+  the previous turn. A session can overshoot its ceiling by one turn.
+- Only Claude Code reports today, because it is the tool that sends
+  `transcript_path`. What Codex exposes has not been checked, so it reports
+  nothing — and a tool that reports nothing is shown as unmeasured rather than
+  as being under budget. The two are different and only one of them is a claim.
+
+### Why context is the last turn and not a sum
+
+Summing every turn's input counts the same cached prefix once per turn. On a
+real session measured while building this, that sum was **26.7M tokens** against
+281k of actual output. Context is how full the window is *now*, so it is read
+from the last turn only.
 
 ## The evidence
 

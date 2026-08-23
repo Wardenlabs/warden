@@ -16,10 +16,12 @@ import { rulesForActor } from '../policy/store.js';
 import type { PolicySpec } from '../policy/types.js';
 import type { QvacAdapter } from '../qvac/types.js';
 import { aggregate } from './aggregate.js';
+import { checkBudget } from './budget.js';
 import { isolate, normalizeUntrusted } from './isolate.js';
 import { adjudicateAll } from './passes/adjudicate.js';
 import { checkQuota } from './quota.js';
 import { sanitize } from './sanitize.js';
+import { tighten } from './types.js';
 import type { Decision, GuardInput, PassTrace } from './types.js';
 
 /** How many non-pinned rules to adjudicate. Each one is a model call. */
@@ -44,6 +46,13 @@ export async function evaluate(
       explanation: `Daily limit reached for role "${input.actor.role}" (${quota.used}/${quota.limit}).`
     });
   }
+
+  // ── pass -1.5: session budget ──────────────────────────────────────────────
+  // Observes only. Its ESCALATE is combined at the end rather than returned
+  // here, because returning it would make a prompt that ALSO breaks a rule come
+  // back held instead of refused — a decision loosened by adding a control.
+  const budget = checkBudget(policy, input.actor, input.usage);
+  passes.push(budget.trace);
 
   // ── pass -1: secrets ───────────────────────────────────────────────────────
   // Normalised before matching: a credential written with full-width
@@ -144,12 +153,18 @@ export async function evaluate(
     detail: { fired: result.firedRules.length }
   });
 
+  // The budget joins here, through the same lattice as everything else. It can
+  // only make the verdict stricter; a rule that fired still refuses.
+  const verdict = tighten(result.verdict, budget.verdict);
+  const explanation = [budget.explanation, result.explanation].filter(Boolean).join('\n\n');
+
   return finish({
-    verdict: result.verdict, policy, passes, started, input,
+    verdict, policy, passes, started, input,
     maskedPrompt: masked, maskedSpans: spans,
     firedRules: result.firedRules,
     quota: { used: quota.used, limit: quota.limit ?? 0 },
-    explanation: result.explanation
+    budget: budget.status,
+    explanation
   });
 }
 
@@ -163,6 +178,7 @@ function finish(args: {
   maskedSpans: Decision['maskedSpans'];
   firedRules: Decision['firedRules'];
   quota: { used: number; limit: number };
+  budget?: Decision['budget'];
   explanation: string;
 }): Decision {
   const partial = {
@@ -174,6 +190,7 @@ function finish(args: {
     maskedPrompt: args.maskedPrompt,
     maskedSpans: args.maskedSpans,
     quota: args.quota,
+    ...(args.budget ? { budget: args.budget } : {}),
     explanation: args.explanation
   };
 

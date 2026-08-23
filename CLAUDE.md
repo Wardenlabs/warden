@@ -103,6 +103,41 @@ attempt — see the note in `targetRule()`. Vetoing on them would switch the
 feature off on exactly the traffic it exists for, since `r-instruction-override`
 is pinned and caused 10 of every 14 refusals on legitimate requests.
 
+**The budget pass observes; it does not decide.** `src/guard/budget.ts` resolves
+to `ESCALATE` when a session is over its ceiling, and `ESCALATE` is not the top
+of the lattice. If it short-circuited the way `checkQuota` does, a prompt that
+was both over budget *and* in breach of a rule would come back held instead of
+refused — a decision made looser by adding a control. So it records its trace
+and its verdict joins through `tighten()` at the end of `pipeline.ts`. Verified:
+an override attack sent with 600k reported output tokens returns BLOCK, not
+ESCALATE. The model calls it declines to skip are on-device and free; the budget
+it protects is the cloud provider's, so there is nothing to save by cutting early.
+
+**Token usage is reported, never measured.** The numbers come from the tool's
+own transcript, read by the hook on the employee's machine — real provider
+counts rather than an estimate of the prompt, and also a file the employee can
+edit. Against someone working within the policy it is a spend control; against
+someone attacking it, it is not, exactly like the hook itself, which they could
+uninstall. The only place Warden could count authoritatively is the proxy, which
+is the one path a Max or Plus subscription cannot be pointed down. Say
+"reported" wherever this is described, the way "on the proxy" is said for output
+screening.
+
+Two things follow. Reporting nothing is not the same as being under budget, so
+`BudgetStatus.unreported` exists and the console says so rather than drawing an
+empty bar that reads as "plenty left". And `UserPromptSubmit` fires before the
+answer, so the hook always sees usage through the *previous* turn — a session
+can overshoot its ceiling by one turn, and one turn can be large.
+
+**`maxSessionOutputTokens` is per session, and the name has to keep saying so.**
+The hook reads one transcript and one transcript is one session. This field
+replaced `maxTokensPerDay`, which was in `quotaSchema` from the first commit and
+which **nothing ever read** — the same failure as `Rule.scope`, and worse for
+being a spend control: an admin who set it got a policy that validated and
+capped nothing. Context is the last turn, not a sum; summing it counts the same
+cached prefix once per turn and yields tens of millions, which measured 26.7M on
+a session whose real output was 281k.
+
 **Self-consistency voting does not fix a biased model.** `WARDEN_CONFIRM_VOTES`
 exists and is tested, and it defaults to `0` because it was measured at 16/32
 false positives against 14/32 without, for 50 extra model calls. Majority voting

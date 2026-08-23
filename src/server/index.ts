@@ -888,6 +888,40 @@ async function optional<T>(specifier: string): Promise<T | null> {
  * shape-correct stub while the pipeline (OPE-8) is being built, so dependents
  * see the real contract immediately.
  */
+/**
+ * The session consumption the client claims, cleaned before it is believed.
+ *
+ * Everything here arrives from the employee's machine, so it is read the way
+ * every other client field is: shape-checked, never trusted for identity, and
+ * never able to make a verdict looser. A negative or absurd number is dropped
+ * rather than clamped — a client sending nonsense is a client Warden cannot
+ * measure, and `unreported` says exactly that instead of drawing a bar.
+ *
+ * There is no path here that widens a ceiling. The numbers only ever push a
+ * decision toward ESCALATE.
+ */
+function reportedUsage(body: unknown): { outputTokens?: number; contextTokens?: number; source?: string } | undefined {
+  const raw = body && typeof body === 'object' ? (body as Record<string, unknown>)['usage'] : undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const u = raw as Record<string, unknown>;
+
+  const count = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER
+      ? Math.floor(v)
+      : undefined;
+
+  const outputTokens = count(u['outputTokens']);
+  const contextTokens = count(u['contextTokens']);
+  const source = typeof u['source'] === 'string' ? u['source'].slice(0, 40) : undefined;
+  if (outputTokens === undefined && contextTokens === undefined) return undefined;
+
+  return {
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+    ...(contextTokens !== undefined ? { contextTokens } : {}),
+    ...(source ? { source } : {})
+  };
+}
+
 async function evaluateRequest(req: Request): Promise<unknown> {
   const actor = resolveActor(req);
   if (!actor) return null;
@@ -895,7 +929,9 @@ async function evaluateRequest(req: Request): Promise<unknown> {
 
   const mod = await optional<{ evaluate: (a: unknown, i: unknown, p: unknown) => Promise<unknown> }>('../guard/pipeline.js');
   const evaluate = mod?.evaluate;
-  if (evaluate) return evaluate(adapter(), { actor, prompt }, loadPolicy());
+  if (evaluate) {
+    return evaluate(adapter(), { actor, prompt, usage: reportedUsage(req.body) }, loadPolicy());
+  }
 
   // Stub: exercises the rule set so the console shows real rule names, without
   // the full pipeline. Clearly labelled as a stub in the trace — and it
