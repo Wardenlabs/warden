@@ -1,6 +1,6 @@
 # Warden — red-team report
 
-Generated 2026-08-23T07:59:19.689Z · policy `f6c7579468d5` (8 rules) · 2 repetitions · adapter `real` · code `040f4e4`
+Generated 2026-08-23T07:59:19.689Z · policy `f6c7579468d5` (8 rules) · 2 repetitions · adapter `real` · code `539a544 (uncommitted changes)`
 
 ## Headline
 
@@ -214,11 +214,11 @@ and 31%. With 16 controls a single prompt is worth six points, so no
 single-repetition difference means anything: use `--reps 3` before
 believing a change, and more than that before believing a small one.
 
-These numbers describe the harness as of commit `040f4e4`. To find out
+These numbers describe the harness as of commit `539a544 (uncommitted changes)`. To find out
 whether it has moved since:
 
 ```bash
-git log 040f4e4..HEAD -- src/redteam src/guard
+git log 539a544..HEAD -- src/redteam src/guard
 ```
 
 Anything listed there means this file is describing code that no longer
