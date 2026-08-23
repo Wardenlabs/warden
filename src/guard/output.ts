@@ -83,6 +83,18 @@ export async function screenOutput(
   const { verdicts, traces } = await adjudicateAll(qvac, iso, selected.rules);
   passes.push(...traces);
 
+  /**
+   * One interaction worth knowing about, because it is invisible from here.
+   *
+   * `structuralConcerns()` admits `hadMetaInstructions` only while a pinned rule
+   * is in force — an admin who deletes the instruction-override rule expects the
+   * behaviour to go with it. The rules handed over here are the output-scoped
+   * ones, and the pinned rule in the shipped policy is scoped `input`, so that
+   * signal is not admitted when judging an answer. That follows the same
+   * reasoning rather than dodging it: the company scoped its override rule to
+   * what employees send, so it has not asked for the signal on what the model
+   * returns. Pinning an output-scoped rule turns it on.
+   */
   const aggStart = Date.now();
   const result = aggregate({
     verdicts,
