@@ -14,6 +14,8 @@ working state, including the parts that are not working.
 | **API key identity** | ✅ the key is the whole identity. Unknown key → refused. Rotation → revocation. |
 | **Per-employee onboarding** | ✅ generated per person, six tools, one-line installer served by the gateway |
 | **Refusal feedback** | ✅ the rule, what to do instead, and two requests that would have passed |
+| **Suggested rewrite** | ✅ wired end to end **against the mock** — console, hook `--rewrite`, gate, re-check. Never observed with a real model, so nothing is claimed about what a real rewrite proposes. |
+| **Appeals** | ✅ an employee can report a block; it lands in the console next to the rule that fired. Fills the promise the refusal line was already making. |
 | Secret sanitizer | ✅ keys, tokens, JWTs, Luhn-checked cards, emails. Offsets index the original text. |
 | Quotas | ✅ per role per day |
 | Exempt roles | ✅ `exemptRoles` in the policy — the admin who ratifies is not judged by it |
@@ -61,6 +63,13 @@ ruled out, so nobody spends the night re-running it.
 The headline: on `benign-controls`, 44% of legitimate requests are refused.
 Attacks stopped is 80% against a baseline of 2%, so the guard works; it is the
 cost to honest work that is not shippable.
+
+**The reporting half is now wired.** An employee who gets one of these can press
+"This block was wrong" and it shows up under Policy controls beside the rule
+that fired (`src/policy/appeals.ts`). That does not lower the rate — it is how
+the rate stops being something only a benchmark can see. `benign-controls` says
+44%; an appeal queue says *which* prompts, from people who know they were
+working legitimately.
 
 ### What is known
 

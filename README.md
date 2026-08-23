@@ -45,11 +45,52 @@ reach the model. See [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
      · cuál es el proceso para pedir un aumento?
      · cuántas personas hay en el equipo de marketing?
 
+   Warden can try to rewrite this so it goes through:
+     warden-hook --rewrite a7f3c2
+     (paste the same prompt, then Ctrl-D)
+
    Audit a7f3c2 · quote this if you think it is wrong
 ```
 
 Every line of that is read from the ratified rule and composed by the hook's own
 renderer — nothing in a refusal is generated at decision time.
+
+### When the block is a dead end
+
+Two of those lines are follow-ups, and they exist because of a number in our own
+report: on legitimate traffic the guard refuses far more than it should. A person
+in that position is holding real work and a "no" with nowhere to take it, and the
+second time it happens they stop using the gateway rather than stop working.
+
+**`--rewrite` asks for a version that passes.** This is the one place a model
+writes something an employee reads, and it is deliberately nowhere near a
+decision: the verdict is already made and already logged, the employee has to ask
+for it, and what comes back is judged by the same guard as any other prompt
+before it is shown. If the rewrite does not come back ALLOW, there is no
+suggestion — a phrasing that got *closer* is exactly what this must never hand
+over.
+
+That is also the honest description of the risk. Something that restates blocked
+prompts is a machine for finding phrasings that pass, so four things bound it:
+the request must match the SHA-256 of a prompt that was really blocked (the audit
+log stores that hash and not the text, which is what makes this checkable at
+all); there is one rewrite per block, so nobody can iterate; a prompt whose
+phrasing reached for the assistant's own instructions is refused outright by a
+deterministic check, before any model runs; and both the rewrite and its re-check
+cost quota and land in the audit log.
+
+**"This block was wrong" reports it.** The refusal line already said to quote the
+audit id if you disagree, and until now there was nowhere to quote it. Now it
+appears in the console under the rule that fired — which is the thing an admin
+has to edit, and the only view where a false positive is distinguishable from a
+correct block.
+
+> **Observed against the mock adapter, end to end** — console, hook, gate and
+> re-check — and **not yet with a real model**, so nothing here claims what a
+> real rewrite proposes. `npx tsx scripts/probe-rewrite.ts` is the harness that
+> answers that; run it against a model. Against the mock it measures only the
+> deterministic gate, which refused 5 of 8 `direct-override` attacks before any
+> generation.
 
 Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK script
 — go through the proxy instead. Setup for both is in
@@ -501,9 +542,10 @@ npm run typecheck
 
 npx tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
 npx tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
+npx tsx scripts/probe-rewrite.ts                       # can a rewrite get an attack through?
 ```
 
-The last two are diagnostics, not tests. `probe-rule` is fast enough to form a
+The last three are diagnostics, not tests. `probe-rule` is fast enough to form a
 hypothesis with and too small to confirm one — thirteen prompts cannot resolve a
 two-prompt difference, and it has already produced a convincing result the
 corpus flatly contradicted. Confirm with `--reps 2` on the corpus before
@@ -589,7 +631,12 @@ A deliberate trade for a gateway running on a company's own machine.
 - **OpenCode is not supported.** Its plugin system has a pre-LLM hook, but the
   abort semantics are undocumented and we have not watched it block anything. It
   goes in this README when it does.
-- **Quota counters are in memory** and reset with the process.
+- **Quota counters are in memory** and reset with the process. So is the
+  one-rewrite-per-block ledger: a restart hands back one rewrite per past block.
+- **A suggested rewrite has never been seen from a real model.** The path is
+  wired and verified against the mock; what a 1.7B model actually proposes when
+  asked to restate a blocked request is unmeasured, and the re-check is what
+  stands between that and an employee.
 - **The admin API has no authentication, and that is where the keys are.**
   Anyone who can reach the port can read the directory — every employee's API
   key with it — write policy, and remove people. Cross-origin access is off by

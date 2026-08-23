@@ -7,6 +7,7 @@
  * read a real evaluation.
  */
 import { writeFileSync } from 'node:fs';
+import { provenanceLabel } from '../provenance.js';
 
 export type ClassResult = {
   class: string;
@@ -88,8 +89,12 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
 
   w('# Warden — red-team report');
   w();
+  // The commit is here so a reader can tell whether the harness has changed
+  // since these numbers were taken — see `Reproducing this` for the command.
+  const code = provenanceLabel();
   w(`Generated ${s.startedAt} · policy \`${s.policyVersion.slice(0, 12)}\` (${s.ruleCount} rules) · `
-    + `${s.reps} repetition${s.reps === 1 ? '' : 's'} · adapter \`${s.adapter}\``);
+    + `${s.reps} repetition${s.reps === 1 ? '' : 's'} · adapter \`${s.adapter}\``
+    + (code ? ` · code \`${code}\`` : ''));
   w();
 
   if (s.adapter === 'mock') {
@@ -288,14 +293,43 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w('## Reproducing this');
   w();
   w('```bash');
-  w('npm install && npm run setup     # downloads models, verifies inference');
-  w('npm run redteam                  # regenerates this file');
-  w('npm run redteam -- --reps 5      # more repetitions');
+  w('npm install && npm run setup       # downloads models, verifies inference');
+  w('npm run redteam -- --reps 3        # regenerates this file');
   w('```');
   w();
-  w('Runs are deterministic: fixed seed, temperature 0. The same corpus against the');
-  w('same policy version reproduces the same numbers.');
+  /**
+   * What used to stand here was "runs are deterministic ... reproduces the same
+   * numbers", and it was false in a way this project had already measured: two
+   * identical runs of `benign-controls` against the same policy at temperature 0
+   * gave 44% and 31%. The adjudicator loads with `parallel: 4`, so concurrent
+   * rule judgements are batched and the batch composition moves the numerics.
+   *
+   * It was the worst sentence in the file to get wrong — it sat under
+   * "Reproducing this", which is where a reader who intends to check goes first,
+   * and it promised them something that would not happen. Saying what actually
+   * varies is the stronger claim, because it is the one that survives them
+   * running it twice.
+   */
+  w('**Runs vary, and the variance is measured.** Generation is greedy at');
+  w('temperature 0, but the adjudicator loads with `parallel: 4`, so concurrent');
+  w('rule judgements are batched and the batch composition moves the numerics.');
+  w('Two identical runs of `benign-controls` against one policy have given 44%');
+  w('and 31%. With 16 controls a single prompt is worth six points, so no');
+  w('single-repetition difference means anything: use `--reps 3` before');
+  w('believing a change, and more than that before believing a small one.');
   w();
+  if (code) {
+    w('These numbers describe the harness as of commit `' + code + '`. To find out');
+    w('whether it has moved since:');
+    w();
+    w('```bash');
+    w('git log ' + code.split(' ')[0] + '..HEAD -- src/redteam src/guard');
+    w('```');
+    w();
+    w('Anything listed there means this file is describing code that no longer');
+    w('runs, and it needs regenerating before it is quoted.');
+    w();
+  }
 
   writeFileSync(path, out.join('\n'));
 }
