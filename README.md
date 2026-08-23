@@ -331,7 +331,7 @@ pristine, so a fresh clone always demonstrates the same company.
 | **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
-| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it. Stores prompt *hashes*, not prompts — a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` recomputes the chain. |
+| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
 
 ---
 
