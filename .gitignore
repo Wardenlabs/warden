@@ -31,6 +31,9 @@ data/company.json
 # not a fixture, and not ours to commit.
 data/appeals.jsonl
 data/escalations.json
+# administrators' answers to held prompts. The queue itself is derived from the
+# audit log; only the answers live here.
+data/escalations.jsonl
 data/cache/
 
 # Generated reports (REPORT.md and BENCHMARKS.md ARE committed — they are deliverables)

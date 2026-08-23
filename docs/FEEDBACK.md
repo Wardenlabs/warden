@@ -74,6 +74,26 @@ débil: "las corridas varían ±6% con n=16, por eso el reporte se saca con
 
 ### 3. `ESCALATE` sigue sin cola, y el admin todavía no puede soltar nada
 
+> **Resuelto en `47b917f`.** La cola existe y se llena sola: se **deriva del
+> audit log** (`escalationQueue()` en `src/policy/escalations.ts`), así que todo
+> `ESCALATE` aparece sin que el empleado tenga que hacer nada — que era
+> exactamente el hueco. `POST /api/escalations/:id` graba aprobado o rechazado
+> con nota, deduplicado, y responde 404 a un id que nunca fue held. Los dos
+> stubs ya no están. La consola lo muestra bajo Policy controls, con el badge de
+> cuántos esperan y actualizándose en vivo por SSE.
+>
+> Una cosa que el hallazgo pedía y **no** se hizo, a propósito: *"soltar"*. Una
+> aprobación no reejecuta el prompt original — el hook volvió segundos después
+> de que la persona apretó Enter y su herramienta siguió, no hay nada que
+> reanudar. Significa "volvé a pedirlo, pasa por sus propios méritos", y está
+> dicho con esas palabras en el botón, en el hook y en el `aggregate`. La
+> alternativa sería una decisión guardada que el pipeline honra sin juzgar, que
+> es el early-ALLOW que el diseño prohíbe.
+>
+> Y como el revisor no puede ver el prompt (el log guarda el hash),
+> `warden-hook --note <auditId>` y el botón "Add context for the reviewer" son
+> el único camino por el que las palabras del empleado llegan a esa pantalla.
+
 `eb60ef8` ("Give a refusal somewhere to go") agregó la apelación y está bien
 hecha: `POST /api/guard/appeal` valida que la decisión sea del que apela contra
 el `auditId`, `recordAppeal` deduplica, y `GET /api/appeals` la muestra unida a
@@ -115,6 +135,27 @@ de que no existe. Borrarlos es una línea y saca la ambigüedad.
 ## P1 — un campo muerto en el modelo de política
 
 **`Rule.scope` no lo lee nadie.**
+
+> **Resuelto en `47b917f`, por la salida cara.** El filtro va en
+> `rulesForActor(spec, actor, side)` y no en `selectRules`: es el mismo lugar
+> que ya resolvía las tres clases de audiencia, y por la misma razón — un
+> llamador que lo filtra a mano es un llamador que se lo olvida. `side` es
+> `'input'` por default; `'any'` existe sólo para *describir* una política (la
+> lista de reglas de una persona en la consola, el system prompt del baseline),
+> nunca para aplicarla.
+>
+> Y la salida se juzga de verdad: `src/guard/output.ts` corre el mismo
+> isolate → retrieve → adjudicate → aggregate sobre la respuesta del modelo, con
+> las reglas `output` y `both`. Dos límites que quedaron escritos en el README
+> porque son reales: corre **sólo en el proxy** (por el hook, Warden actúa antes
+> de mandar el prompt y nunca ve la respuesta), y una política con reglas de
+> salida **no puede streamear**, porque un token no se puede des-mandar — sin
+> reglas de salida, streamea igual que antes.
+>
+> Lo medido: **353 → 324 adjudicaciones** sobre los 98 prompts del corpus con
+> mock, y ninguna otra línea del reporte se movió. Cuánto del 39% era esto sigue
+> **sin medir** y necesita `--reps 3` con modelo real, que es justo lo que el
+> hallazgo pedía averiguar antes de seguir reescribiendo `r-instruction-override`.
 
 Está definido en `src/policy/types.ts:12` (`input | output | both`), el
 compilador se lo pide al modelo (`src/policy/compile.ts:76`), la consola lo

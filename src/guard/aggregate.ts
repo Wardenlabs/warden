@@ -209,7 +209,13 @@ function explain(verdict: Verdict, fired: FiredRule[], concerns: string[]): stri
     lines.push(`(${fired.length - 1} other rule${fired.length > 2 ? 's' : ''} also matched.)`);
   }
   if (verdict === 'ESCALATE') {
-    lines.push('Held for an administrator to review — you have not been refused, just queued.');
+    // Now a description of something that happens. The queue this refers to was
+    // an empty array and a stub for most of this project's life, which made
+    // this the most confident sentence in the product and the least true one.
+    lines.push(
+      'Held for an administrator to review — you have not been refused, just queued. ' +
+        'When they answer, ask again: an approved request goes through on its own merits.'
+    );
   }
 
   return lines.join('\n');

@@ -14,6 +14,7 @@
  */
 import type { Request, Response } from 'express';
 import { evaluate } from '../guard/pipeline.js';
+import { screenOutput, screensOutput } from '../guard/output.js';
 import { normalizeUntrusted } from '../guard/isolate.js';
 import { sanitize } from '../guard/sanitize.js';
 import type { Actor, Decision } from '../guard/types.js';
@@ -49,7 +50,10 @@ function resolveActor(req: Request): Actor | null {
 
 /** Rules folded into a system prompt — the baseline everyone else ships. */
 function baselineSystemPrompt(actor: Actor): string {
-  const rules = rulesForActor(loadPolicy(), actor)
+  // Every rule, both sides: this is a system prompt governing a whole
+  // conversation, not one direction of it, and the baseline is what a team
+  // ships when they have no gateway — they would paste all of them.
+  const rules = rulesForActor(loadPolicy(), actor, 'any')
     .map((r) => `- ${r.text}`)
     .join('\n');
   return `You are a company assistant. Follow these rules at all times:\n${rules}`;
@@ -131,7 +135,119 @@ export async function handleChatCompletion(
     outbound = [{ role: 'system', content: baselineSystemPrompt(actor) }, ...messages];
   }
 
-  await forward(res, { ...body, messages: outbound, model: body.model ?? UPSTREAM_MODEL });
+  const payload = { ...body, messages: outbound, model: body.model ?? UPSTREAM_MODEL };
+
+  /**
+   * Screening the answer costs the stream, so it is bought only when the policy
+   * asks for it.
+   *
+   * There is no version of this that streams. Tokens leave as they arrive, and
+   * a rule that fires on the last sentence cannot recall the first — so an
+   * answer that is going to be judged has to be complete before anyone reads
+   * it. A policy with no output-scoped rules never pays that, and relays token
+   * by token exactly as before.
+   */
+  if (MODE === 'warden' && screensOutput(loadPolicy(), actor)) {
+    await forwardScreened(res, payload, actor, emit);
+    return;
+  }
+
+  await forward(res, payload);
+}
+
+/**
+ * Relay, but hold the answer until it has been judged.
+ *
+ * The upstream call is made non-streaming whatever the client asked for,
+ * because a screened answer has to exist in full before it can be screened. A
+ * client that wanted a stream still gets one — the approved answer is emitted
+ * as a single chunk followed by `[DONE]`, which is a valid, if short, stream.
+ */
+async function forwardScreened(
+  res: Response,
+  payload: { messages: unknown[]; model: string; stream?: boolean },
+  actor: Actor,
+  emit: (decision: unknown) => void
+): Promise<void> {
+  const wantsStream = payload.stream === true;
+
+  let upstream: globalThis.Response;
+  try {
+    upstream = await fetch(`${UPSTREAM}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${UPSTREAM_KEY}` },
+      body: JSON.stringify({ ...payload, stream: false })
+    });
+  } catch (err) {
+    res.status(502).json({
+      error: {
+        code: 'upstream_unreachable',
+        message:
+          `Could not reach the model at ${UPSTREAM}. ` +
+          `Start it with: npx @qvac/cli serve openai  (${err instanceof Error ? err.message : err})`
+      }
+    });
+    return;
+  }
+
+  const raw = await upstream.text();
+  if (!upstream.ok) {
+    // Upstream's own error, passed through untouched. Judging it would be
+    // judging a failure message as if the model had said it.
+    res.status(upstream.status);
+    const contentType = upstream.headers.get('content-type');
+    if (contentType) res.setHeader('content-type', contentType);
+    res.send(raw);
+    return;
+  }
+
+  let answer: string;
+  let parsed: { choices?: { message?: { content?: string } }[] };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+    answer = parsed.choices?.[0]?.message?.content ?? '';
+  } catch {
+    res.status(502).json({
+      error: { code: 'upstream_unparseable', message: 'The model returned something this gateway could not read.' }
+    });
+    return;
+  }
+
+  const decision = await screenOutput(adapter(), { actor, text: answer, policy: loadPolicy() });
+  emit(decision);
+
+  // Same shape the input path refuses with, so a client handles one refusal
+  // and gets both. ESCALATE holds it too: an answer nobody has cleared is not
+  // an answer to show, and unlike a held prompt there is nothing lost by
+  // waiting — the request is already paid for and the text already exists.
+  if (decision.verdict !== 'ALLOW') {
+    res.status(decision.verdict === 'BLOCK' ? 403 : 202).json({
+      error: {
+        code: decision.verdict === 'BLOCK' ? 'policy_block_output' : 'policy_escalate_output',
+        message: decision.explanation,
+        rule: decision.firedRules[0]?.ruleText,
+        auditId: decision.auditId,
+        side: 'output'
+      }
+    });
+    return;
+  }
+
+  if (!wantsStream) {
+    res.status(200).type('application/json').send(raw);
+    return;
+  }
+
+  res.status(200).setHeader('content-type', 'text/event-stream');
+  const chunk = {
+    id: `chatcmpl-${decision.auditId}`,
+    object: 'chat.completion.chunk',
+    model: payload.model,
+    choices: [{ index: 0, delta: { role: 'assistant', content: answer }, finish_reason: 'stop' }]
+  };
+  res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
 }
 
 /**

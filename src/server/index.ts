@@ -30,6 +30,7 @@ import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/st
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
 import { readAppeals, recordAppeal } from '../policy/appeals.js';
+import { escalationQueue, recordReview, type ReviewOutcome } from '../policy/escalations.js';
 import { findDecision } from '../audit/log.js';
 import { checkQuota } from '../guard/quota.js';
 import type { RewriteRefusal, RewriteResult } from '../guard/rewrite.js';
@@ -199,7 +200,9 @@ app.get('/api/people', (_req, res) => {
     // Counting here rather than in the browser keeps one definition of "which
     // rules apply to this person" — the same one the guard uses.
     employees: dir.employees.map((e) => {
-      const applicable = rulesForActor(policy, e);
+      // 'any': the admin is being shown what binds this person, which
+      // includes the output-side rules no input decision will ever run.
+      const applicable = rulesForActor(policy, e, 'any');
       return {
         ...e,
         ruleCount: applicable.length,
@@ -474,7 +477,18 @@ app.post('/api/guard/appeal', asyncRoute(async (req, res) => {
  */
 app.get('/api/appeals', (_req, res) => {
   res.json(
-    readAppeals().map((appeal) => {
+    readAppeals()
+      /**
+       * Notes on held prompts belong to the review queue, not here.
+       *
+       * Both write the same record — one endpoint, one place employee text is
+       * kept — but the employee meant different things by them. On a block it
+       * is "this was wrong"; on a held prompt it is context for a decision
+       * nobody has made yet. Listing the second under "reported as wrong"
+       * misrepresents what they said, to the one person who acts on it.
+       */
+      .filter((appeal) => findDecision(appeal.auditId)?.decision.verdict !== 'ESCALATE')
+      .map((appeal) => {
       const entry = findDecision(appeal.auditId);
       const rule = entry?.decision.firedRules?.[0];
       return {
@@ -484,7 +498,7 @@ app.get('/api/appeals', (_req, res) => {
         ruleId: rule?.ruleId ?? null,
         ruleText: rule?.ruleText ?? null
       };
-    })
+      })
   );
 });
 
@@ -510,8 +524,46 @@ app.get('/api/audit/verify', asyncRoute(async (_req, res) => {
   res.json(verifyChain());
 }));
 
-app.get('/api/escalations', (_req, res) => res.json([]));
-app.post('/api/escalations/:id', (req, res) => res.json({ id: req.params.id, ok: true }));
+/**
+ * What is held for review.
+ *
+ * These two routes existed as stubs — `[]` and an `ok: true` that recorded
+ * nothing — while three different surfaces told employees their prompt was
+ * queued for an administrator. They are real now, and they are deliberately
+ * thin: the queue is derived from the audit log rather than stored a second
+ * time, and this file only joins it to the answers.
+ */
+app.get('/api/escalations', asyncRoute(async (_req, res) => {
+  const queue = await escalationQueue();
+  res.json(
+    queue.map((e) => ({
+      ...e,
+      employeeName: findEmployee(e.employeeId)?.name ?? e.employeeId
+    }))
+  );
+}));
+
+app.post('/api/escalations/:id', asyncRoute(async (req, res) => {
+  const auditId = String(req.params['id']).trim();
+  const outcome = req.body?.outcome;
+  if (outcome !== 'approved' && outcome !== 'refused') {
+    return res.status(400).json({ error: 'outcome must be "approved" or "refused"' });
+  }
+
+  // Only something actually held can be answered. Recording a review against an
+  // id that was never escalated would put a decision in the queue that the
+  // audit log has no matching entry for.
+  const queue = await escalationQueue();
+  if (!queue.some((e) => e.auditId === auditId)) {
+    return res.status(404).json({ error: 'no decision is held for review under that audit id' });
+  }
+
+  const note = typeof req.body?.note === 'string' ? req.body.note : undefined;
+  const review = recordReview({ auditId, outcome: outcome as ReviewOutcome, ...(note ? { note } : {}) });
+  if (!review) return res.status(409).json({ error: 'that escalation has already been answered' });
+
+  res.json(review);
+}));
 
 // ── OpenAI-compatible proxy ──────────────────────────────────────────────────
 app.get('/v1/models', (_req, res) => {

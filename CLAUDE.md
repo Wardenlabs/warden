@@ -31,8 +31,10 @@ src/policy/     Rule/Quota/PolicySpec, compiler, presets, store, retrieval
   audience.ts   who a rule binds: `*`, a role, or `@employeeId`
   people.ts     the company directory — employees, roles, API keys
   appeals.ts    blocks an employee said were wrong
+  escalations.ts admin answers to held prompts; the queue itself is derived
 src/guard/      isolate, sanitize, quota, passes/adjudicate, aggregate, pipeline
   rewrite.ts    post-refusal: propose a prompt that passes. Not a pass.
+  output.ts     judging the model's answer, on the proxy path only
 src/proxy/      OpenAI-compatible endpoint
 src/hook/       warden-hook CLI for Claude Code and Codex
 src/onboarding/ per-employee setup packs, one entry per supported tool
@@ -116,6 +118,58 @@ filters `appliesTo` by hand will miss one of them, and a decision that skipped a
 rule looks exactly like a decision that passed it. `rulesForRole()` exists only
 where there is genuinely no identity (the red-team harness, an unknown caller);
 it cannot see personal rules, which is correct.
+
+**`scope` decides which half of the exchange a rule judges, and it is read in
+exactly one place.** `rulesForActor(spec, actor, side)` filters audience and
+scope together, for the same reason it resolves all three audience kinds at
+once: a caller doing it by hand is a caller who forgets. `side` defaults to
+`'input'`; pass `'any'` only to *describe* a policy — the console listing what
+binds a person, the baseline system prompt — never to enforce one.
+
+This field existed from the first commit and nothing read it until an
+`output`-scoped rule was found being asked whether an employee's *question*
+violated it. That is not a half-built feature, it is a wrong one: a rule written
+to judge answers, judging questions, is a false positive by construction.
+Measured on the mock corpus, filtering it removed **29 of 353 adjudications**
+across 98 prompts with every other number in the report byte-identical. What it
+does to the false-positive rate is unmeasured and needs a real model with
+`--reps 3` — `r-legal-commitment` was one of the rules firing on benign traffic,
+and one of its own compliant examples is a prompt the corpus lists as benign.
+
+**An output verdict is reached by the same code as an input one.**
+`src/guard/output.ts` is not `evaluate()` with a flag, deliberately: every
+measurement in this repo was taken against the input path, and threading a
+second mode through it would put all of them in question. It shares everything
+that decides — `isolate`, `selectRules`, `adjudicateAll`, `aggregate` — and
+skips what does not apply: no quota (the request paid on the way in) and no
+secret masking (rewriting what a person reads is a different feature).
+
+It runs on the proxy and nowhere else, because the proxy is the only place
+Warden ever sees an answer. Through the hook it runs before the prompt is sent
+and the tool talks to its own provider directly. Say "on the proxy" whenever
+this is described; "Warden checks outputs" is a claim the hook path does not
+keep.
+
+**Screening an answer costs the stream, and only a policy that asks for it
+pays.** Tokens cannot be recalled, so a judged answer is buffered until the
+verdict exists. `screensOutput()` is checked before the relay starts: no
+output-scoped rules, no buffering, byte-for-byte the old streaming path.
+
+**An approved escalation does not release the original prompt.** The queue in
+`src/policy/escalations.ts` records an administrator's answer; it cannot resume
+a request whose hook returned seconds after the employee pressed Enter. An
+approval means "ask again, it goes through on its merits", and the second ask is
+judged like any other — the alternative is a stored decision the pipeline is
+told to honour without judging, which is the early-ALLOW this design forbids.
+The UI, the hook and the aggregator all say so in those words. Making that
+sentence disappear is how the queue becomes the second empty promise stacked on
+the first.
+
+The queue is **derived from the audit log**, not stored beside it: every
+escalation is already a decision in the chain, and a second copy is one that can
+disagree with the record it came from. Only the answers are stored separately,
+because an answer is not a decision and would not fit the shape `verifyChain()`
+walks.
 
 **`exemptRoles` is safe only because identity is a key.** A role in
 `spec.exemptRoles` is measured against nothing, checked in `rulesForActor()`
@@ -240,6 +294,12 @@ someone is set up — it only ever says a request arrived from that tool.
 - **`data/policies.json` and `data/company.json` are generated.** Edit the seeds
   (`data/seed/policies.seed.json`, `data/seed/company.json`) and delete the
   generated file to reseed. Both are gitignored; the seeds are committed.
+- **The mock cannot produce an ESCALATE from a rule.** It flags on keywords and
+  then answers VIOLATES for *every* selected rule, and `r-instruction-override`
+  is pinned and `block`, so anything flagged comes back BLOCK. The only mock
+  route to a held decision is a structural one — a mostly non-ASCII prompt over
+  40 characters trips `unusual character mix` with no rule fired, which is what
+  the queue's "held without a named rule" case renders.
 - **Two processes writing one audit log break its chain.** `recordDecision()`
   caches the tail hash in memory, so a second writer appends from a stale one
   and `npm run verify-audit` reports tampering on a log nobody touched. Hit

@@ -181,9 +181,20 @@ function render(res) {
      */
     if (res.auditId) {
       lines.push('');
-      lines.push('   Warden can try to rewrite this so it goes through:');
-      lines.push(`     warden-hook --rewrite ${res.auditId}`);
-      lines.push('     (paste the same prompt, then Ctrl-D)');
+      if (res.verdict === 'ESCALATE') {
+        // A held prompt has no rewrite to offer — nobody has refused it, so
+        // there is nothing to route around. What the reviewer lacks is context:
+        // the audit log kept this prompt's hash, not its text.
+        lines.push('   The reviewer cannot see what you asked. Tell them why:');
+        lines.push(`     warden-hook --note ${res.auditId}`);
+      } else {
+        lines.push('   Warden can try to rewrite this so it goes through:');
+        lines.push(`     warden-hook --rewrite ${res.auditId}`);
+        lines.push('     (paste the same prompt, then Ctrl-D)');
+        lines.push('');
+        lines.push('   Think it was wrong? Say so:');
+        lines.push(`     warden-hook --note ${res.auditId}`);
+      }
     }
   } else if (res.explanation) {
     lines.push('');
@@ -192,7 +203,8 @@ function render(res) {
 
   if (res.verdict === 'ESCALATE') {
     lines.push('');
-    lines.push('   Queued for an administrator. You have not been refused.');
+    lines.push('   Queued for an administrator. You have not been refused —');
+    lines.push('   when they answer, ask again and it is judged on its merits.');
   }
   if (res.maskedSpans?.length) {
     lines.push('');
@@ -332,20 +344,68 @@ async function rewriteMode(auditId, decisionTimeoutMs) {
   process.stdout.write(['', '✎ No suggestion.', '', ...wrap(why), ''].join('\n') + '\n');
 }
 
+/**
+ * `warden-hook --note <auditId>` — say something about a decision.
+ *
+ * One endpoint, two meanings, decided by what happened rather than by a second
+ * flag: on a block it is "this was wrong", on a held prompt it is the context
+ * the reviewer does not have. Both end up in front of the same administrator,
+ * next to the same audit id.
+ *
+ * This is the only thing an employee types that Warden keeps. The audit log
+ * stores prompts as hashes on purpose; a note escapes that because they chose
+ * to write it, about their own request, for a person to read.
+ */
+async function noteMode(auditId, decisionTimeoutMs) {
+  const note = (await readStdin()).trim();
+  if (!note) {
+    process.stderr.write('⚠ warden-hook --note: type your note on stdin, then Ctrl-D.\n');
+    return;
+  }
+
+  let res;
+  try {
+    res = await requestJson(
+      `${WARDEN_URL}/api/guard/appeal`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify({ auditId, note }),
+      },
+      decisionTimeoutMs,
+      (value) => {
+        if (!value || typeof value !== 'object') throw new Error('gateway returned a non-object');
+        return value;
+      },
+      (_http, value) => (value && typeof value === 'object' ? value : undefined)
+    );
+  } catch (err) {
+    process.stderr.write(`⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}).\n`);
+    return;
+  }
+
+  process.stdout.write(
+    res.error
+      ? ['', '✎ Not recorded.', '', ...wrap(res.error), ''].join('\n') + '\n'
+      : ['', '✎ Sent. Your administrator sees it next to this decision.', ''].join('\n') + '\n'
+  );
+}
+
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
-  const rewriteArg = process.argv.indexOf('--rewrite');
-  if (rewriteArg !== -1) {
-    const auditId = process.argv[rewriteArg + 1];
+  for (const [flag, run] of [['--rewrite', rewriteMode], ['--note', noteMode]]) {
+    const at = process.argv.indexOf(flag);
+    if (at === -1) continue;
+    const auditId = process.argv[at + 1];
     if (!auditId) {
-      process.stderr.write('⚠ warden-hook --rewrite needs the audit id from the block.\n');
+      process.stderr.write(`⚠ warden-hook ${flag} needs the audit id Warden printed.\n`);
       return;
     }
-    return rewriteMode(auditId, decisionTimeoutMs);
+    return run(auditId, decisionTimeoutMs);
   }
 
   // Both timeouts above bound a request; neither bounds the wait for the event

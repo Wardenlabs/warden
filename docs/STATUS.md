@@ -16,6 +16,8 @@ working state, including the parts that are not working.
 | **Refusal feedback** | ✅ the rule, what to do instead, and two requests that would have passed |
 | **Suggested rewrite** | ✅ wired end to end **against the mock** — console, hook `--rewrite`, gate, re-check. Never observed with a real model, so nothing is claimed about what a real rewrite proposes. |
 | **Appeals** | ✅ an employee can report a block; it lands in the console next to the rule that fired. Fills the promise the refusal line was already making. |
+| **`ESCALATE` queue** | ✅ real. Derived from the audit log, answered from the console, with the employee's own context beside it. `/api/escalations` returned `[]` for most of this project's life while three surfaces told people they were queued. An approval does **not** replay the prompt, and every surface says so. |
+| **Output-scope rules** | ✅ enforced, **on the proxy only** — it is the one path where Warden sees an answer. The hook runs before the prompt is sent and never sees the response. A policy with output rules cannot stream; one without streams as before. |
 | Secret sanitizer | ✅ keys, tokens, JWTs, Luhn-checked cards, emails. Offsets index the original text. |
 | Quotas | ✅ per role per day |
 | Exempt roles | ✅ `exemptRoles` in the policy — the admin who ratifies is not judged by it |
@@ -70,6 +72,18 @@ that fired (`src/policy/appeals.ts`). That does not lower the rate — it is how
 the rate stops being something only a benchmark can see. `benign-controls` says
 44%; an appeal queue says *which* prompts, from people who know they were
 working legitimately.
+
+**A candidate nobody had counted: `rule.scope` was never read.** Every rule was
+adjudicated against every prompt whatever its scope said, so
+`r-legal-commitment` — which exists to catch the assistant committing the
+company in its *answer* — was being asked whether employees' *questions*
+violated it. One of eight shipped rules, two more among the presets. Filtering
+it removed **29 of 353 adjudications** over the 98-prompt mock corpus with every
+other number identical, which is the latency half of the result; the
+false-positive half is unmeasured and wants `--reps 3` against a real model.
+Worth noting before that run: one of this rule's own compliant examples is
+`redactá un mail al proveedor pidiendo que reenvíe la factura`, a phrasing very
+close to benign controls the guard was refusing.
 
 ### What is known
 
@@ -183,7 +197,8 @@ port forward. Stated in the README's Limits.
 | Everyone | `npm run setup`, paste the report into OPE-14 |
 | Fede | OPE-19 — re-authenticate Claude, and retest Codex only once cold decisions stay under 30 s. Until a run clears the gate, `verified: false` stands and the console says so on every tool. |
 | Jere | OPE-20 — improvised attacks + clean-clone check by someone who did not build it |
-| Gastón | The false-positive investigation above |
+| Gastón | The false-positive investigation above — start with `--reps 3` on `benign-controls` before and after the `scope` filter, which is a candidate cause nobody had counted |
+| Whoever has a model | `npx tsx scripts/probe-rewrite.ts` and one proxy call with an `output` rule in force. Both paths are verified against the mock only. |
 | Martin | OPE-12 — `npm run benchmark` and `npm run redteam` on the demo machine, pin the permalinks to a SHA, record, submit |
 
 ## What not to do

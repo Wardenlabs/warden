@@ -101,15 +101,48 @@ export function seedIfEmpty(seedPath: string): PolicySpec {
 }
 
 /**
+ * Which half of the exchange is being judged.
+ *
+ * `'any'` skips the filter and is for describing a policy rather than enforcing
+ * it — the console listing what binds a person, the baseline system prompt,
+ * which governs a whole conversation and not one direction of it.
+ */
+export type JudgedSide = 'input' | 'output' | 'any';
+
+/**
+ * Does this rule govern the side being judged?
+ *
+ * `Rule.scope` existed from the first commit and, until this was written,
+ * **nothing read it**. Every rule was adjudicated against every prompt whatever
+ * it said, which is not a half-built feature but a wrong one: `r-legal-commitment`
+ * is scoped `output` because it exists to catch the assistant committing the
+ * company to something in its *answer*, and it was being asked whether an
+ * employee's question violated it. A rule written to judge outputs, judging
+ * inputs, is a false positive by construction — and the shipped policy has one
+ * of eight like that, with two more among the presets.
+ */
+function governsSide(rule: Rule, side: JudgedSide): boolean {
+  return side === 'any' || rule.scope === 'both' || rule.scope === side;
+}
+
+/**
  * Rules that bind this actor: the company-wide ones, the ones for their role,
  * and the ones written for them personally.
  *
  * This is the only place the guard decides which rules a prompt is measured
  * against, so the three audience kinds are resolved together rather than
  * layered on by callers — a caller that forgot one would produce a decision
- * that looks complete and is missing a rule.
+ * that looks complete and is missing a rule. Scope joins them here for the same
+ * reason: a caller filtering it by hand is a caller that will forget.
+ *
+ * `side` defaults to `'input'` because that is what almost every caller means
+ * and because defaulting the other way would keep the bug.
  */
-export function rulesForActor(spec: PolicySpec, actor: { id: string; role: string }): Rule[] {
+export function rulesForActor(
+  spec: PolicySpec,
+  actor: { id: string; role: string },
+  side: JudgedSide = 'input'
+): Rule[] {
   // An exempt role is measured against nothing: the person who ratifies the
   // policy is not governed by it. Checked before `appliesTo` so that a rule
   // written for everyone — including the pinned injection rule — does not
@@ -122,7 +155,7 @@ export function rulesForActor(spec: PolicySpec, actor: { id: string; role: strin
   // grants rather than something a caller claims. If a header path is ever
   // reintroduced, this line becomes a bypass again.
   if (isExempt(spec, actor.role)) return [];
-  return spec.rules.filter((r) => bindsActor(r.appliesTo, actor));
+  return spec.rules.filter((r) => bindsActor(r.appliesTo, actor) && governsSide(r, side));
 }
 
 /** Whether the policy declines to govern this role at all. */
@@ -146,8 +179,8 @@ export function isExempt(spec: PolicySpec, role: string): boolean {
  * written for a named employee, which is correct: those rules bind a person,
  * not the role they happen to hold.
  */
-export function rulesForRole(spec: PolicySpec, role: string): Rule[] {
-  return rulesForActor(spec, { id: '', role });
+export function rulesForRole(spec: PolicySpec, role: string, side: JudgedSide = 'input'): Rule[] {
+  return rulesForActor(spec, { id: '', role }, side);
 }
 
 /**

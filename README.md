@@ -154,6 +154,19 @@ prompt
 
 Four of the six passes are ordinary code. That is deliberate.
 
+On the proxy, the answer gets the same treatment against the rules scoped to it
+— `both` and `output` — through the same isolation, retrieval, adjudication and
+aggregation. `r-instruction-override` is scoped `input` and correctly takes no
+part in judging a response.
+
+```
+answer
+  ├ isolate      the model's text is untrusted too
+  ├ retrieve     output-scoped rules only
+  ├ adjudicate   one narrow call per rule
+  └ aggregate    → ALLOW · BLOCK · ESCALATE     → audit, hash-chained
+```
+
 ### The invariant
 
 > Verdicts are ordered `ALLOW < ESCALATE < BLOCK`. Every model pass can only push
@@ -646,9 +659,15 @@ A deliberate trade for a gateway running on a company's own machine.
   who are already trusted. Bind `WARDEN_HOST=127.0.0.1` if that is not true on
   your network. An admin credential is the obvious next piece of work, and until
   it exists this is the largest gap in the system.
-- **Output-scope rules are defined but only input is enforced today.** Rules
-  marked `scope: "output"` are stored and shown; the response-side pass is not
-  built.
+- **Output-scope rules are enforced on the proxy only.** The gateway can judge
+  a model's answer, and does — but it only ever sees an answer on the
+  OpenAI-compatible path. Through the hook, Warden runs before the prompt is
+  sent and never sees what comes back, because the tool talks to its own
+  provider directly. An `output` rule therefore governs Cursor and any OpenAI
+  SDK client, and does not govern Claude Code or Codex.
+- **A policy with output rules cannot stream.** Tokens cannot be recalled once
+  sent, so an answer that is going to be judged is buffered until it has been.
+  Policies with no `output` or `both` rules stream exactly as before.
 - **This is a hackathon build.** The guard is a small model doing a hard job and
   it misses things — which is exactly why `REPORT.md` prints every failure.
 
