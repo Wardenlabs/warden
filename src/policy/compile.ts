@@ -126,6 +126,8 @@ export type PreviewRow = {
   isFalsePositive: boolean;
   /** Violation the candidate rule would wrongly let through. */
   isMiss: boolean;
+  /** Where the case came from: the compiler's own examples, or the audit log. */
+  source: 'example' | 'log';
 };
 
 /**
@@ -140,17 +142,28 @@ export type PreviewRow = {
 export async function previewRule(
   qvac: QvacAdapter,
   rule: Rule,
-  _policy?: PolicySpec
+  _policy?: PolicySpec,
+  /**
+   * Extra cases judged alongside the compiler's own examples.
+   *
+   * The console passes prompts the gateway has already allowed, so the admin
+   * can ask the question that actually matters before shipping a rule: would
+   * this have stopped work that went through fine last week? A rule that reads
+   * well against invented examples and blocks real traffic is exactly the
+   * failure the examples cannot catch, because the compiler wrote them.
+   */
+  against: { prompt: string; expected: 'BLOCK' | 'ALLOW' }[] = []
 ): Promise<{ rows: PreviewRow[]; falsePositives: number; misses: number }> {
   const parsed = ruleSchema.parse(rule);
 
-  const cases: { prompt: string; expected: 'BLOCK' | 'ALLOW' }[] = [
-    ...parsed.examples.violating.map((p) => ({ prompt: p, expected: 'BLOCK' as const })),
-    ...parsed.examples.compliant.map((p) => ({ prompt: p, expected: 'ALLOW' as const }))
+  const cases: { prompt: string; expected: 'BLOCK' | 'ALLOW'; source: 'example' | 'log' }[] = [
+    ...parsed.examples.violating.map((p) => ({ prompt: p, expected: 'BLOCK' as const, source: 'example' as const })),
+    ...parsed.examples.compliant.map((p) => ({ prompt: p, expected: 'ALLOW' as const, source: 'example' as const })),
+    ...against.map((c) => ({ prompt: c.prompt, expected: c.expected, source: 'log' as const }))
   ];
 
   const rows = await Promise.all(
-    cases.map(async ({ prompt, expected }): Promise<PreviewRow> => {
+    cases.map(async ({ prompt, expected, source }): Promise<PreviewRow> => {
       const iso = isolate(prompt);
       try {
         const { verdict } = await adjudicate(qvac, iso, parsed);
@@ -158,7 +171,7 @@ export async function previewRule(
           ? parsed.severity === 'block' ? 'BLOCK' : 'ESCALATE'
           : 'ALLOW';
         return {
-          prompt, expected, verdict: decided,
+          prompt, expected, source, verdict: decided,
           confidence: verdict.confidence,
           reason: verdict.reason,
           isFalsePositive: expected === 'ALLOW' && decided !== 'ALLOW',
@@ -167,7 +180,7 @@ export async function previewRule(
       } catch (err) {
         // A pass that cannot decide escalates, exactly as it would in production.
         return {
-          prompt, expected, verdict: 'ESCALATE', confidence: 0,
+          prompt, expected, source, verdict: 'ESCALATE', confidence: 0,
           reason: `could not evaluate: ${err instanceof Error ? err.message : String(err)}`,
           isFalsePositive: expected === 'ALLOW',
           isMiss: false

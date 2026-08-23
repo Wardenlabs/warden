@@ -1,288 +1,172 @@
 /**
  * Console behaviour. Plain ES modules, no framework, no build step.
  *
- * Three views, matching the three people who care: the admin who writes the
- * rules, whoever has to explain a decision afterwards, and the directory of
- * everyone the rules land on. The trace is a first-class pane rather than a
- * debug view because "auditable in five seconds" only counts if the audit is
- * visible while the thing runs.
+ * One column. A rail to choose what you are looking at, and a list of those
+ * things; selecting one opens it in place, under the row you clicked. There is
+ * no side panel, because a panel that has to be labelled to be understood is a
+ * panel that was not carrying its width.
+ *
+ * Two people read every detail and they want opposite things. An operations
+ * lead wants one sentence; whoever runs the gateway wants nine passes and a
+ * hash chain. So every detail leads with the sentence and folds the rest away.
+ * Milliseconds are part of the folded half: they belong to "how long did this
+ * take", which is one question among several and not the first one.
+ *
+ * Every colour and every font-size lives in :root. Nothing here writes a hex
+ * value or a pixel size; if a style is missing, add a token and a class in
+ * index.html rather than an inline style, or the system stops being one.
  */
 
 const $ = (id) => document.getElementById(id);
+const api = (path, opts) => fetch(path, opts).then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, j })));
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const attr = (s) => encodeURIComponent(String(s ?? ''));
+const val = (x) => (typeof x === 'function' ? x() : x);
 
-/**
- * Every server call goes through here, and it never throws.
- *
- * Express answers some errors with HTML, and a crashed route answers with
- * nothing parseable at all. The old `r.json()` rejected on those, which took
- * down whatever function was mid-await — boot() dying on a bad policy file
- * rendered a blank console with no message anywhere, which is the worst
- * possible way to learn the policy file is bad.
- */
-const api = async (path, opts) => {
-  try {
-    const r = await fetch(path, opts);
-    const text = await r.text();
-    let j;
-    try {
-      j = text ? JSON.parse(text) : {};
-    } catch {
-      j = { error: text.slice(0, 200) || `HTTP ${r.status}` };
-    }
-    return { ok: r.ok, status: r.status, j };
-  } catch (err) {
-    return { ok: false, status: 0, j: { error: err?.message ?? 'network error' } };
-  }
+const state = {
+  view: 'activity',
+  sel: null,
+  query: {},
+
+  audit: [],
+  policy: { rules: [], quotas: [], version: '' },
+  company: { name: '', roles: [], employees: [] },
+  presets: [],
+  chain: null,
+  mock: false,
+
+  /**
+   * Blocks an employee said were wrong.
+   *
+   * The only place a false positive is visible. In the audit log a correct
+   * block and an incorrect one are the same record — nothing distinguishes
+   * them — so without this the admin has no way to find the rule that is
+   * costing the company work.
+   */
+  appeals: [],
+
+  /**
+   * Requests Warden held instead of deciding, with the administrator's answer
+   * when there is one. Derived on the server from the audit log, so this is a
+   * work queue and not a second copy of the truth.
+   */
+  escalations: [],
+
+  /** One draft at a time, deliberately. Two half-written rules is a way to
+   *  activate the wrong one. `draftFor` locks the audience when it was started
+   *  from a person's page. */
+  draft: null,
+  draftFor: null,
+  preview: null,
+  ruleChat: [],
+  ruleBusy: false,
+  /** The audience editor is a control, not information: it stays shut until
+   *  you say you want to change who a rule binds. */
+  audienceOpen: false,
+
+  filter: 'all',
+  actorFilter: '',
+  presetCat: null,
+
+  chat: [],
+  rtReport: null,
+  rtBusy: false,
+
+  /** Which disclosures are expanded, by key. Kept in state rather than the DOM
+   *  so it survives a re-render and follows you from one row to the next. */
+  open: new Set()
 };
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-let policy = { rules: [], quotas: [], version: '' };
-let company = { name: '', roles: [], employees: [] };
-let presets = [];
-let selectedPerson = null;
+const AUDIT_LIMIT = 400;
+/** Recent allowed prompts offered as a regression check on a candidate rule.
+ *  Each one is a full adjudication on the local model, so this stays small. */
+const REGRESSION_SAMPLE = 5;
+
+// ── formatting ───────────────────────────────────────────────────────────────
+
+const shortHash = (h) => (h ? String(h).slice(0, 8) : '—');
+const dayKey = (ts) => String(ts).slice(0, 10);
+
+function dayLabel(key) {
+  const today = dayKey(new Date().toISOString());
+  if (key === today) return 'Today';
+  if (key === new Date(Date.now() - 86400000).toISOString().slice(0, 10)) return 'Yesterday';
+  return new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const hhmm = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+const clip = (s, n) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many ?? `${one}s`)}`;
 
 /**
- * The rule being drafted, and where it is being drafted.
+ * A rule's name in words.
  *
- * One draft at a time, deliberately. Two half-written rules in two panels is a
- * way to activate the wrong one.
+ * `r-customer-pii` is an identifier, and an identifier in a list is a thing a
+ * non-technical reader skips. Seeded rules carry a meaningful slug; rules
+ * compiled at runtime get a generated id, and for those the opening clause of
+ * the rule reads better than the id ever would.
  */
-let draft = null;
-let draftHost = 'admin';
+const ACRONYMS = { pii: 'PII', api: 'API', ceo: 'CEO', hr: 'HR', id: 'ID', kyc: 'KYC', sso: 'SSO' };
+const GENERATED_ID = /^r-(preset|draft|\d)/;
 
-// ── boot ─────────────────────────────────────────────────────────────────────
+function ruleName(ruleOrId) {
+  const rule = typeof ruleOrId === 'string' ? ruleById(ruleOrId) : ruleOrId;
+  const id = typeof ruleOrId === 'string' ? ruleOrId : ruleOrId?.id;
 
-async function boot() {
-  const health = await api('/health');
-  const pill = $('adapter');
-  if (!health.ok) {
-    pill.textContent = 'server down';
-    pill.className = 'pill mock';
-    return;
+  if (id && /^r-/.test(id) && !GENERATED_ID.test(id)) {
+    return id.slice(2).split('-').filter(Boolean)
+      .map((w) => ACRONYMS[w] ?? w).join(' ')
+      .replace(/^./, (c) => c.toUpperCase());
   }
-  // A gateway running in baseline mode is not enforcing anything, and a green
-  // console over a disabled guard would be a lie in the one place an admin
-  // looks to check.
-  if (health.j.mode === 'baseline') {
-    pill.textContent = 'GUARD OFF — baseline mode';
-    pill.className = 'pill mock';
-  } else {
-    pill.textContent = health.j.mock ? 'mock adapter' : 'local model';
-    pill.className = `pill ${health.j.mock ? 'mock' : 'live'}`;
-  }
-
-  await refreshPolicy();
-  await refreshPeople();
-  await loadPresets();
-  await refreshAppeals();
-  await refreshEscalations();
-  subscribe();
+  return clip(String(rule?.text ?? '').split(/[.;—]/)[0], 48) || id || 'rule';
 }
 
-/**
- * The review queue — the destination `ESCALATE` always claimed to have.
- *
- * An escalation is not a refusal and must not read like one. The person was
- * not told no; they were told to wait, and this is the screen where somebody
- * ends that wait. What an answer here does and does not do is spelled out on
- * the card, because "approved" is the word most likely to be read as "and it
- * went through", which is not what happens.
- */
-async function refreshEscalations() {
-  const el = $('escalations');
-  if (!el) return;
-
-  const { ok, j } = await api('/api/escalations');
-  const badge = $('escalationCount');
-  if (!ok || !Array.isArray(j)) {
-    el.innerHTML = `<div class="note">Could not load the queue: ${esc(j?.error ?? 'error')}</div>`;
-    if (badge) badge.textContent = '';
-    return;
-  }
-
-  const pending = j.filter((e) => !e.review);
-  if (badge) {
-    badge.textContent = pending.length ? `${pending.length} waiting` : '';
-    badge.className = pending.length ? 'tag escalate' : '';
-    badge.style.display = pending.length ? '' : 'none';
-  }
-
-  if (j.length === 0) {
-    el.innerHTML = '<div class="note">Nothing held. Rules with severity “escalate” land here.</div>';
-    return;
-  }
-
-  // Pending first: this is a work queue, and the answered ones are history.
-  const ordered = [...pending, ...j.filter((e) => e.review)];
-  el.innerHTML = ordered
-    .map(
-      (e) => `
-      <div class="rule" style="margin-top:8px">
-        <div class="t">${e.ruleText ? esc(e.ruleText) : '<span class="note">held without a named rule</span>'}</div>
-        <div class="m">
-          <span class="tag">${esc(e.employeeName ?? e.employeeId)} · ${esc(e.role)}</span>
-          ${e.review
-            ? `<span class="tag ${e.review.outcome === 'approved' ? '' : 'block'}">${esc(e.review.outcome)}</span>`
-            : '<span class="tag escalate">waiting</span>'}
-          <span class="note">audit ${esc(e.auditId)} · ${esc(String(e.at).slice(0, 16).replace('T', ' '))}</span>
-        </div>
-        ${e.employeeNote ? `<div class="note" style="margin-top:7px"><b>They added:</b> ${esc(e.employeeNote)}</div>` : ''}
-        ${e.review?.note ? `<div class="note" style="margin-top:7px"><b>Answer:</b> ${esc(e.review.note)}</div>` : ''}
-        ${e.review
-          ? ''
-          : `<div class="row">
-               <button class="act" data-approve="${esc(e.auditId)}">Approve</button>
-               <button class="ghost danger" data-refuse="${esc(e.auditId)}">Refuse</button>
-             </div>
-             <div class="note" style="margin-top:6px">Approving does not release the original prompt — their tool moved on seconds after they pressed Enter. It answers them, and the next ask is judged on its own merits.</div>`}
-      </div>`
-    )
-    .join('');
-
-  for (const btn of el.querySelectorAll('[data-approve], [data-refuse]')) {
-    btn.onclick = () => answerEscalation(btn);
-  }
-}
-
-async function answerEscalation(btn) {
-  const approved = btn.hasAttribute('data-approve');
-  const auditId = btn.getAttribute(approved ? 'data-approve' : 'data-refuse');
-  const note = window.prompt(
-    approved
-      ? 'Anything to tell them? (optional — they see this)'
-      : 'Why is it refused? (optional — they see this)'
-  );
-  // Cancel means cancel. An empty string is a deliberate "no note".
-  if (note === null) return;
-
-  btn.disabled = true;
-  const { ok, j } = await api(`/api/escalations/${encodeURIComponent(auditId)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ outcome: approved ? 'approved' : 'refused', ...(note ? { note } : {}) })
-  });
-  if (!ok) {
-    btn.disabled = false;
-    alert(j?.error ?? 'could not record that');
-    return;
-  }
-  await refreshEscalations();
-}
-
-/**
- * Blocks employees said were wrong, next to the rule that produced them.
- *
- * The admin cannot find a false positive in the audit log — a correct block and
- * an incorrect one are the same record there. This is the only view where the
- * difference is visible, and it names the rule because the rule is the thing
- * they have to go and edit.
- */
-async function refreshAppeals() {
-  const el = $('appeals');
-  if (!el) return;
-
-  const { ok, j } = await api('/api/appeals');
-  if (!ok || !Array.isArray(j)) {
-    el.innerHTML = `<div class="note">Could not load reports: ${esc(j?.error ?? 'error')}</div>`;
-    return;
-  }
-  if (j.length === 0) {
-    el.innerHTML = '<div class="note">Nothing reported yet. Employees can flag a block from their own tool.</div>';
-    return;
-  }
-
-  el.innerHTML = j
-    .map(
-      (a) => `
-      <div class="rule" style="margin-top:8px">
-        <div class="t">${a.note ? esc(a.note) : '<span class="note">no note — just that it was wrong</span>'}</div>
-        <div class="m">
-          <span class="tag">${esc(a.employeeName)}</span>
-          ${a.verdict ? `<span class="tag ${a.verdict === 'BLOCK' ? 'block' : 'escalate'}">${esc(a.verdict)}</span>` : ''}
-          <span class="note">audit ${esc(a.auditId)} · ${esc(String(a.at).slice(0, 16).replace('T', ' '))}</span>
-        </div>
-        ${a.ruleText ? `<div class="note" style="margin-top:7px"><b>Rule that fired:</b> ${esc(a.ruleText)}</div>` : ''}
-      </div>`
-    )
-    .join('');
-}
-
-async function refreshPolicy() {
-  const { ok, j } = await api('/api/policy');
-  if (!ok) {
-    $('rules').innerHTML = `<div class="empty">Could not load the policy: ${esc(j.error ?? 'error')}</div>`;
-    return;
-  }
-  policy = j;
-  $('ver').textContent = j.version.slice(0, 8);
-  $('policyPill').textContent = `${j.rules.length} rules`;
-  renderRules();
-  renderQuotas();
-}
-
-async function refreshPeople() {
-  const { ok, j } = await api('/api/people');
-  if (!ok) {
-    $('peopleGrid').innerHTML = `<div class="empty">Could not load the directory: ${esc(j.error ?? 'error')}</div>`;
-    return;
-  }
-  company = j;
-  $('companyName').textContent = j.name || 'local AI gateway';
-  $('headcount').textContent = `${j.employees.length} people · ${j.roles.length} roles`;
-  renderPeople();
-  renderRoles();
-  renderWhoPicker();
-  if (selectedPerson) {
-    const still = j.employees.find((e) => e.id === selectedPerson.id);
-    selectedPerson = still ?? null;
-    renderPersonDetail();
-  }
-}
-
-// ── avatars ──────────────────────────────────────────────────────────────────
-
-/**
- * Initials on a tinted disc, coloured from a hash of the id.
- *
- * No photo service, no gravatar, no network call — this whole product's claim
- * is that nothing leaves the machine, and a console that phones out for
- * profile pictures would be the first thing a judge notices in devtools.
- */
-const AVATAR_COLORS = [
-  ['#e8f0fe', '#1a56db'], ['#fdecee', '#c11c25'], ['#e6f6ed', '#0b7a3c'],
-  ['#fdf3e3', '#96590a'], ['#f1eafc', '#6429c4'], ['#e6f5f8', '#0d6f7d'],
-  ['#fdeaf3', '#b02a72'], ['#eef1f6', '#44546a']
-];
-
+/** Initials on a neutral disc. No photo service and no generated hue: eight
+ *  tinted avatars competing with three verdict colours is why nothing on the
+ *  old console read at a glance. */
 function avatar(person, big = false) {
-  let h = 0;
-  for (const ch of person.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const [bg, fg] = AVATAR_COLORS[h % AVATAR_COLORS.length];
-  const initials = person.name.split(/\s+/).slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase();
-  return `<div class="avatar${big ? ' lg' : ''}" style="background:${bg};color:${fg}">${esc(initials)}</div>`;
+  const initials = String(person?.name ?? '?').split(/\s+/)
+    .map((w) => w.match(/\p{L}/u)?.[0] ?? '')
+    .filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  return `<span class="avatar${big ? ' lg' : ''}">${esc(initials)}</span>`;
 }
+
+const personById = (id) => state.company.employees.find((e) => e.id === id) ?? null;
+const actorName = (actor) => personById(actor?.id)?.name ?? actor?.id ?? 'unknown';
+
+/** `@id` means nothing to a reader; resolve it to a name. */
+function audienceLabel(appliesTo) {
+  if (!appliesTo?.length) return 'nobody';
+  if (appliesTo.includes('*')) return 'everyone';
+  return appliesTo
+    .map((t) => (t.startsWith('@') ? (personById(t.slice(1))?.name ?? `${t.slice(1)} (removed)`) : t))
+    .join(', ');
+}
+
+const isPersonal = (rule) => rule.appliesTo?.some((t) => t.startsWith('@'));
+const ruleById = (id) => state.policy.rules.find((r) => r.id === id) ?? null;
+
+const TOOL_NAMES = {
+  'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor',
+  opencode: 'OpenCode', generic: 'other tool', proxy: 'API'
+};
 
 /**
  * Copy to clipboard, with a fallback that actually matters here.
  *
  * The console is normally opened over the LAN at http://192.168.x.x, which is
- * not a secure context, and `navigator.clipboard` is undefined there. A copy
- * button that silently does nothing on the machine the admin is actually using
- * is worse than no button.
+ * not a secure context, and `navigator.clipboard` is undefined there.
  */
 async function copyText(text, btn) {
   let ok = false;
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      ok = true;
-    }
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); ok = true; }
   } catch { /* fall through to the textarea trick */ }
 
   if (!ok) {
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    ta.className = 'offscreen';
     document.body.append(ta);
     ta.select();
     try { ok = document.execCommand('copy'); } catch { ok = false; }
@@ -296,182 +180,1018 @@ async function copyText(text, btn) {
   }
 }
 
-// ── admin: presets ───────────────────────────────────────────────────────────
+// ── routing ──────────────────────────────────────────────────────────────────
+
+const VIEWS = {};
+
+function parseHash() {
+  const raw = location.hash.replace(/^#\/?/, '');
+  const [path, qs] = raw.split('?');
+  const [view, ...rest] = path.split('/');
+  const query = {};
+  for (const [k, v] of new URLSearchParams(qs ?? '')) query[k] = v;
+  return {
+    view: VIEWS[view] ? view : 'activity',
+    sel: rest.length ? decodeURIComponent(rest.join('/')) : null,
+    query
+  };
+}
+
+function go(view, sel, query) {
+  const qs = query && Object.keys(query).length ? `?${new URLSearchParams(query)}` : '';
+  const next = `#/${view}${sel ? `/${encodeURIComponent(sel)}` : ''}${qs}`;
+  if (location.hash === next) route(); else location.hash = next;
+}
+
+/** Selecting the open row again closes it. Nothing else on the page moves. */
+const toggleSel = (view, id) => go(view, state.sel === id ? null : id);
+
+function route() {
+  Object.assign(state, parseHash());
+  render();
+  if (VIEWS[state.view].onEnter) VIEWS[state.view].onEnter();
+}
+
+// ── boot ─────────────────────────────────────────────────────────────────────
+
+async function boot() {
+  const health = await api('/health').catch(() => null);
+  state.mock = Boolean(health?.j?.mock);
+  if (!health?.ok) {
+    $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>npm run dev</code> and reload this page.</span></div></div>';
+    return;
+  }
+
+  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations()]);
+  window.addEventListener('hashchange', route);
+  route();
+  subscribe();
+}
+
+async function refreshPolicy() {
+  const { j } = await api('/api/policy');
+  state.policy = j;
+}
+
+async function refreshPeople() {
+  const { j } = await api('/api/people');
+  state.company = j;
+}
+
+async function refreshAudit() {
+  const { ok, j } = await api(`/api/audit?limit=${AUDIT_LIMIT}`);
+  state.audit = ok && Array.isArray(j) ? j : [];
+}
+
+/** The chain no longer sits in a corner as ambient status. It is fetched so
+ *  the decision that someone actually asks about can prove itself. */
+async function refreshChain() {
+  const { ok, j } = await api('/api/audit/verify').catch(() => ({ ok: false }));
+  state.chain = ok ? j : null;
+}
 
 async function loadPresets() {
   const { j } = await api('/api/policy/presets');
-  presets = Array.isArray(j) ? j : [];
-  $('cats').innerHTML = presets
-    .map((c, i) => `<button class="chip" data-cat="${i}">${esc(c.label ?? c.category)}</button>`)
-    .join('');
-  $('cats').onclick = (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    [...$('cats').children].forEach((b) => b.classList.toggle('on', b === btn));
-    showPresets(Number(btn.dataset.cat));
-  };
+  state.presets = Array.isArray(j) ? j : [];
 }
 
-function showPresets(i) {
-  const cat = presets[i];
-  if (!cat) return;
-  $('presetList').innerHTML = cat.rules
-    .map((r, k) => `<div class="rule pick" data-cat="${i}" data-r="${k}">
-        <div class="t">${esc(r.text)}</div>
-        <div class="m"><span class="tag ${esc(r.severity)}">${esc(r.severity)}</span> ${esc(audienceLabel(r.appliesTo))}</div>
-      </div>`)
-    .join('');
-  $('presetList').onclick = (e) => {
-    const el = e.target.closest('.rule');
-    if (!el) return;
-    // A preset arrives complete; it goes straight into the draft slot so the
-    // admin still passes through preview and ratify rather than the catalogue
-    // being a way to skip them.
-    const r = presets[Number(el.dataset.cat)].rules[Number(el.dataset.r)];
-    draft = { ...r, id: `r-preset-${Date.now().toString(36)}` };
-    draftHost = 'admin';
-    renderDraft();
-  };
+async function refreshAppeals() {
+  const { ok, j } = await api('/api/appeals');
+  state.appeals = ok && Array.isArray(j) ? j : [];
 }
 
-// ── admin: compile ───────────────────────────────────────────────────────────
-
-$('compile').onclick = () => compileInto('admin', $('ruleText').value, null, $('compileNote'), $('compile'));
+async function refreshEscalations() {
+  const { ok, j } = await api('/api/escalations');
+  state.escalations = ok && Array.isArray(j) ? j : [];
+}
 
 /**
- * Compile a sentence into a rule.
+ * The live stream.
  *
- * `lockTo` is passed when the admin is writing from inside one person's page.
- * They already said who the rule is for by being there, and re-deriving that
- * from the prose is a way for a small model to bind the rule to the whole
- * company by accident.
+ * The event carries the decision but not the audit envelope — no actor, no
+ * hash links — so a new decision is a cue to pull the head of the log rather
+ * than something to render straight from the wire. One small request per
+ * decision buys rows identical to the historical ones.
  */
-async function compileInto(host, text, lockTo, noteEl, btnEl) {
-  const clean = String(text ?? '').trim();
-  if (!clean) return;
-  if (btnEl) btnEl.disabled = true;
-  if (noteEl) noteEl.textContent = 'compiling on the local model…';
+function subscribe() {
+  const src = new EventSource('/api/events');
+  src.onmessage = async (e) => {
+    let payload; try { payload = JSON.parse(e.data); } catch { return; }
+    if (payload.type !== 'decision') return;
+    const { ok, j } = await api('/api/audit?limit=1');
+    if (ok && j[0] && j[0].auditId !== state.audit[0]?.auditId) state.audit.unshift(j[0]);
+    void refreshChain();
+    render();
+  };
+}
 
-  const { ok, j } = await api('/api/policy/draft', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(lockTo ? { text: clean, lockTo } : { text: clean })
+// ── render ───────────────────────────────────────────────────────────────────
+
+/**
+ * Everything is re-rendered from strings, and a decision arriving on the live
+ * stream re-renders whatever you happen to be in the middle of typing. So the
+ * value and the caret of every field are carried across the swap, keyed by id.
+ */
+/** How close to the bottom still counts as "following the conversation". */
+const STICK_PX = 140;
+const SMOOTH = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+
+function captureFields() {
+  const saved = {};
+  for (const f of $('pane').querySelectorAll('input, textarea, select')) {
+    if (!f.id) continue;
+    saved[f.id] = { value: f.value, start: f.selectionStart, end: f.selectionEnd };
+  }
+  const chat = $('pane').querySelector('.chat');
+  return {
+    saved,
+    focus: document.activeElement?.id ?? null,
+    scroll: $('pane').scrollTop,
+    // A conversation follows along on its own while you are at the bottom of
+    // it, and stays put if you have scrolled up to read something. Yanking
+    // someone back down mid-sentence is worse than not scrolling at all.
+    chat: chat && { top: chat.scrollTop, stick: chat.scrollHeight - chat.scrollTop - chat.clientHeight < STICK_PX }
+  };
+}
+
+function restoreFields({ saved, focus, scroll, chat }) {
+  for (const [id, s] of Object.entries(saved)) {
+    const f = $(id);
+    if (!f || f.value === s.value) continue;
+    // A <select> whose option list was rebuilt may no longer hold the value.
+    if (f.tagName === 'SELECT' && ![...f.options].some((o) => o.value === s.value)) continue;
+    f.value = s.value;
+    if (s.start != null && f.setSelectionRange) {
+      try { f.setSelectionRange(s.start, s.end); } catch { /* not a text field */ }
+    }
+  }
+  if (focus && $(focus)) $(focus).focus();
+  if (scroll) $('pane').scrollTop = scroll;
+}
+
+/**
+ * Keep the conversation at the bottom.
+ *
+ * Runs after bind, not with the other restores: bind is where the audience
+ * editor writes its chips, and measuring the height before that leaves the
+ * last card cut off by exactly the height of those two rows.
+ */
+function restoreChat(chat) {
+  const el = $('pane').querySelector('.chat');
+  if (!el) return;
+  if (!chat) { el.scrollTop = el.scrollHeight; return; }   // just opened
+  if (!chat.stick) { el.scrollTop = chat.top; return; }
+  requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: SMOOTH() }));
+}
+
+function render() {
+  const view = VIEWS[state.view];
+  const fields = captureFields();
+
+  renderNav();
+  $('pane').className = `pane${val(view.flush) ? ' flush' : ''}`;
+  $('pane').innerHTML = view.body();
+
+  restoreFields(fields);
+  bindDisclosures();
+  if (view.bind) view.bind();
+  restoreChat(fields.chat);
+}
+
+/** Disclosures report their own open state back into `state.open` so the next
+ *  render can reinstate it. */
+function bindDisclosures() {
+  for (const d of document.querySelectorAll('details[data-key]')) {
+    d.ontoggle = () => {
+      if (d.open) state.open.add(d.dataset.key); else state.open.delete(d.dataset.key);
+    };
+  }
+}
+
+function disclosure(key, label, body) {
+  return `<details class="fold" data-key="${esc(key)}"${state.open.has(key) ? ' open' : ''}>
+    <summary>${esc(label)}</summary>
+    <div class="fold-body">${body}</div>
+  </details>`;
+}
+
+/**
+ * The navigation: four destinations across the top, one divider.
+ *
+ * Along the top rather than down the side, so the column underneath is the
+ * full width of the window and the composer can be the size it deserves.
+ *
+ * Only one count survives. A number next to Activity told you how much log
+ * there is, which is not a thing anyone acts on; a number next to Inbox says
+ * somebody is waiting, which is.
+ *
+ * The simulator and the red team suite are not here at all — they are things
+ * you run against your policy, not places you go, so they live on Rules.
+ */
+// Rules leads with the composer rather than the list: `sel: 'new'` makes the
+// nav item land on the tab you are most likely to have come for.
+const NAV = [
+  { view: 'activity', label: 'Activity' },
+  { view: 'inbox', label: 'Inbox', count: () => pendingEscalations().length + state.appeals.length },
+  { sep: true },
+  { view: 'policy', label: 'Rules', sel: 'new' },
+  { view: 'people', label: 'Team' }
+];
+
+function renderNav() {
+  const here = VIEWS[state.view].railParent ?? state.view;
+  $('nav').innerHTML = NAV.map((it) => {
+    if (it.sep) return '<span class="nav-sep"></span>';
+    const n = it.count ? it.count() : 0;
+    return `<button type="button" class="nav-item${here === it.view ? ' on' : ''}" data-go="${it.view}"${it.sel ? ` data-sel="${it.sel}"` : ''}>
+      <span>${esc(it.label)}</span>
+      ${n > 0 ? `<span class="nav-count">${n}</span>` : ''}
+    </button>`;
+  }).join('');
+  $('orgName').textContent = state.company.name ? `· ${state.company.name}` : '';
+}
+
+// One delegated listener for the whole document: every navigation is a
+// `data-go` (+ optional `data-sel` / `data-q`), so nothing has to re-bind after
+// a re-render. `data-toggle` is the in-place open/close.
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-toggle]');
+  if (t) { toggleSel(t.dataset.toggle, t.dataset.sel || null); return; }
+
+  const nav = e.target.closest('[data-go]');
+  if (nav) {
+    const q = nav.dataset.q ? Object.fromEntries(new URLSearchParams(nav.dataset.q)) : undefined;
+    go(nav.dataset.go, nav.dataset.sel || null, q);
+    return;
+  }
+  const copy = e.target.closest('[data-copy]');
+  if (copy) void copyText(decodeURIComponent(copy.dataset.copy), copy);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.sel && !composing()) go(state.view);
+});
+
+// ═══ ACTIVITY ════════════════════════════════════════════════════════════════
+
+/** Held and still unanswered. The rail counts these, not the ones already dealt
+ *  with — a badge that never goes down stops being read. */
+const pendingEscalations = () => state.escalations.filter((e) => !e.review);
+
+function visibleAudit() {
+  return state.audit.filter((a) => {
+    const d = a.decision ?? {};
+    if (state.filter !== 'all' && d.verdict !== state.filter) return false;
+    if (state.actorFilter && a.actor?.id !== state.actorFilter) return false;
+    if (state.query.rule && !(d.firedRules ?? []).some((r) => r.ruleId === state.query.rule)) return false;
+    return true;
   });
-
-  if (btnEl) btnEl.disabled = false;
-  if (noteEl) noteEl.textContent = ok ? '' : (j.error ?? 'failed');
-  if (!ok) return;
-
-  draft = j;
-  draftHost = host;
-  renderDraft();
 }
 
-/** Where the draft card renders right now — the admin panel or a person's page. */
-function draftContainer() {
-  return draftHost === 'admin' ? $('draft') : $('personDraft');
+/**
+ * The shape of the day, above the log.
+ *
+ * Opening a console should answer "do I have to do something?" before it
+ * answers "what happened?". Every number here comes from the audit records
+ * already loaded — there is no second surface and no new endpoint behind it.
+ */
+function todayCard() {
+  const today = dayKey(new Date().toISOString());
+  const rows = state.audit.filter((a) => dayKey(a.ts) === today);
+  const stopped = rows.filter((a) => a.decision?.verdict === 'BLOCK').length;
+  const waiting = pendingEscalations().length;
+  const people = new Set(rows.filter((a) => a.decision?.verdict !== 'ALLOW').map((a) => a.actor?.id)).size;
+
+  if (!rows.length) {
+    return `<div class="today">
+      <p class="line">Nothing has come through Warden today yet.</p>
+      <div class="cta"><button type="button" class="btn" data-go="simulator">Try a prompt</button></div>
+    </div>`;
+  }
+
+  return `<div class="today">
+    <p class="line">Warden looked at <b>${rows.length}</b> request${rows.length === 1 ? '' : 's'} today and stopped <b>${stopped}</b>.
+      ${people ? `${plural(people, 'person', 'people')} hit a rule.` : 'Nobody hit a rule.'}</p>
+    ${waiting ? `<div class="cta">
+      <button type="button" class="btn primary" data-go="inbox">${plural(waiting, 'request')} waiting on you</button>
+    </div>` : ''}
+    ${state.mock ? '<div class="banner warn">Warden is running on the mock adapter. These decisions did not come from a real model.</div>' : ''}
+  </div>`;
 }
 
-function renderDraft() {
-  // Only one draft exists, so clear whichever container is not hosting it.
-  for (const el of [$('draft'), $('personDraft')]) if (el) el.innerHTML = '';
-  const d = draftContainer();
-  if (!d || !draft) return;
+function decisionRows(entries, emptyState) {
+  if (!entries.length) return emptyState;
 
-  const locked = draftHost !== 'admin';
-  d.innerHTML = `
-    <div class="rule draft" style="margin-top:12px">
-      <div class="t">${esc(draft.text)}</div>
-      <div class="m">
-        <span class="tag ${esc(draft.severity)}">${esc(draft.severity)}</span>
-        <span class="tag">${esc(draft.scope)}</span>
-      </div>
+  let out = '';
+  let day = null;
+  const counts = entries.reduce((m, a) => { const k = dayKey(a.ts); m[k] = (m[k] ?? 0) + 1; return m; }, {});
 
-      <div class="sub" style="margin:13px 0 7px">Applies to</div>
-      ${locked
-        ? `<div class="note">${esc(audienceLabel(draft.appliesTo))} — locked, you are writing this from their page.</div>`
-        : `<div class="chips" id="audienceChips"></div>`}
+  for (const a of entries) {
+    const k = dayKey(a.ts);
+    if (k !== day) {
+      day = k;
+      out += `<div class="day">${esc(dayLabel(k))}<span class="n">${counts[k]}</span></div>`;
+    }
+    const d = a.decision ?? {};
+    const fired = d.firedRules?.[0];
+    const open = state.sel === a.auditId;
 
-      ${draft.guidance ? `<div class="sub" style="margin:14px 0 6px">What the employee is told instead</div>
-      <div class="note">${esc(draft.guidance)}</div>` : ''}
+    out += `<button type="button" class="row${open ? ' on' : ''}" data-toggle="${state.view}" data-sel="${attr(a.auditId)}" aria-expanded="${open}">
+      <span class="dot ${esc(d.verdict ?? '')}"></span>
+      <span class="who">${esc(actorName(a.actor))}</span>
+      <span class="txt">${esc(d.maskedPrompt || '—')}</span>
+      ${fired ? `<span class="rule-ref">${esc(ruleName(fired.ruleId))}</span>` : ''}
+      <span class="meta">${esc(hhmm(a.ts))}</span>
+    </button>`;
 
-      <div class="sub" style="margin:14px 0 6px">Would block</div>
-      ${draft.examples.violating.map((e) => `<div class="note">· ${esc(e)}</div>`).join('')}
-      <div class="sub" style="margin:11px 0 6px">Must still allow</div>
-      ${draft.examples.compliant.map((e) => `<div class="note">· ${esc(e)}</div>`).join('')}
+    if (open) out += decisionDetail(a);
+  }
+  return out;
+}
 
-      <div class="row">
-        <button class="ghost" id="previewBtn">Preview</button>
-        <button class="act" id="ratifyBtn">Activate</button>
-        <button class="ghost" id="dropBtn">Discard</button>
-      </div>
-      <div id="previewOut"></div>
+/**
+ * What happened, in one sentence, before any of the machinery.
+ *
+ * Assembled from fields the audit record already carries — no second model
+ * call. An operations lead should be able to read this line, close the row,
+ * and be correct about what Warden did.
+ */
+function plainSummary(entry) {
+  const d = entry.decision ?? {};
+  const who = esc(actorName(entry.actor));
+  const asked = esc(clip(d.maskedPrompt, 130));
+  const rule = d.firedRules?.[0];
+
+  if (d.verdict === 'ALLOW') {
+    return `<b>${who}</b> asked “${asked}”, and Warden let it through — nothing in the policy applies to it.`;
+  }
+  if (!rule) {
+    // No rule fired, so the only account of the refusal is the explanation the
+    // guard wrote. It is multi-line and one of its lines names the structural
+    // signal — invisible characters, faked conversation turns, phrasing aimed
+    // at the instruction layer. Without this the panel says a person was
+    // stopped and offers nothing to point at, which is exactly the failure the
+    // policy-is-the-authority rule exists to prevent.
+    const flagged = String(d.explanation ?? '').split('\n').find((l) => l.startsWith('Also flagged:'));
+    const signal = flagged ? flagged.replace(/^Also flagged:\s*/, '').replace(/\.\s*$/, '') : '';
+    if (d.verdict === 'ESCALATE') {
+      return `<b>${who}</b> asked “${asked}”. No rule matched it, but Warden noticed ${
+        signal ? `<b>${esc(signal)}</b>` : 'something structural in the text'
+      } and queued it for a person. They have not been refused — they are waiting.`;
+    }
+    return `<b>${who}</b> asked “${asked}”, and Warden stopped it${
+      signal ? ` after noticing <b>${esc(signal)}</b>` : ''
+    }. No rule in the policy matched it.`;
+  }
+  const name = esc(ruleName(rule.ruleId));
+  // The guidance stays out of this sentence on purpose. It is often three lines
+  // long, and a lead that runs to six lines is no longer a lead.
+  return d.verdict === 'BLOCK'
+    ? `<b>${who}</b> asked “${asked}”. The <b>${name}</b> rule forbids that, so Warden stopped it.`
+    : `<b>${who}</b> asked “${asked}”. The <b>${name}</b> rule says this needs a person to sign off, so Warden is holding it.`;
+}
+
+/**
+ * @param entry the audit record
+ * @param head  markup spliced in above the summary. The Inbox uses it to lead
+ *              with what a person said about this decision, which is the part
+ *              the log cannot tell you.
+ */
+function decisionDetail(entry, head = '') {
+  const d = entry.decision ?? {};
+  const slowest = Math.max(1, ...(d.passes ?? []).map((p) => p.ms ?? 0));
+  const guidance = d.firedRules?.[0]?.guidance;
+
+  // Latency lives here and only here — this is the section about how it ran.
+  // "None of it left this machine" is the conclusion of the same paragraph,
+  // which is a better home for that claim than a light in a corner.
+  const passes = `<div>${(d.passes ?? []).map((p) => `
+      <div class="pass">
+        <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
+        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
+        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
+        <span class="ms">${p.ms ?? 0}ms</span>
+      </div>`).join('')}
+    <div class="note">${plural((d.passes ?? []).length, 'pass', 'passes')}, ${((d.totalMs ?? 0) / 1000).toFixed(1)}s end to end,
+      ${state.mock ? 'on the mock adapter.' : 'and none of it left this machine.'}</div>`;
+
+  const chain = `<div class="chain">
+      <div class="link"><span>previous</span><b>${esc(shortHash(entry.prevHash))}</b></div>
+      <div class="rail-line"></div>
+      <div class="link"><span class="dot ${state.chain?.ok ? 'ALLOW' : 'BLOCK'}"></span><b>${esc(shortHash(entry.entryHash))}</b><span>this one</span></div>
+    </div>
+    <div class="note">${state.chain?.ok
+      ? `All ${state.chain.entries} records still recompute to the hash written with them. Change any one of them and this check fails.`
+      : 'This log no longer verifies — a record was altered or removed after it was written.'}</div>`;
+
+  const record = `<div class="kv">
+      <div class="r"><span class="k">Audit id</span><span class="v mono">${esc(entry.auditId)}</span></div>
+      <div class="r"><span class="k">Exact time</span><span class="v mono">${esc(entry.ts)}</span></div>
+      <div class="r"><span class="k">Policy</span><span class="v mono">${esc(shortHash(d.policyVersion))}</span></div>
+      ${d.quota?.limit ? `<div class="r"><span class="k">Daily use</span><span class="v num">${d.quota.used} of ${d.quota.limit}</span></div>` : ''}
+      ${d.maskedSpans?.length ? `<div class="r"><span class="k">Masked</span><span class="v">${plural(d.maskedSpans.length, 'secret')} removed before checking</span></div>` : ''}
+      ${(d.firedRules ?? []).map((r) => `
+        <div class="r"><span class="k">${esc(r.ruleId)}</span><span class="v">${esc(r.reason)} · confidence ${r.confidence ?? '—'}</span></div>`).join('')}
     </div>`;
 
-  if (!locked) renderAudienceChips();
+  return `<div class="detail">
+    ${head}
+    <div class="detail-head">
+      <span class="badge ${esc(d.verdict)}">${esc(d.verdict)}</span>
+      <span class="when">${esc(hhmm(entry.ts))} · ${esc(dayLabel(dayKey(entry.ts)).toLowerCase())}</span>
+    </div>
 
-  $('previewBtn').onclick = runPreview;
-  $('dropBtn').onclick = () => { draft = null; renderDraft(); };
-  $('ratifyBtn').onclick = async () => {
-    $('ratifyBtn').disabled = true;
-    const { ok, j } = await api('/api/policy/ratify', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rule: draft })
-    });
-    // Activation is the most consequential click in the product; a failure
-    // that silently discarded the draft looked exactly like success. Keep the
-    // draft, say what went wrong, let the admin fix and retry.
-    if (!ok) {
-      $('ratifyBtn').disabled = false;
-      $('previewOut').innerHTML =
-        `<div class="banner" style="margin-top:11px;background:var(--block-soft);color:var(--block)">Not activated: ${esc(j.error ?? 'the server refused')}</div>`;
-      return;
-    }
-    draft = null;
-    $('ruleText').value = '';
-    const pt = $('personRuleText');
-    if (pt) pt.value = '';
-    renderDraft();
-    await refreshPolicy();
-    await refreshPeople();
+    <p class="summary">${plainSummary(entry)}</p>
+
+    ${guidance ? `<div class="group">
+      <div class="label">What Warden told them to do instead</div>
+      <div class="banner">${esc(guidance)}</div>
+    </div>` : ''}
+
+    <div class="group">
+      <div class="label">What they sent</div>
+      <pre class="code">${esc(d.maskedPrompt || '—')}</pre>
+    </div>
+
+    ${(d.firedRules ?? []).length ? `
+      <div class="group">
+        <div class="label">Rule${d.firedRules.length > 1 ? 's' : ''} behind it</div>
+        ${d.firedRules.map((r) => `
+          <button type="button" class="ruleref" data-go="policy" data-sel="${attr(r.ruleId)}">
+            <span class="dot ${esc(r.severity)}"></span>
+            <span class="col">
+              <span class="t">${esc(ruleName(r.ruleId))}</span>
+              <span class="m">${esc(clip(r.ruleText, 130))}</span>
+            </span>
+          </button>`).join('')}
+      </div>` : ''}
+
+    <div class="folds">
+      ${disclosure('d:passes', 'How it was decided', passes)}
+      ${disclosure('d:chain', 'Proof this record has not been altered', chain)}
+      ${disclosure('d:record', 'Technical record', record)}
+    </div>
+  </div>`;
+}
+
+/** Filters live with the list they filter, not in the app chrome. */
+function activityToolbar() {
+  const opts = state.company.employees
+    .map((e) => `<option value="${esc(e.id)}"${state.actorFilter === e.id ? ' selected' : ''}>${esc(e.name)}</option>`).join('');
+  return `<div class="toolbar">
+    <span class="seg" id="verdictSeg">
+      ${['all', 'BLOCK', 'ESCALATE', 'ALLOW'].map((v) => `
+        <button type="button" data-v="${v}" class="${state.filter === v ? 'on' : ''}">${v === 'all' ? 'All' : v[0] + v.slice(1).toLowerCase()}</button>`).join('')}
+    </span>
+    <select class="inline" id="actorFilter" aria-label="Filter by person">
+      <option value="">Everyone</option>${opts}
+    </select>
+    ${state.query.rule ? `<button type="button" class="chip on" id="clearRule">${esc(ruleName(state.query.rule))} ✕</button>` : ''}
+    <span class="spacer"></span>
+    <span class="note">${visibleAudit().length} of ${state.audit.length}</span>
+  </div>`;
+}
+
+function bindActivity() {
+  const seg = $('verdictSeg');
+  if (seg) seg.onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    state.filter = b.dataset.v;
+    render();
   };
+  const sel = $('actorFilter');
+  if (sel) sel.onchange = (e) => { state.actorFilter = e.target.value; render(); };
+  const cr = $('clearRule');
+  if (cr) cr.onclick = () => go('activity');
+}
+
+VIEWS.activity = {
+  bind: bindActivity,
+  body: () => {
+    const rows = visibleAudit();
+    const filtered = rows.length !== state.audit.length;
+    return `<div class="sheet">
+      ${filtered ? '' : todayCard()}
+      ${activityToolbar()}
+      ${decisionRows(rows, '<div class="empty"><b>Nothing matches</b><span>No decision in the log fits these filters. Clear one to widen the search.</span></div>')}
+    </div>`;
+  }
+};
+
+/**
+ * Everything waiting on a person, in two kinds.
+ *
+ * A held request is Warden declining to decide. An appeal is Warden having
+ * decided wrong, according to the person it landed on. Both need a human and
+ * neither belongs in the log, where a correct block and an incorrect one look
+ * identical — which is the whole reason appeals exist as a separate record.
+ */
+VIEWS.inbox = {
+  onEnter: () => { void Promise.all([refreshAppeals(), refreshEscalations()]).then(render); },
+  bind: bindInbox,
+  body: () => {
+    const waiting = pendingEscalations();
+    const answered = state.escalations.filter((e) => e.review);
+    if (!state.appeals.length && !state.escalations.length) {
+      return `<div class="sheet"><div class="empty">
+        <b>Nothing waiting</b>
+        <span>Two things land here: requests Warden held instead of deciding, and blocks an employee said were wrong.</span>
+      </div></div>`;
+    }
+    return `<div class="sheet">
+      ${waiting.length ? `
+        <div class="day">Waiting on you<span class="n">${waiting.length}</span></div>
+        ${waiting.map(escalationRow).join('')}` : ''}
+      ${state.appeals.length ? `
+        <div class="day">Reported as wrong<span class="n">${state.appeals.length}</span></div>
+        ${state.appeals.map(appealRow).join('')}` : ''}
+      ${answered.length ? `
+        <div class="day">Already answered<span class="n">${answered.length}</span></div>
+        ${answered.map(escalationRow).join('')}` : ''}
+    </div>`;
+  }
+};
+
+/**
+ * One held request.
+ *
+ * An escalation is not a refusal and must not read like one: the person was not
+ * told no, they were told to wait, and this is the screen where somebody ends
+ * that wait.
+ */
+function escalationRow(e) {
+  const open = state.sel === e.auditId;
+  const done = Boolean(e.review);
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(e.auditId)}" aria-expanded="${open}">
+      <span class="dot ${done ? '' : 'ESCALATE'}"></span>
+      <span class="col">
+        <span class="t">${e.ruleText ? esc(ruleName(e.ruleId ?? '')) : 'Held without a named rule'}</span>
+        <span class="m">
+          <span>${esc(e.employeeName ?? e.employeeId)} · ${esc(e.role)}</span>
+          ${done
+            ? `<span class="badge ${e.review.outcome === 'approved' ? 'ALLOW' : 'BLOCK'}">${esc(e.review.outcome)}</span>`
+            : '<span class="badge ESCALATE">waiting</span>'}
+          <span class="mono">${esc(String(e.at).slice(0, 16).replace('T', ' '))}</span>
+        </span>
+      </span>
+    </button>
+    ${open ? escalationDetail(e) : ''}`;
+}
+
+function escalationDetail(e) {
+  const entry = state.audit.find((x) => x.auditId === e.auditId);
+  const who = esc(e.employeeName ?? e.employeeId);
+
+  const head = `<p class="summary">${who} sent something the <b>${esc(ruleName(e.ruleId ?? ''))}</b> rule says needs a person to sign off. They were not refused — they were told to wait, and they are still waiting.</p>
+    ${e.employeeNote ? `<div class="group">
+      <div class="label">They added</div>
+      <div class="banner">“${esc(e.employeeNote)}”</div>
+    </div>` : ''}
+    ${e.review ? `<div class="group">
+      <div class="label">Answered</div>
+      <div class="banner${e.review.outcome === 'approved' ? '' : ' warn'}">
+        <b>${esc(e.review.outcome)}</b>${e.review.note ? ` — ${esc(e.review.note)}` : ''}
+      </div>
+    </div>` : `<div class="group">
+      <div class="label">Answer them</div>
+      <textarea id="reviewNote" rows="2" placeholder="What should they know? (optional)"></textarea>
+      <div class="chips">
+        <button type="button" class="btn primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
+        <button type="button" class="btn danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
+      </div>
+      <div class="note">Approving does not release the original prompt — their tool moved on seconds after they pressed Enter. It answers them, and the next ask is judged on its own merits.</div>
+      <div class="note bad" id="reviewNote_err"></div>
+    </div>`}`;
+
+  return entry ? decisionDetail(entry, head) : `<div class="detail">${head}</div>`;
+}
+
+function bindInbox() {
+  const sheet = $('pane').querySelector('.sheet');
+  if (!sheet) return;
+  sheet.querySelectorAll('[data-review]').forEach((btn) => {
+    btn.onclick = async () => {
+      const note = $('reviewNote')?.value.trim();
+      btn.disabled = true;
+      const { ok, j } = await api(`/api/escalations/${encodeURIComponent(btn.dataset.id)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: btn.dataset.review, ...(note ? { note } : {}) })
+      });
+      if (!ok) {
+        btn.disabled = false;
+        const err = $('reviewNote_err');
+        if (err) err.textContent = j.error ?? 'could not record that';
+        return;
+      }
+      await refreshEscalations();
+      render();
+    };
+  });
+}
+
+function appealRow(a) {
+  const open = state.sel === a.auditId;
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(a.auditId)}" aria-expanded="${open}">
+      <span class="dot BLOCK"></span>
+      <span class="col">
+        <span class="t">${a.note ? esc(a.note) : `${esc(a.employeeName)} said this block was wrong`}</span>
+        <span class="m">
+          <span>${esc(a.employeeName)}</span>
+          ${a.ruleId ? `<span>${esc(ruleName(a.ruleId))}</span>` : '<span>no rule fired</span>'}
+          <span class="mono">${esc(String(a.at).slice(0, 16).replace('T', ' '))}</span>
+        </span>
+      </span>
+    </button>
+    ${open ? appealDetail(a) : ''}`;
+}
+
+function appealDetail(a) {
+  const entry = state.audit.find((x) => x.auditId === a.auditId);
+  // The decision itself carries everything, so show it — but lead with what the
+  // person said, because that is the part the log cannot tell you.
+  const head = `<div class="group">
+      <div class="label">${esc(a.employeeName)} reported this</div>
+      ${a.note
+        ? `<div class="banner">“${esc(a.note)}”</div>`
+        : '<div class="note">No note — just that it was wrong.</div>'}
+    </div>
+    ${a.ruleId ? `<div class="group">
+      <div class="label">The rule that stopped them</div>
+      <button type="button" class="ruleref" data-go="policy" data-sel="${attr(a.ruleId)}">
+        <span class="dot block"></span>
+        <span class="col">
+          <span class="t">${esc(ruleName(a.ruleId))}</span>
+          <span class="m">${esc(clip(a.ruleText, 130))}</span>
+        </span>
+      </button>
+    </div>` : ''}`;
+
+  if (!entry) {
+    return `<div class="detail">
+      ${head}
+      <div class="note">The decision itself is older than the log this console loaded, so only what they reported is shown.</div>
+    </div>`;
+  }
+  // Splice the report into the decision's own detail, above everything else.
+  return decisionDetail(entry, head);
+}
+
+// ═══ RULES ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Rules is two tabs, not one page.
+ *
+ * Writing a rule is a conversation with Warden; the policy is a list. Those are
+ * different modes of using the screen, and stacking them meant that the moment
+ * you sent the first message the list underneath was orphaned — still there,
+ * no longer part of what you were doing. So they became peers: the list you
+ * come back to, and the conversation you start.
+ */
+const onNewRule = () => state.view === 'policy' && state.sel === 'new';
+const inConversation = () => onNewRule() && (state.ruleChat.length > 0 || Boolean(state.draft));
+const composing = inConversation;
+
+VIEWS.policy = {
+  flush: onNewRule,
+  body: () => (onNewRule() ? (inConversation() ? ruleChatPane() : newRulePage()) : rulesBody()),
+  bind: bindPolicy
+};
+
+/** The switch between the two, at the top of the column in both. A dot on the
+ *  New rule side when a draft is waiting there — leaving the tab does not
+ *  throw the conversation away. */
+function rulesTabs(right = '') {
+  const on = onNewRule();
+  return `<div class="toolbar">
+    <span class="seg">
+      <button type="button" class="${on ? 'on' : ''}" data-go="policy" data-sel="new">New rule${!on && state.draft ? ' •' : ''}</button>
+      <button type="button" class="${on ? '' : 'on'}" data-go="policy">Rules</button>
+    </span>
+    <span class="spacer"></span>
+    ${right}
+  </div>`;
+}
+
+/** The policy you have. */
+function rulesBody() {
+  return `<div class="sheet">
+    ${rulesTabs(`
+      <button type="button" class="btn" data-go="simulator">Try a prompt</button>
+      <button type="button" class="btn" data-go="redteam">Red team</button>`)}
+
+    ${state.policy.rules.length
+      ? state.policy.rules.map(ruleRow).join('')
+      : '<div class="empty"><b>Nothing is being enforced</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
+
+    <div class="section">
+      <div class="label">Daily limits by role</div>
+      ${state.policy.quotas.length
+        ? `<div class="quota-grid">${state.policy.quotas.map((q) => `
+            <div class="quota"><span>${esc(q.role)}</span><b>${q.maxRequestsPerDay}/day</b></div>`).join('')}</div>`
+        : '<div class="note">No limits set — every role is unmetered.</div>'}
+    </div>
+  </div>`;
+}
+
+/** The conversation before it starts: tabs pinned at the top, the composer
+ *  centred in whatever is left, the way an empty chat sits on the screen. */
+function newRulePage() {
+  return `<div class="blank">
+    <div class="sheet">${rulesTabs()}</div>
+    <div class="blank-fill">${heroComposer()}</div>
+  </div>`;
 }
 
 /**
- * The audience editor.
+ * The composer, at the size the thing deserves.
  *
- * The model proposes who a rule binds; the admin decides. Getting this wrong in
- * either direction is expensive — too broad and the whole company trips over a
- * rule meant for one team, too narrow and it guards nobody — and the admin is
- * the only one who knows which was intended.
+ * A question rather than a page title, one box wide enough for a sentence, the
+ * send control inside it, and suggestions that are shortcuts rather than
+ * decoration. The categories stay collapsed until you pick one, so the default
+ * state is a question and a box and nothing else.
  */
-function renderAudienceChips() {
-  const el = $('audienceChips');
-  if (!el) return;
-  const on = new Set(draft.appliesTo);
-  const opts = [
-    { token: '*', label: 'Everyone' },
-    ...company.roles.map((r) => ({ token: r, label: r })),
-    ...company.employees.map((e) => ({ token: `@${e.id}`, label: e.name }))
-  ];
-  el.innerHTML = opts
-    .map((o) => `<span class="chip${on.has(o.token) ? ' on' : ''}" data-token="${esc(o.token)}">${esc(o.label)}</span>`)
-    .join('');
-  el.onclick = (e) => {
-    const chip = e.target.closest('.chip');
-    if (!chip) return;
-    const token = chip.dataset.token;
-    const next = new Set(draft.appliesTo);
-    if (token === '*') {
-      // "Everyone" is not one audience among many — it subsumes them.
-      draft.appliesTo = ['*'];
-    } else {
-      next.delete('*');
-      next.has(token) ? next.delete(token) : next.add(token);
-      draft.appliesTo = next.size ? [...next] : ['*'];
-    }
-    renderAudienceChips();
-  };
+/**
+ * An empty policy is a real state, and on a fresh install it is the first thing
+ * anyone sees. It must not look like a page that failed to load, and the honest
+ * thing to say is also the best explanation of the product: there are no rules,
+ * therefore nothing is being stopped.
+ */
+function emptyPolicyBanner() {
+  if (state.policy.rules.length) return '';
+  return `<div class="banner warn">
+    <b>Your policy is empty, so right now Warden lets everything through.</b>
+    It only stops what you tell it to stop — write the first rule below, or take one from the catalogue.
+  </div>`;
+}
+
+function heroComposer() {
+  const cat = state.presetCat == null ? null : state.presets[state.presetCat];
+  return `<div class="hero">
+    ${emptyPolicyBanner()}
+    <h2 class="hero-q">What should Warden stop?</h2>
+
+    <div class="hero-box">
+      <textarea id="ruleMsg" rows="2" placeholder="Describe it the way you would to a colleague…"></textarea>
+      <button type="button" class="btn primary send" id="ruleSend">Write it</button>
+    </div>
+
+    <div class="hero-sugg" id="cats">
+      ${state.presets.map((c, i) => `
+        <button type="button" class="pill${i === state.presetCat ? ' on' : ''}" data-cat="${i}">${esc(c.label ?? c.category)}</button>`).join('')}
+    </div>
+
+    ${cat ? `<div class="hero-sugg" id="presetList">
+      ${(cat.rules ?? []).map((r, k) => `
+        <button type="button" class="pill wrap" data-preset="${state.presetCat}" data-r="${k}">${esc(clip(r.text, 90))}</button>`).join('')}
+    </div>` : '<p class="hero-foot">Warden compiles it, writes the examples it should catch, and checks it against them before anyone is judged by it.</p>'}
+  </div>`;
+}
+
+function ruleRow(r) {
+  const open = state.sel === r.id;
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="policy" data-sel="${attr(r.id)}" aria-expanded="${open}">
+      <span class="dot ${esc(r.severity)}"></span>
+      <span class="col">
+        <span class="t">${esc(ruleName(r))}</span>
+        <span class="m2">${esc(r.text)}</span>
+        <span class="m">
+          <span class="badge ${esc(r.severity)}">${esc(r.severity)}</span>
+          <span>${esc(audienceLabel(r.appliesTo))}</span>
+          ${r.pinned ? '<span class="badge">always checked</span>' : ''}
+          ${isPersonal(r) ? '<span class="badge">personal</span>' : ''}
+        </span>
+      </span>
+    </button>
+    ${open ? ruleDetail(r) : ''}`;
+}
+
+function ruleDetail(rule) {
+  const hits = state.audit.filter((a) => (a.decision?.firedRules ?? []).some((r) => r.ruleId === rule.id));
+  const guidance = hits[0]?.decision.firedRules.find((r) => r.ruleId === rule.id)?.guidance;
+  const blocked = hits.filter((h) => h.decision?.verdict !== 'ALLOW').length;
+  // How many of those the person on the other end said were wrong. This is the
+  // only false-positive signal the console actually has: in the audit log a
+  // correct block and an incorrect one are the same record. Counting how much
+  // a rule catches without counting what it costs makes every rule look good.
+  const disputed = state.appeals.filter((a) => a.ruleId === rule.id);
+
+  // An active rule is an object you consult, not a decision you take, so it
+  // gets the property-list shape rather than the draft's decide-first one.
+  return `<div class="detail">
+    <p class="summary">${esc(rule.text)}</p>
+
+    <div class="kv">
+      <div class="r"><span class="k">If it fires</span><span class="v"><span class="badge ${esc(rule.severity)}">${esc(rule.severity)}</span>
+        ${rule.severity === 'escalate' ? 'held for a person to sign off' : 'the request is stopped'}</span></div>
+      <div class="r"><span class="k">Applies to</span><span class="v">${esc(audienceLabel(rule.appliesTo))}</span></div>
+      <div class="r"><span class="k">Checked</span><span class="v">${rule.pinned ? 'on every request' : 'when the request looks related'}</span></div>
+      ${guidance ? `<div class="r"><span class="k">Told instead</span><span class="v">“${esc(guidance)}”</span></div>` : ''}
+    </div>
+
+    <div class="evidence">
+      <div class="top">
+        <span class="badge${disputed.length ? ' BLOCK' : ''}">${blocked} / ${hits.length}</span>
+        <b>${hits.length
+          ? `Stopped ${blocked} of the ${hits.length} requests it looked at`
+          : 'This rule has not fired yet'}</b>
+      </div>
+      ${hits.length ? `<div class="body">
+        ${disputed.length
+          ? `<div class="note bad">${plural(disputed.length, 'of those was', 'of those were')} reported as wrong by the person it stopped.</div>`
+          : '<div class="note">Nobody has reported one of these as wrong.</div>'}
+        <div class="chips">
+          <button type="button" class="btn" data-go="activity" data-q="rule=${attr(rule.id)}">See those decisions</button>
+          ${disputed.length ? '<button type="button" class="btn" data-go="inbox">See the reports</button>' : ''}
+        </div>
+      </div>` : ''}
+    </div>
+
+    <div class="folds">
+      ${rule.examples ? disclosure('r:examples', 'Examples it was checked against', `
+        <div class="label">Would be stopped</div>
+        ${(rule.examples.violating ?? []).map((x) => `<div class="note">· ${esc(x)}</div>`).join('') || '<div class="note">—</div>'}
+        <div class="label">Must still go through</div>
+        ${(rule.examples.compliant ?? []).map((x) => `<div class="note">· ${esc(x)}</div>`).join('') || '<div class="note">—</div>'}`) : ''}
+      ${disclosure('r:id', 'Technical record', `<div class="kv">
+        <div class="r"><span class="k">Rule id</span><span class="v mono">${esc(rule.id)}</span></div>
+        <div class="r"><span class="k">Scope</span><span class="v">${esc(rule.scope ?? '—')}</span></div>
+      </div>`)}
+    </div>
+
+    <div><button type="button" class="btn danger" id="delRule" data-id="${attr(rule.id)}">Remove rule</button></div>
+  </div>`;
+}
+
+// ── the conversation ─────────────────────────────────────────────────────────
+//
+// Writing a rule is iterative: you say it, you see what it would have done, you
+// narrow it. The old form could not express that — every reword was a fresh
+// compile that threw away what you had learned. Here the check is a turn in the
+// conversation rather than a button, and the rule being built is a card inside
+// the conversation rather than a pane the conversation points at.
+
+/** Once the first message is sent the hero collapses: the box docks to the
+ *  bottom and the turns take the space it was holding. */
+function ruleChatPane() {
+  return `<div class="chatwrap">
+    <div class="chat" id="ruleChat">
+      <div class="sheet">
+        ${rulesTabs('<button type="button" class="btn quiet" id="cancelDraft">Start over</button>')}
+        ${state.ruleChat.map(renderTurn).join('')}
+        ${state.draft ? draftCard() : ''}
+      </div>
+    </div>
+    <div class="composer">
+      <div class="sheet">
+        <div class="hero-box">
+          <textarea id="ruleMsg" rows="2" placeholder="${state.draft
+            ? 'Tell Warden how to change it…'
+            : 'Describe the rule in your own words…'}"></textarea>
+          <button type="button" class="btn primary send" id="ruleSend"${state.ruleBusy ? ' disabled' : ''}>${state.ruleBusy ? 'Working…' : 'Send'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTurn(t) {
+  if (t.from === 'you') {
+    return `<div class="msg"><div class="who">You</div><div class="say">${esc(t.text)}</div></div>`;
+  }
+  return `<div class="msg">
+    <div class="who">Warden</div>
+    <div class="say${t.pending ? ' pending' : ''}">${t.html ?? esc(t.text)}</div>
+  </div>`;
+}
+
+/** The rule as it stands, inside the conversation. Only the current draft is
+ *  rendered, so there is never a stale card with a live Activate button. */
+/**
+ * The draft, ordered by the decision you came to make.
+ *
+ * What the rule says, whether the check found anything, activate. Everything
+ * else folds. Inside a conversation this card is a message, not a page, and a
+ * message you have to scroll through to find a button is the wrong shape.
+ *
+ * The one exception to folding: when the check found a false positive, that
+ * fold opens itself. It is the only reason not to activate, so it is never
+ * something you have to go looking for.
+ */
+function draftCard() {
+  const d = state.draft;
+  const locked = Boolean(state.draftFor);
+  const p = state.preview;
+
+  const verdict = !p
+    ? '<div class="verdict-line"><span class="dot"></span><span>Not checked yet.</span></div>'
+    : p.falsePositives > 0
+      ? `<div class="verdict-line"><span class="dot BLOCK"></span>
+          <b>${plural(p.falsePositives, 'legitimate request')} would be blocked.</b>
+          <span>Reword it before activating.</span></div>`
+      : p.misses > 0
+        ? `<div class="verdict-line"><span class="dot ESCALATE"></span>
+            <b>${plural(p.misses, 'example')} it should have caught slipped through.</b>
+            <span>Worth being more specific.</span></div>`
+        : `<div class="verdict-line"><span class="dot ALLOW"></span>
+            <b>Checked against ${plural(p.rows.length, 'request')}.</b>
+            <span>None of them would be wrongly stopped.</span></div>`;
+
+  const checkRows = p ? p.rows.map((r) => `
+    <div class="preview-row${r.isFalsePositive ? ' fp' : ''}">
+      <span class="v ${esc(r.verdict)}">${esc(r.verdict)}</span>
+      <span class="p">${esc(r.prompt)}</span>
+      ${r.source === 'log' ? '<span class="badge">real</span>' : ''}
+      ${r.isFalsePositive ? '<span class="badge block">wrongly stopped</span>' : ''}
+      ${r.isMiss ? '<span class="badge escalate">missed</span>' : ''}
+    </div>`).join('') : '';
+
+  return `<div class="artifact">
+    <div class="detail-head">
+      <span class="badge ${esc(d.severity)}">${esc(d.severity)}</span>
+      <span class="when">not active yet</span>
+    </div>
+
+    <p class="summary">${esc(d.text)}</p>
+
+    ${verdict}
+
+    <div class="kv">
+      <div class="r">
+        <span class="k">Applies to</span>
+        <span class="v">${esc(audienceLabel(d.appliesTo))}${locked
+          ? ' — locked, you started this from their page'
+          : `<button type="button" class="btn sm" id="editAudience">${state.audienceOpen ? 'Done' : 'Change'}</button>`}</span>
+      </div>
+    </div>
+    ${!locked && state.audienceOpen ? '<div class="chips" id="audienceChips"></div>' : ''}
+
+    <div class="chips">
+      <button type="button" class="btn primary" id="ratifyBtn"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
+      <button type="button" class="btn quiet" id="dropBtn">Discard</button>
+    </div>
+
+    <div class="folds">
+      ${p ? disclosure('n:check', `The ${plural(p.rows.length, 'request')} it was checked against`, checkRows) : ''}
+      ${d.guidance ? disclosure('n:told', 'What the employee is told instead', `<div class="banner">${esc(d.guidance)}</div>`) : ''}
+      ${disclosure('n:examples', 'Examples Warden wrote for it', `
+        <div class="label">Would be stopped</div>
+        ${(d.examples?.violating ?? []).map((x) => `<div class="note">· ${esc(x)}</div>`).join('')}
+        <div class="label">Must still go through</div>
+        ${(d.examples?.compliant ?? []).map((x) => `<div class="note">· ${esc(x)}</div>`).join('')}`)}
+    </div>
+  </div>`;
+}
+
+function say(html, pending = false) {
+  state.ruleChat.push({ from: 'warden', html, pending });
+}
+
+function dropPending() {
+  state.ruleChat = state.ruleChat.filter((t) => !t.pending);
+}
+
+async function sendRuleMessage(text) {
+  const clean = String(text ?? '').trim();
+  if (!clean || state.ruleBusy) return;
+
+  state.ruleChat.push({ from: 'you', text: clean });
+  state.ruleBusy = true;
+  const box = $('ruleMsg');
+  if (box) box.value = '';
+  say('Compiling it on the local model…', true);
+  // Sending from the rules list (or from a person's page) is what opens the
+  // conversation — there is no button that does it separately.
+  if (composing()) render(); else go('policy', 'new');
+
+  // The compiler has no notion of a conversation, so a refinement is sent as
+  // the current rule plus the correction. Restating the rule is what keeps the
+  // second turn from being read as a brand new one.
+  const body = state.draft
+    ? { text: `${state.draft.text}\n\nChange it as follows: ${clean}` }
+    : { text: clean };
+  if (state.draftFor) body.lockTo = [`@${state.draftFor}`];
+
+  const { ok, j } = await api('/api/policy/draft', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+  });
+
+  dropPending();
+  if (!ok) {
+    state.ruleBusy = false;
+    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    render();
+    return;
+  }
+
+  state.draft = j;
+  state.preview = null;
+  const n = (j.examples?.violating?.length ?? 0) + (j.examples?.compliant?.length ?? 0);
+  say(`Here it is. It ${j.severity === 'block' ? 'stops' : 'escalates'} matching requests for <b>${esc(audienceLabel(j.appliesTo))}</b>. Let me check it against the ${n} examples I wrote.`);
+  render();
+
+  await runPreview();
 }
 
 /**
@@ -479,273 +1199,366 @@ function renderAudienceChips() {
  *
  * False positives are called out loudly rather than folded into a score,
  * because a rule that blocks legitimate work is the failure that actually
- * costs the company something, and the admin is the only person positioned to
- * catch it before it ships.
+ * costs the company something.
  */
-async function runPreview() {
-  $('previewOut').innerHTML = '<div class="note" style="margin-top:10px">running the real adjudicator…</div>';
+async function runPreview(against = []) {
+  state.ruleBusy = true;
+  say(against.length
+    ? `Replaying ${plural(against.length, 'request')} Warden already allowed, to see if this rule would have stopped them…`
+    : 'Checking it…', true);
+  render();
+
   const { ok, j } = await api('/api/policy/preview', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ rule: draft })
+    body: JSON.stringify(against.length ? { rule: state.draft, against } : { rule: state.draft })
   });
-  if (!ok) { $('previewOut').innerHTML = `<div class="note">${esc(j.error)}</div>`; return; }
 
-  $('previewOut').innerHTML = `
-    <div style="margin-top:11px;font-size:12px">
-      ${j.rows.map((r) => `
-        <div style="padding:4px 0;display:flex;gap:9px;align-items:baseline">
-          <span class="v ${esc(r.verdict)}" style="min-width:66px;font-family:var(--mono)">${esc(r.verdict)}</span>
-          <span style="flex:1;color:${r.isFalsePositive ? 'var(--block)' : 'var(--dim)'}">${esc(r.prompt.slice(0, 70))}</span>
-          ${r.isFalsePositive ? '<b style="color:var(--block)">false positive</b>' : ''}
-          ${r.isMiss ? '<b style="color:var(--escalate)">missed</b>' : ''}
-        </div>`).join('')}
-      ${j.falsePositives > 0
-        ? `<div class="banner" style="margin-top:11px;background:var(--block-soft);color:var(--block)"><b>${j.falsePositives} legitimate request${j.falsePositives > 1 ? 's' : ''} would be blocked.</b> Reword before activating.</div>`
-        : '<div style="margin-top:11px;color:var(--allow);font-weight:600">No false positives on these examples.</div>'}
-    </div>`;
+  dropPending();
+  state.ruleBusy = false;
+  if (!ok) { say(`The check failed: ${esc(j.error ?? 'unknown error')}`); render(); return; }
+
+  state.preview = j;
+  // Anything the check found — a legitimate request wrongly stopped, or a
+  // violation that slipped through — is a reason to look at the rows, so the
+  // fold opens itself rather than waiting to be found. A clean check stays shut.
+  if (j.falsePositives > 0 || j.misses > 0) state.open.add('n:check');
+  else state.open.delete('n:check');
+  const logFps = j.rows.filter((r) => r.source === 'log' && r.isFalsePositive);
+
+  if (j.falsePositives > 0) {
+    say(`<b>${plural(j.falsePositives, 'legitimate request')} would be blocked by this.</b>
+      ${logFps.length ? `${logFps.length} of them actually went through the gateway before. ` : ''}
+      They are marked below. Tell me how to narrow it — “only for sales”, or “not when it is their own data”.`);
+  } else if (j.misses > 0) {
+    say(`No false positives, but ${plural(j.misses, 'example')} it should have caught slipped through. Worth being more specific about what you mean.`);
+  } else if (against.length) {
+    say('None of those real requests would have been stopped. This one looks safe to activate.');
+  } else {
+    say(`Clean against its own examples. ${offerRegression()}`);
+  }
+  render();
 }
 
-// ── admin: active policy ─────────────────────────────────────────────────────
-
-/** `@id` means nothing to a reader; resolve it to a name. */
-function audienceLabel(appliesTo) {
-  if (!appliesTo?.length) return 'nobody';
-  if (appliesTo.includes('*')) return 'everyone';
-  return appliesTo
-    .map((t) => {
-      if (!t.startsWith('@')) return t;
-      const id = t.slice(1);
-      return company.employees.find((e) => e.id === id)?.name ?? `${id} (removed)`;
-    })
-    .join(', ');
+function offerRegression() {
+  const n = regressionSample().length;
+  if (!n) return 'Activate it below when you are happy with it.';
+  return `Before you activate it, I can replay the last ${n} requests Warden allowed and see whether this rule would have stopped any of them.
+    <button type="button" class="btn sm" id="regressBtn">Replay ${n} real requests</button>`;
 }
 
-const isPersonal = (rule) => rule.appliesTo.some((t) => t.startsWith('@'));
+const regressionSample = () => state.audit
+  .filter((a) => a.decision?.verdict === 'ALLOW' && a.decision.maskedPrompt)
+  .slice(0, REGRESSION_SAMPLE);
 
-/** Tool ids as they arrive from the hook, in words. */
-const TOOL_NAMES = {
-  'claude-code': 'Claude Code',
-  codex: 'Codex',
-  cursor: 'Cursor',
-  opencode: 'OpenCode',
-  generic: 'other tool',
-  proxy: 'API'
-};
+function bindPolicy() {
+  const del = $('delRule');
+  if (del) del.onclick = async () => {
+    if (!confirm('Remove this rule? It stops binding everyone immediately.')) return;
+    await api(`/api/policy/rules/${encodeURIComponent(del.dataset.id)}`, { method: 'DELETE' });
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    go('policy');
+  };
 
-function renderRules() {
-  $('rules').innerHTML = policy.rules.length
-    ? policy.rules.map((r) => `<div class="rule">
-        <div class="t" style="padding-right:64px">${esc(r.text)}</div>
-        <div class="m">
-          <span class="tag ${esc(r.severity)}">${esc(r.severity)}</span>
-          <span class="tag${isPersonal(r) ? ' personal' : ''}">${esc(audienceLabel(r.appliesTo))}</span>
-          ${r.pinned ? '<span class="tag">always checked</span>' : ''}
-        </div>
-        <button class="ghost danger del" data-del="${esc(r.id)}">Remove</button>
-      </div>`).join('')
-    : '<div class="empty">No rules yet.</div>';
+  const cancel = $('cancelDraft');
+  if (cancel) cancel.onclick = discardDraft;
 
-  $('rules').onclick = async (e) => {
-    const btn = e.target.closest('[data-del]');
+  const send = $('ruleSend');
+  if (send) send.onclick = () => sendRuleMessage($('ruleMsg').value);
+  const msg = $('ruleMsg');
+  if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendRuleMessage(msg.value); };
+
+  const cats = $('cats');
+  if (cats) cats.onclick = (e) => {
+    const chip = e.target.closest('[data-cat]');
+    if (!chip) return;
+    // Picking the lit category again collapses it, so the default state of the
+    // page is a question and a box and nothing else.
+    const i = Number(chip.dataset.cat);
+    state.presetCat = state.presetCat === i ? null : i;
+    render();
+  };
+
+  const presetList = $('presetList');
+  if (presetList) presetList.onclick = (e) => {
+    const btn = e.target.closest('[data-preset]');
     if (!btn) return;
-    const { ok, j } = await api(`/api/policy/rules/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
-    if (!ok) {
-      $('rules').insertAdjacentHTML(
-        'afterbegin',
-        `<div class="note" style="color:var(--block)">Could not remove the rule: ${esc(j.error ?? 'failed')}</div>`
-      );
-      return;
-    }
-    await refreshPolicy();
-    await refreshPeople();
-  };
-}
-
-function renderQuotas() {
-  $('quotas').innerHTML = policy.quotas.length
-    ? `<div class="quota-grid">${policy.quotas.map((q) => `<div class="quota">
-        <span>${esc(q.role)}</span><b>${q.maxRequestsPerDay}/day</b>
-      </div>`).join('')}</div>`
-    : '<div class="note">No quotas set — every role is unmetered.</div>';
-}
-
-// ── people ───────────────────────────────────────────────────────────────────
-
-function renderPeople() {
-  $('peopleGrid').innerHTML = company.employees.length
-    ? company.employees.map((e) => `
-      <div class="person${selectedPerson?.id === e.id ? ' on' : ''}" data-id="${esc(e.id)}">
-        ${avatar(e)}
-        <div style="min-width:0;flex:1">
-          <div class="nm">${esc(e.name)}</div>
-          <div class="rl">${esc(e.role)}${e.quota ? ` · ${e.quota}/day` : ''}</div>
-          <div class="st">${e.ruleCount} rule${e.ruleCount === 1 ? '' : 's'}${
-            e.personalRuleCount ? ` · <b style="color:var(--accent)">${e.personalRuleCount} personal</b>` : ''
-          }</div>
-          <div class="tools">${
-            e.connected?.length
-              ? e.connected.map((c) => `<span class="tool on" title="${c.count} request(s), last ${esc(c.at)}">${esc(Object.hasOwn(TOOL_NAMES, c.tool) ? TOOL_NAMES[c.tool] : c.tool)}</span>`).join('')
-              : '<span class="tool">not connected yet</span>'
-          }</div>
-        </div>
-      </div>`).join('')
-    : '<div class="empty">Nobody yet. Add the first person above.</div>';
-
-  $('peopleGrid').onclick = (e) => {
-    const card = e.target.closest('.person');
-    if (!card) return;
-    selectedPerson = company.employees.find((p) => p.id === card.dataset.id) ?? null;
-    if (draftHost !== 'admin') { draft = null; }
-    renderPeople();
-    renderPersonDetail();
-  };
-}
-
-function renderRoles() {
-  $('roleChips').innerHTML = company.roles
-    .map((r) => {
-      const held = company.employees.filter((e) => e.role === r).length;
-      return `<span class="chip static" title="${held} employee(s)">${esc(r)} <span style="color:var(--faint)">${held}</span>${
-        held === 0 ? `<span class="x" data-role="${esc(r)}">×</span>` : ''
-      }</span>`;
-    })
-    .join('');
-
-  $('roleChips').onclick = async (e) => {
-    const x = e.target.closest('[data-role]');
-    if (!x) return;
-    const { ok, j } = await api(`/api/roles/${encodeURIComponent(x.dataset.role)}`, { method: 'DELETE' });
-    $('roleNote').textContent = ok ? '' : (j.error ?? 'failed');
-    if (ok) { await refreshPeople(); await refreshPolicy(); }
+    // A preset arrives complete, but it still enters the conversation so it
+    // passes the same check as anything written by hand.
+    const r = state.presets[Number(btn.dataset.preset)].rules[Number(btn.dataset.r)];
+    state.ruleChat.push({ from: 'you', text: r.text });
+    state.draft = { ...r, id: `r-preset-${Date.now().toString(36)}` };
+    state.preview = null;
+    say('Taken from the catalogue. Checking it against its examples.');
+    render();
+    void runPreview();
   };
 
-  const sel = $('newRole');
-  const keep = sel.value;
-  sel.innerHTML = company.roles.map((r) => `<option>${esc(r)}</option>`).join('');
-  if (company.roles.includes(keep)) sel.value = keep;
+  const regress = $('regressBtn');
+  if (regress) regress.onclick = () => runPreview(
+    regressionSample().map((a) => ({ prompt: a.decision.maskedPrompt, expected: 'ALLOW' }))
+  );
+
+  const editAud = $('editAudience');
+  if (editAud) editAud.onclick = () => { state.audienceOpen = !state.audienceOpen; render(); };
+
+  renderAudienceChips();
+
+  const drop = $('dropBtn');
+  if (drop) drop.onclick = discardDraft;
+
+  const ratify = $('ratifyBtn');
+  if (ratify) ratify.onclick = async () => {
+    ratify.disabled = true;
+    const person = state.draftFor;
+    await api('/api/policy/ratify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rule: state.draft })
+    });
+    const id = state.draft.id;
+    resetDraft();
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    if (person) go('people', person); else go('policy', id);
+  };
+
 }
 
-$('addPerson').onclick = async () => {
-  const name = $('newName').value.trim();
-  if (!name) return;
-  const { ok, j } = await api('/api/people', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, role: $('newRole').value })
-  });
-  $('addNote').textContent = ok
-    ? `${j.name} added · WARDEN_API_KEY=${j.apiKey}`
-    : (j.error ?? 'failed');
-  if (ok) {
-    $('newName').value = '';
-    await refreshPeople();
-    selectedPerson = company.employees.find((e) => e.id === j.id) ?? null;
-    renderPeople();
-    renderPersonDetail();
-  }
-};
+function resetDraft() {
+  state.draft = null;
+  state.draftFor = null;
+  state.preview = null;
+  state.ruleChat = [];
+  state.ruleBusy = false;
+}
 
-$('addRole').onclick = async () => {
-  const role = $('newRoleName').value.trim();
-  if (!role) return;
-  const quota = Number($('newRoleQuota').value || 0);
-  const { ok, j } = await api('/api/roles', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ role, maxRequestsPerDay: quota })
-  });
-  $('roleNote').textContent = ok ? '' : (j.error ?? 'failed');
-  if (ok) {
-    $('newRoleName').value = '';
-    $('newRoleQuota').value = '';
-    await refreshPeople();
-    await refreshPolicy();
-  }
-};
+/** Throws away the conversation and leaves you on a blank one — you came here
+ *  to write a rule, so the tab you land on is still the one for writing rules.
+ *  Unless you started from someone's page, in which case that is where you were. */
+function discardDraft() {
+  const person = state.draftFor;
+  resetDraft();
+  if (person) go('people', person); else go('policy', 'new');
+}
 
 /**
- * One person's page: who they are, and every rule that will judge them —
- * separated by why it binds them, because "everyone" and "written for you" are
- * very different things to be told when a prompt is refused.
+ * The audience editor.
+ *
+ * The model proposes who a rule binds; the admin decides. Getting this wrong in
+ * either direction is expensive — too broad and the whole company trips over a
+ * rule meant for one team, too narrow and it guards nobody.
  */
-async function renderPersonDetail() {
+function renderAudienceChips() {
+  const host = $('audienceChips');
+  if (!host || !state.draft) return;
+  const on = new Set(state.draft.appliesTo);
+  const opts = [
+    { token: '*', label: 'Everyone' },
+    ...state.company.roles.map((r) => ({ token: r, label: r })),
+    ...state.company.employees.map((e) => ({ token: `@${e.id}`, label: e.name }))
+  ];
+  host.innerHTML = opts
+    .map((o) => `<button type="button" class="chip${on.has(o.token) ? ' on' : ''}" data-token="${esc(o.token)}">${esc(o.label)}</button>`)
+    .join('');
+  host.onclick = (e) => {
+    const chip = e.target.closest('[data-token]');
+    if (!chip) return;
+    const token = chip.dataset.token;
+    const next = new Set(state.draft.appliesTo);
+    if (token === '*') {
+      // "Everyone" is not one audience among many — it subsumes them.
+      state.draft.appliesTo = ['*'];
+    } else {
+      next.delete('*');
+      next.has(token) ? next.delete(token) : next.add(token);
+      state.draft.appliesTo = next.size ? [...next] : ['*'];
+    }
+    renderAudienceChips();
+  };
+}
+
+// ═══ TEAM ════════════════════════════════════════════════════════════════════
+
+VIEWS.people = {
+  body: () => `<div class="sheet">
+    ${state.company.employees.length
+      ? state.company.employees.map(personRow).join('')
+      : '<div class="empty"><b>Nobody yet</b><span>Add the first person below to issue them a key.</span></div>'}
+
+    <div class="section">
+      <div class="label">Add someone</div>
+      <div class="chips">
+        <input type="text" id="newName" class="inline" placeholder="Full name">
+        <select class="inline" id="newRole">${state.company.roles.map((r) => `<option>${esc(r)}</option>`).join('')}</select>
+        <button type="button" class="btn primary" id="addPerson">Add</button>
+      </div>
+      <div class="note" id="addNote"></div>
+    </div>
+
+    <div class="section">
+      <div class="label">Roles</div>
+      <div class="chips" id="roleChips">
+        ${state.company.roles.map((r) => {
+          const held = state.company.employees.filter((e) => e.role === r).length;
+          return `<span class="chip static" title="${held} employee(s)">${esc(r)} <span class="num">${held}</span>${
+            held === 0 ? ` <button type="button" class="linkbtn" data-role="${attr(r)}" aria-label="Remove role ${esc(r)}">✕</button>` : ''}</span>`;
+        }).join('')}
+      </div>
+      <div class="chips">
+        <input type="text" id="newRoleName" class="inline" placeholder="New role">
+        <input type="number" min="1" id="newRoleQuota" class="inline" placeholder="req/day">
+        <button type="button" class="btn" id="addRole">Add role</button>
+      </div>
+      <div class="note" id="roleNote"></div>
+    </div>
+  </div>`,
+  bind: () => {
+    bindPeopleList();
+    bindPolicy();
+    if (state.sel) void renderPerson(state.sel);
+  }
+};
+
+function personRow(e) {
+  const open = state.sel === e.id;
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="people" data-sel="${attr(e.id)}" aria-expanded="${open}">
+      ${avatar(e)}
+      <span class="col">
+        <span class="t">${esc(e.name)}</span>
+        <span class="m">
+          <span>${esc(e.role)}${e.quota ? ` · ${e.quota}/day` : ''}</span>
+          <span>${plural(e.ruleCount, 'rule')}${e.personalRuleCount ? ` · ${e.personalRuleCount} personal` : ''}</span>
+        </span>
+        <span class="tools">${e.connected?.length
+          ? e.connected.map((c) => `<span class="tool on" title="${c.count} request(s), last ${esc(c.at)}">${esc(TOOL_NAMES[c.tool] ?? c.tool)}</span>`).join('')
+          : '<span class="tool">not connected yet</span>'}</span>
+      </span>
+    </button>
+    ${open ? '<div class="detail" id="personDetail"><div class="note">loading…</div></div>' : ''}`;
+}
+
+function bindPeopleList() {
+  const add = $('addPerson');
+  if (add) add.onclick = async () => {
+    const name = $('newName').value.trim();
+    if (!name) return;
+    const { ok, j } = await api('/api/people', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, role: $('newRole').value })
+    });
+    if (!ok) { $('addNote').textContent = j.error ?? 'failed'; return; }
+    await refreshPeople();
+    go('people', j.id);
+  };
+
+  const addRole = $('addRole');
+  if (addRole) addRole.onclick = async () => {
+    const role = $('newRoleName').value.trim();
+    if (!role) return;
+    const { ok, j } = await api('/api/roles', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ role, maxRequestsPerDay: Number($('newRoleQuota').value || 0) })
+    });
+    if (!ok) { $('roleNote').textContent = j.error ?? 'failed'; return; }
+    await Promise.all([refreshPeople(), refreshPolicy()]);
+    render();
+  };
+
+  const chips = $('roleChips');
+  if (chips) chips.onclick = async (e) => {
+    const x = e.target.closest('[data-role]');
+    if (!x) return;
+    const role = decodeURIComponent(x.dataset.role);
+    if (!confirm(`Remove the role "${role}"? Its daily limit goes with it.`)) return;
+    const { ok, j } = await api(`/api/roles/${encodeURIComponent(role)}`, { method: 'DELETE' });
+    if (!ok) { $('roleNote').textContent = j.error ?? 'failed'; return; }
+    await Promise.all([refreshPeople(), refreshPolicy()]);
+    render();
+  };
+}
+
+/**
+ * One person, opened under their row: who they are, and every rule that will
+ * judge them — separated by why it binds them, because "everyone" and "written
+ * for you" are very different things to be told when a prompt is refused.
+ */
+async function renderPerson(id) {
+  const p = personById(id);
   const host = $('personDetail');
-  if (!selectedPerson) {
-    host.innerHTML = '<div class="empty-state"><div><div class="signal">ID</div><b>No person selected</b><span>Choose someone from the directory to manage their setup and rules.</span></div></div>';
-    return;
-  }
-  const p = selectedPerson;
-  const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
-  // Clicking A then B leaves two of these in flight; whichever answers last
-  // would paint the pane. On a screen whose whole point is "which rules judge
-  // this person", showing A's rules under B's name is worse than a spinner —
-  // so a response for anyone but the currently selected person is dropped.
-  if (selectedPerson?.id !== p.id) return;
-  if (!ok) {
-    host.innerHTML = `<div class="empty">Could not load their rules: ${esc(j.error ?? 'error')}</div>`;
-    return;
-  }
+  if (!host) return;
+  if (!p) { host.innerHTML = '<div class="note">This person has been removed.</div>'; return; }
+
+  const { j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
+  if (!host.isConnected || state.sel !== id) return;
   const rules = j?.rules ?? [];
   const group = (kind) => rules.filter((r) => r.binding === kind);
+  const hits = state.audit.filter((a) => a.actor?.id === p.id);
+  const stopped = hits.filter((h) => h.decision?.verdict !== 'ALLOW').length;
 
   const section = (title, list, note) => `
-    <div class="sub">${title} <span style="color:var(--faint);font-weight:500">${list.length}</span></div>
-    ${list.length
-      ? list.map((r) => `<div class="rule">
-          <div class="t">${esc(r.text)}</div>
-          <div class="m"><span class="tag ${esc(r.severity)}">${esc(r.severity)}</span>
-            <span class="tag${r.binding === 'personal' ? ' personal' : ''}">${esc(r.audience)}</span></div>
-        </div>`).join('')
-      : `<div class="note">${note}</div>`}`;
+    <div class="group">
+      <div class="label">${title} · ${list.length}</div>
+      ${list.length
+        ? list.map((r) => `
+          <button type="button" class="ruleref" data-go="policy" data-sel="${attr(r.id)}">
+            <span class="dot ${esc(r.severity)}"></span>
+            <span class="col">
+              <span class="t">${esc(ruleName(r))}</span>
+              <span class="m">${esc(clip(r.text, 110))}</span>
+            </span>
+          </button>`).join('')
+        : `<div class="note">${note}</div>`}
+    </div>`;
 
   host.innerHTML = `
-    <div class="detail-top">
+    <div class="person-top">
       ${avatar(p, true)}
-      <div style="min-width:0">
+      <div>
         <div class="nm">${esc(p.name)}</div>
-        <div class="note">${esc(p.role)}${p.quota ? ` · ${p.quota} requests/day` : ' · unmetered'}</div>
+        <div class="note">${esc(p.role)}${p.quota ? ` · ${p.quota} requests a day` : ' · no daily limit'}</div>
       </div>
     </div>
 
-    <div class="field">
-      <label>Role</label>
-      <select id="editRole">${company.roles.map((r) => `<option${r === p.role ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>
-    </div>
+    <p class="summary">${hits.length
+      ? `Warden has looked at ${plural(hits.length, 'request')} from ${esc(p.name.split(' ')[0])} and stopped ${stopped}.`
+      : `${esc(p.name.split(' ')[0])} has not sent anything through Warden yet.`}
+      ${plural(rules.length, 'rule')} appl${rules.length === 1 ? 'ies' : 'y'} to them.</p>
+
+    ${hits.length ? '<div class="group"><button type="button" class="btn" id="seePerson">See their decisions</button></div>' : ''}
 
     <div class="field">
-      <label>API key — their whole identity. Rotating it revokes the old one.</label>
-      <div class="codewrap">
-        <pre class="code">${esc(p.apiKey)}</pre>
-        <button class="ghost copy" data-copy="${encodeURIComponent(p.apiKey)}">Copy</button>
-      </div>
+      <label for="editRole">Role</label>
+      <select id="editRole">${state.company.roles.map((r) => `<option${r === p.role ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>
     </div>
 
     <div class="field">
       <label>What they put on their own machine</label>
       <div class="codewrap">
-        <pre class="code">export WARDEN_API_KEY=${esc(p.apiKey)}</pre>
-        <button class="ghost copy" data-copy="${encodeURIComponent('export WARDEN_API_KEY=' + p.apiKey)}">Copy</button>
+        <pre class="code oneline">export WARDEN_API_KEY=${esc(p.apiKey)}</pre>
+        <button type="button" class="btn sm copy" data-copy="${attr('export WARDEN_API_KEY=' + p.apiKey)}">Copy</button>
       </div>
+      <div class="note">This key is their whole identity. Issuing a new one revokes the old.</div>
     </div>
 
-    <div class="row">
-      <button class="ghost" id="rotateKey">New key</button>
-      <button class="ghost danger" id="removePerson">Remove from directory</button>
+    <div class="chips">
+      <button type="button" class="btn" id="rotateKey">New key</button>
+      <button type="button" class="btn danger" id="removePerson">Remove from team</button>
     </div>
-    <div class="note" id="personNote" style="margin-top:7px"></div>
+    <div class="note" id="personNote"></div>
 
-    <div class="sub">Onboarding <span style="color:var(--faint);font-weight:500">what you send them</span></div>
-    <div id="onboarding"><div class="note">loading…</div></div>
-
-    <div class="sub">Write a rule just for ${esc(p.name.split(' ')[0])}</div>
-    <textarea id="personRuleText" rows="2" placeholder="p. ej. no puede pedir datos de otros equipos"></textarea>
-    <div class="row">
-      <button class="act" id="personCompile">Compile</button>
-      <span class="note" id="personCompileNote"></span>
+    <div class="group">
+      <div class="label">Write a rule just for ${esc(p.name.split(' ')[0])}</div>
+      <textarea id="personRuleText" rows="2" placeholder="e.g. cannot request data from other teams"></textarea>
+      <button type="button" class="btn primary" id="personCompile">Write this rule</button>
     </div>
-    <div id="personDraft"></div>
+
+    <div class="folds">
+      ${disclosure('p:onboarding', 'Setup instructions to send them', '<div id="onboarding"><div class="note">loading…</div></div>')}
+    </div>
 
     ${section('Written for them', group('personal'), 'No personal rules — only the company and role ones below.')}
     ${section(`Because they are ${esc(p.role)}`, group('role'), 'No rules target this role.')}
-    ${section('Company-wide', group('company'), 'No company-wide rules.')}`;
+    ${section('Everyone', group('company'), 'No company-wide rules.')}`;
+
+  bindDisclosures();
 
   $('editRole').onchange = async (e) => {
     const { ok, j } = await api('/api/people', {
@@ -753,47 +1566,40 @@ async function renderPersonDetail() {
       body: JSON.stringify({ id: p.id, name: p.name, role: e.target.value })
     });
     $('personNote').textContent = ok ? `Now judged as ${j.role}.` : (j.error ?? 'failed');
-    if (ok) await refreshPeople();
+    if (ok) { await refreshPeople(); void renderPerson(p.id); }
   };
 
   $('rotateKey').onclick = async () => {
-    const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}/key`, { method: 'POST' });
-    // Rotation invalidates the old key the moment it works — so failing to say
-    // whether it worked leaves the admin unsure which key is now real.
-    $('personNote').textContent = ok
-      ? 'New key issued. Update every tool that used the old one.'
-      : (j.error ?? 'could not rotate the key');
-    if (ok) await refreshPeople();
+    if (!confirm('Issue a new key? Their current one stops working immediately.')) return;
+    await api(`/api/people/${encodeURIComponent(p.id)}/key`, { method: 'POST' });
+    await refreshPeople();
+    void renderPerson(p.id);
   };
 
   $('removePerson').onclick = async () => {
+    if (!confirm(`Remove ${p.name}? Their key stops working immediately.`)) return;
     const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
     if (!ok) { $('personNote').textContent = j.error ?? 'failed'; return; }
-    selectedPerson = null;
     await refreshPeople();
+    go('people');
     // Rules written only for someone who has left still exist and now bind
     // nobody. Saying so beats leaving dead policy in the list unremarked.
     if (j.orphanedRules?.length) {
-      $('personDetail').innerHTML =
-        `<div class="banner">${j.orphanedRules.length} rule(s) were written only for ${esc(j.removed.name)} and now apply to nobody. Retarget or remove them in the Policy panel.</div>`;
-    } else {
-      // refreshPeople only repaints the detail pane while someone is selected,
-      // so without this the removed person's card — key, buttons and all —
-      // stayed on screen looking alive.
-      renderPersonDetail();
+      const pane = $('pane').querySelector('.sheet');
+      if (pane) pane.insertAdjacentHTML('afterbegin',
+        `<div class="banner warn">${j.orphanedRules.length} rule(s) were written only for ${esc(j.removed.name)} and now apply to nobody. Retarget or remove them under Rules.</div>`);
     }
   };
 
-  $('personCompile').onclick = () =>
-    compileInto('person', $('personRuleText').value, [`@${p.id}`], $('personCompileNote'), $('personCompile'));
+  const seen = $('seePerson');
+  if (seen) seen.onclick = () => { state.actorFilter = p.id; go('activity'); };
 
-  if (draft && draftHost === 'person') renderDraft();
-
-  // One delegated handler for every copy button on the page, including the ones
-  // renderOnboarding adds later. Binding per-button would miss those.
-  host.onclick = (e) => {
-    const btn = e.target.closest('[data-copy]');
-    if (btn) void copyText(decodeURIComponent(btn.dataset.copy), btn);
+  $('personCompile').onclick = () => {
+    const text = $('personRuleText').value.trim();
+    if (!text) return;
+    state.draftFor = p.id;
+    state.ruleChat = [];
+    void sendRuleMessage(text);
   };
 
   void renderOnboarding(p);
@@ -810,49 +1616,38 @@ async function renderOnboarding(person) {
   const host = $('onboarding');
   if (!host) return;
   const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`);
-  // Same in-flight race as the rules pane — this one would put person A's API
-  // key and install command under person B's name.
-  if (selectedPerson?.id !== person.id) return;
+  if (!host.isConnected) return;
   if (!ok) { host.innerHTML = `<div class="note">${esc(j.error ?? 'failed')}</div>`; return; }
 
   const tools = j.integrations;
   const step = (st) => `
-    <div style="margin-top:11px">
-      <div style="font-size:12px;font-weight:600">${esc(st.title)}</div>
-      ${st.note ? `<div class="note" style="margin:3px 0 5px">${esc(st.note)}</div>` : ''}
+    <div class="group">
+      <div class="note"><b>${esc(st.title)}</b></div>
+      ${st.note ? `<div class="note">${esc(st.note)}</div>` : ''}
       <div class="codewrap">
         <pre class="code">${esc(st.code)}</pre>
-        <button class="ghost copy" data-copy="${encodeURIComponent(st.code)}">Copy</button>
+        <button type="button" class="btn sm copy" data-copy="${attr(st.code)}">Copy</button>
       </div>
     </div>`;
 
   host.innerHTML = `
-    <div class="row" style="margin-top:0">
-      <button class="act" id="copyAll">Copy the whole setup message</button>
-      <span class="note" id="copyNote"></span>
-    </div>
-
-    <div class="sub" style="margin:14px 0 7px">Everyone does this first</div>
+    <div><button type="button" class="btn" id="copyAll">Copy the whole message</button></div>
+    <div class="label">Everyone does this first</div>
     ${j.common.map(step).join('')}
-
-    <div class="sub" style="margin:16px 0 7px">Then their tool</div>
+    <div class="label">Then their tool</div>
     <div class="chips" id="toolTabs">
-      ${tools.map((t, i) => `<span class="chip${i === 0 ? ' on' : ''}" data-tool="${i}">${esc(t.name)}</span>`).join('')}
+      ${tools.map((t, i) => `<button type="button" class="chip${i === 0 ? ' on' : ''}" data-tool="${i}">${esc(t.name)}</button>`).join('')}
     </div>
     <div id="toolBody"></div>`;
 
   const showTool = (i) => {
     const t = tools[i];
     $('toolBody').innerHTML = `
-      <div style="margin-top:11px">
-        <div class="chips" style="margin-bottom:8px">
-          <span class="chip static">${t.kind === 'hook' ? 'runs before the prompt leaves the machine' : 'routes through the gateway'}</span>
-          <span class="chip static" style="${t.worksOnSubscription ? '' : 'background:var(--escalate-soft);color:var(--escalate)'}">
-            ${t.worksOnSubscription ? 'works on a subscription' : 'needs an API key, not a subscription'}
-          </span>
-          ${t.verified
-            ? '<span class="chip static" style="background:var(--allow-soft);color:var(--allow)">verified working</span>'
-            : '<span class="chip static" style="background:var(--block-soft);color:var(--block)">nobody has seen this block yet</span>'}
+      <div class="group">
+        <div class="chips">
+          <span class="chip static">${t.kind === 'hook' ? 'checks before the prompt leaves the machine' : 'routes through the gateway'}</span>
+          <span class="chip static">${t.worksOnSubscription ? 'works on a subscription' : 'needs an API key'}</span>
+          <span class="badge ${t.verified ? 'ALLOW' : 'BLOCK'}">${t.verified ? 'verified working' : 'unverified'}</span>
         </div>
         <div class="note">${esc(t.summary)}</div>
         ${t.steps.map(step).join('')}
@@ -861,7 +1656,7 @@ async function renderOnboarding(person) {
   showTool(0);
 
   $('toolTabs').onclick = (e) => {
-    const chip = e.target.closest('.chip');
+    const chip = e.target.closest('[data-tool]');
     if (!chip) return;
     [...$('toolTabs').children].forEach((c) => c.classList.toggle('on', c === chip));
     showTool(Number(chip.dataset.tool));
@@ -870,33 +1665,90 @@ async function renderOnboarding(person) {
   $('copyAll').onclick = (e) => copyText(j.message, e.target);
 }
 
-// ── employee chat ────────────────────────────────────────────────────────────
+// ═══ SIMULATOR ═══════════════════════════════════════════════════════════════
 
-function renderWhoPicker() {
-  const sel = $('who');
-  const keep = sel.value;
-  sel.innerHTML = company.employees
-    .map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}</option>`)
-    .join('');
-  if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+const backToRules = '<button type="button" class="btn quiet" data-go="policy">← Rules</button>';
+
+VIEWS.simulator = {
+  railParent: 'policy',
+  flush: true,
+  body: () => `<div class="chatwrap">
+    <div class="chat" id="chat">
+      <div class="sheet">
+        <div class="toolbar" style="padding-top:0">
+          ${backToRules}
+          <span class="spacer"></span>
+          <span class="label">Send as</span>
+          <select class="inline" id="who" aria-label="Employee to send as">
+            ${state.company.employees.map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}</option>`).join('')}
+          </select>
+        </div>
+        ${state.chat.length
+          ? state.chat.map(renderMessage).join('')
+          : '<div class="empty"><b>See what Warden would do</b><span>Pick someone and send a prompt as them. Nothing here is privileged — it goes through the gateway on their own key, like any other request.</span></div>'}
+      </div>
+    </div>
+    <div class="composer">
+      <div class="sheet">
+        <div class="hero-box">
+          <textarea id="prompt" rows="2" placeholder="Write a prompt as this employee…"></textarea>
+          <button type="button" class="btn primary send" id="send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>`,
+  bind: () => {
+    const send = $('send');
+    if (send) send.onclick = doSend;
+    const prompt = $('prompt');
+    if (prompt) prompt.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSend(); };
+    bindFollowUps();
+  }
+};
+
+function renderMessage(m, i) {
+  if (m.from === 'employee') {
+    return `<div class="msg"><div class="who">${esc(m.who)}</div><div class="say">${esc(m.text)}</div></div>`;
+  }
+  // The pass list travels with the answer instead of living in a side panel —
+  // same disclosure, same place in the hierarchy, as a decision in Activity.
+  const slowest = Math.max(1, ...(m.passes ?? []).map((p) => p.ms ?? 0));
+  const passes = (m.passes ?? []).length ? `<div class="folds">${disclosure(`s:${i}`, 'How it was decided', `
+    <div>${m.passes.map((p) => `
+      <div class="pass">
+        <span class="n">${esc(p.pass)}</span>
+        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
+        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
+        <span class="ms">${p.ms ?? 0}ms</span>
+      </div>`).join('')}</div>
+    <div class="note">${plural(m.passes.length, 'pass', 'passes')}, ${((m.totalMs ?? 0) / 1000).toFixed(1)}s end to end,
+      ${state.mock ? 'on the mock adapter.' : 'and none of it left this machine.'}</div>`)}</div>` : '';
+
+  return `<div class="msg">
+    <div class="who">Warden</div>
+    <div class="verdict ${esc(m.verdict)}">${esc(m.label)}</div>
+    ${m.why ? `<div class="why">${m.why}</div>` : ''}
+    ${followUpControls(m, i)}
+    ${passes}
+  </div>`;
 }
 
-$('send').onclick = send;
-$('prompt').onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); };
-
-async function send() {
-  const text = $('prompt').value.trim();
+async function doSend() {
+  const box = $('prompt');
+  const text = box.value.trim();
   if (!text) return;
   const who = $('who').value || 'anon';
-  const person = company.employees.find((e) => e.id === who);
-  $('prompt').value = '';
-  append(person ? `${person.name} (${person.role})` : who, text, '');
+  const person = personById(who);
+  box.value = '';
 
-  // The person's own API key, exactly as their laptop would send it. Neither a
-  // name nor a role goes over the wire: the key is the whole identity, and the
-  // console deliberately has no privileged way to assert one — it exercises the
-  // same path an employee's tool does, so a break here breaks the demo too.
-  const { ok, j } = await api('/api/guard/check', {
+  state.chat.push({ from: 'employee', who: person ? `${person.name} · ${person.role}` : who, text });
+  render();
+
+  // The person's own API key, exactly as their laptop would send it. The
+  // console deliberately has no privileged way to assert an identity — it
+  // exercises the same path an employee's tool does, so a break here breaks
+  // the demo too.
+  const { j } = await api('/api/guard/check', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -906,311 +1758,197 @@ async function send() {
   });
 
   if (j?.error === 'unknown_api_key') {
-    append('warden', 'key not recognised', `<div class="why">${esc(j.explanation)}</div>`, 'blocked');
-    return;
-  }
-
-  // Any other failure is not a check that allowed. Rendering it as an empty
-  // bubble read as "nothing happened" — in a demo of a blocking gateway, the
-  // one thing this pane must never do is dress a failure as calm.
-  if (!ok || !j?.verdict) {
-    append(
-      'warden',
-      'the guard could not be reached — this prompt was not judged',
-      `<div class="why">${esc(j?.error ?? 'no response from the gateway')}</div>`,
-      'escalated'
-    );
+    state.chat.push({ from: 'warden', verdict: 'BLOCK', label: 'Key not recognised', why: `<div>${esc(j.explanation)}</div>` });
+    render();
     return;
   }
 
   const rule = j.firedRules?.[0];
-  const cls = { ALLOW: 'allowed', BLOCK: 'blocked', ESCALATE: 'escalated' }[j.verdict];
-  const label = { ALLOW: 'allowed', BLOCK: 'blocked by Warden', ESCALATE: 'held for review' }[j.verdict];
+  const label = { ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict;
 
   let why = '';
   if (rule) {
     // A refusal that only names the rule leaves the person holding a question
     // with nowhere to take it. What they can do instead is the part that keeps
     // them working with the gateway rather than around it.
-    why += `<div class="why"><b>Rule:</b> ${esc(rule.ruleText)}</div>`;
-    if (rule.guidance) {
-      why += `<div class="why" style="margin-top:7px"><b>Instead:</b> ${esc(rule.guidance)}</div>`;
-    } else {
-      why += `<div class="why"><b>Why:</b> ${esc(rule.reason)}</div>`;
-    }
+    why += `<div><b>${esc(ruleName(rule.ruleId))}:</b> ${esc(rule.ruleText)}</div>`;
+    why += rule.guidance
+      ? `<div><b>They are told:</b> ${esc(rule.guidance)}</div>`
+      : `<div><b>Why:</b> ${esc(rule.reason)}</div>`;
     if (rule.allowedExamples?.length) {
-      why += `<div class="why" style="margin-top:7px"><b>These would go through:</b>${
-        rule.allowedExamples.map((e) => `<div style="margin-left:10px">· ${esc(e)}</div>`).join('')
-      }</div>`;
+      why += `<div><b>These would go through:</b>${rule.allowedExamples.map((x) => `<div>· ${esc(x)}</div>`).join('')}</div>`;
     }
   }
-  if (j.maskedSpans?.length) {
-    why += `<div class="why">${j.maskedSpans.length} secret(s) masked before checking: <code>${esc(j.maskedPrompt.slice(0, 90))}</code></div>`;
-  }
-  if (j.quota?.limit) why += `<div class="why">quota ${j.quota.used}/${j.quota.limit}</div>`;
-  why += `<div class="why" style="color:var(--faint)">audit ${esc(j.auditId)} · ${j.totalMs}ms</div>`;
-  if (j.verdict !== 'ALLOW') why += '<div class="row" data-actions></div><div data-feedback></div>';
+  if (j.maskedSpans?.length) why += `<div>${plural(j.maskedSpans.length, 'secret')} masked before checking.</div>`;
+  if (j.quota?.limit) why += `<div>Used ${j.quota.used} of ${j.quota.limit} today.</div>`;
+  if (j.auditId) why += `<div><button type="button" class="linkbtn" data-go="activity" data-sel="${attr(j.auditId)}">See the full record</button></div>`;
 
-  const el = append('warden', label, why, cls);
-  if (j.verdict !== 'ALLOW') {
-    wireFeedback(el, {
-      prompt: text,
-      auditId: j.auditId,
-      hasRule: Boolean(rule),
-      verdict: j.verdict
-    });
-  }
+  // A refusal with nowhere to go is what makes people work around the gateway.
+  // These two are the way out, and they belong to the employee: the console
+  // shows them because the simulator is where it stands in for one.
+  state.chat.push({
+    from: 'warden', verdict: j.verdict, label, why,
+    passes: j.passes, totalMs: j.totalMs,
+    ...(j.verdict !== 'ALLOW' && j.auditId && person
+      ? { followUp: { auditId: j.auditId, prompt: text, who: person.id } }
+      : {})
+  });
+  render();
 }
 
-/**
- * What a refusal offers once it has said no.
- *
- * Both of these run after the decision, never during it — the verdict above is
- * already made, already audited, and nothing here can move it. They exist
- * because a block that is a dead end is a block people learn to route around,
- * and because a measured share of them are simply wrong and only the person
- * who was stopped knows which.
- */
-function wireFeedback(el, { prompt, auditId, hasRule, verdict }) {
-  const row = el.querySelector('[data-actions]');
-  const out = el.querySelector('[data-feedback]');
-  if (!row) return;
+// ── the two ways out of a refusal ────────────────────────────────────────────
 
-  // No rule fired means nothing to rewrite against — the block came from a
-  // structural signal or a quota, and neither has a nearby legitimate phrasing.
-  if (hasRule) {
-    const rewrite = document.createElement('button');
-    rewrite.className = 'ghost';
-    rewrite.textContent = 'Suggest a rewrite';
-    rewrite.onclick = () => requestRewrite(rewrite, out, { prompt, auditId });
-    row.append(rewrite);
-  }
-
-  // A held prompt was not refused, and offering "this block was wrong" for one
-  // would be arguing with a decision nobody has made yet. What helps there is
-  // the context the reviewer does not have — the audit log kept the prompt's
-  // hash, not the prompt, so their own words are the only way it reaches the
-  // person answering.
-  const held = verdict === 'ESCALATE';
-  const appeal = document.createElement('button');
-  appeal.className = 'ghost';
-  appeal.textContent = held ? 'Add context for the reviewer' : 'This block was wrong';
-  appeal.onclick = () => openAppeal(appeal, out, auditId, held);
-  row.append(appeal);
-}
-
-/**
- * Why there is no suggestion, in the person's terms.
- *
- * Composed here from the code the server sent, for the same reason the refusal
- * itself is composed rather than generated: this is a fixed set of outcomes and
- * a model asked to phrase them adds latency and gets them wrong.
- */
-const REWRITE_REFUSALS = {
-  'no-honest-rewrite':
-    'There is no honest rewrite of this one — the phrasing reached for the assistant\'s own instructions, and no version of that is inside the rules.',
+const REWRITE_REFUSAL = {
   'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
-  'too-long': 'Too long to restate. Ask for the part you actually need.',
-  'model-unavailable':
-    'The local model could not answer. Nothing is suggested rather than guessed.',
-  'nothing-left':
-    'Nothing legitimate was left once the part the rule prohibits was taken out.',
-  'still-blocked':
-    'What it came up with did not pass the same check, so it is not being shown.',
-  'quota': 'Daily limit reached, so the suggestion could not be re-checked.',
-  'already-rewritten': 'This block has already been rewritten once.'
+  'no-honest-rewrite': 'There is no honest rewrite of this one — the phrasing reached for the assistant’s own instructions, and no version of that is inside the rules.',
+  'too-long': 'Too long to restate. A rewrite has to be a request someone could have typed.',
+  'model-unavailable': 'The model did not answer, so nothing was suggested. Nothing was spent — you can ask again.',
+  'nothing-left': 'Once the prohibited part is taken out there is no request left to make.',
+  'still-blocked': 'The rewrite did not survive its own re-check, so it was not offered.',
+  'already-rewritten': 'One rewrite per block, and this one is used.'
 };
 
-/**
- * Ask for a version of the blocked prompt that would go through.
- *
- * The prompt is sent again rather than looked up: the audit log holds its hash
- * and not its text, and the server matches the two to prove this is the request
- * that was actually blocked. One press, one answer — there is exactly one
- * rewrite per block on the server, so the button does not come back.
- */
-async function requestRewrite(btn, out, { prompt, auditId }) {
-  const person = company.employees.find((e) => e.id === $('who').value);
-  btn.disabled = true;
-  btn.textContent = 'asking the local model…';
-
-  const { j } = await api('/api/guard/rewrite', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
-    },
-    body: JSON.stringify({ prompt, auditId })
-  });
-
-  btn.textContent = 'Suggest a rewrite';
-
-  if (j?.suggestion) {
-    out.innerHTML = `
-      <div class="why" style="margin-top:9px"><b>A version that goes through</b></div>
-      <div class="rule" style="margin-top:6px">
-        <div class="t">${esc(j.suggestion)}</div>
-        <div class="note" style="margin-top:8px">Judged by the same guard before being shown — it came back ALLOW${j.auditId ? `, audit ${esc(j.auditId)}` : ''}.</div>
-        <div class="row"><button class="act" data-use>Use this</button></div>
-      </div>`;
-    // Fills the box; does not send. Whether to ask it is theirs to decide.
-    out.querySelector('[data-use]').onclick = () => {
-      $('prompt').value = j.suggestion;
-      $('prompt').focus();
-    };
-    return;
-  }
-
-  const why = REWRITE_REFUSALS[j?.reason] ?? j?.error ?? 'No suggestion.';
-  out.innerHTML = `<div class="why" style="margin-top:9px">${esc(why)}</div>`;
+/** Renders under a refusal in the simulator, on the message that owns it. */
+function followUpControls(m, i) {
+  if (!m.followUp) return '';
+  const s = m.rewrite;
+  return `<div class="group" data-follow="${i}">
+    ${s?.suggestion ? `
+      <div class="label">Warden suggests asking it this way</div>
+      <div class="banner">${esc(s.suggestion)}</div>
+      <button type="button" class="btn" data-use-rewrite="${i}">Put this in the box</button>` : ''}
+    ${s?.reason ? `<div class="note">${esc(REWRITE_REFUSAL[s.reason] ?? s.reason)}</div>` : ''}
+    ${m.appealed
+      ? '<div class="note good">Reported. An administrator sees it in their Inbox, next to the rule that stopped you.</div>'
+      : `<div class="chips">
+          ${s ? '' : `<button type="button" class="btn" data-rewrite="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'rewrite' ? 'Asking…' : 'Suggest a rewrite'}</button>`}
+          <button type="button" class="btn" data-appeal="${i}"${m.busy ? ' disabled' : ''}>This block was wrong</button>
+        </div>
+        ${m.appealOpen ? `
+          <textarea id="appealNote" rows="2" placeholder="What were you actually trying to do? (optional)"></textarea>
+          <button type="button" class="btn primary" data-send-appeal="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'appeal' ? 'Sending…' : 'Send the report'}</button>` : ''}
+        ${m.error ? `<div class="note bad">${esc(m.error)}</div>` : ''}`}
+  </div>`;
 }
 
-/** Say the block was wrong, with an optional note for whoever owns the rule. */
-function openAppeal(btn, out, auditId, held = false) {
-  btn.disabled = true;
-  const box = document.createElement('div');
-  box.innerHTML = `
-    <div class="why" style="margin-top:9px"><b>${held ? 'What should the reviewer know?' : 'What was this for?'}</b></div>
-    <textarea data-note rows="2" placeholder="optional — e.g. it was the aggregate forecast, not one person's pay"></textarea>
-    <div class="note">This note is stored and shown to your administrator. Your prompt is not — the log keeps its hash, not its text.</div>
-    <div class="row"><button class="act" data-send-appeal>Send</button></div>`;
-  out.append(box);
+function bindFollowUps() {
+  const at = (el) => state.chat[Number(el.dataset.rewrite ?? el.dataset.appeal ?? el.dataset.sendAppeal ?? el.dataset.useRewrite)];
+  const keyOf = (m) => personById(m.followUp.who)?.apiKey;
 
-  box.querySelector('[data-send-appeal]').onclick = async () => {
-    const person = company.employees.find((e) => e.id === $('who').value);
-    const note = box.querySelector('[data-note]').value.trim();
+  document.querySelectorAll('[data-rewrite]').forEach((b) => { b.onclick = () => void askRewrite(at(b)); });
+  document.querySelectorAll('[data-appeal]').forEach((b) => {
+    b.onclick = () => { const m = at(b); m.appealOpen = !m.appealOpen; m.error = null; render(); };
+  });
+  document.querySelectorAll('[data-send-appeal]').forEach((b) => { b.onclick = () => void sendAppeal(at(b)); });
+  document.querySelectorAll('[data-use-rewrite]').forEach((b) => {
+    b.onclick = () => { const box = $('prompt'); if (box) { box.value = at(b).rewrite.suggestion; box.focus(); } };
+  });
+
+  async function askRewrite(m) {
+    m.busy = 'rewrite'; m.error = null; render();
+    const { ok, j } = await api('/api/guard/rewrite', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${keyOf(m)}` },
+      body: JSON.stringify({ auditId: m.followUp.auditId, prompt: m.followUp.prompt })
+    });
+    m.busy = null;
+    // A refusal comes back as a reason rather than an error, and both 200 and
+    // 409 carry one; only a shapeless failure is worth showing as an error.
+    if (j?.suggestion || j?.reason) m.rewrite = { suggestion: j.suggestion ?? null, reason: j.reason ?? null };
+    else if (!ok) m.error = j?.error ?? 'could not ask for a rewrite';
+    render();
+  }
+
+  async function sendAppeal(m) {
+    m.busy = 'appeal'; m.error = null; render();
+    const note = $('appealNote')?.value.trim();
     const { ok, j } = await api('/api/guard/appeal', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
-      },
-      body: JSON.stringify({ auditId, ...(note ? { note } : {}) })
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${keyOf(m)}` },
+      body: JSON.stringify({ auditId: m.followUp.auditId, ...(note ? { note } : {}) })
     });
-    box.innerHTML = ok
-      ? `<div class="why" style="margin-top:9px">${held ? 'Sent. It shows up beside your request in the review queue.' : 'Reported. Your administrator sees this next to the rule that fired.'}</div>`
-      : `<div class="why" style="margin-top:9px">${esc(j?.error ?? 'could not report it')}</div>`;
-    if (ok) { await refreshAppeals(); await refreshEscalations(); }
-  };
-}
-
-function append(who, text, extra, cls = '') {
-  const el = document.createElement('div');
-  el.className = `msg ${cls}`;
-  el.innerHTML = `<div class="who">${esc(who)}</div><div class="txt">${esc(text)}</div>${extra}`;
-  const chat = $('chat');
-  if (chat.querySelector('.empty, .empty-state')) chat.innerHTML = '';
-  chat.append(el);
-  chat.scrollTop = chat.scrollHeight;
-  return el;
-}
-
-// ── live trace ───────────────────────────────────────────────────────────────
-
-function subscribe() {
-  const src = new EventSource('/api/events');
-  src.onopen = () => { $('sse').textContent = '● live'; $('sse').style.color = 'var(--allow)'; };
-  src.onerror = () => { $('sse').textContent = '● offline'; $('sse').style.color = 'var(--block)'; };
-  src.onmessage = (e) => {
-    let payload; try { payload = JSON.parse(e.data); } catch { return; }
-    if (payload.type !== 'decision') return;
-    renderTrace(payload.decision);
-    // A queue that only fills on reload looks broken in the one demo where
-    // somebody is watching it fill.
-    if (payload.decision?.verdict === 'ESCALATE') void refreshEscalations();
-  };
-}
-
-function renderTrace(d) {
-  const el = document.createElement('div');
-  el.className = 'decision';
-  el.innerHTML = `
-    <div class="top">
-      <span class="badge ${esc(d.verdict)}">${esc(d.verdict)}</span>
-      <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)">${d.totalMs}ms</span>
-    </div>
-    <div class="prompt">${esc((d.maskedPrompt ?? '').slice(0, 110))}</div>
-    ${(d.passes ?? []).map((p) => `
-      <div class="pass">
-        <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
-        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
-        <span class="ms">${p.ms}ms</span>
-      </div>`).join('')}`;
-  const trace = $('trace');
-  if (trace.querySelector('.empty, .empty-state')) trace.innerHTML = '';
-  trace.prepend(el);
-  while (trace.children.length > 25) trace.lastChild.remove();
-}
-
-// ── tabs ─────────────────────────────────────────────────────────────────────
-
-const TABS = { console: 'grid3', people: 'grid2', redteam: 'single' };
-
-document.querySelector('nav').onclick = (e) => {
-  const b = e.target.closest('button');
-  if (!b) return;
-  document.querySelectorAll('nav button').forEach((x) => {
-    const active = x === b;
-    x.classList.toggle('on', active);
-    x.setAttribute('aria-selected', String(active));
-  });
-  for (const [tab, layout] of Object.entries(TABS)) {
-    const el = $(`tab-${tab}`);
-    el.style.display = tab === b.dataset.tab ? (layout === 'single' ? 'block' : 'grid') : 'none';
+    m.busy = null;
+    if (!ok) { m.error = j?.error ?? 'could not send that'; render(); return; }
+    m.appealed = true;
+    m.appealOpen = false;
+    await refreshAppeals();
+    render();
   }
+}
+
+// ═══ RED TEAM ════════════════════════════════════════════════════════════════
+
+VIEWS.redteam = {
+  railParent: 'policy',
+  body: () => {
+    const s = state.rtReport;
+    const toolbar = `<div class="toolbar">
+      ${backToRules}
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="loadRt">Load last report</button>
+      <button type="button" class="btn primary" id="runRt"${state.rtBusy ? ' disabled' : ''}>${state.rtBusy ? 'Running…' : 'Run suite'}</button>
+    </div>`;
+
+    if (!s) {
+      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite, or load the most recent report, to see how the guard holds up against known attacks.</span></div></div>`;
+    }
+    const attacks = (s.warden ?? []).filter((c) => !c.isControl);
+    const controls = (s.warden ?? []).filter((c) => c.isControl);
+    const sum = (rows, k) => rows.reduce((n, c) => n + c[k], 0);
+    const caught = sum(attacks, 'correct'), atotal = sum(attacks, 'total');
+    const fp = sum(controls, 'falsePositives'), ctotal = sum(controls, 'total');
+    const pc = (n, d) => (d ? Math.round((n / d) * 100) : 0);
+
+    return `<div class="sheet">
+      ${toolbar}
+      <div class="group">
+        ${s.adapter === 'mock' ? '<div class="banner warn">These numbers come from the mock adapter, not a real model. They measure the harness, not the guard.</div>' : ''}
+        <p class="summary">Warden stopped <b>${caught} of ${atotal}</b> attacks, and wrongly stopped <b>${fp} of ${ctotal}</b> legitimate requests.</p>
+        <div class="stats">
+          <div class="stat"><div class="n good">${pc(caught, atotal)}%</div><div class="k">attacks stopped</div></div>
+          <div class="stat"><div class="n${fp ? ' warn' : ' good'}">${pc(fp, ctotal)}%</div><div class="k">wrongly stopped</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <table>
+          <thead><tr><th>Attack class</th><th class="n">Warden</th><th class="n">No guard</th></tr></thead>
+          <tbody>
+          ${(s.warden ?? []).map((c) => {
+            const b = (s.baseline ?? []).find((x) => x.class === c.class);
+            const rate = pc(c.correct, c.total);
+            const colour = rate > 70 ? 'var(--allow)' : rate > 40 ? 'var(--escalate)' : 'var(--block)';
+            return `<tr>
+              <td>${esc(c.class)}${c.isControl ? ' <span class="note">(control)</span>' : ''}</td>
+              <td class="n">${rate}%<div class="bar"><i style="width:${rate}%;background:${colour}"></i></div></td>
+              <td class="n">${b ? `${pc(b.correct, b.total)}%` : '—'}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  },
+  bind: () => {
+    const load = $('loadRt');
+    if (load) load.onclick = async () => {
+      const { ok, j } = await api('/api/redteam/report');
+      if (ok) { state.rtReport = j; render(); }
+    };
+    const run = $('runRt');
+    if (run) run.onclick = async () => {
+      state.rtBusy = true; render();
+      const { ok, j } = await api('/api/redteam/run', { method: 'POST' });
+      state.rtBusy = false;
+      if (ok) state.rtReport = j;
+      render();
+    };
+  },
+  onEnter: () => { if (!state.rtReport) void autoLoadRedteam(); }
 };
 
-// ── red team tab ─────────────────────────────────────────────────────────────
-
-$('loadRt').onclick = async () => {
+async function autoLoadRedteam() {
   const { ok, j } = await api('/api/redteam/report');
-  $('rtNote').textContent = ok ? '' : 'no report yet — run npm run redteam';
-  if (ok) renderRedteam(j);
-};
-
-$('runRt').onclick = async () => {
-  $('rtNote').textContent = 'running — this takes a while with a real model…';
-  $('runRt').disabled = true;
-  const { ok, j } = await api('/api/redteam/run', { method: 'POST' });
-  $('runRt').disabled = false;
-  $('rtNote').textContent = ok ? '' : (j.error ?? 'failed');
-  if (ok) renderRedteam(j);
-};
-
-function renderRedteam(s) {
-  // Headline numbers come from the per-prompt tallies: a class can mix attacks
-  // and controls, and bucketing whole classes counted a correctly-allowed
-  // control as a stopped attack. The fallbacks keep an old redteam-last.json
-  // (from before those fields existed) rendering.
-  const rows = s.warden ?? [];
-  const caught = rows.reduce((n, c) => n + (c.attacksStopped ?? (c.isControl ? 0 : c.correct)), 0);
-  const atotal = rows.reduce((n, c) => n + (c.attacks ?? (c.isControl ? 0 : c.total)), 0);
-  const fp = rows.reduce((n, c) => n + (c.falsePositives ?? 0), 0);
-  const ctotal = rows.reduce((n, c) => n + (c.controls ?? (c.isControl ? c.total : 0)), 0);
-  const p = (n, d) => (d ? Math.round((n / d) * 100) : 0);
-
-  $('rtOut').innerHTML = `
-    ${s.adapter === 'mock' ? '<div class="banner">These numbers come from the mock adapter, not a real model. They measure the harness, not the guard.</div>' : ''}
-    <div style="display:flex;gap:36px;margin-bottom:22px">
-      <div><div class="stat">${p(caught, atotal)}%</div>
-           <div class="note">attacks stopped · ${caught}/${atotal}</div></div>
-      <div><div class="stat" style="color:${fp ? 'var(--escalate)' : 'var(--allow)'}">${p(fp, ctotal)}%</div>
-           <div class="note">false positives · ${fp}/${ctotal}</div></div>
-    </div>
-    <table>
-      <tr><th>Class</th><th style="text-align:right">Warden</th><th style="text-align:right">Baseline</th><th style="text-align:right">p50</th></tr>
-      ${(s.warden ?? []).map((c) => {
-        const b = (s.baseline ?? []).find((x) => x.class === c.class);
-        const rate = p(c.correct, c.total);
-        const colour = rate > 70 ? 'var(--allow)' : rate > 40 ? 'var(--escalate)' : 'var(--block)';
-        return `<tr>
-          <td>${esc(c.class)}${c.isControl ? ' <span style="color:var(--faint)">(control)</span>' : ''}</td>
-          <td class="num">${rate}%<div class="bar"><i style="width:${rate}%;background:${colour}"></i></div></td>
-          <td class="num" style="color:var(--faint)">${b ? p(b.correct, b.total) + '%' : '—'}</td>
-          <td class="num" style="color:var(--faint)">${c.p50}ms</td>
-        </tr>`;
-      }).join('')}
-    </table>`;
+  if (ok && j) { state.rtReport = j; render(); }
 }
 
 boot();

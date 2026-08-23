@@ -159,10 +159,25 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
 }));
 
 app.post('/api/policy/preview', asyncRoute(async (req, res) => {
-  const mod = await optional<{ previewRule: (a: unknown, r: unknown, p: unknown) => Promise<unknown> }>('../policy/compile.js');
+  const mod = await optional<{
+    previewRule: (a: unknown, r: unknown, p: unknown, x?: unknown) => Promise<unknown>;
+  }>('../policy/compile.js');
   const previewRule = mod?.previewRule;
   if (!previewRule) return res.status(503).json({ error: 'preview not wired yet (OPE-7)' });
-  res.json(await previewRule(adapter(), req.body?.rule, loadPolicy()));
+  // `against` carries prompts the gateway already ruled on, so a candidate rule
+  // can be checked for regressions against real traffic and not only against
+  // the examples its own compiler invented. Capped: every case is a full
+  // adjudication on the local model.
+  const against = Array.isArray(req.body?.against)
+    ? req.body.against
+        .slice(0, 8)
+        .map((c: { prompt?: unknown; expected?: unknown }) => ({
+          prompt: String(c?.prompt ?? '').slice(0, 2000),
+          expected: c?.expected === 'BLOCK' ? 'BLOCK' : 'ALLOW'
+        }))
+        .filter((c: { prompt: string }) => c.prompt.length > 0)
+    : [];
+  res.json(await previewRule(adapter(), req.body?.rule, loadPolicy(), against));
 }));
 
 app.post('/api/policy/ratify', asyncRoute(async (req, res) => {
@@ -497,6 +512,16 @@ app.get('/api/audit', asyncRoute(async (req, res) => {
   const raw = Number(req.query['limit'] ?? 50);
   const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 1), 500) : 50;
   res.json(await readAudit(limit));
+}));
+
+// The chain is the product's whole evidence claim, and evidence nobody can see
+// is not evidence. `npm run verify-audit` recomputes it from the terminal; this
+// is the same check, so the console can show it too.
+app.get('/api/audit/verify', asyncRoute(async (_req, res) => {
+  const mod = await optional<{ verifyChain: () => unknown }>('../audit/log.js');
+  const verifyChain = mod?.verifyChain;
+  if (!verifyChain) return res.json({ ok: true, entries: 0 });
+  res.json(verifyChain());
 }));
 
 /**
