@@ -190,6 +190,19 @@ behind a restrictive network.
 on a public address — which is why the deployment notes push Tailscale over a
 port forward. Stated in the README's Limits.
 
+## La entrega
+
+Cierra **domingo 23, 12:00 ART**. Lo que pide la página, contra lo que hay:
+
+| Requisito | Estado |
+|---|---|
+| Código open source + README | ✅ el repo es público, el README es el documento |
+| Ventana de commits (todo escrito durante el hackathon) | ✅ primer commit 22-Ago 16:21 ART, con el evento abierto desde las 12:00 |
+| Contratos desplegados | N/A — no hay |
+| Track seleccionada en el form | ⬜ **QVAC**, acordarse al enviar |
+| **Video de 3 minutos** | ⬜ guion listo en [`DEMO.md`](DEMO.md), falta grabarlo |
+| Permalinks del README pineados al commit final | ⬜ `npm run permalinks -- --write`, **después** del último push |
+
 ## Needs a human
 
 | Who | What |

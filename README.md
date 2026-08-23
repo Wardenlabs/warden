@@ -85,6 +85,14 @@ appears in the console under the rule that fired — which is the thing an admin
 has to edit, and the only view where a false positive is distinguishable from a
 correct block.
 
+Both land somewhere. A reported block shows up in the admin console **under the
+rule that fired**, which is the object they have to edit — and with a measured
+false-positive rate of 44%, that screen is the only place where a wrong block is
+distinguishable from a right one. A held prompt lands in a review queue the
+admin answers from the same page. That is the whole loop: a refusal the employee
+can act on, a signal the admin can act on, and a rule that gets better because
+somebody was stopped by it.
+
 > **Observed against the mock adapter, end to end** — console, hook, gate and
 > re-check — and **not yet with a real model**, so nothing here claims what a
 > real rewrite proposes. `npx tsx scripts/probe-rewrite.ts` is the harness that
@@ -389,6 +397,9 @@ therefore measured against no rules at all.
 | | |
 |---|---|
 | **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
+| **Held for review** | `ESCALATE` is half the severity model, and it now has somewhere to go. The queue is *derived from the audit log*, so every held prompt appears without the employee doing anything, and the admin answers it — approve or refuse, with a note — from the console. Approving does **not** replay the original prompt: the hook returned seconds after the employee pressed Enter and their tool moved on. It means "ask again, and it is judged on its own merits", which is the only version of this that does not smuggle an un-judged ALLOW into the pipeline. |
+| **Reported as wrong** | An employee can mark a block as a mistake and it reaches the admin next to the rule that produced it. The audit log keeps a prompt's hash and not its text, so their note is the only path by which their own words reach that screen — and it is the only place a false positive is visible as one. |
+| **Answers judged too** | Rules scoped `output` are enforced against what the model *says*, through the same isolate → retrieve → adjudicate → aggregate. On the proxy only: through the hook, Warden runs before the prompt is sent and never sees the response. A policy with output rules buffers the answer instead of streaming it, because a token cannot be recalled. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
 | **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
@@ -418,7 +429,8 @@ the corpus is too easy, not that the guard is airtight.
 
 ### The numbers
 
-Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition:
+Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition,
+**generated 2026-08-22 21:25 — before the `scope` filter landed**:
 
 | | Warden | Baseline |
 |---|---|---|
@@ -434,6 +446,14 @@ second is the honest cost, and it is **not shippable** — a gateway that refuse
 That number is the open problem, and the investigation into it — including three
 hypotheses measured and rejected, and the lead that is still live — is written up
 in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
+
+That date matters and is not a disclaimer. `Rule.scope` was not read by anything
+when these were measured, so one rule scoped to *outputs* was being adjudicated
+against every *input* — 29 of 353 adjudications in an equivalent mock run. It is
+filtered now, and what that does to the 44% is **not yet measured**: it needs
+`npm run redteam -- --reps 3` on a machine with the models. Until that run
+exists, these numbers describe the build of 2026-08-22, and the table says so
+rather than presenting them as current.
 
 Two caveats that qualify every number above. Runs are **not reproducible**: two
 identical runs of the same policy at temperature 0 gave 44% and 31%, because
