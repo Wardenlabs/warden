@@ -45,6 +45,13 @@ const state = {
    */
   appeals: [],
 
+  /**
+   * Requests Warden held instead of deciding, with the administrator's answer
+   * when there is one. Derived on the server from the audit log, so this is a
+   * work queue and not a second copy of the truth.
+   */
+  escalations: [],
+
   /** One draft at a time, deliberately. Two half-written rules is a way to
    *  activate the wrong one. `draftFor` locks the audience when it was started
    *  from a person's page. */
@@ -215,7 +222,7 @@ async function boot() {
     return;
   }
 
-  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals()]);
+  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations()]);
   window.addEventListener('hashchange', route);
   route();
   subscribe();
@@ -251,6 +258,11 @@ async function loadPresets() {
 async function refreshAppeals() {
   const { ok, j } = await api('/api/appeals');
   state.appeals = ok && Array.isArray(j) ? j : [];
+}
+
+async function refreshEscalations() {
+  const { ok, j } = await api('/api/escalations');
+  state.escalations = ok && Array.isArray(j) ? j : [];
 }
 
 /**
@@ -380,7 +392,7 @@ function disclosure(key, label, body) {
 // nav item land on the tab you are most likely to have come for.
 const NAV = [
   { view: 'activity', label: 'Activity' },
-  { view: 'inbox', label: 'Inbox', count: () => escalated().length + state.appeals.length },
+  { view: 'inbox', label: 'Inbox', count: () => pendingEscalations().length + state.appeals.length },
   { sep: true },
   { view: 'policy', label: 'Rules', sel: 'new' },
   { view: 'people', label: 'Team' }
@@ -422,7 +434,9 @@ document.addEventListener('keydown', (e) => {
 
 // ═══ ACTIVITY ════════════════════════════════════════════════════════════════
 
-const escalated = () => state.audit.filter((a) => a.decision?.verdict === 'ESCALATE');
+/** Held and still unanswered. The rail counts these, not the ones already dealt
+ *  with — a badge that never goes down stops being read. */
+const pendingEscalations = () => state.escalations.filter((e) => !e.review);
 
 function visibleAudit() {
   return state.audit.filter((a) => {
@@ -445,7 +459,7 @@ function todayCard() {
   const today = dayKey(new Date().toISOString());
   const rows = state.audit.filter((a) => dayKey(a.ts) === today);
   const stopped = rows.filter((a) => a.decision?.verdict === 'BLOCK').length;
-  const waiting = escalated().length;
+  const waiting = pendingEscalations().length;
   const people = new Set(rows.filter((a) => a.decision?.verdict !== 'ALLOW').map((a) => a.actor?.id)).size;
 
   if (!rows.length) {
@@ -512,7 +526,22 @@ function plainSummary(entry) {
     return `<b>${who}</b> asked “${asked}”, and Warden let it through — nothing in the policy applies to it.`;
   }
   if (!rule) {
-    return `<b>${who}</b> asked “${asked}”, and Warden ${d.verdict === 'BLOCK' ? 'stopped it' : 'held it for a person to decide'}.`;
+    // No rule fired, so the only account of the refusal is the explanation the
+    // guard wrote. It is multi-line and one of its lines names the structural
+    // signal — invisible characters, faked conversation turns, phrasing aimed
+    // at the instruction layer. Without this the panel says a person was
+    // stopped and offers nothing to point at, which is exactly the failure the
+    // policy-is-the-authority rule exists to prevent.
+    const flagged = String(d.explanation ?? '').split('\n').find((l) => l.startsWith('Also flagged:'));
+    const signal = flagged ? flagged.replace(/^Also flagged:\s*/, '').replace(/\.\s*$/, '') : '';
+    if (d.verdict === 'ESCALATE') {
+      return `<b>${who}</b> asked “${asked}”. No rule matched it, but Warden noticed ${
+        signal ? `<b>${esc(signal)}</b>` : 'something structural in the text'
+      } and queued it for a person. They have not been refused — they are waiting.`;
+    }
+    return `<b>${who}</b> asked “${asked}”, and Warden stopped it${
+      signal ? ` after noticing <b>${esc(signal)}</b>` : ''
+    }. No rule in the policy matched it.`;
   }
   const name = esc(ruleName(rule.ruleId));
   // The guidance stays out of this sentence on purpose. It is often three lines
@@ -522,7 +551,13 @@ function plainSummary(entry) {
     : `<b>${who}</b> asked “${asked}”. The <b>${name}</b> rule says this needs a person to sign off, so Warden is holding it.`;
 }
 
-function decisionDetail(entry) {
+/**
+ * @param entry the audit record
+ * @param head  markup spliced in above the summary. The Inbox uses it to lead
+ *              with what a person said about this decision, which is the part
+ *              the log cannot tell you.
+ */
+function decisionDetail(entry, head = '') {
   const d = entry.decision ?? {};
   const slowest = Math.max(1, ...(d.passes ?? []).map((p) => p.ms ?? 0));
   const guidance = d.firedRules?.[0]?.guidance;
@@ -560,6 +595,7 @@ function decisionDetail(entry) {
     </div>`;
 
   return `<div class="detail">
+    ${head}
     <div class="detail-head">
       <span class="badge ${esc(d.verdict)}">${esc(d.verdict)}</span>
       <span class="when">${esc(hhmm(entry.ts))} · ${esc(dayLabel(dayKey(entry.ts)).toLowerCase())}</span>
@@ -652,25 +688,108 @@ VIEWS.activity = {
  * identical — which is the whole reason appeals exist as a separate record.
  */
 VIEWS.inbox = {
-  onEnter: () => { void refreshAppeals().then(render); },
+  onEnter: () => { void Promise.all([refreshAppeals(), refreshEscalations()]).then(render); },
+  bind: bindInbox,
   body: () => {
-    const held = escalated();
-    if (!state.appeals.length && !held.length) {
+    const waiting = pendingEscalations();
+    const answered = state.escalations.filter((e) => e.review);
+    if (!state.appeals.length && !state.escalations.length) {
       return `<div class="sheet"><div class="empty">
         <b>Nothing waiting</b>
         <span>Two things land here: requests Warden held instead of deciding, and blocks an employee said were wrong.</span>
       </div></div>`;
     }
     return `<div class="sheet">
+      ${waiting.length ? `
+        <div class="day">Waiting on you<span class="n">${waiting.length}</span></div>
+        ${waiting.map(escalationRow).join('')}` : ''}
       ${state.appeals.length ? `
         <div class="day">Reported as wrong<span class="n">${state.appeals.length}</span></div>
         ${state.appeals.map(appealRow).join('')}` : ''}
-      ${held.length ? `
-        <div class="day">Held for a person<span class="n">${held.length}</span></div>
-        ${decisionRows(held, '')}` : ''}
+      ${answered.length ? `
+        <div class="day">Already answered<span class="n">${answered.length}</span></div>
+        ${answered.map(escalationRow).join('')}` : ''}
     </div>`;
   }
 };
+
+/**
+ * One held request.
+ *
+ * An escalation is not a refusal and must not read like one: the person was not
+ * told no, they were told to wait, and this is the screen where somebody ends
+ * that wait.
+ */
+function escalationRow(e) {
+  const open = state.sel === e.auditId;
+  const done = Boolean(e.review);
+  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(e.auditId)}" aria-expanded="${open}">
+      <span class="dot ${done ? '' : 'ESCALATE'}"></span>
+      <span class="col">
+        <span class="t">${e.ruleText ? esc(ruleName(e.ruleId ?? '')) : 'Held without a named rule'}</span>
+        <span class="m">
+          <span>${esc(e.employeeName ?? e.employeeId)} · ${esc(e.role)}</span>
+          ${done
+            ? `<span class="badge ${e.review.outcome === 'approved' ? 'ALLOW' : 'BLOCK'}">${esc(e.review.outcome)}</span>`
+            : '<span class="badge ESCALATE">waiting</span>'}
+          <span class="mono">${esc(String(e.at).slice(0, 16).replace('T', ' '))}</span>
+        </span>
+      </span>
+    </button>
+    ${open ? escalationDetail(e) : ''}`;
+}
+
+function escalationDetail(e) {
+  const entry = state.audit.find((x) => x.auditId === e.auditId);
+  const who = esc(e.employeeName ?? e.employeeId);
+
+  const head = `<p class="summary">${who} sent something the <b>${esc(ruleName(e.ruleId ?? ''))}</b> rule says needs a person to sign off. They were not refused — they were told to wait, and they are still waiting.</p>
+    ${e.employeeNote ? `<div class="group">
+      <div class="label">They added</div>
+      <div class="banner">“${esc(e.employeeNote)}”</div>
+    </div>` : ''}
+    ${e.review ? `<div class="group">
+      <div class="label">Answered</div>
+      <div class="banner${e.review.outcome === 'approved' ? '' : ' warn'}">
+        <b>${esc(e.review.outcome)}</b>${e.review.note ? ` — ${esc(e.review.note)}` : ''}
+      </div>
+    </div>` : `<div class="group">
+      <div class="label">Answer them</div>
+      <textarea id="reviewNote" rows="2" placeholder="What should they know? (optional)"></textarea>
+      <div class="chips">
+        <button type="button" class="btn primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
+        <button type="button" class="btn danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
+      </div>
+      <div class="note">Approving does not release the original prompt — their tool moved on seconds after they pressed Enter. It answers them, and the next ask is judged on its own merits.</div>
+      <div class="note bad" id="reviewNote_err"></div>
+    </div>`}`;
+
+  return entry ? decisionDetail(entry, head) : `<div class="detail">${head}</div>`;
+}
+
+function bindInbox() {
+  const sheet = $('pane').querySelector('.sheet');
+  if (!sheet) return;
+  sheet.querySelectorAll('[data-review]').forEach((btn) => {
+    btn.onclick = async () => {
+      const note = $('reviewNote')?.value.trim();
+      btn.disabled = true;
+      const { ok, j } = await api(`/api/escalations/${encodeURIComponent(btn.dataset.id)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: btn.dataset.review, ...(note ? { note } : {}) })
+      });
+      if (!ok) {
+        btn.disabled = false;
+        const err = $('reviewNote_err');
+        if (err) err.textContent = j.error ?? 'could not record that';
+        return;
+      }
+      await refreshEscalations();
+      render();
+    };
+  });
+}
 
 function appealRow(a) {
   const open = state.sel === a.auditId;
@@ -764,7 +883,7 @@ function rulesBody() {
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')
-      : '<div class="empty"><b>No rules yet</b><span>Start one under New rule and Warden will compile it.</span></div>'}
+      : '<div class="empty"><b>Nothing is being enforced</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
 
     <div class="section">
       <div class="label">Daily limits by role</div>
@@ -793,9 +912,24 @@ function newRulePage() {
  * decoration. The categories stay collapsed until you pick one, so the default
  * state is a question and a box and nothing else.
  */
+/**
+ * An empty policy is a real state, and on a fresh install it is the first thing
+ * anyone sees. It must not look like a page that failed to load, and the honest
+ * thing to say is also the best explanation of the product: there are no rules,
+ * therefore nothing is being stopped.
+ */
+function emptyPolicyBanner() {
+  if (state.policy.rules.length) return '';
+  return `<div class="banner warn">
+    <b>Your policy is empty, so right now Warden lets everything through.</b>
+    It only stops what you tell it to stop — write the first rule below, or take one from the catalogue.
+  </div>`;
+}
+
 function heroComposer() {
   const cat = state.presetCat == null ? null : state.presets[state.presetCat];
   return `<div class="hero">
+    ${emptyPolicyBanner()}
     <h2 class="hero-q">What should Warden stop?</h2>
 
     <div class="hero-box">
@@ -837,6 +971,11 @@ function ruleDetail(rule) {
   const hits = state.audit.filter((a) => (a.decision?.firedRules ?? []).some((r) => r.ruleId === rule.id));
   const guidance = hits[0]?.decision.firedRules.find((r) => r.ruleId === rule.id)?.guidance;
   const blocked = hits.filter((h) => h.decision?.verdict !== 'ALLOW').length;
+  // How many of those the person on the other end said were wrong. This is the
+  // only false-positive signal the console actually has: in the audit log a
+  // correct block and an incorrect one are the same record. Counting how much
+  // a rule catches without counting what it costs makes every rule look good.
+  const disputed = state.appeals.filter((a) => a.ruleId === rule.id);
 
   // An active rule is an object you consult, not a decision you take, so it
   // gets the property-list shape rather than the draft's decide-first one.
@@ -853,13 +992,19 @@ function ruleDetail(rule) {
 
     <div class="evidence">
       <div class="top">
-        <span class="badge${hits.length ? '' : ''}">${blocked} / ${hits.length}</span>
+        <span class="badge${disputed.length ? ' BLOCK' : ''}">${blocked} / ${hits.length}</span>
         <b>${hits.length
           ? `Stopped ${blocked} of the ${hits.length} requests it looked at`
           : 'This rule has not fired yet'}</b>
       </div>
       ${hits.length ? `<div class="body">
-        <button type="button" class="btn" data-go="activity" data-q="rule=${attr(rule.id)}">See those decisions</button>
+        ${disputed.length
+          ? `<div class="note bad">${plural(disputed.length, 'of those was', 'of those were')} reported as wrong by the person it stopped.</div>`
+          : '<div class="note">Nobody has reported one of these as wrong.</div>'}
+        <div class="chips">
+          <button type="button" class="btn" data-go="activity" data-q="rule=${attr(rule.id)}">See those decisions</button>
+          ${disputed.length ? '<button type="button" class="btn" data-go="inbox">See the reports</button>' : ''}
+        </div>
       </div>` : ''}
     </div>
 
@@ -1557,6 +1702,7 @@ VIEWS.simulator = {
     if (send) send.onclick = doSend;
     const prompt = $('prompt');
     if (prompt) prompt.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSend(); };
+    bindFollowUps();
   }
 };
 
@@ -1582,6 +1728,7 @@ function renderMessage(m, i) {
     <div class="who">Warden</div>
     <div class="verdict ${esc(m.verdict)}">${esc(m.label)}</div>
     ${m.why ? `<div class="why">${m.why}</div>` : ''}
+    ${followUpControls(m, i)}
     ${passes}
   </div>`;
 }
@@ -1636,8 +1783,97 @@ async function doSend() {
   if (j.quota?.limit) why += `<div>Used ${j.quota.used} of ${j.quota.limit} today.</div>`;
   if (j.auditId) why += `<div><button type="button" class="linkbtn" data-go="activity" data-sel="${attr(j.auditId)}">See the full record</button></div>`;
 
-  state.chat.push({ from: 'warden', verdict: j.verdict, label, why, passes: j.passes, totalMs: j.totalMs });
+  // A refusal with nowhere to go is what makes people work around the gateway.
+  // These two are the way out, and they belong to the employee: the console
+  // shows them because the simulator is where it stands in for one.
+  state.chat.push({
+    from: 'warden', verdict: j.verdict, label, why,
+    passes: j.passes, totalMs: j.totalMs,
+    ...(j.verdict !== 'ALLOW' && j.auditId && person
+      ? { followUp: { auditId: j.auditId, prompt: text, who: person.id } }
+      : {})
+  });
   render();
+}
+
+// ── the two ways out of a refusal ────────────────────────────────────────────
+
+const REWRITE_REFUSAL = {
+  'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
+  'no-honest-rewrite': 'There is no honest rewrite of this one — the phrasing reached for the assistant’s own instructions, and no version of that is inside the rules.',
+  'too-long': 'Too long to restate. A rewrite has to be a request someone could have typed.',
+  'model-unavailable': 'The model did not answer, so nothing was suggested. Nothing was spent — you can ask again.',
+  'nothing-left': 'Once the prohibited part is taken out there is no request left to make.',
+  'still-blocked': 'The rewrite did not survive its own re-check, so it was not offered.',
+  'already-rewritten': 'One rewrite per block, and this one is used.'
+};
+
+/** Renders under a refusal in the simulator, on the message that owns it. */
+function followUpControls(m, i) {
+  if (!m.followUp) return '';
+  const s = m.rewrite;
+  return `<div class="group" data-follow="${i}">
+    ${s?.suggestion ? `
+      <div class="label">Warden suggests asking it this way</div>
+      <div class="banner">${esc(s.suggestion)}</div>
+      <button type="button" class="btn" data-use-rewrite="${i}">Put this in the box</button>` : ''}
+    ${s?.reason ? `<div class="note">${esc(REWRITE_REFUSAL[s.reason] ?? s.reason)}</div>` : ''}
+    ${m.appealed
+      ? '<div class="note good">Reported. An administrator sees it in their Inbox, next to the rule that stopped you.</div>'
+      : `<div class="chips">
+          ${s ? '' : `<button type="button" class="btn" data-rewrite="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'rewrite' ? 'Asking…' : 'Suggest a rewrite'}</button>`}
+          <button type="button" class="btn" data-appeal="${i}"${m.busy ? ' disabled' : ''}>This block was wrong</button>
+        </div>
+        ${m.appealOpen ? `
+          <textarea id="appealNote" rows="2" placeholder="What were you actually trying to do? (optional)"></textarea>
+          <button type="button" class="btn primary" data-send-appeal="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'appeal' ? 'Sending…' : 'Send the report'}</button>` : ''}
+        ${m.error ? `<div class="note bad">${esc(m.error)}</div>` : ''}`}
+  </div>`;
+}
+
+function bindFollowUps() {
+  const at = (el) => state.chat[Number(el.dataset.rewrite ?? el.dataset.appeal ?? el.dataset.sendAppeal ?? el.dataset.useRewrite)];
+  const keyOf = (m) => personById(m.followUp.who)?.apiKey;
+
+  document.querySelectorAll('[data-rewrite]').forEach((b) => { b.onclick = () => void askRewrite(at(b)); });
+  document.querySelectorAll('[data-appeal]').forEach((b) => {
+    b.onclick = () => { const m = at(b); m.appealOpen = !m.appealOpen; m.error = null; render(); };
+  });
+  document.querySelectorAll('[data-send-appeal]').forEach((b) => { b.onclick = () => void sendAppeal(at(b)); });
+  document.querySelectorAll('[data-use-rewrite]').forEach((b) => {
+    b.onclick = () => { const box = $('prompt'); if (box) { box.value = at(b).rewrite.suggestion; box.focus(); } };
+  });
+
+  async function askRewrite(m) {
+    m.busy = 'rewrite'; m.error = null; render();
+    const { ok, j } = await api('/api/guard/rewrite', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${keyOf(m)}` },
+      body: JSON.stringify({ auditId: m.followUp.auditId, prompt: m.followUp.prompt })
+    });
+    m.busy = null;
+    // A refusal comes back as a reason rather than an error, and both 200 and
+    // 409 carry one; only a shapeless failure is worth showing as an error.
+    if (j?.suggestion || j?.reason) m.rewrite = { suggestion: j.suggestion ?? null, reason: j.reason ?? null };
+    else if (!ok) m.error = j?.error ?? 'could not ask for a rewrite';
+    render();
+  }
+
+  async function sendAppeal(m) {
+    m.busy = 'appeal'; m.error = null; render();
+    const note = $('appealNote')?.value.trim();
+    const { ok, j } = await api('/api/guard/appeal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${keyOf(m)}` },
+      body: JSON.stringify({ auditId: m.followUp.auditId, ...(note ? { note } : {}) })
+    });
+    m.busy = null;
+    if (!ok) { m.error = j?.error ?? 'could not send that'; render(); return; }
+    m.appealed = true;
+    m.appealOpen = false;
+    await refreshAppeals();
+    render();
+  }
 }
 
 // ═══ RED TEAM ════════════════════════════════════════════════════════════════
