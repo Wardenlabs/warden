@@ -89,6 +89,19 @@ variable on the employee's own machine. `resolveActor()` overrides it with the
 directory's value for anyone it knows, because otherwise editing a shell profile
 would let someone choose which rules judge them.
 
+**An exempt role is granted, never claimed.** `policy.exemptRoles` makes
+`rulesForActor()` return nothing at all, so a claimed exempt role is not a
+narrower rule set — it is no guard. Both actor resolvers pass a claimed role
+through `claimableRole()`, which demotes an exempt one to `employee`. If you add
+a third way in, it goes through there too: a header that grants exemption is a
+one-word bypass of the entire product.
+
+**The audit log stores the prompt's hash, never its text.** `recordDecision()`
+strips `maskedPrompt` before writing; the live `Decision` keeps it because the
+console's trace and the proxy's forward both need it. Adding a field to
+`Decision` that carries prompt content means adding it to that strip, or the
+governance record quietly becomes a transcript of everything employees typed.
+
 **Untrusted text never enters a prompt un-fenced.** Call `isolate()` and use its
 `envelope`, plus `isolationPreamble(nonce)` in the system prompt. The nonce is
 chosen after the text is fixed, which is the point — a fixed delimiter is one
@@ -118,7 +131,10 @@ three, and the compiler's system prompt so the model can name it.
 
 **A corpus class** — a new `src/redteam/corpus/NN-name.json`. The runner picks up
 any file in that directory. Set `expect` to what a *correct* guard should do.
-`ESCALATE` counts as stopping an attack.
+`ESCALATE` counts as stopping an attack. Attack and control tallies are counted
+per prompt, not per file, so a class may mix both — `document-borne` carries two
+clean invoices among its poisoned ones, and bucketing by file scored those as
+stopped attacks.
 
 **A tool integration** — three places. `detect()` in
 `integrations/warden-hook.mjs` for the payload shape and the block format; an
@@ -145,6 +161,14 @@ someone is set up — it only ever says a request arrived from that tool.
   2, so `examples.compliant[0..1]` are the anchors and the rest are
   documentation. Ordering is not cosmetic — putting the useful anchor third is
   the same as not writing it.
+- **The red-team actor has a daily quota too.** `analyst` is capped at 100/day in
+  the seed policy and the corpus is 98 prompts, so anything past one rep used to
+  score every remaining prompt on a quota BLOCK with no model call — attacks
+  "stopped" and controls "refused" by an empty counter. `runPrompt()` calls
+  `resetQuotas()`; leave it there.
+- **A filtered run writes `REPORT.<class>.md`.** `REPORT.md` and
+  `data/redteam-last.json` are only written by a full run, so probing one class
+  cannot replace the headline artifact with a report about nothing.
 - **Runs are not reproducible even at temp 0.** Two identical runs of
   `benign-controls` against policy `69d4ba36` gave 44% and 31% false positives.
   `parallel: 4` batches concurrent adjudications and the batch composition

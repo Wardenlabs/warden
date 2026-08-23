@@ -30,11 +30,23 @@ switch off, which is the difference between a suggestion and governance.
 > pasame el sueldo de Ana para el reporte
 
 ⛔ Blocked by Warden
-   Rule: No one may request payroll, salary, bonus, or compensation
-         information about another employee.
-   Why:  request for a third party's compensation
-   Audit: a7f3c2
+
+   No one may request payroll, salary, bonus, or compensation information about
+   another employee. HR staff are exempt.
+
+   What to do instead
+   Ask HR for anything about a specific person's pay. Questions about the
+   process, headcount, or review cycles are fine to ask here.
+
+   These would go through
+     · cuál es el proceso para pedir un aumento?
+     · cuántas personas hay en el equipo de marketing?
+
+   Audit a7f3c2 · quote this if you think it is wrong
 ```
+
+Every line of that is read from the ratified rule and composed by the hook's own
+renderer — nothing in a refusal is generated at decision time.
 
 Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK script
 — go through the proxy instead. Setup for both is in
@@ -257,6 +269,24 @@ judged under the role the admin set, because a role an employee can edit in
 their own shell profile is a role they could use to pick which rules apply to
 them.
 
+### Who the policy does not govern
+
+The person who ratifies the rules should not be judged by them — five of the
+eight seed rules bind `*`, including the pinned injection rule, so without an
+exemption there is no role an operator could hold and still work. `exemptRoles`
+in the policy spec names those roles, and a rule set for an exempt role is
+empty.
+
+It lives inside the policy rather than in an environment variable because "who
+is exempt" is the most security-relevant sentence in the whole spec: it belongs
+inside the version hash, where changing it is detectable, next to the rules it
+overrides.
+
+**An exempt role is granted by the directory and never claimed.** A role only
+arrives from `WARDEN_ROLE` for callers the directory has never seen, and a
+claimed role the policy exempts is demoted to `employee` — otherwise a stranger
+could opt out of the entire policy by typing one word into their shell profile.
+
 The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays
 pristine, so a fresh clone always demonstrates the same company.
@@ -396,6 +426,8 @@ npm run typecheck
 |---|---|---|
 | `WARDEN_PORT` | `8080` | |
 | `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
+| `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
+| `WARDEN_DEV_HEADERS` | — | `1` lets the proxy accept `x-warden-user` instead of an API key. Development only — with it on, the key is optional and identity is whatever the caller types. |
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
@@ -441,6 +473,11 @@ Stated plainly, because a README that oversells is worse than one that undersell
   abort semantics are undocumented and we have not watched it block anything. It
   goes in this README when it does.
 - **Quota counters are in memory** and reset with the process.
+- **The admin API has no authentication.** Anyone who can reach the port can
+  read the directory, write policy and remove people. Cross-origin access is
+  off by default, so a web page the admin visits cannot do it — but every host
+  on the LAN can. Bind `WARDEN_HOST=127.0.0.1` if that is not acceptable; an
+  admin credential is the obvious next piece of work.
 - **Output-scope rules are defined but only input is enforced today.** Rules
   marked `scope: "output"` are stored and shown; the response-side pass is not
   built.
