@@ -80,9 +80,17 @@ function loadCorpus(filter?: string): CorpusFile[] {
  *
  * Nothing is written to disk. A benchmark that mutates the machine it runs on
  * is a benchmark you can only trust the first time.
+ *
+ * It is a file of its own rather than the shipped seed because the two answer
+ * different questions. The seed is what a fresh install starts with, and that
+ * set is deliberately small — the admin writes the policy, so shipping a
+ * company's worth of invented rules would be shipping our guesses as their
+ * policy. The corpus, meanwhile, needs enough rules to be worth attacking, and
+ * its 98 prompts were written against these eight. Tying them together would
+ * mean every product decision about defaults silently rewrites the benchmark.
  */
 function benchmarkPolicy(): PolicySpec {
-  const path = process.env['WARDEN_BENCHMARK_POLICY'] ?? 'data/seed/policies.seed.json';
+  const path = process.env['WARDEN_BENCHMARK_POLICY'] ?? 'data/seed/benchmark-policy.json';
   const seed = JSON.parse(readFileSync(path, 'utf8')) as {
     rules?: Rule[];
     quotas?: Quota[];
