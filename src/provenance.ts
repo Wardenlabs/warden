@@ -47,12 +47,27 @@ function git(...args: string[]): string | null {
   }
 }
 
+/**
+ * The files this stamp appears in, excluded from the dirty check.
+ *
+ * Writing the artifact is what makes the tree dirty, so counting it would make
+ * every generated file say "uncommitted changes" forever — including the ones
+ * produced from a pristine checkout. A warning that is always on is one readers
+ * learn to skip, which costs more than not having it.
+ *
+ * What the stamp is about is the apparatus: whether the code that took the
+ * measurement matches the commit named beside it. That question is unaffected by
+ * the measurement's own output.
+ */
+const GENERATED = ['REPORT.md', 'BENCHMARKS.md'];
+
 export function provenance(): Provenance {
   const commit = git('rev-parse', '--short', 'HEAD');
   if (!commit) return { commit: null, dirty: false };
   // `--quiet` exits non-zero when there is a difference, which `git()` turns
   // into null. No output and no error means the tree matches the commit.
-  const clean = git('diff', '--quiet', 'HEAD') !== null;
+  const clean =
+    git('diff', '--quiet', 'HEAD', '--', '.', ...GENERATED.map((f) => `:(exclude)${f}`)) !== null;
   return { commit, dirty: !clean };
 }
 
