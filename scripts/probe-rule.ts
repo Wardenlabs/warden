@@ -86,4 +86,10 @@ async function main(): Promise<void> {
   await qvac.dispose();
 }
 
-void main();
+main().catch(async (err: unknown) => {
+  // A usage mistake should print its message, not an unhandled-rejection
+  // stack — and it must still release whatever model got loaded.
+  console.error('probe-rule failed:', err instanceof Error ? err.message : err);
+  await adapter().dispose().catch(() => {});
+  process.exitCode = 1;
+});

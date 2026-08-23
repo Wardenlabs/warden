@@ -9,6 +9,12 @@
  * and it would look exactly like everything working.
  *
  * Run: npm run test:vote
+ *
+ * The npm script sets WARDEN_CONFIRM_VOTES=2. It has to happen in the
+ * environment, not in here: the static import below is hoisted above any
+ * assignment this file could make, and adjudicate.ts reads the variable at
+ * module load. With the vote off, only one call is ever made and every check
+ * about confirmations fails vacuously.
  */
 import { adjudicate } from '../src/guard/passes/adjudicate.js';
 import { isolate } from '../src/guard/isolate.js';
@@ -97,7 +103,10 @@ async function main(): Promise<void> {
   }
 
   console.log(failures === 0 ? '\nall good\n' : `\n${failures} check(s) failed\n`);
-  process.exit(failures === 0 ? 0 : 1);
+  process.exitCode = failures === 0 ? 0 : 1;
 }
 
-void main();
+main().catch((err: unknown) => {
+  console.error('test-vote failed:', err);
+  process.exitCode = 1;
+});
