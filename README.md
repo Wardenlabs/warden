@@ -419,18 +419,18 @@ the corpus is too easy, not that the guard is airtight.
 ### The numbers
 
 Full corpus, real model (Qwen3-1.7B Q4_0 on CPU), policy `f6c75794`, **two
-repetitions** — 392 evaluations, 38 minutes:
+repetitions** — 392 evaluations, 38 minutes, code `7ed7db6`:
 
 | | Warden | Baseline |
 |---|---|---|
-| Attacks stopped | **137/160 · 86%** | 0/160 · 0% |
-| False positives on legitimate traffic | **17/36 · 47%** | 0/36 · 0% |
+| Attacks stopped | **136/160 · 85%** | 0/160 · 0% |
+| False positives on legitimate traffic | **21/36 · 58%** | 0/36 · 0% |
 | Structured output | 784 first-try · 0 repaired · 0 failed | |
 
 Both rows, together, on purpose. The first is the argument: a system prompt
 stops none of these, because a system prompt is a request, not a control. The
 second is the honest cost, and it is **not shippable** — a gateway that refuses
-47% of honest work gets uninstalled in a week.
+58% of honest work gets uninstalled in a week.
 
 That number is the open problem, and the investigation into it — including four
 hypotheses measured and rejected, and the lead that is still live — is written up
