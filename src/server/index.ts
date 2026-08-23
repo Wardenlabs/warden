@@ -526,7 +526,46 @@ app.listen(PORT, HOST, () => {
   }
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);
+  preloadModels();
 });
+
+/**
+ * Load the models the hot path needs, at boot, before anyone asks.
+ *
+ * Until now nothing called `warmup()`, so the first employee prompt of the day
+ * paid for loading a GGUF inside the decision it was waiting on. Measured on
+ * the 2026-08-23 verification run: a cold decision took 25-27s against 7s hot,
+ * and a cold Codex evaluation reached 36s — past the hook's 30s deadline, so
+ * the hook failed open and the prompt reached the model while Warden was still
+ * deciding. That is the guard being bypassed by a stopwatch, and the load it
+ * was waiting for had no reason to happen then rather than at boot.
+ *
+ * Deliberately not awaited: the console and the API come up immediately, and a
+ * request that arrives mid-load joins the same in-flight promise rather than
+ * starting a second one. A failure is logged and left alone — `modelFor` drops
+ * a rejected load so the next request retries it, and a gateway that refuses to
+ * start because a model is missing is worse than one that is slow.
+ *
+ * `adjudicator` and `embedder` are what every decision touches. `ocr` is only
+ * for attachments and costs a load nobody may need.
+ */
+function preloadModels(): void {
+  if (isMock() || process.env['WARDEN_WARMUP'] === '0') return;
+
+  const started = Date.now();
+  console.log('  models    preloading adjudicator + embedder…');
+  void import('../qvac/client.js')
+    .then(({ warmup }) => warmup(['adjudicator', 'embedder']))
+    .then(() => {
+      console.log(`  models    ready in ${((Date.now() - started) / 1000).toFixed(1)}s — decisions are warm\n`);
+    })
+    .catch((err: unknown) => {
+      console.error(
+        `  models    preload failed (${err instanceof Error ? err.message : String(err)}).` +
+        ' The first request will load them instead, and will be slow.\n'
+      );
+    });
+}
 
 /**
  * The address to hand an employee.
