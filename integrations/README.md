@@ -137,11 +137,22 @@ is loaded.
    Rule: No one may request payroll, salary, bonus, or compensation
          information about another employee.
    Why:  request for a third party's compensation
+
+   Warden can try to rewrite this so it goes through:
+     warden-hook --rewrite a7f3c2
+     (paste the same prompt, then Ctrl-D)
+
    Audit: a7f3c2
 ```
 
 An ordinary prompt goes through with no output at all — a gateway that comments
 on every message becomes noise people learn to ignore.
+
+`--rewrite` is run by hand, never by the tool: it takes the audit id from the
+block and the same prompt on stdin — which is also how the gateway confirms this
+is the request that was blocked, since the log stores that prompt's hash and not
+its text. What comes back was judged by the same policy before it was shown, so
+if nothing passes you get a reason instead of a suggestion. One per block.
 
 ---
 

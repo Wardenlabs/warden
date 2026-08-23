@@ -137,6 +137,30 @@ export async function readAudit(limit = 50): Promise<AuditEntry[]> {
 }
 
 /**
+ * One entry by its audit id, or null.
+ *
+ * The id is the only handle an employee is given — it is printed on every
+ * refusal — so anything that answers a question about a past decision (an
+ * appeal, a rewrite request) has to start by finding it. Scans the file rather
+ * than reading a tail: a decision from last week is exactly the one somebody is
+ * still arguing about, and a silent "only the last N" window would refuse it
+ * while looking like the id was invalid.
+ */
+export function findDecision(auditId: string): AuditEntry | null {
+  if (!auditId || !existsSync(AUDIT_PATH)) return null;
+  const lines = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const entry = JSON.parse(lines[i]!) as AuditEntry;
+      if (entry.auditId === auditId) return entry;
+    } catch {
+      // A damaged line is a verification finding, not a reason to stop looking.
+    }
+  }
+  return null;
+}
+
+/**
  * Recompute the chain and report the first entry that does not match, then
  * check the log is as long as it should be.
  *

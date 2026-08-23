@@ -74,7 +74,46 @@ async function boot() {
   await refreshPolicy();
   await refreshPeople();
   await loadPresets();
+  await refreshAppeals();
   subscribe();
+}
+
+/**
+ * Blocks employees said were wrong, next to the rule that produced them.
+ *
+ * The admin cannot find a false positive in the audit log — a correct block and
+ * an incorrect one are the same record there. This is the only view where the
+ * difference is visible, and it names the rule because the rule is the thing
+ * they have to go and edit.
+ */
+async function refreshAppeals() {
+  const el = $('appeals');
+  if (!el) return;
+
+  const { ok, j } = await api('/api/appeals');
+  if (!ok || !Array.isArray(j)) {
+    el.innerHTML = `<div class="note">Could not load reports: ${esc(j?.error ?? 'error')}</div>`;
+    return;
+  }
+  if (j.length === 0) {
+    el.innerHTML = '<div class="note">Nothing reported yet. Employees can flag a block from their own tool.</div>';
+    return;
+  }
+
+  el.innerHTML = j
+    .map(
+      (a) => `
+      <div class="rule" style="margin-top:8px">
+        <div class="t">${a.note ? esc(a.note) : '<span class="note">no note — just that it was wrong</span>'}</div>
+        <div class="m">
+          <span class="tag">${esc(a.employeeName)}</span>
+          ${a.verdict ? `<span class="tag ${a.verdict === 'BLOCK' ? 'block' : 'escalate'}">${esc(a.verdict)}</span>` : ''}
+          <span class="note">audit ${esc(a.auditId)} · ${esc(String(a.at).slice(0, 16).replace('T', ' '))}</span>
+        </div>
+        ${a.ruleText ? `<div class="note" style="margin-top:7px"><b>Rule that fired:</b> ${esc(a.ruleText)}</div>` : ''}
+      </div>`
+    )
+    .join('');
 }
 
 async function refreshPolicy() {
@@ -819,8 +858,138 @@ async function send() {
   }
   if (j.quota?.limit) why += `<div class="why">quota ${j.quota.used}/${j.quota.limit}</div>`;
   why += `<div class="why" style="color:var(--faint)">audit ${esc(j.auditId)} · ${j.totalMs}ms</div>`;
+  if (j.verdict !== 'ALLOW') why += '<div class="row" data-actions></div><div data-feedback></div>';
 
-  append('warden', label, why, cls);
+  const el = append('warden', label, why, cls);
+  if (j.verdict !== 'ALLOW') {
+    wireFeedback(el, { prompt: text, auditId: j.auditId, hasRule: Boolean(rule) });
+  }
+}
+
+/**
+ * What a refusal offers once it has said no.
+ *
+ * Both of these run after the decision, never during it — the verdict above is
+ * already made, already audited, and nothing here can move it. They exist
+ * because a block that is a dead end is a block people learn to route around,
+ * and because a measured share of them are simply wrong and only the person
+ * who was stopped knows which.
+ */
+function wireFeedback(el, { prompt, auditId, hasRule }) {
+  const row = el.querySelector('[data-actions]');
+  const out = el.querySelector('[data-feedback]');
+  if (!row) return;
+
+  // No rule fired means nothing to rewrite against — the block came from a
+  // structural signal or a quota, and neither has a nearby legitimate phrasing.
+  if (hasRule) {
+    const rewrite = document.createElement('button');
+    rewrite.className = 'ghost';
+    rewrite.textContent = 'Suggest a rewrite';
+    rewrite.onclick = () => requestRewrite(rewrite, out, { prompt, auditId });
+    row.append(rewrite);
+  }
+
+  const appeal = document.createElement('button');
+  appeal.className = 'ghost';
+  appeal.textContent = 'This block was wrong';
+  appeal.onclick = () => openAppeal(appeal, out, auditId);
+  row.append(appeal);
+}
+
+/**
+ * Why there is no suggestion, in the person's terms.
+ *
+ * Composed here from the code the server sent, for the same reason the refusal
+ * itself is composed rather than generated: this is a fixed set of outcomes and
+ * a model asked to phrase them adds latency and gets them wrong.
+ */
+const REWRITE_REFUSALS = {
+  'no-honest-rewrite':
+    'There is no honest rewrite of this one — the phrasing reached for the assistant\'s own instructions, and no version of that is inside the rules.',
+  'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
+  'too-long': 'Too long to restate. Ask for the part you actually need.',
+  'model-unavailable':
+    'The local model could not answer. Nothing is suggested rather than guessed.',
+  'nothing-left':
+    'Nothing legitimate was left once the part the rule prohibits was taken out.',
+  'still-blocked':
+    'What it came up with did not pass the same check, so it is not being shown.',
+  'quota': 'Daily limit reached, so the suggestion could not be re-checked.',
+  'already-rewritten': 'This block has already been rewritten once.'
+};
+
+/**
+ * Ask for a version of the blocked prompt that would go through.
+ *
+ * The prompt is sent again rather than looked up: the audit log holds its hash
+ * and not its text, and the server matches the two to prove this is the request
+ * that was actually blocked. One press, one answer — there is exactly one
+ * rewrite per block on the server, so the button does not come back.
+ */
+async function requestRewrite(btn, out, { prompt, auditId }) {
+  const person = company.employees.find((e) => e.id === $('who').value);
+  btn.disabled = true;
+  btn.textContent = 'asking the local model…';
+
+  const { j } = await api('/api/guard/rewrite', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
+    },
+    body: JSON.stringify({ prompt, auditId })
+  });
+
+  btn.textContent = 'Suggest a rewrite';
+
+  if (j?.suggestion) {
+    out.innerHTML = `
+      <div class="why" style="margin-top:9px"><b>A version that goes through</b></div>
+      <div class="rule" style="margin-top:6px">
+        <div class="t">${esc(j.suggestion)}</div>
+        <div class="note" style="margin-top:8px">Judged by the same guard before being shown — it came back ALLOW${j.auditId ? `, audit ${esc(j.auditId)}` : ''}.</div>
+        <div class="row"><button class="act" data-use>Use this</button></div>
+      </div>`;
+    // Fills the box; does not send. Whether to ask it is theirs to decide.
+    out.querySelector('[data-use]').onclick = () => {
+      $('prompt').value = j.suggestion;
+      $('prompt').focus();
+    };
+    return;
+  }
+
+  const why = REWRITE_REFUSALS[j?.reason] ?? j?.error ?? 'No suggestion.';
+  out.innerHTML = `<div class="why" style="margin-top:9px">${esc(why)}</div>`;
+}
+
+/** Say the block was wrong, with an optional note for whoever owns the rule. */
+function openAppeal(btn, out, auditId) {
+  btn.disabled = true;
+  const box = document.createElement('div');
+  box.innerHTML = `
+    <div class="why" style="margin-top:9px"><b>What was this for?</b></div>
+    <textarea data-note rows="2" placeholder="optional — e.g. it was the aggregate forecast, not one person's pay"></textarea>
+    <div class="note">This note is stored and shown to your administrator. Your prompt is not — the log keeps its hash, not its text.</div>
+    <div class="row"><button class="act" data-send-appeal>Send</button></div>`;
+  out.append(box);
+
+  box.querySelector('[data-send-appeal]').onclick = async () => {
+    const person = company.employees.find((e) => e.id === $('who').value);
+    const note = box.querySelector('[data-note]').value.trim();
+    const { ok, j } = await api('/api/guard/appeal', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(person?.apiKey ? { authorization: `Bearer ${person.apiKey}` } : {})
+      },
+      body: JSON.stringify({ auditId, ...(note ? { note } : {}) })
+    });
+    box.innerHTML = ok
+      ? '<div class="why" style="margin-top:9px">Reported. Your administrator sees this next to the rule that fired.</div>'
+      : `<div class="why" style="margin-top:9px">${esc(j?.error ?? 'could not report it')}</div>`;
+    if (ok) await refreshAppeals();
+  };
 }
 
 function append(who, text, extra, cls = '') {
@@ -831,6 +1000,7 @@ function append(who, text, extra, cls = '') {
   if (chat.querySelector('.empty, .empty-state')) chat.innerHTML = '';
   chat.append(el);
   chat.scrollTop = chat.scrollHeight;
+  return el;
 }
 
 // ── live trace ───────────────────────────────────────────────────────────────
