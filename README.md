@@ -405,28 +405,42 @@ the corpus is too easy, not that the guard is airtight.
 
 ### The numbers
 
-Full corpus, real model (Qwen3-1.7B on CPU), policy `69d4ba36`, one repetition:
+Full corpus, real model (Qwen3-1.7B Q4_0 on CPU), policy `f6c75794`, **two
+repetitions** — 392 evaluations, 38 minutes:
 
 | | Warden | Baseline |
 |---|---|---|
-| Attacks stopped | **66/82 · 80%** | 2/82 · 2% |
-| False positives on legitimate traffic | **7/16 · 44%** | 0/16 · 0% |
-| Structured output | 294 first-try · 0 repaired · 0 failed | |
+| Attacks stopped | **137/160 · 86%** | 0/160 · 0% |
+| False positives on legitimate traffic | **17/36 · 47%** | 0/36 · 0% |
+| Structured output | 784 first-try · 0 repaired · 0 failed | |
 
 Both rows, together, on purpose. The first is the argument: a system prompt
-stops 2% of these because a system prompt is a request, not a control. The
+stops none of these, because a system prompt is a request, not a control. The
 second is the honest cost, and it is **not shippable** — a gateway that refuses
-44% of honest work gets uninstalled in a week.
+47% of honest work gets uninstalled in a week.
 
-That number is the open problem, and the investigation into it — including three
+That number is the open problem, and the investigation into it — including four
 hypotheses measured and rejected, and the lead that is still live — is written up
 in [`docs/STATUS.md`](docs/STATUS.md) rather than smoothed over here.
 
-Two caveats that qualify every number above. Runs are **not reproducible**: two
-identical runs of the same policy at temperature 0 gave 44% and 31%, because
-`parallel: 4` batches concurrent adjudications and batch composition changes the
-numerics. And n=16 on the control class means one prompt is six points. Use
-`--reps 2` at minimum before believing a difference.
+Three caveats that qualify every number above.
+
+Runs are **not reproducible**: two identical runs of the same policy at
+temperature 0 gave 44% and 31%, because `parallel: 4` batches concurrent
+adjudications and batch composition changes the numerics. This run is two
+repetitions for that reason; treat a difference smaller than a few points as
+noise.
+
+The OCR model **was not available on the machine that ran this**, so twelve
+attachments could not be read. An unreadable attachment fails closed, which
+moves both columns and earns neither — `document-borne` shows 8/8 stopped with
+nothing having read the documents, and its clean invoices count as false
+positives for the same reason. [`REPORT.md`](REPORT.md) says so where the number
+appears; `OCR_LATIN` has no HTTPS mirror and arrives only over the P2P registry.
+
+And every generated number carries the commit that produced it. If
+`git log <that sha>..HEAD -- src/redteam` lists anything, the harness has moved
+and the table is describing something that no longer runs.
 
 ### What we learned about small models
 
