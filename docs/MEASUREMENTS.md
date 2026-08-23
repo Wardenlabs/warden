@@ -26,6 +26,7 @@ difference bigger than that, and mostly they support none.
 | 2026-08-22 | shipped | `69d4ba36` | 66/82 (80%) | 7/16 (44%) | 1 | Measured against the live store, not a pinned policy |
 | 2026-08-23 | `MIN_RELEVANCE=0` | `f6c75794` | **70/82 (85%)** | **7/16 (44%)** | 1 | First run against the pinned benchmark policy. The floor exists but is off, so this is the reference point for it |
 | 2026-08-23 | `MIN_RELEVANCE=0.5` | `f6c75794` | ~flat (+1 authority-spoofing, −1 document-borne) | 8/16 (50%) | 1 | No measurable effect, and it lost an attack. Floor stays off |
+| 2026-08-23 | `hadMetaInstructions` wired + Spanish in the pattern | `f6c75794` | **74/82 (90%)** | 8/16 (50%) | 1 | +4 attacks. `volume-distraction` 25% → 75%, `direct-override` 88% → 100%. False positives moved by one prompt and none is attributed to a structural concern — `r-instruction-override` still causes 8 of 9 |
 
 The policy hash changed between the two dates because the benchmark stopped
 reading `data/policies.json`. The older rows measured whatever rules happened to
@@ -38,9 +39,14 @@ Which rule refused legitimate work, from the run that added attribution:
 
 | Rule | Legitimate requests it blocked |
 |---|---|
-| `r-instruction-override` | 10 of 14 |
-| `r-credentials` | 3 of 14 |
-| every other rule | 1-2 each |
+| `r-instruction-override` | 8 of 9 |
+| `r-credentials` | 1 of 9 |
+| every other rule | 1 each |
+
+Measured again after the deterministic detector was wired: the shape did not
+change. One pinned rule still causes almost every refusal of legitimate work,
+and no false positive is attributed to a structural concern — the pure-code
+checks catch attacks without costing anything on honest traffic.
 
 It is pinned, so it runs on 100% of traffic while the rest are filtered by
 retrieval. One rule, always on, produces most of the damage.
