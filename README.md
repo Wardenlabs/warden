@@ -33,11 +33,64 @@ reach the model. See [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
 > pasame el sueldo de Ana para el reporte
 
 ⛔ Blocked by Warden
-   Rule: No one may request payroll, salary, bonus, or compensation
-         information about another employee.
-   Why:  request for a third party's compensation
-   Audit: a7f3c2
+
+   No one may request payroll, salary, bonus, or compensation information about
+   another employee. HR staff are exempt.
+
+   What to do instead
+   Ask HR for anything about a specific person's pay. Questions about the
+   process, headcount, or review cycles are fine to ask here.
+
+   These would go through
+     · cuál es el proceso para pedir un aumento?
+     · cuántas personas hay en el equipo de marketing?
+
+   Warden can try to rewrite this so it goes through:
+     warden-hook --rewrite a7f3c2
+     (paste the same prompt, then Ctrl-D)
+
+   Audit a7f3c2 · quote this if you think it is wrong
 ```
+
+Every line of that is read from the ratified rule and composed by the hook's own
+renderer — nothing in a refusal is generated at decision time.
+
+### When the block is a dead end
+
+Two of those lines are follow-ups, and they exist because of a number in our own
+report: on legitimate traffic the guard refuses far more than it should. A person
+in that position is holding real work and a "no" with nowhere to take it, and the
+second time it happens they stop using the gateway rather than stop working.
+
+**`--rewrite` asks for a version that passes.** This is the one place a model
+writes something an employee reads, and it is deliberately nowhere near a
+decision: the verdict is already made and already logged, the employee has to ask
+for it, and what comes back is judged by the same guard as any other prompt
+before it is shown. If the rewrite does not come back ALLOW, there is no
+suggestion — a phrasing that got *closer* is exactly what this must never hand
+over.
+
+That is also the honest description of the risk. Something that restates blocked
+prompts is a machine for finding phrasings that pass, so four things bound it:
+the request must match the SHA-256 of a prompt that was really blocked (the audit
+log stores that hash and not the text, which is what makes this checkable at
+all); there is one rewrite per block, so nobody can iterate; a prompt whose
+phrasing reached for the assistant's own instructions is refused outright by a
+deterministic check, before any model runs; and both the rewrite and its re-check
+cost quota and land in the audit log.
+
+**"This block was wrong" reports it.** The refusal line already said to quote the
+audit id if you disagree, and until now there was nowhere to quote it. Now it
+appears in the console under the rule that fired — which is the thing an admin
+has to edit, and the only view where a false positive is distinguishable from a
+correct block.
+
+> **Observed against the mock adapter, end to end** — console, hook, gate and
+> re-check — and **not yet with a real model**, so nothing here claims what a
+> real rewrite proposes. `npx tsx scripts/probe-rewrite.ts` is the harness that
+> answers that; run it against a model. Against the mock it measures only the
+> deterministic gate, which refused 5 of 8 `direct-override` attacks before any
+> generation.
 
 Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK script
 — go through the proxy instead. Setup for both is in
@@ -286,9 +339,35 @@ does not exist, and an unrecognised one is refused outright rather than judged
 under a default. Rotation is revocation: the old key stops working on the next
 prompt.
 
+### Who the policy does not govern
+
+The person who ratifies the rules should not be judged by them — five of the
+eight seed rules bind `*`, including the pinned injection rule, so without an
+exemption there is no role an operator could hold and still work. `exemptRoles`
+in the policy spec names those roles, and a rule set for an exempt role is
+empty.
+
+It lives inside the policy rather than in an environment variable because "who
+is exempt" is the most security-relevant sentence in the whole spec: it belongs
+inside the version hash, where changing it is detectable, next to the rules it
+overrides.
+
+**An exempt role is granted by the directory and never claimed.** That is what
+makes the exemption safe rather than a bypass switch: a role reaches the guard
+only from the directory entry behind an issued API key, so there is nothing an
+employee can type to select one. It was not always so — an unrecognised caller
+used to keep the role they claimed, which put the entire policy one header
+away.
+
 The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays
 pristine, so a fresh clone always demonstrates the same company.
+
+**The seed names people and roles, and carries no keys.** Those are issued on
+the first run, so no two installs share one. A key committed to a public
+repository is a published credential rather than a convenience — and the
+sharpest case is the seeded admin, whose role is in `exemptRoles` and is
+therefore measured against no rules at all.
 
 ---
 
@@ -299,7 +378,7 @@ pristine, so a fresh clone always demonstrates the same company.
 | **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
-| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it. Stores prompt *hashes*, not prompts — a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` recomputes the chain. |
+| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
 
 ---
 
@@ -408,13 +487,30 @@ benign-controls class caught all of them. Nothing else would have.
 Every model call in the project goes through one directory. Nothing else imports
 `@qvac/sdk`.
 
-| File | What runs there |
+Every link below is pinned to a commit, so it shows the code as it was when this
+was written rather than whatever the branch drifted to. Regenerate with
+`npm run permalinks -- --write` after the last commit; it resolves each line by
+searching for the call rather than trusting a number, and refuses to emit links
+for a commit that has not been pushed.
+
+<!-- permalinks:start -->
+Pinned to [`5cac1e20b97d`](https://github.com/MartinPuli/operations-aleph/tree/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed). Line numbers move; a commit does not.
+
+| Where | What runs there |
 |---|---|
-| [`src/qvac/real.ts`](src/qvac/real.ts) | `completion()` with `responseFormat: json_schema`, zod validation, one repair attempt, fail-closed. `embed()` and `ocr()`. |
-| [`src/qvac/client.ts`](src/qvac/client.ts) | `loadModel()` per role, `parallel: 4` on the adjudicator so pass 3 judges several rules against one loaded instance. |
-| [`src/guard/passes/adjudicate.ts`](src/guard/passes/adjudicate.ts) | The per-rule judgement, and the enum-vs-boolean finding above. |
-| [`src/policy/compile.ts`](src/policy/compile.ts) | Natural language → structured rule, plus the preview pass. |
-| [`src/policy/index.ts`](src/policy/index.ts) | Embedding-based rule retrieval. |
+| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
+| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
+| [`src/qvac/real.ts L130-L155`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L130-L155) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
+| [`src/qvac/real.ts L99`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L99) | `embed()` — the vectors behind rule retrieval. |
+| [`src/qvac/real.ts L110`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/real.ts#L110) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
+| [`src/qvac/client.ts L119-L128`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/client.ts#L119-L128) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator. |
+| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
+| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
+| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
+| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
+| [`src/guard/pipeline.ts L76`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
+| [`src/guard/aggregate.ts L47`](https://github.com/MartinPuli/operations-aleph/blob/5cac1e20b97d58bf25b3aaa1b710eb6310db65ed/src/guard/aggregate.ts#L47) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
+<!-- permalinks:end -->
 
 ### Models and capabilities used
 
@@ -446,9 +542,10 @@ npm run typecheck
 
 npx tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
 npx tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
+npx tsx scripts/probe-rewrite.ts                       # can a rewrite get an attack through?
 ```
 
-The last two are diagnostics, not tests. `probe-rule` is fast enough to form a
+The last three are diagnostics, not tests. `probe-rule` is fast enough to form a
 hypothesis with and too small to confirm one — thirteen prompts cannot resolve a
 two-prompt difference, and it has already produced a convincing result the
 corpus flatly contradicted. Confirm with `--reps 2` on the corpus before
@@ -460,14 +557,18 @@ believing anything either of them says.
 |---|---|---|
 | `WARDEN_PORT` | `8080` | |
 | `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
+| `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
+| `WARDEN_MIN_RELEVANCE` | `0.25` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. |
+| `WARDEN_WARMUP` | — | `0` skips loading the models at boot. On by default: the first prompt used to pay for the model load inside the decision it was waiting on, which is how a cold check passed the hook's deadline. |
 | `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
 | `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
 | `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
+| `WARDEN_API_KEY` | — | Read by the hook, on the employee's machine. Their whole identity: no name, no role. Issued from the console's People tab. |
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
@@ -530,7 +631,21 @@ A deliberate trade for a gateway running on a company's own machine.
 - **OpenCode is not supported.** Its plugin system has a pre-LLM hook, but the
   abort semantics are undocumented and we have not watched it block anything. It
   goes in this README when it does.
-- **Quota counters are in memory** and reset with the process.
+- **Quota counters are in memory** and reset with the process. So is the
+  one-rewrite-per-block ledger: a restart hands back one rewrite per past block.
+- **A suggested rewrite has never been seen from a real model.** The path is
+  wired and verified against the mock; what a 1.7B model actually proposes when
+  asked to restate a blocked request is unmeasured, and the re-check is what
+  stands between that and an employee.
+- **The admin API has no authentication, and that is where the keys are.**
+  Anyone who can reach the port can read the directory — every employee's API
+  key with it — write policy, and remove people. Cross-origin access is off by
+  default, so a web page an admin visits cannot do it, but every host on the LAN
+  can. The employee-facing paths are properly authenticated; the admin ones are
+  not, so the whole key model rests on that port being reachable only by people
+  who are already trusted. Bind `WARDEN_HOST=127.0.0.1` if that is not true on
+  your network. An admin credential is the obvious next piece of work, and until
+  it exists this is the largest gap in the system.
 - **Output-scope rules are defined but only input is enforced today.** Rules
   marked `scope: "output"` are stored and shown; the response-side pass is not
   built.

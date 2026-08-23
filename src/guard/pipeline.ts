@@ -16,7 +16,7 @@ import { rulesForActor } from '../policy/store.js';
 import type { PolicySpec } from '../policy/types.js';
 import type { QvacAdapter } from '../qvac/types.js';
 import { aggregate } from './aggregate.js';
-import { isolate } from './isolate.js';
+import { isolate, normalizeUntrusted } from './isolate.js';
 import { adjudicateAll } from './passes/adjudicate.js';
 import { checkQuota } from './quota.js';
 import { sanitize } from './sanitize.js';
@@ -46,8 +46,13 @@ export async function evaluate(
   }
 
   // ── pass -1: secrets ───────────────────────────────────────────────────────
+  // Normalised before matching: a credential written with full-width
+  // homoglyphs or zero-width characters matches no pattern in its raw form,
+  // and every later stage — the guard model, the audit spans, the upstream
+  // forward — reads the masked text. Tamper evidence survives because the
+  // isolation flags below are computed against the raw text.
   const sanitizeStart = Date.now();
-  const { masked, spans } = sanitize(input.prompt);
+  const { masked, spans } = sanitize(normalizeUntrusted(input.prompt));
   passes.push({
     pass: 'sanitize',
     ms: Date.now() - sanitizeStart,
@@ -58,20 +63,28 @@ export async function evaluate(
   // Attachment text joins the message here, before isolation, because a
   // document is exactly as untrusted as the prompt that carried it — and it is
   // the channel an attacker uses when the employee is innocent.
+  const SEPARATOR = '\n\n--- attachment ---\n';
   let subject = masked;
+  let rawSubject = input.prompt;
   let unreadableAttachments = 0;
   if (input.attachments?.length) {
     const ocrStart = Date.now();
     const extracted: string[] = [];
+    const rawExtracted: string[] = [];
     for (const path of input.attachments) {
       try {
-        extracted.push(sanitize(await qvac.ocr(path)).masked);
+        const text = await qvac.ocr(path);
+        rawExtracted.push(text);
+        extracted.push(sanitize(normalizeUntrusted(text)).masked);
       } catch (err) {
         unreadableAttachments++;
-        extracted.push(`[attachment could not be read: ${err instanceof Error ? err.message : err}]`);
+        const note = `[attachment could not be read: ${err instanceof Error ? err.message : err}]`;
+        rawExtracted.push(note);
+        extracted.push(note);
       }
     }
-    subject = [masked, ...extracted].join('\n\n--- attachment ---\n');
+    subject = [masked, ...extracted].join(SEPARATOR);
+    rawSubject = [input.prompt, ...rawExtracted].join(SEPARATOR);
     passes.push({
       pass: 'ocr',
       ms: Date.now() - ocrStart,
@@ -89,7 +102,7 @@ export async function evaluate(
 
   // ── pass 0: isolate ────────────────────────────────────────────────────────
   const isoStart = Date.now();
-  const iso = isolate(subject);
+  const iso = isolate(subject, rawSubject);
   passes.push({ pass: 'isolate', ms: Date.now() - isoStart, verdict: 'ALLOW', detail: iso.flags });
 
   // ── pass 2: retrieve ───────────────────────────────────────────────────────

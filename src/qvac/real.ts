@@ -16,6 +16,7 @@
 import { cancel, completion, embed, ocr } from '@qvac/sdk';
 import type { ZodType } from 'zod';
 import { modelFor, shutdown } from './client.js';
+import { withDeadline } from './deadline.js';
 import {
   FailClosedError,
   type CompleteRequest,
@@ -27,6 +28,27 @@ import {
 /** Small models drift and pad without a cap; verdicts are short by nature. */
 const DEFAULT_MAX_TOKENS = 256;
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** How long after asking a generation to cancel we wait before giving up on it. */
+const CANCEL_GRACE_MS = 5_000;
+
+/**
+ * Deadlines for the two SDK calls that are not generations.
+ *
+ * `completion()` had a hard stop and these did not, which is a distinction the
+ * caller cannot see and an attacker can. Retrieval embeds the whole prompt, so
+ * a long enough message parks the embedder — measured at 13 minutes on one
+ * `volume-distraction` prompt, against a 14ms p50 for a normal one. The guard
+ * request behind it waits, the hook hits its own 30s deadline, and it fails
+ * open by design. That turns "send a very large prompt" into a bypass, which is
+ * exactly what that corpus class is built to try.
+ *
+ * Both are generous — 700x the measured p50 for embedding — because the point
+ * is to bound a hang, not to fail slow work. Loading the model is bounded
+ * separately in `client.ts`, since it happens before either call.
+ */
+const EMBED_TIMEOUT_MS = 10_000;
+const OCR_TIMEOUT_MS = 30_000;
 
 /**
  * Fixed seed and zero temperature by default.
@@ -93,7 +115,7 @@ export class RealQvacAdapter implements QvacAdapter {
   async embed(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     const modelId = await modelFor('embedder');
-    const res = await embed({ modelId, text: texts });
+    const res = await withDeadline(embed({ modelId, text: texts }), EMBED_TIMEOUT_MS, 'embed');
 
     // The SDK returns a bare vector for one input and a matrix for many.
     const raw = res.embedding as number[] | number[][];
@@ -105,7 +127,8 @@ export class RealQvacAdapter implements QvacAdapter {
     const modelId = await modelFor('ocr');
     // `ocr()` returns synchronously with promises inside; the blocks arrive later.
     const { blocks } = ocr({ modelId, image: imagePath, options: { paragraph: true } });
-    return (await blocks).map((b) => b.text).join('\n');
+    const read = await withDeadline(blocks, OCR_TIMEOUT_MS, 'ocr');
+    return read.map((b) => b.text).join('\n');
   }
 
   stats(): { firstTry: number; repaired: number; failed: number } {
@@ -151,11 +174,12 @@ export class RealQvacAdapter implements QvacAdapter {
         : {})
     });
 
+    const timeoutMs = req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const timeout = setTimeout(() => {
       void cancel({ requestId: run.requestId }).catch(() => {});
-    }, req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    }, timeoutMs);
 
-    try {
+    const consume = async () => {
       for await (const _event of run.events) {
         // Drained for its side effect; the aggregate arrives via `final`.
       }
@@ -171,8 +195,29 @@ export class RealQvacAdapter implements QvacAdapter {
           ...(final.stats?.backendDevice !== undefined && { backend: final.stats.backendDevice })
         }
       };
+    };
+
+    // `cancel()` is a request, not a guarantee: if the worker never ends the
+    // stream, `run.final` would park this call — and the guard request behind
+    // it — forever. The hard deadline turns that hang into a thrown error,
+    // which every caller already resolves to ESCALATE. Stricter, never stuck.
+    let deadline: NodeJS.Timeout | undefined;
+    const hardStop = new Promise<never>((_, reject) => {
+      deadline = setTimeout(
+        () => reject(new Error(`generation did not end within ${timeoutMs + CANCEL_GRACE_MS}ms of starting`)),
+        timeoutMs + CANCEL_GRACE_MS
+      );
+    });
+
+    try {
+      const pending = consume();
+      // If the deadline wins, the abandoned generation may still settle later;
+      // swallow that so it cannot surface as an unhandled rejection.
+      pending.catch(() => {});
+      return await Promise.race([pending, hardStop]);
     } finally {
       clearTimeout(timeout);
+      if (deadline) clearTimeout(deadline);
     }
   }
 

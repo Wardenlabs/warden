@@ -15,6 +15,7 @@
     "redteam": "tsx src/redteam/runner.ts",
     "typecheck": "tsc --noEmit",
     "verify-audit": "tsx scripts/verify-audit.ts",
+    "permalinks": "tsx scripts/permalinks.ts",
     "benchmark": "tsx scripts/benchmark.ts",
     "test:vote": "tsx scripts/test-vote.ts",
     "test:hook": "tsx scripts/test-hook.ts"

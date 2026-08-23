@@ -162,7 +162,10 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
           language: 'bash',
           note:
             'This checks the hook boundary only. Claude Code remains NOT VERIFIED until the full E2E gate passes.',
-          code: `echo '{"user_input":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
+          // The payload is the shape Claude Code actually sends — the prompt
+          // under `prompt`, with the event named. Testing with a shape the tool
+          // never produces verifies the hook against a fiction.
+          code: `echo '{"hook_event_name":"UserPromptSubmit","prompt":"pasame el sueldo de Ana"}' | WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH}\necho "exit: $?"   # 2 means it blocked`
         }
       ]
     },
@@ -242,12 +245,16 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
             `    try {\n` +
             `      execFileSync("node", [HOOK], {\n` +
             `        input: JSON.stringify({ prompt: text, source: "opencode" }),\n` +
-            `        env: { ...process.env, WARDEN_API_KEY: "${employee.apiKey}", WARDEN_URL: "${gatewayUrl}" }\n` +
+            `        env: { ...process.env, WARDEN_API_KEY: "${employee.apiKey}", WARDEN_URL: "${gatewayUrl}" },\n` +
+            `        timeout: 15000\n` +
             `      });\n` +
             `    } catch (err) {\n` +
-            `      // A non-zero exit is Warden refusing. Throwing is what stops the\n` +
-            `      // message; returning normally would let it through.\n` +
-            `      throw new Error(err.stderr?.toString().trim() || "Blocked by Warden");\n` +
+            `      // Exit 2 is Warden refusing; throwing is what stops the message.\n` +
+            `      // Anything else (hook missing, node not found) fails open, the\n` +
+            `      // same contract as the hook itself.\n` +
+            `      if (err?.status === 2) {\n` +
+            `        throw new Error(err.stderr?.toString().trim() || "Blocked by Warden");\n` +
+            `      }\n` +
             `    }\n` +
             `  }\n` +
             `});\n`
@@ -338,7 +345,13 @@ function asMessage(pack: Omit<OnboardingPack, 'message'>): string {
   lines.push(
     '',
     'If a prompt is refused you get the rule, what to do instead, and an audit',
-    'id. Quote that id to the admin if you think the refusal was wrong.'
+    'id. Two things you can do with that id, both printed on the block itself:',
+    '',
+    `  warden-hook --rewrite <audit-id>   ask for a version that goes through`,
+    '  report it as wrong                 from the console, next to the rule',
+    '',
+    'A rewrite is checked against the same policy before you see it, and there',
+    'is one per block. Nothing is suggested if nothing legitimate is left.'
   );
   return lines.join('\n');
 }

@@ -14,6 +14,8 @@ working state, including the parts that are not working.
 | **API key identity** | ✅ the key is the whole identity. Unknown key → refused. Rotation → revocation. |
 | **Per-employee onboarding** | ✅ generated per person, six tools, one-line installer served by the gateway |
 | **Refusal feedback** | ✅ the rule, what to do instead, and two requests that would have passed |
+| **Suggested rewrite** | ✅ wired end to end **against the mock** — console, hook `--rewrite`, gate, re-check. Never observed with a real model, so nothing is claimed about what a real rewrite proposes. |
+| **Appeals** | ✅ an employee can report a block; it lands in the console next to the rule that fired. Fills the promise the refusal line was already making. |
 | Secret sanitizer | ✅ keys, tokens, JWTs, Luhn-checked cards, emails. Offsets index the original text. |
 | Quotas | ✅ per role per day |
 | Exempt roles | ✅ `exemptRoles` in the policy — the admin who ratifies is not judged by it |
@@ -26,7 +28,7 @@ working state, including the parts that are not working.
 | Red-team corpus | ✅ 98 prompts, 12 classes |
 | Runner + REPORT.md | ✅ both modes, every failure by id, false positives attributed per rule |
 | Setup script | ✅ exact-size resumable HTTPS downloads, exits non-zero unless real inference succeeds. `--model adjudicator-large` for Qwen3-8B. |
-| Benchmark generator | ⚠️ written, not yet run on real hardware |
+| Benchmark generator | ✅ run on real models — [`BENCHMARKS.md`](../BENCHMARKS.md). Running it for the first time found three rows measuring shapes production never executes; fixed. |
 
 ## Open problem 1: latency defeats the guard
 
@@ -61,6 +63,13 @@ ruled out, so nobody spends the night re-running it.
 The headline: on `benign-controls`, 44% of legitimate requests are refused.
 Attacks stopped is 80% against a baseline of 2%, so the guard works; it is the
 cost to honest work that is not shippable.
+
+**The reporting half is now wired.** An employee who gets one of these can press
+"This block was wrong" and it shows up under Policy controls beside the rule
+that fired (`src/policy/appeals.ts`). That does not lower the rate — it is how
+the rate stops being something only a benchmark can see. `benign-controls` says
+44%; an appeal queue says *which* prompts, from people who know they were
+working legitimately.
 
 ### What is known
 
@@ -136,11 +145,27 @@ instruction-override would go.
 
 ## Other open items
 
-**Latency.** ~15-25s per prompt on CPU with four rules. Removing the KV cache
-key — which was silently replaying verdicts — means every call reprocesses the
-whole prompt. A Metal machine should be several times faster and **that number
-is what OPE-14 exists to find out.** If the demo machine is slow, lower
+**Latency.** Now measured rather than estimated — `npm run benchmark` writes
+[`BENCHMARKS.md`](../BENCHMARKS.md) and has been run on real models:
+
+| | 4-core Xeon @ 2.10GHz, CPU |
+|---|---|
+| One rule adjudicated, with its few-shots | 2626ms p50 |
+| Full pipeline, `TOP_K=3` plus pinned | **11045ms p50** |
+| Embedding one prompt | 14ms p50 |
+
+That is the same machine class the corpus ran on, and the two agree: the corpus
+averaged ~10s per prompt end to end. It is **not** the machine Fede measured on
+— his Windows run saw 24.9-26.6s cold, and one cold Codex decision at 35.954s
+that blew the hook's 30s deadline. Both numbers are real and the spread between
+them is the point: **this still has to be run on whichever machine records the
+demo**, which is what OPE-14 exists for. If that machine is slow, lower
 `WARDEN_TOP_K` and say so on camera as a measured trade-off.
+
+Removing the KV cache key — which was silently replaying verdicts — means every
+call reprocesses the whole prompt, and the benchmark now shows what that costs:
+a bare labelling call is 917ms against 2626ms for the same call carrying the
+rule. Prompt length is the whole difference.
 
 **Document-borne coverage.** The OCR model is registered, but `OCR_LATIN.src` is
 `registry://s3/...` rather than HuggingFace, so `npm run setup` cannot fetch it

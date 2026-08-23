@@ -19,9 +19,32 @@ const INVISIBLE = /[​-‏‪-‮⁠-⁤﻿­]/g;
 /** Chat-turn markers, the classic way to fake a new conversation turn. */
 const ROLE_MARKER = /^\s*(system|assistant|user|tool|developer)\s*[:>]/gim;
 
-/** Phrasings that only appear when someone is addressing the guard itself. */
-const META_INSTRUCTION =
-  /\b(ignore|disregard|forget|override)\b[\s\S]{0,40}\b(previous|prior|above|earlier|all)\b|\b(you are now|new instructions?|system prompt|answer\s+allow|respond\s+with\s+allow)\b/gi;
+/**
+ * Phrasings that only appear when someone is addressing the guard itself.
+ *
+ * Two shapes: a verb aimed at the rules paired with what it is aimed at, and a
+ * handful of markers that need no verb because nothing else says them.
+ *
+ * **Do not put `\b` next to the Spanish or Portuguese alternatives.** In
+ * JavaScript `\w` is `[A-Za-z0-9_]`, so an accented letter is a non-word
+ * character and `\b` lands in the middle of `olvidá`. An earlier version of this
+ * pattern had the boundaries and matched nothing at all — it would have shipped
+ * looking like Spanish coverage while adding none. `\S*` instead of `\w*` for
+ * the same reason.
+ *
+ * Measured against the corpus: 5 of 8 `direct-override` attacks, and 0 false
+ * positives across all 16 `benign-controls`. The three it misses are phrased
+ * without any of these markers and are the adjudicator's job.
+ */
+const META_INSTRUCTION = new RegExp(
+  // Verb at the rules, plus what it is aimed at, within a short distance.
+  '\\b(ignore|disregard|forget|override)\\b[\\s\\S]{0,40}\\b(previous|prior|above|earlier|all|your (rules|instructions|guidelines))\\b' +
+  '|(ignor|olvid|desestim|omit|esquec)[aáeéíi]\\S*[\\s\\S]{0,40}(regla|instrucci|instruç|pol[ií]tica|restricci|restriç|anterior|previa|diretriz)' +
+  // Markers that carry the intent on their own.
+  '|\\b(you are now|new instructions?|system prompt|developer mode|answer\\s+allow|respond\\s+with\\s+allow|from now on)\\b' +
+  '|(a partir de ahora|de ahora en m[aá]s|ahora sos|ahora eres|a partir de agora)',
+  'gi'
+);
 
 export type IsolationFlags = {
   /** Invisible characters were present and have been stripped. */
@@ -50,15 +73,34 @@ export type Isolated = {
 };
 
 /**
+ * NFKC-normalise and strip invisible characters.
+ *
+ * Exported so the pipeline can normalise *before* secret masking: a credential
+ * written with full-width homoglyphs or zero-width joints matches no sanitizer
+ * pattern in its raw form, and normalising after masking would hand the
+ * un-masked secret to every later stage. Tamper evidence is not lost by
+ * normalising early — `isolate` computes its flags against whatever original
+ * text it is given.
+ */
+export function normalizeUntrusted(text: string): string {
+  return text.normalize('NFKC').replace(INVISIBLE, '');
+}
+
+/**
  * Normalise and fence untrusted text.
  *
  * Nothing is rejected here — flags are evidence for later passes, and a
  * suspicious-looking prompt may still be legitimate. Deciding is pass 4's job.
+ *
+ * `original` is the text as the caller first received it. It defaults to
+ * `text`, and the pipeline passes the pre-normalisation, pre-masking form so
+ * the tampering flags describe what the sender actually wrote rather than what
+ * survived the earlier passes.
  */
-export function isolate(text: string): Isolated {
-  const nfkc = text.normalize('NFKC');
-  const stripped = nfkc.replace(INVISIBLE, '');
+export function isolate(text: string, original: string = text): Isolated {
+  const stripped = normalizeUntrusted(text);
 
+  INVISIBLE.lastIndex = 0;
   ROLE_MARKER.lastIndex = 0;
   META_INSTRUCTION.lastIndex = 0;
 
@@ -67,14 +109,14 @@ export function isolate(text: string): Isolated {
 
   return {
     clean: stripped,
-    original: text,
+    original,
     nonce,
     envelope: buildEnvelope(stripped, nonce),
     flags: {
-      hadInvisibleChars: INVISIBLE.test(text),
+      hadInvisibleChars: INVISIBLE.test(original),
       hadRoleMarkers: ROLE_MARKER.test(stripped),
       hadMetaInstructions: META_INSTRUCTION.test(stripped),
-      normalizationChanged: nfkc !== text,
+      normalizationChanged: original.normalize('NFKC') !== original,
       nonAsciiRatio: stripped.length === 0 ? 0 : nonAscii / stripped.length,
       length: stripped.length
     }

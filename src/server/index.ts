@@ -11,6 +11,7 @@
  * clearly-marked stub, never with a lie about being finished — a stub returns
  * plausible shape, logs that it is a stub, and is replaced in place.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import express, { type Request, type Response } from 'express';
@@ -28,6 +29,10 @@ import {
 import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
+import { readAppeals, recordAppeal } from '../policy/appeals.js';
+import { findDecision } from '../audit/log.js';
+import { checkQuota } from '../guard/quota.js';
+import type { RewriteRefusal, RewriteResult } from '../guard/rewrite.js';
 import { onboardingFor, supportedTools } from '../onboarding/index.js';
 
 const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
@@ -46,14 +51,24 @@ const HOST = process.env['WARDEN_HOST'] ?? '0.0.0.0';
 const app = express();
 app.use(express.json({ limit: '4mb' }));
 
-// Local-first tool: allow the web console (a different dev port) to call the API.
-app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'content-type, authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  next();
-});
-app.options(/.*/, (_req, res) => res.sendStatus(204));
+/**
+ * The console is served by this same process, so same-origin needs no CORS at
+ * all. The wildcard that used to sit here let any web page an admin happened to
+ * visit read the directory and post policy changes cross-origin — the admin API
+ * has no authentication, so the browser's origin check was the only thing
+ * standing in the way. Serving web/ from a separate dev port is the one case
+ * that needs an exception, and it is opt-in and explicit.
+ */
+const CORS_ORIGIN = process.env['WARDEN_CORS_ORIGIN'];
+if (CORS_ORIGIN) {
+  app.use((_req, res, next) => {
+    res.header('Access-Control-Allow-Origin', CORS_ORIGIN);
+    res.header('Access-Control-Allow-Headers', 'content-type, authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    next();
+  });
+  app.options(/.*/, (_req, res) => res.sendStatus(204));
+}
 
 // Seed the demo policy on boot if the store is empty, so a fresh clone has
 // something to show without a manual step.
@@ -107,7 +122,14 @@ app.get('/api/events', (_req, res) => {
 /** Broadcast a decision to every connected trace viewer. */
 export function emitDecision(decision: unknown): void {
   const payload = `data: ${JSON.stringify({ type: 'decision', decision })}\n\n`;
-  for (const client of sseClients) client.write(payload);
+  for (const client of sseClients) {
+    // One dead viewer must not turn a finished guard decision into a 500.
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
 }
 
 // ── Policy API ───────────────────────────────────────────────────────────────
@@ -300,18 +322,182 @@ app.post('/api/guard/check', asyncRoute(async (req, res) => {
 
   const decision = await evaluateRequest(req);
   // The hook names the tool it came from; that sighting is what the console's
-  // "connected" badges are built from.
+  // "connected" badges are built from. `actor.id` comes from the key the
+  // gateway issued, so it is an employee by construction — the id no longer
+  // arrives on a header that could inflate the count with strangers.
   recordActivity(actor.id, typeof req.body?.source === 'string' ? req.body.source : undefined);
   emitDecision(decision);
   res.json(decision);
 }));
+
+// ── Feedback on a refusal ────────────────────────────────────────────────────
+/**
+ * Everything below runs *after* a decision exists, never during one. A verdict
+ * is still decided by `aggregate()` in ordinary code from the ratified rule,
+ * and nothing here can change one that has already been made.
+ */
+
+/**
+ * Decisions that have already been rewritten once.
+ *
+ * The single most important limit on this endpoint. A rewrite you can ask for
+ * repeatedly is a search for a phrasing that passes, run on the attacker's
+ * behalf and paid for by us; one per block is a suggestion.
+ *
+ * In memory, resetting with the process, like the quota counters and the
+ * activity sightings. Honest about what it is: a restart returns one rewrite
+ * per past block, which is a real hole and a small one next to a durable store
+ * this gateway does not otherwise need. The audit log is the record.
+ */
+const rewritten = new Set<string>();
+
+/**
+ * Propose a version of a blocked prompt that would go through.
+ *
+ * The employee asks for this; it is never offered on the decision path, and a
+ * refusal that nobody follows up on costs exactly what it costs today.
+ *
+ * The prompt has to be sent again rather than read back from the log, and that
+ * is the point: the log stores its SHA-256 and not its text, so matching the
+ * two proves this is the request that was actually blocked without the
+ * governance record ever having held what anybody typed.
+ */
+app.post('/api/guard/rewrite', asyncRoute(async (req, res) => {
+  const actor = resolveActor(req);
+  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+
+  const auditId = typeof req.body?.auditId === 'string' ? req.body.auditId.trim() : '';
+  const prompt = extractPrompt(req.body);
+  if (!auditId || !prompt) {
+    return res.status(400).json({ error: 'auditId and prompt are both required' });
+  }
+
+  const entry = findDecision(auditId);
+  // One body for "no such decision" and "not yours", deliberately. Which of the
+  // two it is, is not something a caller gets to probe for.
+  if (!entry || entry.actor.id !== actor.id) {
+    return res.status(403).json({ error: 'that decision is not yours to rewrite' });
+  }
+  if (createHash('sha256').update(prompt).digest('hex') !== entry.promptHash) {
+    return res.status(400).json({ error: 'that is not the prompt this decision was made about' });
+  }
+  if (entry.decision.verdict === 'ALLOW') {
+    return res.status(400).json({ error: 'that prompt was allowed — there is nothing to rewrite' });
+  }
+  const policy = loadPolicy();
+  const mod = await optional<{
+    suggestRewrite: (a: unknown, args: unknown) => Promise<RewriteResult>;
+    rewriteGate: (args: unknown) => RewriteRefusal | null;
+  }>('../guard/rewrite.js');
+  if (!mod?.suggestRewrite || !mod.rewriteGate) {
+    return res.status(503).json({ error: 'rewrite is not wired on this gateway', suggestion: null });
+  }
+
+  // Asked and answered for free. A refusal decided here ran nothing, so it
+  // charges nothing and spends nothing — the answer is deterministic and asking
+  // again returns it again.
+  const gated = mod.rewriteGate({ prompt, decision: entry.decision, policy });
+  if (gated) return res.json({ suggestion: null, reason: gated });
+
+  if (rewritten.has(auditId)) {
+    return res.status(409).json({
+      error: 'this block has already been rewritten once',
+      suggestion: null,
+      reason: 'already-rewritten'
+    });
+  }
+
+  // Writing a rewrite is a model call this person caused, so it is charged like
+  // one. The re-check inside `suggestRewrite` charges its own: a rewrite costs
+  // two units because it is two passes of the model.
+  const quota = checkQuota(policy, actor);
+  if (!quota.allowed) {
+    return res.status(429).json({
+      error: `daily limit reached for role "${actor.role}" (${quota.used}/${quota.limit})`,
+      suggestion: null,
+      reason: 'quota'
+    });
+  }
+
+  // Burned before the call, not after: a rewrite that is only spent on success
+  // is a rewrite you can retry until it succeeds. The one exception is below.
+  rewritten.add(auditId);
+
+  const result = await mod.suggestRewrite(adapter(), {
+    actor,
+    prompt,
+    decision: entry.decision,
+    policy,
+    onRecheck: emitDecision
+  });
+
+  // A generation that never produced text leaked nothing, so it does not cost
+  // the attempt. Everything else did produce one, and that is where the
+  // information an attacker would iterate on lives.
+  if (result.reason === 'model-unavailable') rewritten.delete(auditId);
+
+  res.json(result);
+}));
+
+/**
+ * "This block was wrong."
+ *
+ * The other half of the same problem. A refusal already tells people to quote
+ * their audit id if they disagree, and until now there was nowhere to quote it.
+ * No model runs and no quota is charged: this is a person disagreeing, which
+ * costs nothing and is worth more than most of what does.
+ */
+app.post('/api/guard/appeal', asyncRoute(async (req, res) => {
+  const actor = resolveActor(req);
+  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+
+  const auditId = typeof req.body?.auditId === 'string' ? req.body.auditId.trim() : '';
+  const note = typeof req.body?.note === 'string' ? req.body.note : undefined;
+  if (!auditId) return res.status(400).json({ error: 'auditId is required' });
+
+  const entry = findDecision(auditId);
+  if (!entry || entry.actor.id !== actor.id) {
+    return res.status(403).json({ error: 'that decision is not yours to appeal' });
+  }
+
+  const appeal = recordAppeal({ auditId, employeeId: actor.id, ...(note ? { note } : {}) });
+  if (!appeal) return res.status(409).json({ error: 'you have already reported this decision' });
+  res.json(appeal);
+}));
+
+/**
+ * What employees have reported as wrong, newest first.
+ *
+ * Joined back to the rule that fired, because the rule is the object the admin
+ * has to go and edit — an appeal that only said "block 3f2a was wrong" would
+ * leave them looking it up by hand, and nobody does that twice.
+ */
+app.get('/api/appeals', (_req, res) => {
+  res.json(
+    readAppeals().map((appeal) => {
+      const entry = findDecision(appeal.auditId);
+      const rule = entry?.decision.firedRules?.[0];
+      return {
+        ...appeal,
+        employeeName: findEmployee(appeal.employeeId)?.name ?? appeal.employeeId,
+        verdict: entry?.decision.verdict ?? null,
+        ruleId: rule?.ruleId ?? null,
+        ruleText: rule?.ruleText ?? null
+      };
+    })
+  );
+});
 
 // ── Audit + escalations ──────────────────────────────────────────────────────
 app.get('/api/audit', asyncRoute(async (req, res) => {
   const mod = await optional<{ readAudit: (n: number) => Promise<unknown> }>('../audit/log.js');
   const readAudit = mod?.readAudit;
   if (!readAudit) return res.json([]);
-  res.json(await readAudit(Number(req.query['limit'] ?? 50)));
+  // `slice(-NaN)` is `slice(0)`, so an unparseable limit would dump the whole
+  // chain. Clamp instead.
+  const raw = Number(req.query['limit'] ?? 50);
+  const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 1), 500) : 50;
+  res.json(await readAudit(limit));
 }));
 
 // The chain is the product's whole evidence claim, and evidence nobody can see
@@ -361,7 +547,17 @@ app.get('/api/redteam/report', (_req, res) => {
   res.json(last);
 });
 
+let redteamRunning = false;
+
 app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
+  // One at a time: overlapping runners race on REPORT.md and the result file,
+  // and each spawn is a full corpus of model calls. The flag follows the child
+  // process, not this request — a run that outlives the 120s response window
+  // still holds the slot until it exits.
+  if (redteamRunning) {
+    return res.status(409).json({ error: 'a run is already in progress — use Load last report' });
+  }
+  redteamRunning = true;
   const { spawn } = await import('node:child_process');
   const { resolve } = await import('node:path');
   // Invoke the installed TSX entry point through this exact Node runtime.
@@ -370,13 +566,24 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   const tsx = resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
   const child = spawn(process.execPath, [tsx, 'src/redteam/runner.ts'], {
     cwd: process.cwd(),
-    env: process.env,
+    // The runner is a second process; sharing the server's audit file would
+    // interleave two hash chains and "break" the log from ordinary use.
+    env: { ...process.env, WARDEN_AUDIT_PATH: 'data/audit-redteam.jsonl' },
     stdio: 'ignore',
     detached: false,
     windowsHide: true
   });
+  // The slot is released by the child ending, not by this request returning, so
+  // a run that outlives the response window still holds it. Registered once,
+  // before the race, because an 'error' with no listener at all — a missing
+  // runtime — would take down the whole gateway rather than failing this one
+  // request.
+  child.once('error', () => { redteamRunning = false; });
+  child.once('exit', () => { redteamRunning = false; });
+
   // Long enough that a mock run finishes inline; a real-model run keeps going
   // and the console picks it up from disk on the next "Load last report".
+  let timer: NodeJS.Timeout | undefined;
   const outcome = await Promise.race([
     new Promise<{ finished: true; error?: string }>((resolve) => {
       child.once('error', (err) => resolve({ finished: true, error: err.message }));
@@ -385,8 +592,11 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
         error: code === 0 ? undefined : `runner exited with code ${code ?? 'unknown'}`
       }));
     }),
-    new Promise<{ finished: false }>((resolve) => setTimeout(() => resolve({ finished: false }), 120_000))
+    new Promise<{ finished: false }>((resolve) => {
+      timer = setTimeout(() => resolve({ finished: false }), 120_000);
+    })
   ]);
+  if (timer) clearTimeout(timer);
   if (outcome.finished && outcome.error) {
     return res.status(500).json({ error: `red-team run failed: ${outcome.error}` });
   }
@@ -425,13 +635,16 @@ app.get('/install/:employeeId', (req, res) => {
   // Resolved against the directory rather than echoed back. A made-up id must
   // not produce a script that configures somebody the gateway has never heard
   // of — that account would be judged as a stranger, which is the exact failure
-  // this route exists to prevent.
-  const person = findEmployee(id);
+  // this route exists to prevent. The id is also never interpolated unless it
+  // matches the shape `uniqueId` generates: this response is piped into `sh`,
+  // so anything echoed back verbatim is one URL-encoded newline away from
+  // being executed on an employee's laptop.
+  const person = /^[a-z0-9][a-z0-9-]*$/.test(id) ? findEmployee(id) : null;
   if (!person) {
     return res
       .status(404)
       .type('text/plain')
-      .send(`# No employee "${id}" in the directory. Ask your admin for the right link.\nexit 1\n`);
+      .send('# No such employee in the directory. Ask your admin for the right link.\nexit 1\n');
   }
 
   const url = gatewayUrl(req);
@@ -439,8 +652,14 @@ app.get('/install/:employeeId', (req, res) => {
   // credential: it is only ever shown to the admin, inside the console, for a
   // person who already exists. The alternative — the employee pasting a key by
   // hand — is the step that gets mistyped.
+  //
+  // The name appears in a script comment and an echo, and this whole response
+  // is piped into `sh`. It is admin-authored, but "admin-authored" reaches here
+  // through an API, so anything that could close the comment or open a command
+  // substitution is stripped rather than trusted.
+  const safeName = person.name.replace(/[^\p{L}\p{N} .,()-]/gu, '');
   res.type('text/plain').send(`#!/bin/sh
-# Warden setup for ${person.name} (${person.role})
+# Warden setup for ${safeName} (${person.role})
 set -e
 
 HOOK="$HOME/.warden-hook.mjs"
@@ -469,14 +688,23 @@ WARDEN_BLOCK
 echo ""
 echo "Done. Hook at $HOOK, environment in $PROFILE."
 echo "Open a new terminal (or: source $PROFILE), then wire up your tool."
-echo "Setup per tool: ${url}  ->  People  ->  ${person.name}  ->  Onboarding"
+echo "Setup per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
 `);
 });
 
 // ── static console ───────────────────────────────────────────────────────────
 app.use(express.static('web'));
 
-app.get('/health', (_req, res) => res.json({ ok: true, mock: isMock() }));
+// `mode` is surfaced for the same reason `mock` is: a gateway running with the
+// guard switched off (`WARDEN_MODE=baseline`) must not present an identical
+// green UI to one that is enforcing.
+app.get('/health', (_req, res) =>
+  res.json({
+    ok: true,
+    mock: isMock(),
+    mode: process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden'
+  })
+);
 
 app.listen(PORT, HOST, () => {
   console.log(`\nWarden  (adapter=${isMock() ? 'mock' : 'real'})`);
@@ -486,7 +714,46 @@ app.listen(PORT, HOST, () => {
   }
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);
+  preloadModels();
 });
+
+/**
+ * Load the models the hot path needs, at boot, before anyone asks.
+ *
+ * Until now nothing called `warmup()`, so the first employee prompt of the day
+ * paid for loading a GGUF inside the decision it was waiting on. Measured on
+ * the 2026-08-23 verification run: a cold decision took 25-27s against 7s hot,
+ * and a cold Codex evaluation reached 36s — past the hook's 30s deadline, so
+ * the hook failed open and the prompt reached the model while Warden was still
+ * deciding. That is the guard being bypassed by a stopwatch, and the load it
+ * was waiting for had no reason to happen then rather than at boot.
+ *
+ * Deliberately not awaited: the console and the API come up immediately, and a
+ * request that arrives mid-load joins the same in-flight promise rather than
+ * starting a second one. A failure is logged and left alone — `modelFor` drops
+ * a rejected load so the next request retries it, and a gateway that refuses to
+ * start because a model is missing is worse than one that is slow.
+ *
+ * `adjudicator` and `embedder` are what every decision touches. `ocr` is only
+ * for attachments and costs a load nobody may need.
+ */
+function preloadModels(): void {
+  if (isMock() || process.env['WARDEN_WARMUP'] === '0') return;
+
+  const started = Date.now();
+  console.log('  models    preloading adjudicator + embedder…');
+  void import('../qvac/client.js')
+    .then(({ warmup }) => warmup(['adjudicator', 'embedder']))
+    .then(() => {
+      console.log(`  models    ready in ${((Date.now() - started) / 1000).toFixed(1)}s — decisions are warm\n`);
+    })
+    .catch((err: unknown) => {
+      console.error(
+        `  models    preload failed (${err instanceof Error ? err.message : String(err)}).` +
+        ' The first request will load them instead, and will be slow.\n'
+      );
+    });
+}
 
 /**
  * The address to hand an employee.
@@ -499,8 +766,12 @@ app.listen(PORT, HOST, () => {
 function gatewayUrl(req: Request): string {
   const configured = process.env['WARDEN_PUBLIC_URL'];
   if (configured) return configured.replace(/\/$/, '');
-
-  const host = req.header('host');
+  // The Host header is written by the caller, and this URL is interpolated into
+  // shell scripts and generated configs — so only a plain host[:port] shape is
+  // accepted here. Anything else falls through to an interface address rather
+  // than reaching a file somebody runs.
+  const rawHost = req.header('host');
+  const host = rawHost && /^[A-Za-z0-9.-]+(:\d+)?$/.test(rawHost) ? rawHost : undefined;
   if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) {
     /**
      * Behind a tunnel — Cloudflare, Tailscale Funnel, ngrok — the edge
@@ -542,10 +813,20 @@ function lanAddresses(): string[] {
  * null and the route answers with an explicit "not wired" status instead of
  * pretending to work.
  */
+const failedImports = new Set<string>();
+
 async function optional<T>(specifier: string): Promise<T | null> {
   try {
     return (await import(specifier)) as T;
-  } catch {
+  } catch (err) {
+    // A module that exists but crashes on load is very different from one not
+    // written yet, and swallowing the error made the two indistinguishable — a
+    // broken transitive import would quietly demote the guard to its stub.
+    // Logged once per specifier so a hot route does not flood the terminal.
+    if (!failedImports.has(specifier)) {
+      failedImports.add(specifier);
+      console.error(`optional module ${specifier} failed to load:`, err);
+    }
     return null;
   }
 }
@@ -565,12 +846,18 @@ async function evaluateRequest(req: Request): Promise<unknown> {
   if (evaluate) return evaluate(adapter(), { actor, prompt }, loadPolicy());
 
   // Stub: exercises the rule set so the console shows real rule names, without
-  // the full pipeline. Clearly labelled as a stub in the trace.
+  // the full pipeline. Clearly labelled as a stub in the trace — and it
+  // escalates, because "the guard could not run" must never read as "the guard
+  // cleared it". An ALLOW here would be the early-allow the whole design
+  // forbids, reachable by nothing more than a broken import. The prompt is not
+  // echoed back either: no sanitize pass ran, so nothing here may claim to be
+  // masked text.
   const rules = rulesForActor(loadPolicy(), actor);
   return {
-    verdict: 'ALLOW', auditId: 'stub', policyVersion: loadPolicy().version, totalMs: 0,
-    firedRules: [], maskedPrompt: prompt, maskedSpans: [], passes: [{ pass: 'stub', ms: 0, detail: { rulesConsidered: rules.length } }],
-    explanation: 'pipeline not wired yet (OPE-8)'
+    verdict: 'ESCALATE', auditId: 'stub', policyVersion: loadPolicy().version, totalMs: 0,
+    firedRules: [], maskedPrompt: '', maskedSpans: [],
+    passes: [{ pass: 'stub', ms: 0, verdict: 'ESCALATE', failedClosed: true, detail: { rulesConsidered: rules.length } }],
+    explanation: 'The guard pipeline is unavailable — held for review rather than assumed clean.'
   };
 }
 
@@ -620,7 +907,12 @@ function asyncRoute(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response) => {
     fn(req, res).catch((err: unknown) => {
       console.error('route error:', err);
-      if (!res.headersSent) res.status(500).json({ error: String(err) });
+      // The message alone, not `String(err)`: this text is rendered straight
+      // into the console, and "Error: audience names nobody…" reads as a crash
+      // where "audience names nobody…" reads as the instruction it is.
+      if (!res.headersSent) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+      }
     });
   };
 }

@@ -30,13 +30,15 @@ src/qvac/       the ONLY place @qvac/sdk is imported
 src/policy/     Rule/Quota/PolicySpec, compiler, presets, store, retrieval
   audience.ts   who a rule binds: `*`, a role, or `@employeeId`
   people.ts     the company directory — employees, roles, API keys
+  appeals.ts    blocks an employee said were wrong
 src/guard/      isolate, sanitize, quota, passes/adjudicate, aggregate, pipeline
+  rewrite.ts    post-refusal: propose a prompt that passes. Not a pass.
 src/proxy/      OpenAI-compatible endpoint
 src/hook/       warden-hook CLI for Claude Code and Codex
 src/onboarding/ per-employee setup packs, one entry per supported tool
 src/redteam/    corpus/*.json, runner, report generator
 scripts/        setup, smoke, benchmark, verify-audit, test-vote,
-                probe-rule + diagnose-fp (diagnostics, not tests)
+                probe-rule + diagnose-fp + probe-rewrite (diagnostics, not tests)
 src/server/     Express host: proxy + /api + SSE
 web/            console — one HTML file, one ES module, no build step
 ```
@@ -70,6 +72,35 @@ composed by code in `aggregate.ts`. Asking the adjudicator for prose per
 decision was measured at 16/16 false positives. If a refusal needs to say
 something new, add a field to `Rule` and have the compiler write it once.
 
+`src/guard/rewrite.ts` is not an exception to that, and the distinction is the
+whole reason it is allowed to exist. It runs only when an employee asks for a
+rewrite, after the verdict is decided and already in the log; it is not a pass,
+it is not in `pipeline.ts`, and nothing it produces enters `Decision`. A refusal
+that nobody follows up on costs exactly what it cost before.
+
+**A rewrite endpoint is an evasion oracle unless four things hold.** Anything
+that offers to restate a blocked prompt is, described honestly, a machine for
+finding phrasings that pass. No wording in the rewriter's prompt defends against
+that. These do, and removing any one of them is a security change, not a
+refactor:
+
+- the request is bound to a real block by `sha256(prompt) === entry.promptHash`,
+  so it cannot rewrite arbitrary text — and this is why the audit log storing a
+  hash rather than the prompt turns out to be what makes the feature safe;
+- one rewrite per `auditId`, so nobody can iterate toward a version that lands;
+- `rewriteGate()` refuses outright when `isolate()` flagged the original as
+  reaching for the instruction layer — deterministic, 0 false positives across
+  all 16 benign controls, and it caught 5 of 8 direct-override attacks in
+  `scripts/probe-rewrite.ts`;
+- the suggestion is re-judged through the full pipeline and shown **only** if
+  that returns ALLOW. A rewrite that cannot clear the policy is not a
+  suggestion, it is a phrasing that got closer.
+
+Pinned rules are skipped as rewrite *targets* and deliberately do not veto the
+attempt — see the note in `targetRule()`. Vetoing on them would switch the
+feature off on exactly the traffic it exists for, since `r-instruction-override`
+is pinned and caused 10 of every 14 refusals on legitimate requests.
+
 **Self-consistency voting does not fix a biased model.** `WARDEN_CONFIRM_VOTES`
 exists and is tested, and it defaults to `0` because it was measured at 16/32
 false positives against 14/32 without, for 50 extra model calls. Majority voting
@@ -93,10 +124,18 @@ before `appliesTo`. That is a bypass switch, and it is defensible only because
 any path where a caller supplies its own role and this becomes a one-header
 exemption from the entire policy.
 
-**A claimed role is not a role.** `x-warden-role` comes from an environment
-variable on the employee's own machine. `resolveActor()` overrides it with the
-directory's value for anyone it knows, because otherwise editing a shell profile
-would let someone choose which rules judge them.
+**Nothing an employee types says who they are.** There is one identity path —
+the API key, resolved through `actorForCredential()` — and no name or role
+header anywhere. Adding a second way to identify a caller means the weaker one
+is the one that gets used: an unknown id that kept its claimed role was
+measured returning zero rules under `x-warden-role: admin`, which is not a
+narrower rule set but no guard at all.
+
+**The audit log stores the prompt's hash, never its text.** `recordDecision()`
+strips `maskedPrompt` before writing; the live `Decision` keeps it because the
+console's trace and the proxy's forward both need it. Adding a field to
+`Decision` that carries prompt content means adding it to that strip, or the
+governance record quietly becomes a transcript of everything employees typed.
 
 **Untrusted text never enters a prompt un-fenced.** Call `isolate()` and use its
 `envelope`, plus `isolationPreamble(nonce)` in the system prompt. The nonce is
@@ -144,7 +183,18 @@ three, and the compiler's system prompt so the model can name it.
 
 **A corpus class** — a new `src/redteam/corpus/NN-name.json`. The runner picks up
 any file in that directory. Set `expect` to what a *correct* guard should do.
-`ESCALATE` counts as stopping an attack.
+`ESCALATE` counts as stopping an attack. Attack and control tallies are counted
+per prompt, not per file, so a class may mix both — `document-borne` carries two
+clean invoices among its poisoned ones, and bucketing by file scored those as
+stopped attacks.
+
+**A refusal-feedback surface** — anything new an employee gets *after* a block
+belongs beside `rewrite.ts` and `appeals.ts`, never in a pass. Two invariants
+carry over: it runs on request rather than automatically, and it cannot make a
+verdict looser. The employee-visible copy for a fixed set of outcomes is
+composed in code in three places that must agree — `REWRITE_REFUSALS` in
+`web/app.js` and in `integrations/warden-hook.mjs`, and the `RewriteRefusal`
+union they render.
 
 **A tool integration** — three places. `detect()` in
 `integrations/warden-hook.mjs` for the payload shape and the block format; an
@@ -171,6 +221,14 @@ someone is set up — it only ever says a request arrived from that tool.
   2, so `examples.compliant[0..1]` are the anchors and the rest are
   documentation. Ordering is not cosmetic — putting the useful anchor third is
   the same as not writing it.
+- **The red-team actor has a daily quota too.** `analyst` is capped at 100/day in
+  the seed policy and the corpus is 98 prompts, so anything past one rep used to
+  score every remaining prompt on a quota BLOCK with no model call — attacks
+  "stopped" and controls "refused" by an empty counter. `runPrompt()` calls
+  `resetQuotas()`; leave it there.
+- **A filtered run writes `REPORT.<class>.md`.** `REPORT.md` and
+  `data/redteam-last.json` are only written by a full run, so probing one class
+  cannot replace the headline artifact with a report about nothing.
 - **Runs are not reproducible even at temp 0.** Two identical runs of
   `benign-controls` against policy `69d4ba36` gave 44% and 31% false positives.
   `parallel: 4` batches concurrent adjudications and the batch composition
@@ -182,6 +240,28 @@ someone is set up — it only ever says a request arrived from that tool.
 - **`data/policies.json` and `data/company.json` are generated.** Edit the seeds
   (`data/seed/policies.seed.json`, `data/seed/company.json`) and delete the
   generated file to reseed. Both are gitignored; the seeds are committed.
+- **Two processes writing one audit log break its chain.** `recordDecision()`
+  caches the tail hash in memory, so a second writer appends from a stale one
+  and `npm run verify-audit` reports tampering on a log nobody touched. Hit
+  directly: a browser decision landed between two of `probe-rewrite`'s and broke
+  the chain at entry 177 of 375. `npm run redteam` from the CLI writes to the
+  default path too — the server sets `WARDEN_AUDIT_PATH=data/audit-redteam.jsonl`
+  only when *it* spawns the suite. Point a diagnostic at its own path (before
+  importing the guard — the path is read at module load) or stop the gateway
+  first.
+- **`data/appeals.jsonl` is the only place employee-typed text is persisted.**
+  The audit log keeps a prompt's hash on purpose, and an appeal note is the one
+  thing that escapes that — because the employee chose to write it, about their
+  own request, for an admin to read. It is not in the hash chain (a non-decision
+  entry would break the shape `verifyChain()` walks), it never enters a model
+  prompt, and it is escaped where it is rendered. Anything that starts copying
+  prompt text into it has turned the appeal queue into the transcript the audit
+  log refuses to be.
+- **A mock run of `scripts/probe-rewrite.ts` measures the gate and nothing
+  else.** The mock rewrites every prompt to one fixed signal-free sentence, so
+  it clears the mock adjudicator every time and the "suggestion offered" column
+  is an artifact. The script says so in its own output; believe the gate column
+  and re-run against a model for the rest.
 - **The OCR model cannot be fetched over HTTPS.** `OCR_LATIN.src` is
   `registry://s3/...`, not `registry://hf/...`, so `toHttpsUrl()` returns null
   and `npm run setup` skips it. It only arrives over the P2P registry — the path

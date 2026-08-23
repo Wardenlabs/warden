@@ -207,6 +207,12 @@ function mockValue(
     };
   }
 
+  // The rewrite endpoint asks for a restated prompt. Deliberately free of every
+  // signal above, because the suggestion is re-judged by the guard before it is
+  // shown — a mock rewrite that tripped the mock adjudicator would make the one
+  // flow this stands in for impossible to exercise without a model.
+  if (k.includes('rewrit')) return 'mock: a version of this request that stays inside the rule';
+
   if (k.includes('reason') || k.includes('explanation')) {
     if (ctx.injection.length > 0) return `mock: instruction-override phrasing (${ctx.injection[0]})`;
     if (ctx.violation.length > 0) return `mock: restricted topic (${ctx.violation[0]})`;

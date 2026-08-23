@@ -12,8 +12,12 @@
  * once from `data/seed/company.json` and then owned by the admin console —
  * the seed file stays pristine so a fresh clone always demonstrates the same
  * company, and so `git status` stays quiet while someone plays with the app.
+ *
+ * The seed names people and roles; it carries no keys. Those are issued on the
+ * first run — see `loadDirectory()` for why a committed key is a published
+ * credential rather than a convenience.
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
@@ -58,8 +62,37 @@ export function loadDirectory(): Directory {
   }
 
   const seeded = readIfPresent(SEED_PATH);
-  cached = seeded ?? EMPTY;
-  return cached;
+  if (!seeded) {
+    cached = EMPTY;
+    return cached;
+  }
+
+  /**
+   * Every key is issued here, on first run, and never shipped.
+   *
+   * The seed is a committed file in a public repository, so a key written into
+   * it is a published credential: the same string would authenticate on every
+   * install that had not rotated it. That is sharpest for the seeded admin,
+   * whose role sits in `exemptRoles` and is therefore measured against no rules
+   * at all — a working bypass, printed in the repo, for a product whose whole
+   * claim is that prompts are judged.
+   *
+   * So the seed carries placeholders and this issues the real ones, which also
+   * means no two installs share a key and the demo company can stay committed.
+   */
+  const issued: Directory = {
+    ...seeded,
+    employees: seeded.employees.map((e) => ({ ...e, apiKey: newApiKey(e.id) }))
+  };
+
+  try {
+    return save(issued);
+  } catch {
+    // A read-only checkout still gets a working directory for this process;
+    // the keys simply do not survive a restart.
+    cached = issued;
+    return cached;
+  }
 }
 
 function readIfPresent(path: string): Directory | null {
@@ -91,7 +124,19 @@ export function findEmployee(id: string): Employee | null {
 }
 
 export function findByApiKey(key: string): Employee | null {
-  return loadDirectory().employees.find((e) => e.apiKey === key) ?? null;
+  return loadDirectory().employees.find((e) => keyMatches(e.apiKey, key)) ?? null;
+}
+
+/**
+ * Constant-time key comparison, over digests so length differences leak
+ * nothing either. `===` short-circuits on the first differing byte, which is
+ * measurable — and this string is the only credential on the proxy path.
+ */
+function keyMatches(stored: string, presented: string): boolean {
+  return timingSafeEqual(
+    createHash('sha256').update(stored).digest(),
+    createHash('sha256').update(presented).digest()
+  );
 }
 
 /**
@@ -134,7 +179,10 @@ export function upsertEmployee(input: {
   role: string;
 }): Employee {
   const dir = loadDirectory();
-  const name = input.name.trim();
+  // Control and format characters are stripped, not stored: the name is
+  // interpolated into onboarding scripts and shell profiles, and a newline in
+  // it would be executable there. Nothing legitimate is lost by removing them.
+  const name = input.name.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
   if (!name) throw new Error('name is required');
 
   const role = input.role.trim();
@@ -258,6 +306,12 @@ function uniqueId(name: string, taken: string[]): string {
   return `${base}-${randomBytes(3).toString('hex')}`;
 }
 
+/**
+ * The key is the whole identity on the proxy path, so it carries real entropy:
+ * 128 bits, not a short suffix someone could sweep. The id stays in the prefix
+ * because an admin reading a config file needs to tell whose key they are
+ * looking at without a lookup table.
+ */
 function newApiKey(id: string): string {
-  return `wk-${id}-${randomBytes(4).toString('hex')}`;
+  return `wk-${id}-${randomBytes(16).toString('hex')}`;
 }

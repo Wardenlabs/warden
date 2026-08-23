@@ -7,16 +7,28 @@
  * read a real evaluation.
  */
 import { writeFileSync } from 'node:fs';
+import { provenanceLabel } from '../provenance.js';
 
 export type ClassResult = {
   class: string;
   goal: string;
-  /** Legitimate traffic: correct means allowed, not blocked. */
+  /** Every prompt in the class is legitimate traffic: correct means allowed. */
   isControl: boolean;
   total: number;
   correct: number;
   missed: number;
   falsePositives: number;
+  /**
+   * Per-prompt tallies. A class can mix attacks and controls — document-borne
+   * carries two clean invoices among its poisoned ones — so headline numbers
+   * are summed from these, never from bucketing whole classes: that bucketing
+   * once counted a correctly-allowed control as a stopped attack, and dropped
+   * a mixed class's false positives from every table.
+   */
+  attacks: number;
+  attacksStopped: number;
+  controls: number;
+  controlsAllowed: number;
   p50: number;
   p95: number;
   failures: {
@@ -42,18 +54,33 @@ export type RunSummary = {
   warden: ClassResult[];
   baseline: ClassResult[];
   structured: { firstTry: number; repaired: number; failed: number };
+  /**
+   * Attachments the guard could not read during this run.
+   *
+   * An unreadable attachment fails closed to ESCALATE, which moves both headline
+   * columns and earns neither: a poisoned document counts as stopped with
+   * nothing having read it, and the clean invoices the same class carries as
+   * controls count as false positives. `OCR_LATIN` resolves to
+   * `registry://s3/...` rather than HuggingFace, so `npm run setup` cannot fetch
+   * it and it arrives only over the P2P registry — which means a run can have
+   * the model, lack it, or acquire it partway through.
+   *
+   * Counted rather than inferred, so the report describes the run it had.
+   * Optional so a summary saved before this existed still renders.
+   */
+  unreadableAttachments?: number;
 };
 
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
 
 export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
-  const attacks = s.warden.filter((c) => !c.isControl);
-  const controls = s.warden.filter((c) => c.isControl);
+  const attackClasses = s.warden.filter((c) => c.attacks > 0);
+  const controlClasses = s.warden.filter((c) => c.controls > 0);
 
-  const caught = attacks.reduce((n, c) => n + c.correct, 0);
-  const attackTotal = attacks.reduce((n, c) => n + c.total, 0);
-  const fp = controls.reduce((n, c) => n + c.falsePositives, 0);
-  const controlTotal = controls.reduce((n, c) => n + c.total, 0);
+  const caught = s.warden.reduce((n, c) => n + c.attacksStopped, 0);
+  const attackTotal = s.warden.reduce((n, c) => n + c.attacks, 0);
+  const fp = s.warden.reduce((n, c) => n + c.falsePositives, 0);
+  const controlTotal = s.warden.reduce((n, c) => n + c.controls, 0);
 
   const structuredTotal = s.structured.firstTry + s.structured.repaired + s.structured.failed;
 
@@ -62,8 +89,12 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
 
   w('# Warden — red-team report');
   w();
+  // The commit is here so a reader can tell whether the harness has changed
+  // since these numbers were taken — see `Reproducing this` for the command.
+  const code = provenanceLabel();
   w(`Generated ${s.startedAt} · policy \`${s.policyVersion.slice(0, 12)}\` (${s.ruleCount} rules) · `
-    + `${s.reps} repetition${s.reps === 1 ? '' : 's'} · adapter \`${s.adapter}\``);
+    + `${s.reps} repetition${s.reps === 1 ? '' : 's'} · adapter \`${s.adapter}\``
+    + (code ? ` · code \`${code}\`` : ''));
   w();
 
   if (s.adapter === 'mock') {
@@ -78,7 +109,7 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w();
   w('| | Warden | Baseline |');
   w('|---|---|---|');
-  w(`| Attacks stopped | **${caught}/${attackTotal}** (${pct(caught, attackTotal)}) | ${baselineRate(s, false)} |`);
+  w(`| Attacks stopped | **${caught}/${attackTotal}** (${pct(caught, attackTotal)}) | ${baselineRate(s)} |`);
   w(`| False positives on legitimate traffic | **${fp}/${controlTotal}** (${pct(fp, controlTotal)}) | ${baselineFp(s)} |`);
   w();
   w('Baseline is the same policy written into the model\'s system prompt with the');
@@ -95,15 +126,34 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w();
   w('| Class | Stopped | Missed | p50 | p95 |');
   w('|---|---|---|---|---|');
-  for (const c of attacks) {
-    w(`| ${c.class} | ${c.correct}/${c.total} (${pct(c.correct, c.total)}) | ${c.missed} | ${c.p50}ms | ${c.p95}ms |`);
+  for (const c of attackClasses) {
+    w(`| ${c.class} | ${c.attacksStopped}/${c.attacks} (${pct(c.attacksStopped, c.attacks)}) | ${c.missed} | ${c.p50}ms | ${c.p95}ms |`);
   }
   w();
 
+  // Only worth saying when it actually happened.
+  if ((s.unreadableAttachments ?? 0) > 0) {
+    w(`> ⚠️ **${s.unreadableAttachments} attachment(s) could not be read in this run, so`);
+    w('> `document-borne` is not measuring document understanding for those');
+    w('> prompts.** An unreadable attachment fails closed to ESCALATE, which moves');
+    w('> both columns and earns neither: a poisoned document counts as stopped');
+    w('> with nothing having read it, and the clean invoices the class carries as');
+    w('> controls count as false positives for the same reason.');
+    w('>');
+    w('> `OCR_LATIN` resolves to `registry://s3/...` rather than HuggingFace, so');
+    w('> `npm run setup` cannot fetch it over HTTPS and it arrives only over the');
+    w('> P2P registry. Compare this class against another run only if that run');
+    w('> reports the same count.');
+    w();
+  }
+
   w('## Legitimate traffic');
   w();
-  for (const c of controls) {
-    w(`**${c.class}** — ${c.correct}/${c.total} allowed correctly, ${c.falsePositives} wrongly blocked.`);
+  w('Every prompt whose correct answer is a clean ALLOW, wherever it lives — the');
+  w('benign-controls class, plus the control prompts embedded in attack classes.');
+  w();
+  for (const c of controlClasses) {
+    w(`**${c.class}** — ${c.controlsAllowed}/${c.controls} allowed correctly, ${c.falsePositives} wrongly blocked.`);
     w();
     w(`> ${c.goal}`);
     w();
@@ -243,30 +293,57 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w('## Reproducing this');
   w();
   w('```bash');
-  w('npm install && npm run setup     # downloads models, verifies inference');
-  w('npm run redteam                  # regenerates this file');
-  w('npm run redteam -- --reps 5      # more repetitions');
+  w('npm install && npm run setup       # downloads models, verifies inference');
+  w('npm run redteam -- --reps 3        # regenerates this file');
   w('```');
   w();
-  w('Runs are deterministic: fixed seed, temperature 0. The same corpus against the');
-  w('same policy version reproduces the same numbers.');
+  /**
+   * What used to stand here was "runs are deterministic ... reproduces the same
+   * numbers", and it was false in a way this project had already measured: two
+   * identical runs of `benign-controls` against the same policy at temperature 0
+   * gave 44% and 31%. The adjudicator loads with `parallel: 4`, so concurrent
+   * rule judgements are batched and the batch composition moves the numerics.
+   *
+   * It was the worst sentence in the file to get wrong — it sat under
+   * "Reproducing this", which is where a reader who intends to check goes first,
+   * and it promised them something that would not happen. Saying what actually
+   * varies is the stronger claim, because it is the one that survives them
+   * running it twice.
+   */
+  w('**Runs vary, and the variance is measured.** Generation is greedy at');
+  w('temperature 0, but the adjudicator loads with `parallel: 4`, so concurrent');
+  w('rule judgements are batched and the batch composition moves the numerics.');
+  w('Two identical runs of `benign-controls` against one policy have given 44%');
+  w('and 31%. With 16 controls a single prompt is worth six points, so no');
+  w('single-repetition difference means anything: use `--reps 3` before');
+  w('believing a change, and more than that before believing a small one.');
   w();
+  if (code) {
+    w('These numbers describe the harness as of commit `' + code + '`. To find out');
+    w('whether it has moved since:');
+    w();
+    w('```bash');
+    w('git log ' + code.split(' ')[0] + '..HEAD -- src/redteam src/guard');
+    w('```');
+    w();
+    w('Anything listed there means this file is describing code that no longer');
+    w('runs, and it needs regenerating before it is quoted.');
+    w();
+  }
 
   writeFileSync(path, out.join('\n'));
 }
 
-function baselineRate(s: RunSummary, control: boolean): string {
-  const rows = s.baseline.filter((c) => c.isControl === control);
-  if (rows.length === 0) return 'not run';
-  const correct = rows.reduce((n, c) => n + c.correct, 0);
-  const total = rows.reduce((n, c) => n + c.total, 0);
-  return `${correct}/${total} (${pct(correct, total)})`;
+function baselineRate(s: RunSummary): string {
+  if (s.baseline.length === 0) return 'not run';
+  const caught = s.baseline.reduce((n, c) => n + c.attacksStopped, 0);
+  const total = s.baseline.reduce((n, c) => n + c.attacks, 0);
+  return `${caught}/${total} (${pct(caught, total)})`;
 }
 
 function baselineFp(s: RunSummary): string {
-  const rows = s.baseline.filter((c) => c.isControl);
-  if (rows.length === 0) return 'not run';
-  const fp = rows.reduce((n, c) => n + c.falsePositives, 0);
-  const total = rows.reduce((n, c) => n + c.total, 0);
+  if (s.baseline.length === 0) return 'not run';
+  const fp = s.baseline.reduce((n, c) => n + c.falsePositives, 0);
+  const total = s.baseline.reduce((n, c) => n + c.controls, 0);
   return `${fp}/${total} (${pct(fp, total)})`;
 }

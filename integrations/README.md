@@ -59,7 +59,7 @@ profile). The installer writes them for you:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
-export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by the admin
+export WARDEN_API_KEY=wk-fede-YOUR-KEY-HERE       # issued by the admin
 export WARDEN_HEALTH_TIMEOUT_MS=2000
 export WARDEN_TIMEOUT_MS=30000
 ```
@@ -68,7 +68,7 @@ PowerShell (current session):
 
 ```powershell
 $env:WARDEN_URL = 'http://192.168.1.42:8080'
-$env:WARDEN_API_KEY = 'wk-fede-8b1d40e2'
+$env:WARDEN_API_KEY = 'wk-fede-YOUR-KEY-HERE'
 $env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
 $env:WARDEN_TIMEOUT_MS = '30000'
 ```
@@ -103,8 +103,11 @@ Merge `claude-code/settings.json` into `~/.claude/settings.json`:
 }
 ```
 
-Claude Code blocks on exit code 2 and on `{"continue": false, "reason": "..."}`.
-The hook emits both.
+Claude Code blocks on exit code 2. The hook also writes
+`{"continue": false, "stopReason": …, "decision": "block", "reason": …}` to
+stdout — every key any supported tool is documented to read, in one object,
+because extra keys are inert to a tool that ignores them while a missing one is
+a refusal that does not land. The exit code is the part that always works.
 
 ## 4. Codex
 
@@ -121,8 +124,9 @@ type = "command"
 command = "node ~/.warden-hook.mjs"
 ```
 
-Codex blocks on `{"decision": "block", "reason": "..."}` and on exit code 2.
-The hook emits both. Run `/hooks` inside Codex to confirm it is loaded.
+Codex blocks on `{"decision": "block", "reason": "..."}` and on exit code 2,
+both of which are in the object above. Run `/hooks` inside Codex to confirm it
+is loaded.
 
 ## 5. Try it
 
@@ -133,11 +137,22 @@ The hook emits both. Run `/hooks` inside Codex to confirm it is loaded.
    Rule: No one may request payroll, salary, bonus, or compensation
          information about another employee.
    Why:  request for a third party's compensation
+
+   Warden can try to rewrite this so it goes through:
+     warden-hook --rewrite a7f3c2
+     (paste the same prompt, then Ctrl-D)
+
    Audit: a7f3c2
 ```
 
 An ordinary prompt goes through with no output at all — a gateway that comments
 on every message becomes noise people learn to ignore.
+
+`--rewrite` is run by hand, never by the tool: it takes the audit id from the
+block and the same prompt on stdin — which is also how the gateway confirms this
+is the request that was blocked, since the log stores that prompt's hash and not
+its text. What comes back was judged by the same policy before it was shown, so
+if nothing passes you get a reason instead of a suggestion. One per block.
 
 ---
 
@@ -194,7 +209,7 @@ the proxy instead:
 
 ```bash
 export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
-export OPENAI_API_KEY=wk-fede-8b1d40e2      # per-employee Warden key
+export OPENAI_API_KEY=wk-fede-YOUR-KEY-HERE      # per-employee Warden key
 ```
 
 That path only works with API keys, which is exactly why the hook exists.
@@ -268,8 +283,9 @@ hooks not firing. If it silently does nothing, that is the failure to report.
 ## Anything else
 
 The hook reads the prompt from whichever of these the payload carries:
-`user_input`, `prompt`, `message`, `text`, `input`, or the last user turn of an
+`prompt`, `user_input`, `message`, `text`, `input`, or the last user turn of an
 OpenAI-shaped `messages` array. A wrapper for a tool not listed here only has to
 put JSON on stdin and check the exit code — `2` means refused, and the reason is
 on stderr. Pass `source` to have the tool named in the console's connected
-badges.
+badges: without it the hook guesses from the payload shape, and a guess is what
+puts the wrong tool on somebody's page.
