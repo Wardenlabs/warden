@@ -322,6 +322,12 @@ The live directory lives in `data/company.json`, seeded once from
 `data/seed/company.json` and owned by the console after that. The seed stays
 pristine, so a fresh clone always demonstrates the same company.
 
+**The seed names people and roles, and carries no keys.** Those are issued on
+the first run, so no two installs share one. A key committed to a public
+repository is a published credential rather than a convenience — and the
+sharpest case is the seeded admin, whose role is in `exemptRoles` and is
+therefore measured against no rules at all.
+
 ---
 
 ## What else the gateway does
@@ -331,7 +337,7 @@ pristine, so a fresh clone always demonstrates the same company.
 | **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
 | **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
 | **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
-| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it. Stores prompt *hashes*, not prompts — a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` recomputes the chain. |
+| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `npm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
 
 ---
 
@@ -513,11 +519,14 @@ believing anything either of them says.
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
+| `WARDEN_MIN_RELEVANCE` | `0.25` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. |
+| `WARDEN_WARMUP` | — | `0` skips loading the models at boot. On by default: the first prompt used to pay for the model load inside the decision it was waiting on, which is how a cold check passed the hook's deadline. |
 | `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
 | `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
 | `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
+| `WARDEN_API_KEY` | — | Read by the hook, on the employee's machine. Their whole identity: no name, no role. Issued from the console's People tab. |
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |

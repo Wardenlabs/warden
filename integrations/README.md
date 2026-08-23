@@ -59,7 +59,7 @@ profile). The installer writes them for you:
 
 ```bash
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
-export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by the admin
+export WARDEN_API_KEY=wk-fede-YOUR-KEY-HERE       # issued by the admin
 export WARDEN_HEALTH_TIMEOUT_MS=2000
 export WARDEN_TIMEOUT_MS=30000
 ```
@@ -68,7 +68,7 @@ PowerShell (current session):
 
 ```powershell
 $env:WARDEN_URL = 'http://192.168.1.42:8080'
-$env:WARDEN_API_KEY = 'wk-fede-8b1d40e2'
+$env:WARDEN_API_KEY = 'wk-fede-YOUR-KEY-HERE'
 $env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
 $env:WARDEN_TIMEOUT_MS = '30000'
 ```
@@ -198,7 +198,7 @@ the proxy instead:
 
 ```bash
 export OPENAI_BASE_URL=http://192.168.1.42:8080/v1
-export OPENAI_API_KEY=wk-fede-8b1d40e2      # per-employee Warden key
+export OPENAI_API_KEY=wk-fede-YOUR-KEY-HERE      # per-employee Warden key
 ```
 
 That path only works with API keys, which is exactly why the hook exists.

@@ -18,6 +18,9 @@ models/
 # Runtime data — regenerated, never committed
 data/audit.jsonl
 data/audit-redteam.jsonl
+# records how long each log should be, so a removed tail is detectable
+data/audit.witness.json
+data/audit-redteam.witness.json
 data/policies.json
 # the live directory; data/seed/company.json is the committed starting point
 data/company.json
