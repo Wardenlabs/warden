@@ -18,7 +18,7 @@ on:
         required: false
         default: ''
   push:
-    branches: [main, claude/native-macos-windows-app-f3evkm]
+    branches: [main]
     tags: ['v*']
     paths:
       - 'desktop/**'
