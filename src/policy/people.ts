@@ -117,7 +117,7 @@ export function invalidate(): void {
   cached = null;
 }
 
-// ── employees ──────────────────────────────────────────────────────────────────
+// ── employees ────────────────────────────────────────────────────────────────
 
 export function findEmployee(id: string): Employee | null {
   return loadDirectory().employees.find((e) => e.id === id) ?? null;
