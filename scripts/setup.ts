@@ -10,14 +10,17 @@
  * Hyperswarm, which hangs indefinitely on restrictive networks. Conference wifi
  * is exactly that kind of network, and finding out at recording time is not a
  * risk worth taking.
+ *
+ * The download mechanics live in src/setup/download.ts, shared with the
+ * desktop app's first-run screen — this file owns the terminal experience.
  */
-import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { arch, platform, release, totalmem } from 'node:os';
 import { join, resolve } from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import { ALTERNATE_MODELS, MODEL_SPECS, modelsDir, toHttpsUrl, type ModelSpec } from '../src/qvac/models.js';
+import { MODEL_CATALOG } from '../src/setup/catalog.js';
+import { downloadModel, type DownloadSpec } from '../src/setup/download.js';
 
 const MIN_NODE_MAJOR = 22;
 const MIN_NODE_MINOR = 17;
@@ -80,73 +83,67 @@ function platformNotes(): void {
   }
 }
 
+function toDownloadSpec(spec: ModelSpec): DownloadSpec {
+  return {
+    role: spec.role,
+    filename: spec.filename,
+    url: toHttpsUrl(spec.entry),
+    approxMB: spec.approxMB,
+    required: spec.required
+  };
+}
+
 /**
- * Fetch a model, resuming a partial file rather than restarting it.
- *
- * A 1.1 GB download on conference wifi will get interrupted. Re-running setup
- * should continue, not start over.
+ * The desktop app downloads from src/setup/catalog.ts, which cannot import the
+ * SDK and therefore duplicates each entry's HTTPS form. If someone changes a
+ * model in MODEL_SPECS and forgets the catalog, this is where they hear it.
  */
-async function download(spec: ModelSpec, dir: string): Promise<void> {
-  const url = toHttpsUrl(spec.entry);
-  const dest = join(dir, spec.filename);
-
-  if (!url) {
-    report.models.push({
-      role: spec.role, file: spec.filename, sizeMB: 0, ok: false,
-      note: 'no HTTPS URL — this model can only come from the QVAC registry'
-    });
-    return;
+function checkCatalogDrift(): void {
+  for (const spec of MODEL_SPECS) {
+    const mirrored = MODEL_CATALOG.find((c) => c.role === spec.role);
+    const expected = toDownloadSpec(spec);
+    if (
+      !mirrored ||
+      mirrored.filename !== expected.filename ||
+      mirrored.url !== expected.url ||
+      mirrored.required !== expected.required
+    ) {
+      report.warnings.push(
+        `src/setup/catalog.ts is out of date for "${spec.role}" — the desktop app would download the wrong weights. Update it to match src/qvac/models.ts.`
+      );
+    }
   }
+}
 
-  let existing = existsSync(dest) ? statSync(dest).size : 0;
-
-  try {
-    const head = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-    if (!head.ok) throw new Error(`metadata HTTP ${head.status}`);
-    const expected = Number(head.headers.get('content-length'));
-    if (!Number.isFinite(expected) || expected <= 0) {
-      throw new Error('model server did not provide a valid content-length');
+/** Fetch a model with the same terminal output the setup has always printed. */
+async function download(spec: ModelSpec, dir: string): Promise<void> {
+  const dl = toDownloadSpec(spec);
+  let announced = false;
+  const outcome = await downloadModel(dl, dir, () => {
+    if (!announced) {
+      announced = true;
+      process.stdout.write(`  ${dim('↓')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`~${spec.approxMB} MB`)}`);
     }
+  });
 
-    if (existing === expected) {
-      report.models.push({
-        role: spec.role, file: spec.filename,
-        sizeMB: Math.round(existing / 1e6), ok: true, note: 'cached'
-      });
-      console.log(`  ${green('✓')} ${spec.role.padEnd(12)} ${dim('already downloaded')}`);
-      return;
-    }
+  report.models.push({
+    role: outcome.role,
+    file: outcome.file,
+    sizeMB: outcome.sizeMB,
+    ok: outcome.ok,
+    ...(outcome.note ? { note: outcome.note } : {})
+  });
 
-    // A larger file cannot be resumed safely. A smaller one is a genuine
-    // partial download even when it happens to exceed the approximate size.
-    if (existing > expected) existing = 0;
-
-    process.stdout.write(`  ${dim('↓')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`~${spec.approxMB} MB`)}`);
-
-    const headers: Record<string, string> = {};
-    if (existing > 0) headers['Range'] = `bytes=${existing}-`;
-
-    const res = await fetch(url, { headers, redirect: 'follow' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    if (!res.body) throw new Error('empty response body');
-
-    const resuming = existing > 0 && res.status === 206;
-    await pipeline(
-      Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
-      createWriteStream(dest, resuming ? { flags: 'a' } : {})
-    );
-
-    const size = statSync(dest).size;
-    const ok = size === expected;
-    report.models.push({
-      role: spec.role, file: spec.filename, sizeMB: Math.round(size / 1e6), ok,
-      ...(ok ? {} : { note: `expected ${expected} bytes, received ${size}` })
-    });
-    console.log(`\r  ${ok ? green('✓') : yellow('!')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`${Math.round(size / 1e6)} MB`)}          `);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    report.models.push({ role: spec.role, file: spec.filename, sizeMB: 0, ok: false, note: msg });
-    console.log(`\r  ${red('✗')} ${spec.role.padEnd(12)} ${spec.filename} ${red(msg)}          `);
+  if (!dl.url) return; // same silence as always: the report carries the note
+  const back = announced ? '\r' : '';
+  if (outcome.ok && outcome.note === 'cached') {
+    console.log(`${back}  ${green('✓')} ${spec.role.padEnd(12)} ${dim('already downloaded')}          `);
+  } else if (outcome.ok) {
+    console.log(`${back}  ${green('✓')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`${outcome.sizeMB} MB`)}          `);
+  } else if (outcome.note?.startsWith('expected ')) {
+    console.log(`${back}  ${yellow('!')} ${spec.role.padEnd(12)} ${spec.filename} ${dim(`${outcome.sizeMB} MB`)}          `);
+  } else {
+    console.log(`${back}  ${red('✗')} ${spec.role.padEnd(12)} ${spec.filename} ${red(outcome.note ?? 'failed')}          `);
   }
 }
 
@@ -251,6 +248,7 @@ async function main(): Promise<void> {
 
   checkNode();
   platformNotes();
+  checkCatalogDrift();
   try {
     const pkg = await import('@qvac/sdk/package', { with: { type: 'json' } });
     report.sdkVersion = (pkg.default as { version?: string }).version ?? 'unknown';

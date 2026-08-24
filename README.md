@@ -149,6 +149,26 @@ system against a deterministic stand-in. Everything works except the judging.
 > HuggingFace URL and downloads over plain HTTPS with resume instead. If you have
 > seen a QVAC model download stall forever, this is why.
 
+### Desktop app
+
+The same gateway ships as an installable desktop app for macOS (Apple Silicon
+and Intel, separately — native inference prebuilds are per-arch) and Windows,
+built with Electron Forge and QVAC's first-party Forge plugin. The window is
+this same console over `127.0.0.1`; a first-run screen downloads the models
+with resume, or drops into mock mode. LAN mode — the team deployment — is an
+explicit toggle in the Gateway menu.
+
+Installers come out of the `desktop` GitHub Actions workflow
+(`warden-darwin-arm64`, `warden-darwin-x64`, `warden-win32-x64`), or locally:
+
+```bash
+npm run app:make    # installer for the current platform, in out/make/
+npm run app:dev     # run the desktop shell unpackaged
+```
+
+Details — unsigned-build caveats, data locations, LAN mode:
+**[`docs/DESKTOP.md`](docs/DESKTOP.md)** (Spanish).
+
 ---
 
 ## How a decision gets made
@@ -663,6 +683,11 @@ npm run verify-audit     # recompute the audit hash chain
 npm run test:vote        # semantics of the confirmation vote
 npm run typecheck
 
+npm run build            # compile server + desktop shell to dist/ and desktop/dist/
+npm start                # run the compiled server (what the desktop app runs)
+npm run app:dev          # desktop shell, unpackaged
+npm run app:make         # desktop installer for this platform → out/make/
+
 npx tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
 npx tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
 npx tsx scripts/probe-rewrite.ts                       # can a rewrite get an attack through?
@@ -695,6 +720,7 @@ believing anything either of them says.
 | `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
 | `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
 | `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
+| `WARDEN_ASSETS_DIR` | repo root | Where the read-only pieces live (`web/`, `integrations/`, `data/seed/`). The desktop app points it at its bundle; writable state stays cwd-relative. |
 | `WARDEN_PUBLIC_URL` | — | The address employees should use, when it is not the one the gateway can infer — behind a tunnel or a VPN. |
 
 ---

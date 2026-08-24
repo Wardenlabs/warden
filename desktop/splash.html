@@ -1,0 +1,202 @@
+<!doctype html>
+<!--
+  First-run and boot screen for the desktop shell. Same design language as the
+  console (web/index.html): white, quiet, one accent. Self-contained on
+  purpose — no network, no external assets, talks to the main process only
+  through the tiny bridge preload.cts exposes as window.warden.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Warden</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #17181c;
+      --muted: #70747c;
+      --line: #eaeaed;
+      --line-firm: #dcdce1;
+      --accent: #1a1d23;
+      --accent-hover: #2b2f37;
+      --accent-ink: #ffffff;
+      --ok: #1f7a3d;
+      --bad: #b3261e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .card { width: 100%; max-width: 460px; padding: 32px 36px; }
+    .mark { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+    .mark svg { display: block; }
+    .mark .name { font-size: 17px; font-weight: 650; letter-spacing: 0.2px; }
+    .mark .tag { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    h1 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    p.sub { color: var(--muted); margin-bottom: 18px; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .row { display: flex; gap: 10px; margin-top: 18px; }
+    button {
+      appearance: none;
+      border: 1px solid var(--line-firm);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 9px 14px;
+      font: inherit;
+      font-weight: 550;
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    button.primary:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .warn { color: var(--bad); font-size: 13px; margin-top: 10px; display: none; }
+    .models { margin-top: 6px; }
+    .model { margin: 12px 0; }
+    .model .head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+    .model .head .role { font-weight: 600; text-transform: capitalize; }
+    .model .head .mb { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.25s linear; }
+    .model.done .bar > i { background: var(--ok); }
+    .model.failed .bar > i { background: var(--bad); }
+    .spin {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--line-firm); border-top-color: var(--accent);
+      animation: r 0.9s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 9px;
+    }
+    @keyframes r { to { transform: rotate(360deg); } }
+    .err { color: var(--bad); font-size: 13px; word-break: break-word; margin-top: 4px; }
+    .fine { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z"
+              stroke="#17181c" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M8.6 12l2.3 2.3 4.5-4.6" stroke="#17181c" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="name">Warden</div>
+        <div class="tag">the local AI gateway</div>
+      </div>
+    </div>
+
+    <div id="welcome" class="section">
+      <h1>Download the on-device models</h1>
+      <p class="sub">
+        Warden judges every prompt locally — nothing leaves this machine. That
+        needs <span id="total-mb">~1.8 GB</span> of model weights, fetched once
+        from HuggingFace and kept in your app data folder.
+      </p>
+      <div id="disk-warn" class="warn"></div>
+      <div class="row">
+        <button id="btn-download" class="primary">Download models</button>
+        <button id="btn-mock">Try demo mode instead</button>
+      </div>
+      <p class="fine">Demo mode runs the full console with simulated inference — you can download the models later from the Gateway menu.</p>
+    </div>
+
+    <div id="downloading" class="section">
+      <h1>Downloading models</h1>
+      <p class="sub">Interrupted downloads resume where they stopped.</p>
+      <div id="models" class="models"></div>
+    </div>
+
+    <div id="starting" class="section">
+      <h1><span class="spin"></span><span id="starting-text">Starting the gateway…</span></h1>
+      <p class="sub" id="starting-sub"></p>
+    </div>
+
+    <div id="error" class="section">
+      <h1>Download failed</h1>
+      <div id="error-msg" class="err"></div>
+      <div class="row">
+        <button id="btn-retry" class="primary">Retry</button>
+        <button id="btn-mock-2">Use demo mode</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const sections = ['welcome', 'downloading', 'starting', 'error'];
+    const show = (id) => sections.forEach((s) => $(s).classList.toggle('active', s === id));
+
+    const choose = (choice) => {
+      for (const b of document.querySelectorAll('button')) b.disabled = true;
+      window.warden.choose(choice);
+    };
+    $('btn-download').addEventListener('click', () => choose('download'));
+    $('btn-mock').addEventListener('click', () => choose('mock'));
+    $('btn-mock-2').addEventListener('click', () => choose('mock'));
+    $('btn-retry').addEventListener('click', () => choose('retry'));
+
+    const enableButtons = () => {
+      for (const b of document.querySelectorAll('button')) b.disabled = false;
+    };
+
+    function render(state) {
+      if (state.phase === 'welcome') {
+        enableButtons();
+        $('total-mb').textContent = `~${(state.totalMB / 1000).toFixed(1)} GB`;
+        const needGB = Math.ceil(state.totalMB / 1000) + 2;
+        if (state.freeGB !== null && state.freeGB < needGB) {
+          $('disk-warn').style.display = 'block';
+          $('disk-warn').textContent =
+            `Only ${state.freeGB} GB free on disk — about ${needGB} GB is recommended.`;
+        } else {
+          $('disk-warn').style.display = 'none';
+        }
+        show('welcome');
+      } else if (state.phase === 'downloading') {
+        const box = $('models');
+        box.innerHTML = '';
+        for (const m of state.models) {
+          const el = document.createElement('div');
+          el.className = 'model' + (m.done ? ' done' : m.failed ? ' failed' : '');
+          const pct = m.totalMB > 0 ? Math.min(100, Math.round((m.receivedMB / m.totalMB) * 100)) : 0;
+          el.innerHTML =
+            `<div class="head"><span class="role"></span><span class="mb"></span></div>` +
+            `<div class="bar"><i style="width:${m.done ? 100 : pct}%"></i></div>`;
+          el.querySelector('.role').textContent = m.role;
+          el.querySelector('.mb').textContent = m.failed
+            ? 'failed'
+            : m.done
+              ? `${m.totalMB} MB ✓`
+              : `${m.receivedMB} / ${m.totalMB} MB`;
+          box.appendChild(el);
+        }
+        show('downloading');
+      } else if (state.phase === 'starting') {
+        $('starting-text').textContent =
+          state.detail === 'warming' ? 'Warming the models…' : 'Starting the gateway…';
+        $('starting-sub').textContent =
+          state.detail === 'warming'
+            ? 'First boot loads ~2 GB of weights into memory. Up to half a minute.'
+            : '';
+        show('starting');
+      } else if (state.phase === 'error') {
+        enableButtons();
+        $('error-msg').textContent = state.message;
+        show('error');
+      }
+    }
+
+    window.warden.onState(render);
+    // Until the main process says otherwise, the honest state is "starting".
+    show('starting');
+  </script>
+</body>
+</html>
