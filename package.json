@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
+  "author": "MartinPuli",
   "license": "Apache-2.0",
   "main": "desktop/dist/main.js",
   "engines": {

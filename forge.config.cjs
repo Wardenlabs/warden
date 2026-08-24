@@ -53,7 +53,9 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
-      config: { name: 'Warden', setupExe: 'Warden-Setup.exe' }
+      // `authors` is required by the NuGet package Squirrel builds; without
+      // it the maker dies with "Authors is required."
+      config: { name: 'Warden', authors: 'MartinPuli', setupExe: 'Warden-Setup.exe' }
     }
   ]
 };
