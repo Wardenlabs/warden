@@ -37,6 +37,10 @@ concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: true
 
+# The release job publishes installers to GitHub Releases on v* tags.
+permissions:
+  contents: write
+
 jobs:
   smoke-linux:
     runs-on: ubuntu-latest
@@ -111,3 +115,22 @@ jobs:
           name: warden-win32-x64
           path: out/make/**
           if-no-files-found: error
+
+  # Tag a commit v* and the installers land on the repo's Releases page —
+  # stable download links instead of digging through a run's artifacts.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [smoke-linux, make-macos, make-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
