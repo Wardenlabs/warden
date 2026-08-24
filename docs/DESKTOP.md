@@ -57,9 +57,12 @@ npm run app:dev         # correr la app sin empaquetar, para desarrollo
 Los artefactos de CI todavía no van firmados ni notarizados (eso requiere un
 certificado de Apple Developer y uno de code-signing de Windows — pendiente).
 
-- **macOS**: la primera vez, clic derecho sobre `Warden.app` → **Abrir** →
-  **Abrir**. Si Gatekeeper insiste ("la app está dañada"), quitá la
-  cuarentena: `xattr -rd com.apple.quarantine /Applications/Warden.app`.
+- **macOS**: al abrirla, Gatekeeper dice **"Warden is damaged and can't be
+  opened"**. No está dañada — es el mensaje estándar para apps descargadas
+  sin notarizar, y con estos builds el clic derecho → Abrir **no** alcanza
+  (verificado en una instalación real). Quitá la cuarentena una vez, desde
+  Terminal ejecutando: `xattr -rd com.apple.quarantine /Applications/Warden.app`
+  y abrila normalmente después.
 - **Windows**: en el aviso de SmartScreen, **Más información** → **Ejecutar de
   todas formas**.
 

@@ -72,7 +72,7 @@ jobs:
       - name: Packaged app boots headless in mock mode
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          WARDEN_SMOKE=1 xvfb-run -a out/Warden-linux-x64/warden --no-sandbox 2>&1 | tee smoke.log
+          WARDEN_SMOKE=1 xvfb-run -a out/Warden-linux-x64/Warden --no-sandbox 2>&1 | tee smoke.log
           grep -q WARDEN_SMOKE_OK smoke.log
 
   make-macos:

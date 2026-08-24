@@ -39,8 +39,9 @@ const KEEP = [
 
 module.exports = {
   packagerConfig: {
+    // No executableName override: the binary inherits "Warden" everywhere —
+    // a lowercase executable was what Gatekeeper's dialog showed to users.
     name: 'Warden',
-    executableName: 'warden',
     appBundleId: 'com.warden.gateway',
     icon: './desktop/icons/icon',
     prune: true,
