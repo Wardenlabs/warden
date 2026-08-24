@@ -77,11 +77,19 @@ jobs:
 
   make-macos:
     runs-on: macos-14
-    timeout-minutes: 40
+    # Notarization waits on Apple's service; give the signed path headroom.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         arch: [arm64, x64]
+    # Present only when the repo has signing secrets configured; forge.config
+    # switches signing/notarization on when it sees them.
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -95,6 +103,12 @@ jobs:
         # dependency; the @qvac/* addons themselves ship every arch's
         # prebuilds inside each package, so only the bare runtime is missing.
         run: npm install --no-save --force --os=darwin --cpu=x64 bare-runtime-darwin-x64
+      - name: Import signing certificate
+        if: env.MACOS_CERT_P12 != ''
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERT_P12 }}
+          p12-password: ${{ secrets.MACOS_CERT_PASSWORD }}
       - run: npm run build
       - run: npx electron-forge make --platform=darwin --arch=${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
