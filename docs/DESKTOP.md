@@ -54,6 +54,11 @@ npm run app:dev         # correr la app sin empaquetar, para desarrollo
 
 ## Abrir builds sin firmar
 
+Con los secrets de firma configurados en el repo (`MACOS_CERT_P12`,
+`MACOS_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+`APPLE_TEAM_ID`) los builds de macOS salen firmados y notarizados, y esta
+sección deja de aplicar.
+
 Los artefactos de CI todavía no van firmados ni notarizados (eso requiere un
 certificado de Apple Developer y uno de code-signing de Windows — pendiente).
 

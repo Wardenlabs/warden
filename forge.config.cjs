@@ -37,6 +37,30 @@ const KEEP = [
   /^\/qvac(\/|$)/
 ];
 
+const DROP = [
+  // Dangling .bin symlinks: their devDependency targets are pruned, and the
+  // leftovers surface as xattr/codesign noise inside the bundle.
+  /^\/node_modules\/\.bin(\/|$)/
+];
+
+/**
+ * macOS signing/notarization switch on only when CI provides credentials,
+ * so local builds and forks keep producing unsigned artifacts.
+ */
+const macSigning =
+  process.env.APPLE_ID && process.env.APPLE_ID_PASSWORD && process.env.APPLE_TEAM_ID
+    ? {
+        osxSign: {
+          optionsForFile: () => ({ entitlements: './desktop/entitlements.plist' })
+        },
+        osxNotarize: {
+          appleId: process.env.APPLE_ID,
+          appleIdPassword: process.env.APPLE_ID_PASSWORD,
+          teamId: process.env.APPLE_TEAM_ID
+        }
+      }
+    : {};
+
 module.exports = {
   packagerConfig: {
     // No executableName override: the binary inherits "Warden" everywhere —
@@ -45,7 +69,8 @@ module.exports = {
     appBundleId: 'com.warden.gateway',
     icon: './desktop/icons/icon',
     prune: true,
-    ignore: (path) => path !== '' && !KEEP.some((re) => re.test(path))
+    ignore: (path) => path !== '' && (DROP.some((re) => re.test(path)) || !KEEP.some((re) => re.test(path))),
+    ...macSigning
   },
   plugins: [new QvacForgePlugin({ logLevel: 'info' })],
   makers: [

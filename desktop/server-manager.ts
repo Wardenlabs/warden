@@ -77,10 +77,7 @@ export function startServer(config: ServerConfig, onExit: (code: number) => void
     WARDEN_HOST: config.host,
     WARDEN_PORT: String(config.port),
     WARDEN_ASSETS_DIR: config.assetsDir,
-    WARDEN_MODELS_DIR: config.modelsDir,
-    // The demo directory ships read-only with the app; the live copy is
-    // seeded from it into the (cwd-relative) data folder on first boot.
-    WARDEN_COMPANY_SEED: `${config.assetsDir}/data/seed/company.json`
+    WARDEN_MODELS_DIR: config.modelsDir
   };
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];
