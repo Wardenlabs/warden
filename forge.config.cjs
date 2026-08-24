@@ -49,13 +49,23 @@ module.exports = {
   plugins: [new QvacForgePlugin({ logLevel: 'info' })],
   makers: [
     { name: '@electron-forge/maker-zip', platforms: ['darwin', 'win32', 'linux'] },
-    { name: '@electron-forge/maker-dmg', platforms: ['darwin'] },
+    {
+      name: '@electron-forge/maker-dmg',
+      platforms: ['darwin'],
+      // The mounted volume carries the brand badge, not the generic disk icon.
+      config: { icon: './desktop/icons/icon.icns' }
+    },
     {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
       // `authors` is required by the NuGet package Squirrel builds; without
       // it the maker dies with "Authors is required."
-      config: { name: 'Warden', authors: 'MartinPuli', setupExe: 'Warden-Setup.exe' }
+      config: {
+        name: 'Warden',
+        authors: 'MartinPuli',
+        setupExe: 'Warden-Setup.exe',
+        setupIcon: './desktop/icons/icon.ico'
+      }
     }
   ]
 };

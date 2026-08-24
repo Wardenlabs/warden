@@ -82,9 +82,9 @@ al de siempre.
 
 | SO | Carpeta |
 |---|---|
-| macOS | `~/Library/Application Support/warden/` |
-| Windows | `%APPDATA%\warden\` |
-| Linux | `~/.config/warden/` |
+| macOS | `~/Library/Application Support/Warden/` |
+| Windows | `%APPDATA%\Warden\` |
+| Linux | `~/.config/Warden/` |
 
 Adentro: `data/` (política, directorio, auditoría — los mismos JSON/JSONL de
 siempre), `models/` (los GGUF descargados), `logs/warden-gateway.log` y

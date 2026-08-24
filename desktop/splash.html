@@ -81,12 +81,9 @@
 <body>
   <div class="card">
     <div class="mark">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z"
-              stroke="#17181c" stroke-width="1.6" stroke-linejoin="round"/>
-        <path d="M8.6 12l2.3 2.3 4.5-4.6" stroke="#17181c" stroke-width="1.6"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <!-- The real mark (shield + W), copied from brand/warden-mark.svg into
+           icons/ because brand/ is not part of the packaged app. -->
+      <img src="icons/warden-mark.svg" width="32" height="32" alt="" />
       <div>
         <div class="name">Warden</div>
         <div class="tag">the local AI gateway</div>
@@ -136,7 +133,8 @@
 
     const choose = (choice) => {
       for (const b of document.querySelectorAll('button')) b.disabled = true;
-      window.warden.choose(choice);
+      // Optional-chained so the page also renders in a plain browser.
+      window.warden?.choose?.(choice);
     };
     $('btn-download').addEventListener('click', () => choose('download'));
     $('btn-mock').addEventListener('click', () => choose('mock'));
@@ -194,7 +192,7 @@
       }
     }
 
-    window.warden.onState(render);
+    window.warden?.onState?.(render);
     // Until the main process says otherwise, the honest state is "starting".
     show('starting');
   </script>

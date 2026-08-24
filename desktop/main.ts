@@ -90,6 +90,11 @@ if (!app.requestSingleInstanceLock()) {
 
 async function main(): Promise<void> {
   await app.whenReady();
+  // Packaged builds get the icon from the bundle; this covers `npm run
+  // app:dev`, where the dock would otherwise show Electron's own.
+  if (!app.isPackaged && process.platform === 'darwin') {
+    app.dock?.setIcon(ICON_PNG);
+  }
   userData = app.getPath('userData');
   settings = readSettings(userData);
   if (SMOKE) {
