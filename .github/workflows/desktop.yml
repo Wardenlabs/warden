@@ -12,6 +12,11 @@ name: desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish installers to this release tag (e.g. v0.1.0). Empty = build only.'
+        required: false
+        default: ''
   push:
     branches: [main, claude/native-macos-windows-app-f3evkm]
     tags: ['v*']
@@ -116,10 +121,12 @@ jobs:
           path: out/make/**
           if-no-files-found: error
 
-  # Tag a commit v* and the installers land on the repo's Releases page —
-  # stable download links instead of digging through a run's artifacts.
+  # Installers land on the repo's Releases page — stable download links
+  # instead of digging through a run's artifacts. Two ways in: push a v* tag,
+  # or dispatch the workflow with release_tag set (the release step then
+  # creates that tag via the API, for environments that cannot push tags).
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: [smoke-linux, make-macos, make-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -129,6 +136,8 @@ jobs:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             artifacts/**/*.dmg
