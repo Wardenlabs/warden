@@ -77,8 +77,11 @@ jobs:
 
   make-macos:
     runs-on: macos-14
-    # Notarization waits on Apple's service; give the signed path headroom.
-    timeout-minutes: 60
+    # Apple's notary queue has been observed past an hour on bad days.
+    timeout-minutes: 90
+    # Intel is best-effort: a slow notarization there must not hold the
+    # release hostage. arm64 stays required — it is the deliverable.
+    continue-on-error: ${{ matrix.arch == 'x64' }}
     strategy:
       fail-fast: false
       matrix:
