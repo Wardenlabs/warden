@@ -1,0 +1,159 @@
+# Desktop app: build proof on Linux, installers for macOS and Windows.
+#
+# The Linux job is the cheap, always-on verification loop: it exercises the
+# whole Forge + QVAC-plugin mechanism (bundle, verify, prune, asar-off) and
+# boots the packaged app headless in mock mode. The macOS/Windows jobs produce
+# the actual artifacts; real on-device inference can only be proven by running
+# those on real hardware.
+#
+# macOS universal builds are rejected by the QVAC plugin (native prebuilds are
+# arch-specific), so darwin-arm64 and darwin-x64 are built separately.
+name: desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish installers to this release tag (e.g. v0.1.0). Empty = build only.'
+        required: false
+        default: ''
+  push:
+    branches: [main, claude/native-macos-windows-app-f3evkm]
+    tags: ['v*']
+    paths:
+      - 'desktop/**'
+      - 'forge.config.cjs'
+      - 'qvac.config.json'
+      - 'tsconfig.build.json'
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/copy-dist-assets.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'forge.config.cjs'
+      - 'qvac.config.json'
+      - '.github/workflows/desktop.yml'
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+# The release job publishes installers to GitHub Releases on v* tags.
+permissions:
+  contents: write
+
+jobs:
+  smoke-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Compiled gateway answers in mock mode
+        run: |
+          WARDEN_ADAPTER=mock WARDEN_PORT=18080 node dist/server/index.js &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:18080/health > /dev/null && break; sleep 1; done
+          curl -fs http://127.0.0.1:18080/health | grep -q '"ok":true'
+          curl -fs http://127.0.0.1:18080/api/policy > /dev/null
+          curl -fs http://127.0.0.1:18080/ | grep -qi '<!doctype html>'
+          kill %1
+      - name: Package (linux x64 — exercises the QVAC forge plugin)
+        run: npx electron-forge package --platform=linux --arch=x64
+      - name: Packaged app boots headless in mock mode
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          WARDEN_SMOKE=1 xvfb-run -a out/Warden-linux-x64/Warden --no-sandbox 2>&1 | tee smoke.log
+          grep -q WARDEN_SMOKE_OK smoke.log
+
+  make-macos:
+    runs-on: macos-14
+    # Notarization waits on Apple's service; give the signed path headroom.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    # Present only when the repo has signing secrets configured; forge.config
+    # switches signing/notarization on when it sees them.
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Add the darwin-x64 bare runtime (cross-arch build)
+        if: matrix.arch == 'x64'
+        # npm ci on an arm64 host skips this platform-scoped optional
+        # dependency; the @qvac/* addons themselves ship every arch's
+        # prebuilds inside each package, so only the bare runtime is missing.
+        run: npm install --no-save --force --os=darwin --cpu=x64 bare-runtime-darwin-x64
+      - name: Import signing certificate
+        if: env.MACOS_CERT_P12 != ''
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERT_P12 }}
+          p12-password: ${{ secrets.MACOS_CERT_PASSWORD }}
+      - run: npm run build
+      - run: npx electron-forge make --platform=darwin --arch=${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: warden-darwin-${{ matrix.arch }}
+          path: out/make/**
+          if-no-files-found: error
+
+  make-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-forge make --platform=win32 --arch=x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: warden-win32-x64
+          path: out/make/**
+          if-no-files-found: error
+
+  # Installers land on the repo's Releases page — stable download links
+  # instead of digging through a run's artifacts. Two ways in: push a v* tag,
+  # or dispatch the workflow with release_tag set (the release step then
+  # creates that tag via the API, for environments that cannot push tags).
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    needs: [smoke-linux, make-macos, make-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe

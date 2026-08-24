@@ -35,7 +35,7 @@ export const employeeSchema = z.object({
 export type Employee = z.infer<typeof employeeSchema>;
 
 export const directorySchema = z.object({
-  name: z.string().default('Your company'),
+  name: z.string().default(''),
   description: z.string().default(''),
   roles: z.array(z.string().min(1)).min(1),
   employees: z.array(employeeSchema)
@@ -43,7 +43,7 @@ export const directorySchema = z.object({
 export type Directory = z.infer<typeof directorySchema>;
 
 const EMPTY: Directory = {
-  name: 'Your company',
+  name: '',
   description: '',
   roles: ['admin', 'employee'],
   employees: []
@@ -238,7 +238,7 @@ export function rotateApiKey(id: string): Employee | null {
   return updated;
 }
 
-// ── roles ────────────────────────────────────────────────────────────────────
+// ── roles ──────────────────────────────────────────────────────────────────────
 
 export function roles(): string[] {
   return loadDirectory().roles;
@@ -282,7 +282,7 @@ export function removeRole(role: string): Directory {
   return save({ ...dir, roles: dir.roles.filter((r) => r !== role) });
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────────────────────
 
 /**
  * A readable id derived from the name, because it shows up in audit entries,
@@ -294,7 +294,7 @@ function uniqueId(name: string, taken: string[]): string {
     name
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .split(/\s+/)[0]
       ?.replace(/[^a-z0-9]/g, '') || 'user';
 

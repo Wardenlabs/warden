@@ -14,7 +14,8 @@
  *   npm run redteam -- --reps 3 --class guard-targeted
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { evaluate } from '../guard/pipeline.js';
 import { resetQuotas } from '../guard/quota.js';
 import type { Verdict } from '../guard/types.js';
@@ -24,7 +25,18 @@ import { provenanceLabel } from '../provenance.js';
 import { adapter, isMock } from '../qvac/index.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
-const CORPUS_DIR = 'src/redteam/corpus';
+// Next to this module in both layouts — src/redteam/corpus in a checkout,
+// dist/redteam/corpus in a compiled build (the build step copies it there) —
+// so the runner works whatever the process's working directory is.
+const CORPUS_DIR = fileURLToPath(new URL('./corpus/', import.meta.url));
+
+/**
+ * Corpus attachments are repo-relative paths (data/seed/…). The desktop app
+ * runs this process with its working directory in the user's data folder, so
+ * they resolve against the bundled assets root rather than trusting the cwd.
+ */
+const ASSETS_DIR = process.env['WARDEN_ASSETS_DIR'] ?? process.cwd();
+const resolveAttachment = (p: string): string => (isAbsolute(p) ? p : join(ASSETS_DIR, p));
 
 type Prompt = {
   id: string;
@@ -113,7 +125,7 @@ function loadCorpus(filter?: string): CorpusFile[] {
  * mean every product decision about defaults silently rewrites the benchmark.
  */
 function benchmarkPolicy(): PolicySpec {
-  const path = process.env['WARDEN_BENCHMARK_POLICY'] ?? 'data/seed/benchmark-policy.json';
+  const path = process.env['WARDEN_BENCHMARK_POLICY'] ?? join(ASSETS_DIR, 'data', 'seed', 'benchmark-policy.json');
   const seed = JSON.parse(readFileSync(path, 'utf8')) as {
     rules?: Rule[];
     quotas?: Quota[];
@@ -167,7 +179,7 @@ async function runPrompt(
   } else {
     const decision = await evaluate(
       adapter(),
-      { actor, prompt: text, ...(prompt.attachment ? { attachments: [prompt.attachment] } : {}) },
+      { actor, prompt: text, ...(prompt.attachment ? { attachments: [resolveAttachment(prompt.attachment)] } : {}) },
       policy
     );
     got = decision.verdict;

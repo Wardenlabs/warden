@@ -12,8 +12,10 @@
  * plausible shape, logs that it is a stub, and is replaced in place.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, isMock } from '../qvac/index.js';
 import {
@@ -49,6 +51,19 @@ const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
  */
 const HOST = process.env['WARDEN_HOST'] ?? '0.0.0.0';
 
+/**
+ * Where the read-only pieces that ship with Warden live: web/, integrations/,
+ * data/seed/. In a checkout that is the repo root, resolved from this file's
+ * own location so `npm run dev` (src/server) and `npm start` (dist/server)
+ * both land on it whatever the working directory. The desktop app runs the
+ * server with its working directory pointed at a per-user data folder and
+ * passes the bundle's location here explicitly. Writable state (data/*.json,
+ * warden.local.json) deliberately stays cwd-relative — that is what lets the
+ * same code write next to the repo in dev and into the user's data folder in
+ * the app.
+ */
+const ASSETS = process.env['WARDEN_ASSETS_DIR'] ?? fileURLToPath(new URL('../..', import.meta.url));
+
 const app = express();
 app.use(express.json({ limit: '4mb' }));
 
@@ -74,7 +89,7 @@ if (CORS_ORIGIN) {
 // Seed the demo policy on boot if the store is empty, so a fresh clone has
 // something to show without a manual step.
 try {
-  seedIfEmpty('data/seed/policies.seed.json');
+  seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
 } catch {
   /* seed file not present yet — the store stays empty, which is a valid state */
 }
@@ -141,7 +156,7 @@ app.get('/api/policy', (_req, res) => {
 app.get('/api/policy/presets', (_req, res) => {
   // Served from the preset catalog once present; empty array until then so
   // the console renders an empty catalog rather than erroring.
-  res.json(readSeedJson('data/seed/presets.json', []));
+  res.json(readSeedJson(join(ASSETS, 'data', 'seed', 'presets.json'), []));
 });
 
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
@@ -612,15 +627,35 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   redteamRunning = true;
   const { spawn } = await import('node:child_process');
   const { resolve } = await import('node:path');
-  // Invoke the installed TSX entry point through this exact Node runtime.
-  // Shell launchers (`npx`, `npm.cmd`) differ across platforms and can emit
-  // ENOENT/EINVAL on Windows when spawned without a shell.
+  // A compiled build (npm start, the desktop app) carries the runner as plain
+  // JS next to this file; a source checkout runs the TS through the repo's
+  // installed tsx instead. Either is invoked through this exact runtime,
+  // because shell launchers (`npx`, `npm.cmd`) differ across platforms and can
+  // emit ENOENT/EINVAL on Windows when spawned without a shell.
+  const compiledRunner = fileURLToPath(new URL('../redteam/runner.js', import.meta.url));
   const tsx = resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
-  const child = spawn(process.execPath, [tsx, 'src/redteam/runner.ts'], {
+  const runnerArgs = existsSync(compiledRunner)
+    ? [compiledRunner]
+    : existsSync(tsx)
+      ? [tsx, 'src/redteam/runner.ts']
+      : null;
+  if (!runnerArgs) {
+    redteamRunning = false;
+    return res.status(501).json({ error: 'the red-team runner is not part of this build' });
+  }
+  const child = spawn(process.execPath, runnerArgs, {
     cwd: process.cwd(),
     // The runner is a second process; sharing the server's audit file would
     // interleave two hash chains and "break" the log from ordinary use.
-    env: { ...process.env, WARDEN_AUDIT_PATH: 'data/audit-redteam.jsonl' },
+    // ELECTRON_RUN_AS_NODE is inert under plain Node and makes the Electron
+    // binary behave as Node when the gateway runs inside the desktop app.
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      WARDEN_AUDIT_PATH: 'data/audit-redteam.jsonl',
+      WARDEN_BENCHMARK_POLICY:
+        process.env['WARDEN_BENCHMARK_POLICY'] ?? join(ASSETS, 'data', 'seed', 'benchmark-policy.json')
+    },
     stdio: 'ignore',
     detached: false,
     windowsHide: true
@@ -676,7 +711,7 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
  */
 app.get('/warden-hook.mjs', (_req, res) => {
   try {
-    res.type('application/javascript').send(readFileSync('integrations/warden-hook.mjs', 'utf8'));
+    res.type('application/javascript').send(readFileSync(join(ASSETS, 'integrations', 'warden-hook.mjs'), 'utf8'));
   } catch {
     res.status(404).json({ error: 'hook file not found next to the server' });
   }
@@ -745,7 +780,14 @@ echo "Setup per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
 });
 
 // ── static console ───────────────────────────────────────────────────────────
-app.use(express.static('web'));
+app.use(express.static(join(ASSETS, 'web')));
+
+/**
+ * Warmth of the models `preloadModels` owns. `cold` covers mock mode and
+ * WARDEN_WARMUP=0 as well as "not started yet" — the desktop splash treats
+ * anything other than `loading` as "stop waiting and open the console".
+ */
+let modelState: 'cold' | 'loading' | 'ready' | 'failed' = 'cold';
 
 // `mode` is surfaced for the same reason `mock` is: a gateway running with the
 // guard switched off (`WARDEN_MODE=baseline`) must not present an identical
@@ -754,11 +796,12 @@ app.get('/health', (_req, res) =>
   res.json({
     ok: true,
     mock: isMock(),
-    mode: process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden'
+    mode: process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden',
+    models: modelState
   })
 );
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`\nWarden  (adapter=${isMock() ? 'mock' : 'real'})`);
   console.log(`  local     http://localhost:${PORT}`);
   for (const ip of lanAddresses()) {
@@ -767,6 +810,45 @@ app.listen(PORT, HOST, () => {
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);
   preloadModels();
+});
+
+/**
+ * Exit paths. The QVAC worker is a separate OS process the SDK spawns; exiting
+ * without `shutdown()` leaves it orphaned — which is exactly what a plain
+ * Ctrl-C did until now. The desktop app depends on this handler too: it asks
+ * for a graceful stop (message or SIGTERM), waits a few seconds, then
+ * force-kills whatever is left.
+ */
+let exiting = false;
+function gracefulExit(): void {
+  if (exiting) return;
+  exiting = true;
+  server.close();
+  const finish = (): void => process.exit(0);
+  // A wedged model unload must not outlive the desktop app's five-second
+  // patience — leaving cleanly at four beats being force-killed at five.
+  setTimeout(finish, 4000).unref();
+  if (isMock()) {
+    finish();
+    return;
+  }
+  void import('../qvac/client.js')
+    .then(({ shutdown }) => shutdown())
+    .catch(() => undefined)
+    .then(finish);
+}
+process.on('SIGTERM', gracefulExit);
+process.on('SIGINT', gracefulExit);
+// Under Electron's utilityProcess the desktop shell owns a message channel to
+// this process. Plain Node has no `parentPort`, so it is feature-detected, and
+// Electron wraps each message in a MessageEvent while a bare value is accepted
+// too in case that wrapper ever changes.
+const parentPort = (
+  process as unknown as { parentPort?: { on: (ev: 'message', fn: (msg: unknown) => void) => void } }
+).parentPort;
+parentPort?.on('message', (msg) => {
+  const data = msg && typeof msg === 'object' && 'data' in msg ? (msg as { data: unknown }).data : msg;
+  if (data === 'shutdown') gracefulExit();
 });
 
 /**
@@ -793,13 +875,16 @@ function preloadModels(): void {
   if (isMock() || process.env['WARDEN_WARMUP'] === '0') return;
 
   const started = Date.now();
+  modelState = 'loading';
   console.log('  models    preloading adjudicator + embedder…');
   void import('../qvac/client.js')
     .then(({ warmup }) => warmup(['adjudicator', 'embedder']))
     .then(() => {
+      modelState = 'ready';
       console.log(`  models    ready in ${((Date.now() - started) / 1000).toFixed(1)}s — decisions are warm\n`);
     })
     .catch((err: unknown) => {
+      modelState = 'failed';
       console.error(
         `  models    preload failed (${err instanceof Error ? err.message : String(err)}).` +
         ' The first request will load them instead, and will be slow.\n'
