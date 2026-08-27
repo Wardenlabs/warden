@@ -29,7 +29,7 @@ the repo:
 
 ```bash
 curl -o ~/.warden-hook.mjs \
-  https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs
+  https://raw.githubusercontent.com/Wardenlabs/warden/main/integrations/warden-hook.mjs
 chmod +x ~/.warden-hook.mjs
 ```
 

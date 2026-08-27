@@ -28,8 +28,8 @@ Necesitás ~3 GB libres para los modelos.
 ## 1. Bajar y preparar
 
 ```bash
-git clone https://github.com/MartinPuli/operations-aleph
-cd operations-aleph
+git clone https://github.com/Wardenlabs/warden
+cd warden
 git checkout main
 npm install
 npm run setup

@@ -17,8 +17,8 @@ tiene los modelos; las demás sólo bajan un archivo de 4 KB.
 # Parte 1 — El admin (una vez)
 
 ```bash
-git clone https://github.com/MartinPuli/operations-aleph
-cd operations-aleph
+git clone https://github.com/Wardenlabs/warden
+cd warden
 npm ci
 npm run setup
 npm run dev

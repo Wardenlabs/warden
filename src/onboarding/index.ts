@@ -78,7 +78,7 @@ const HOOK_PATH = '~/.warden-hook.mjs';
 export function publicHookUrl(): string {
   return (
     process.env['WARDEN_HOOK_URL'] ??
-    'https://raw.githubusercontent.com/MartinPuli/operations-aleph/main/integrations/warden-hook.mjs'
+    'https://raw.githubusercontent.com/Wardenlabs/warden/main/integrations/warden-hook.mjs'
   );
 }
 

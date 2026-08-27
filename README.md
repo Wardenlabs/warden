@@ -118,8 +118,8 @@ Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK scri
 Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-IT.md)**.
 
 ```bash
-git clone https://github.com/MartinPuli/operations-aleph
-cd operations-aleph
+git clone https://github.com/Wardenlabs/warden
+cd warden
 npm ci
 npm run setup
 npm run dev
@@ -635,24 +635,24 @@ searching for the call rather than trusting a number, and refuses to emit links
 for a commit that has not been pushed.
 
 <!-- permalinks:start -->
-Pinned to [`b854bb800dac`](https://github.com/MartinPuli/operations-aleph/tree/b854bb800dacbdcd52917d034416d9697273f603). Line numbers move; a commit does not.
+Pinned to [`b854bb800dac`](https://github.com/Wardenlabs/warden/tree/b854bb800dacbdcd52917d034416d9697273f603). Line numbers move; a commit does not.
 
 | Where | What runs there |
 |---|---|
-| [`src/qvac/types.ts L69-L95`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
-| [`src/qvac/real.ts L16`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
-| [`src/qvac/real.ts L150-L175`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L150-L175) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
-| [`src/qvac/real.ts L118`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L118) | `embed()` — the vectors behind rule retrieval, under a hard deadline. |
-| [`src/qvac/real.ts L129-L130`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L129-L130) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
-| [`src/qvac/client.ts L169-L176`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/client.ts#L169-L176) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator — under the deadline that covers the download too. |
-| [`src/qvac/models.ts L12-L19`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
-| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
-| [`src/guard/output.ts L83`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/output.ts#L83) | The same judgement, applied to what the model *answered*. Output-scoped rules only, on the proxy path. |
-| [`src/policy/compile.ts L94-L104`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
-| [`src/guard/rewrite.ts L233-L247`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/rewrite.ts#L233-L247) | The one generation an employee reads — off the decision path, on request, and re-judged by the full guard before it is shown. |
-| [`src/policy/index.ts L94`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
-| [`src/guard/pipeline.ts L76`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
-| [`src/guard/aggregate.ts L70`](https://github.com/MartinPuli/operations-aleph/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/aggregate.ts#L70) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
+| [`src/qvac/types.ts L69-L95`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
+| [`src/qvac/real.ts L16`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
+| [`src/qvac/real.ts L150-L175`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L150-L175) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
+| [`src/qvac/real.ts L118`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L118) | `embed()` — the vectors behind rule retrieval, under a hard deadline. |
+| [`src/qvac/real.ts L129-L130`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L129-L130) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
+| [`src/qvac/client.ts L169-L176`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/client.ts#L169-L176) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator — under the deadline that covers the download too. |
+| [`src/qvac/models.ts L12-L19`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
+| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
+| [`src/guard/output.ts L83`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/output.ts#L83) | The same judgement, applied to what the model *answered*. Output-scoped rules only, on the proxy path. |
+| [`src/policy/compile.ts L94-L104`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
+| [`src/guard/rewrite.ts L233-L247`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/rewrite.ts#L233-L247) | The one generation an employee reads — off the decision path, on request, and re-judged by the full guard before it is shown. |
+| [`src/policy/index.ts L94`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
+| [`src/guard/pipeline.ts L76`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
+| [`src/guard/aggregate.ts L70`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/aggregate.ts#L70) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
 <!-- permalinks:end -->
 
 ### Models and capabilities used
