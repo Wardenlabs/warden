@@ -8,7 +8,7 @@ its place doing.
 |---|---|
 | `index.html` | Structure and copy. The mark and wordmark are inlined from `brand/`, path for path. |
 | `styles.css` | The whole design system. `:root` first, then everything that reads from it. |
-| `app.js` | The prompt that types itself in the hero, reveal-on-scroll, the count-up on the two headline numbers, and naming the visitor's platform on the download button. |
+| `app.js` | The prompt that types itself in the hero, reveal-on-scroll, the count-up on the two headline numbers, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
 | `light.js` | The light: the gate line under the hero, on a canvas. Nothing else imports from it and it touches nothing outside `.hero-zone`. |
 
 ## Why four files and not one
