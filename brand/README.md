@@ -8,6 +8,7 @@ source file, so there is one place to change if the logo changes.
 | `warden-lockup-source.png` | The original raster the logo was delivered as. Provenance only — nothing reads it. | — |
 | `warden-mark.svg` | Shield + W alone, `fill="currentColor"`, square viewBox, holes as `fill-rule="evenodd"`. 2.3 KB. | Inlined in `web/index.html` header |
 | `warden-lockup.svg` | Mark + "warden" wordmark, `fill="currentColor"`. 5.7 KB. | The master for anything that can set its own colour |
+| `warden-wordmark.svg` | The wordmark alone, no shield, `fill="currentColor"`, tight viewBox. | Anywhere the mark already appears separately |
 | `warden-lockup-light.svg` | Lockup with `#141414` baked in. | `README.md`, light backgrounds |
 | `warden-lockup-dark.svg` | Lockup with `#f0f0f2` baked in. | `README.md` dark mode, dark backgrounds |
 | `warden-favicon.svg` | The mark knocked out of a dark rounded square. | Inlined as a data URI in `web/index.html` |
@@ -23,7 +24,15 @@ Submission forms, slide decks, and app stores. All of them are rendered from
 | `warden-lockup-on-white.png` | 2400 x 879 | white |
 | `warden-lockup-on-dark.png` | 2400 x 879 | `#17181c` |
 | `warden-mark.png` | 1024 x 1024 | transparent |
+| `warden-wordmark.png` | 2400 x 490 | transparent |
+| `warden-wordmark-on-white.png` | 2400 x 490 | white |
+| `warden-wordmark-on-dark.png` | 2400 x 490 | `#17181c` |
 | `warden-icon-512/180/32/16.png` | square | the dark badge |
+
+The wordmark set was cut from `warden-lockup.svg` rather than re-traced: the
+last six paths are the letters, and their tight box came from `getBBox()` in a
+headless browser. Deriving it from the lockup is the point — a wordmark redrawn
+on its own is a second source of truth that drifts from the first.
 
 Transparency was recovered by mapping luminance to alpha (`alpha = 255 - L`),
 which is exact here and only here: the render is pure greyscale black on pure
