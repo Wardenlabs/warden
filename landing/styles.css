@@ -1,0 +1,791 @@
+/*
+ * Warden — landing.
+ *
+ * The token block below is the console's dark palette from web/index.html,
+ * on a deeper ground: the landing is dark by design, not by preference, so
+ * dark is :root and there is no light theme. Everything after the "landing
+ * only" comment is an addition. The rule the console states holds here too:
+ * no literal colour and no literal font-size appears outside :root.
+ *
+ * The light is the one idea this page adds. Warden is a gate, so the hero
+ * has one: a hairline below the call to action, drawn on a canvas so it can
+ * emit rather than just sit there. It is warm white while prompts pass and
+ * turns the verdict's coral when one is blocked. The seam is `.hero-zone
+ * canvas.scene`, `.gate`, and light.js. Swap those and nothing else on this
+ * page knows the difference.
+ */
+
+:root {
+  /* ── surfaces: the console's dark set, one step deeper so the light has
+        somewhere to go ─────────────────────────────────────────────────── */
+  --bg:       #050507;
+  --sunken:   #0b0c0f;
+  --hover:    #101115;
+  --selected: #16171c;
+
+  /* ── lines ─────────────────────────────────────────────────────────── */
+  --line-soft: #111216;
+  --line:      #1a1c21;
+  --line-firm: #2a2d34;
+
+  /* ── ink ───────────────────────────────────────────────────────────── */
+  --ink:   #f0f0f2;
+  --ink-2: #c3c6cd;
+  --muted: #8d919a;
+  --faint: #63676f;
+
+  /* ── accent: near-white, the only high-contrast thing here ─────────── */
+  --accent:       #f0f0f2;
+  --accent-hover: #ffffff;
+  --accent-ink:   #050507;
+  --accent-line:  #3c3f47;
+
+  /* ── verdict: the only saturated colour in the product ─────────────── */
+  --allow:       #55b483;
+  --allow-bg:    #12241b;
+  --block:       #ef6b70;
+  --block-bg:    #2a1416;
+  --escalate:    #d29b34;
+  --escalate-bg: #291f0e;
+
+  /* ── type ──────────────────────────────────────────────────────────── */
+  --fs-1: 11px;   /* uppercase labels, mono metadata */
+  --fs-2: 12px;   /* secondary text, captions, chips */
+  --fs-3: 13px;   /* body — the workhorse */
+  --fs-4: 15px;   /* the plain-language line */
+  --fs-5: 26px;   /* section heads */
+  --fs-6: 30px;   /* statistics */
+  --fs-7: 40px;   /* display — landing only */
+  --fs-8: 56px;   /* hero — landing only */
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semi:   590;
+
+  --lh-tight: 1.25;
+  --lh-snug:  1.45;
+  --lh-body:  1.6;
+
+  --ls-label: .06em;
+  --ls-tight: -.011em;
+  --ls-display: -.022em;
+
+  /* ── space ─────────────────────────────────────────────────────────── */
+  --s-1: 4px;  --s-2: 6px;  --s-3: 8px;  --s-4: 12px;
+  --s-5: 16px; --s-6: 20px; --s-7: 28px; --s-8: 40px; --s-9: 64px;
+  --s-10: 96px;
+
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+
+  --read:  880px;
+  --prose: 68ch;
+
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* ══ landing only ═══════════════════════════════════════════════════ */
+
+  /* Type below the console's floor. A marketing page renders the product
+     at a quarter size, and the console has no tier for that. */
+  --fs-0:  9px;
+  --fs-05: 10px;
+
+  /* And above its ceiling. Fluid, because a 78px headline on a phone is
+     not a headline. */
+  --fs-9:  clamp(40px, 5vw, 72px);     /* hero */
+  --fs-h2: clamp(27px, 3.9vw, 44px);   /* section heads */
+  --fs-stat: clamp(44px, 7vw, 84px);   /* the count-up numerals */
+  --fs-h3: clamp(24px, 3.3vw, 34px);   /* a feature's claim */
+  --fs-sub: 16px;                      /* the hero's one sentence under the headline */
+
+  --ls-hero: -.02em;
+  --lh-hero: 1.05;
+
+  --s-11: 128px;  --s-12: 168px;
+  --r-xl: 16px;   --r-2xl: 22px;
+
+  --wide: 1140px;
+  --guide-w: 1px;
+
+  /* Mono renders optically larger than the sans at the same px. This is the
+     correction, not a size choice, which is why it is a ratio. */
+  --fs-mono-adj: .94em;
+
+  /* Light. light.js reads these off :root and draws with them, so the gate
+     is the same coral as the verdict chip and its floor is exactly --bg. */
+  --gate: #fff5e6;     /* the line while prompts pass: warm white */
+  --beam: #2f3644;     /* the edge light that travels a surface's top */
+  --gate-fallback: #fff5e6bf;  /* the line when there is no WebGL: the same white, at the alpha the canvas would render it */
+  --gate-fallback-block: #ef6b70cc;
+}
+
+/* ═══ base ═══════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-4);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-tight);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, p, figure, pre, table { margin: 0; }
+a { color: inherit; }
+svg { display: block; }
+::selection { background: var(--selected); }
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+/* ═══ layout ═════════════════════════════════════════════════════════════ */
+
+.wrap {
+  width: 100%;
+  max-width: var(--wide);
+  margin-inline: auto;
+  padding-inline: var(--s-6);
+  position: relative;
+}
+
+/* The vertical guides that run the length of the page. Vercel's grid system
+   is DOM elements with a 1px border, not a canvas; this is the same idea at
+   the only scale this page needs — the container edge itself is the guide. */
+@media (min-width: 900px) {
+  .rails > .wrap {
+    border-inline: var(--guide-w) solid var(--line);
+    padding-inline: var(--s-8);
+  }
+}
+
+section { position: relative; padding-block: var(--s-11); border-top: var(--guide-w) solid var(--line); }
+
+@media (max-width: 700px) { section { padding-block: var(--s-9); } }
+
+.stack   { display: grid; gap: var(--s-5); }
+.two     { display: grid; gap: var(--s-5); }
+@media (min-width: 860px) { .two { grid-template-columns: 1fr 1fr; } }
+
+/* ═══ type ═══════════════════════════════════════════════════════════════ */
+
+.label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  font-size: var(--fs-9);
+  font-weight: var(--fw-normal);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--ls-hero);
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+  text-wrap: balance;
+}
+
+h3 {
+  font-size: var(--fs-4);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-tight);
+}
+
+.sec-head { max-width: var(--read); display: grid; gap: var(--s-4); margin-bottom: var(--s-9); }
+.sec-head p { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-body); max-width: var(--prose); }
+
+.lead { font-size: var(--fs-4); color: var(--muted); }
+.mono { font-family: var(--mono); font-size: var(--fs-mono-adj); }
+.dim  { color: var(--faint); }
+
+a.link { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line-firm); }
+a.link:hover { border-bottom-color: var(--ink); }
+
+/* ═══ buttons and pills ══════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: 40px;
+  padding-inline: var(--s-5);
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font-size: var(--fs-3);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-tight);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.btn svg { width: 15px; height: 15px; }
+
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary .sz { font-family: var(--mono); font-size: var(--fs-1); opacity: .55; }
+
+.btn-secondary { background: var(--bg); color: var(--ink); border-color: var(--line-firm); }
+.btn-secondary:hover { background: var(--hover); }
+
+.btn-sm { height: 32px; padding-inline: var(--s-4); font-size: var(--fs-2); }
+
+/* The announcement pill. Both references open with one; it is the page's
+   only place for something that changes week to week. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: 30px;
+  padding-inline: var(--s-4) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  font-size: var(--fs-2);
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease;
+}
+.pill:hover { border-color: var(--line-firm); background: var(--hover); }
+.pill .chev { color: var(--faint); font-size: var(--fs-2); }
+.pill .tag {
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 2px var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--allow);
+  flex: none;
+}
+.dot-live { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+  50%      { box-shadow: 0 0 0 4px var(--allow-bg); opacity: .75; }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 22px;
+  padding-inline: var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chip-block { background: var(--block-bg); border-color: transparent; color: var(--block); }
+.chip-allow { background: var(--allow-bg); border-color: transparent; color: var(--allow); }
+.chip-escalate { background: var(--escalate-bg); border-color: transparent; color: var(--escalate); }
+
+/* ═══ header ═════════════════════════════════════════════════════════════ */
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+}
+header .bar { display: flex; align-items: center; justify-content: space-between; height: 56px; gap: var(--s-6); }
+.brand { display: flex; align-items: center; gap: var(--s-3); color: var(--ink); text-decoration: none; }
+.brand .mark { width: 19px; height: 19px; }
+.brand .word { height: 13px; width: auto; }
+header nav { display: flex; align-items: center; gap: var(--s-6); }
+header nav a { font-size: var(--fs-3); color: var(--muted); text-decoration: none; transition: color .15s ease; }
+header nav a:hover { color: var(--ink); }
+header nav .btn { color: var(--accent-ink); }
+@media (max-width: 760px) { .hide-sm { display: none; } header nav { gap: var(--s-5); } }
+
+/* ═══ the light ══════════════════════════════════════════════════════════ */
+/*
+ * A canvas under the whole hero zone, and one empty 1px element — the gate —
+ * that marks where on it the line is drawn. Both decorative, both aria-hidden;
+ * nothing in the document depends on them rendering. When there is no WebGL
+ * the canvas is dropped and the gate draws itself.
+ */
+
+.hero-zone canvas.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gate {
+  grid-area: gate;
+  align-self: end;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 1px;
+  pointer-events: none;
+}
+/* the prompt and the line share a cell: the line at its floor, the prompt
+   just above it */
+.judge { align-self: end; padding-bottom: var(--s-6); }
+
+.hero-zone.nogl canvas.scene { display: none; }
+.hero-zone.nogl .gate {
+  background: linear-gradient(90deg, transparent, var(--gate-fallback) 30%, var(--gate-fallback) 70%, transparent);
+  transition: background .6s ease;
+}
+.hero-zone.nogl.judged .gate {
+  background: linear-gradient(90deg, transparent, var(--gate-fallback-block) 30%, var(--gate-fallback-block) 70%, transparent);
+}
+
+/* ═══ hero ═══════════════════════════════════════════════════════════════ */
+/*
+ * The first screen, and three things on it: what Warden claims, what to do
+ * about it, and a prompt arriving at the gate. Read, act, watch — in that
+ * order down the page. The vertical is proportional, not padded: the copy
+ * sits in the upper third, the gate near the bottom, and the big air is
+ * between the CTA and the prompt, where the eye needs to travel. No rails
+ * through it — the light is the only line here.
+ */
+
+.hero-zone { min-height: calc(clamp(640px, 100vh, 920px) - 56px); display: grid; grid-template-columns: minmax(0, 1fr); }
+.hero-zone > .hero.wrap { border-inline: 0; }
+.hero {
+  position: relative; z-index: 1;
+  display: grid;
+  /* one column, the container's width — an implicit column would size itself
+     to the prompt's max-content and push the whole stack off a phone */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 3fr auto 3fr auto 2fr;
+  grid-template-areas: "." "copy" "." "gate" ".";
+  justify-items: center;
+  text-align: center;
+}
+.hero > * { position: relative; }
+.hero .copy { grid-area: copy; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; }
+.hero h1 { max-width: 15ch; margin-inline: auto; }
+.hero .sub {
+  margin: var(--s-6) auto 0;
+  max-width: 72ch;
+  font-size: var(--fs-sub);
+  color: var(--muted);
+  line-height: var(--lh-body);
+  text-wrap: balance;
+}
+
+/* The prompt being judged. One line of mono that types itself, is judged,
+   and starts over; the gate below takes the verdict. The headline and the
+   sub are one thought and sit close; this gets its own zone. */
+.judge {
+  grid-area: gate;
+  font-family: var(--mono);
+  font-size: var(--fs-4);
+  color: var(--ink);
+  min-height: 1.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+}
+.judge .gt { color: var(--faint); margin-right: .6em; }
+.judge .cur {
+  display: inline-block;
+  width: .6em;
+  height: 1.15em;
+  background: var(--ink-2);
+  margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+.judge .verdict { margin-left: 1.2em; color: var(--block); font-weight: var(--fw-medium); opacity: 0; transition: opacity .5s ease; }
+.judge .verdict .rule { color: var(--muted); }
+.judge.judged .verdict { opacity: 1; }
+.judge.judged .cur { display: none; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.hero .cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-6); justify-content: center; margin-top: var(--s-8); }
+.hero .cta .src { font-size: var(--fs-3); color: var(--muted); text-decoration: none; transition: color .15s ease; }
+.hero .cta .src:hover { color: var(--ink); }
+
+@media (max-width: 700px) {
+  .hero-zone { min-height: 0; }
+  .hero { grid-template-rows: var(--s-9) auto var(--s-10) auto var(--s-9); }
+  .hero .cta .btn { flex: 1 1 100%; justify-content: center; }
+  /* the verdict takes its own line on a phone rather than leaving the screen */
+  .judge { font-size: var(--fs-2); white-space: normal; flex-wrap: wrap; row-gap: var(--s-2); }
+  .judge .verdict { flex: 1 1 100%; margin-left: 0; }
+}
+
+/* ═══ product surfaces ═══════════════════════════════════════════════════ */
+/*
+ * The mockups are DOM, not screenshots — which is why --fs-0 exists. Both
+ * references do this and it is the single thing that makes a marketing page
+ * look like it was made by the people who made the product.
+ */
+
+.ui {
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--bg);
+  overflow: hidden;
+  position: relative;
+}
+
+/* A light that travels the top edge once the surface is on screen. Vercel
+   does this with offset-path; a moving background is cheaper and reads the
+   same at 1px tall. */
+.ui-lit::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--beam) 22%, var(--ink-2) 50%, var(--beam) 78%, transparent 100%);
+  background-size: 220% 100%;
+  animation: edge-light 7s linear infinite;
+  opacity: .55;
+}
+@keyframes edge-light {
+  from { background-position: 130% 0; }
+  to   { background-position: -130% 0; }
+}
+
+.ui-chrome {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: 34px;
+  padding-inline: var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--sunken);
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ui-chrome .spacer { margin-left: auto; }
+.ui-body { padding: var(--s-6); display: grid; gap: var(--s-5); }
+.ui-split { display: grid; }
+@media (min-width: 760px) { .ui-split { grid-template-columns: 220px 1fr; } .ui-split > * + * { border-left: 1px solid var(--line); } }
+
+.ui-list { display: grid; }
+.ui-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-2);
+}
+.ui-item:last-child { border-bottom: 0; }
+.ui-item.on { background: var(--hover); }
+.ui-item .t {
+  color: var(--ink);
+  letter-spacing: var(--ls-tight);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-item .m { font-family: var(--mono); font-size: var(--fs-0); color: var(--faint); }
+
+.avatar {
+  width: 20px; height: 20px;
+  border-radius: var(--r-pill);
+  background: var(--selected);
+  color: var(--ink-2);
+  display: grid; place-items: center;
+  font-size: var(--fs-0);
+  font-weight: var(--fw-semi);
+  flex: none;
+}
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-5); font-family: var(--mono); font-size: var(--fs-1); }
+.kv dt { color: var(--faint); letter-spacing: var(--ls-label); text-transform: uppercase; }
+.kv dd { margin: 0; color: var(--ink-2); }
+
+/* ═══ sections ═══════════════════════════════════════════════════════════ */
+
+/* ── the surfaces strip: social proof, except the proof is integrations ── */
+.strip { padding-block: var(--s-8); }
+.strip p { text-align: center; font-size: var(--fs-2); color: var(--faint); margin-bottom: var(--s-7); }
+.strip ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: var(--s-4) var(--s-9);
+}
+.strip li {
+  display: flex; align-items: center; gap: var(--s-3);
+  font-size: var(--fs-3); color: var(--muted);
+  letter-spacing: var(--ls-tight);
+}
+.strip li .how {
+  font-family: var(--mono); font-size: var(--fs-0);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--faint);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 1px var(--s-2);
+}
+
+/* ── the argument: two columns, one number each ─────────────────────────── */
+.versus { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
+@media (min-width: 760px) { .versus { grid-template-columns: 1fr 1fr; } }
+.versus > div { padding: var(--s-8); display: grid; gap: var(--s-3); align-content: start; }
+.versus > div + div { border-top: 1px solid var(--line); }
+@media (min-width: 760px) { .versus > div + div { border-top: 0; border-left: 1px solid var(--line); } }
+.versus .who { font-family: var(--mono); font-size: var(--fs-1); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted); }
+.versus .n {
+  font-size: var(--fs-stat);
+  font-weight: var(--fw-semi);
+  line-height: 1;
+  letter-spacing: var(--ls-hero);
+  font-variant-numeric: tabular-nums;
+}
+.versus .cap { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); max-width: 34ch; }
+.versus .win { background: var(--bg); }
+.versus .win .n { color: var(--ink); }
+.versus .baseline { background: var(--sunken); }
+.versus .baseline .n, .versus .baseline .who { color: var(--faint); }
+.versus b { font-weight: var(--fw-semi); color: var(--ink-2); }
+.versus-note { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); max-width: var(--prose); }
+.versus-note a { color: var(--muted); }
+
+/* ── feature blocks: eyebrow, claim, one sentence, a surface ───────────── */
+.feat { display: grid; gap: var(--s-8); align-items: center; }
+@media (min-width: 940px) {
+  .feat { grid-template-columns: minmax(0, 390px) minmax(0, 1fr); gap: var(--s-10); }
+  .feat.flip { grid-template-columns: minmax(0, 1fr) minmax(0, 390px); }
+  .feat.flip > .feat-copy { order: 2; }
+}
+.feat + .feat { margin-top: var(--s-10); padding-top: var(--s-10); border-top: 1px solid var(--line); }
+.feat-copy { display: grid; gap: var(--s-4); align-content: start; }
+.feat-copy h2 { font-size: var(--fs-7); }
+.feat-copy p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
+.feat-copy .bul { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: var(--s-3); }
+.feat-copy .bul li { display: grid; grid-template-columns: auto 1fr; gap: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
+.feat-copy .bul svg { width: 14px; height: 14px; margin-top: 4px; color: var(--faint); }
+
+/* ── the refusal, rendered as the employee sees it ─────────────────────── */
+.term {
+  font-family: var(--mono);
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  white-space: pre-wrap;
+  padding: var(--s-7);
+  color: var(--ink-2);
+  background: var(--sunken);
+  margin: 0;
+  overflow-x: auto;
+}
+.term .you  { color: var(--faint); }
+.term .stop { color: var(--block); font-weight: var(--fw-semi); }
+.term .rule { color: var(--ink); }
+.term .ok   { color: var(--allow); }
+.term .dim  { color: var(--faint); }
+
+/* ── numbers ───────────────────────────────────────────────────────────── */
+.tbl { border: 1px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
+thead th {
+  text-align: left; padding: var(--s-4) var(--s-6);
+  font-family: var(--mono); font-size: var(--fs-1);
+  letter-spacing: var(--ls-label); text-transform: uppercase;
+  font-weight: var(--fw-medium); color: var(--muted);
+  background: var(--sunken); border-bottom: 1px solid var(--line);
+}
+tbody td { padding: var(--s-4) var(--s-6); border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+tbody tr:last-child td { border-bottom: 0; }
+td b { font-weight: var(--fw-medium); color: var(--ink); }
+th.n, td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.n { color: var(--ink-2); }
+
+.rows { display: grid; gap: var(--s-5); }
+.row {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-7);
+  display: grid; gap: var(--s-3); align-content: start;
+  background: var(--bg);
+  transition: border-color .18s ease, background .18s ease;
+}
+.row:hover { border-color: var(--line-firm); background: var(--sunken); }
+.row .tag {
+  justify-self: start;
+  font-family: var(--mono); font-size: var(--fs-0);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px var(--s-2);
+}
+.row p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
+
+/* ── the honest section. Same visual weight as everything else, on purpose ─ */
+#honest { background: var(--sunken); }
+.candid {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--escalate);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  padding: var(--s-8);
+  display: grid; gap: var(--s-4);
+  max-width: var(--read);
+}
+.candid h3 { font-size: var(--fs-5); letter-spacing: var(--ls-display); }
+.candid p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
+.candid code { font-family: var(--mono); font-size: var(--fs-mono-adj); background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px 4px; color: var(--ink-2); }
+.candid a { color: var(--ink-2); }
+
+/* ── download ──────────────────────────────────────────────────────────── */
+.dl { display: grid; gap: var(--s-4); }
+@media (min-width: 700px) { .dl { grid-template-columns: 1fr 1fr; } }
+.dl a {
+  display: flex; align-items: center; gap: var(--s-5);
+  padding: var(--s-6) var(--s-7);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  text-decoration: none; background: var(--bg);
+  transition: border-color .18s ease, background .18s ease;
+}
+.dl a:hover { border-color: var(--line-firm); background: var(--sunken); }
+.dl svg { width: 26px; height: 26px; color: var(--ink); flex: none; }
+.dl .t { display: block; font-size: var(--fs-4); font-weight: var(--fw-medium); }
+.dl .m { display: block; font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); margin-top: 2px; }
+
+.cmd {
+  font-family: var(--mono); font-size: var(--fs-2); line-height: var(--lh-snug);
+  background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--s-6); color: var(--ink-2); overflow-x: auto;
+  margin-top: var(--s-4);
+}
+
+/* ── footer ────────────────────────────────────────────────────────────── */
+footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size: var(--fs-2); color: var(--muted); }
+.foot { display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: space-between; align-items: center; }
+.foot a { color: var(--muted); text-decoration: none; }
+.foot a:hover { color: var(--ink); }
+.foot nav { display: flex; flex-wrap: wrap; gap: var(--s-5); }
+
+/* ═══ motion ═════════════════════════════════════════════════════════════ */
+
+/* Gated on .js — set by an inline statement in <head>. The hidden state is
+   only safe to apply when something exists to remove it. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .6s cubic-bezier(.22,.61,.36,1), transform .6s cubic-bezier(.22,.61,.36,1);
+  transition-delay: var(--reveal-delay, 0s);
+}
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .js [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .judge .cur,
+  .ui-lit::before,
+  .dot-live { animation: none; }
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* ═══ pieces the sections above call for ═════════════════════════════════ */
+
+.hero-zone { position: relative; overflow: hidden; }
+.hero-surface { margin-top: var(--s-9); }
+.hero-surface { position: relative; z-index: 1; padding-bottom: var(--s-11); }
+
+/* the verdict panel in the hero surface */
+.verdict-head { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.verdict-rule {
+  font-size: var(--fs-3);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  letter-spacing: var(--ls-tight);
+  max-width: 52ch;
+}
+
+/* the pipeline */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; }
+.steps li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-6);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-2);
+  color: var(--ink-2);
+}
+.steps li:last-child { border-bottom: 0; }
+.steps .stepn {
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  font-family: var(--mono); font-size: var(--fs-0); color: var(--muted);
+  flex: none;
+}
+.steps .m { font-family: var(--mono); font-size: var(--fs-0); color: var(--faint); white-space: nowrap; }
+.steps .never { background: var(--sunken); color: var(--faint); }
+.steps .never .stepn { border-style: dashed; }
+
+/* the audit list foot */
+.ui-foot {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-4) var(--s-6);
+  border-top: 1px solid var(--line);
+  background: var(--sunken);
+  font-family: var(--mono); font-size: var(--fs-0);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.hashes .m { font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); }
+.hashes .t { font-size: var(--fs-2); color: var(--ink-2); }
+
+/* The refusal sits in a surface, so it loses the surface's own padding. */
+.ui > .term { border-radius: 0; }
+
+/* A feature headline is a claim, not the page's headline. */
+.feat-copy h2 { font-size: var(--fs-h3); }
+
+.gap-t   { margin-top: var(--s-5); }
+.gap-t-l { margin-top: var(--s-9); }
+.note    { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); }
+.dot-off { background: var(--line-firm); }
+
+/* ── responsive trims ──────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .hero-surface { padding-bottom: var(--s-9); }
+  .feat + .feat { margin-top: var(--s-9); padding-top: var(--s-9); }
+  .ui-body { padding: var(--s-5); }
+  .term { padding: var(--s-5); font-size: var(--fs-1); }
+  .steps li, .ui-item { padding-inline: var(--s-5); }
+  .strip ul { gap: var(--s-4) var(--s-6); }
+}
