@@ -42,7 +42,7 @@ whether anyone leaves it switched on.
 > controls count as false positives for the same reason.
 >
 > `OCR_LATIN` resolves to `registry://s3/...` rather than HuggingFace, so
-> `npm run setup` cannot fetch it over HTTPS and it arrives only over the
+> `pnpm run setup` cannot fetch it over HTTPS and it arrives only over the
 > P2P registry. Compare this class against another run only if that run
 > reports the same count.
 
@@ -206,8 +206,8 @@ their place.
 ## Reproducing this
 
 ```bash
-npm install && npm run setup       # downloads models, verifies inference
-npm run redteam -- --reps 3        # regenerates this file
+pnpm install && pnpm run setup       # downloads models, verifies inference
+pnpm run redteam -- --reps 3        # regenerates this file
 ```
 
 **Runs vary, and the variance is measured.** Generation is greedy at

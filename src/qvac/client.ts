@@ -12,7 +12,7 @@ import { withDeadline } from './deadline.js';
 import { MODEL_SPECS, modelsDir } from './models.js';
 import type { ModelRole } from './types.js';
 
-/** Written by `npm run setup` — resolved absolute paths per role. */
+/** Written by `pnpm run setup` — resolved absolute paths per role. */
 type LocalConfig = { modelsDir: string; adapter: string; models: Record<string, string> };
 
 let localConfig: LocalConfig | null = null;
@@ -49,7 +49,7 @@ function overrideFor(role: ModelRole): string | null {
 /**
  * Where a role's weights live.
  *
- * An explicit env override wins, then the path `npm run setup` recorded, then
+ * An explicit env override wins, then the path `pnpm run setup` recorded, then
  * the conventional filename in the models directory, and finally the SDK
  * registry constant so a machine with working P2P still resolves.
  */

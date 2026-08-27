@@ -1,0 +1,30 @@
+# pnpm settings. Not a monorepo — pnpm 11 reads its configuration from this
+# file (.npmrc is auth only), so it exists for the four settings below.
+
+# Electron Forge's packager and the QVAC forge plugin walk node_modules as a
+# flat tree and prune per platform; pnpm's default symlinked layout breaks
+# that. hoisted gives them the npm-shaped tree they expect.
+nodeLinker: hoisted
+
+# pnpm refuses git-resolved transitive dependencies by default. @electron/rebuild
+# (via @electron-forge/cli) pins @electron/node-gyp to a GitHub commit; the
+# lockfile records that commit, so it is reproducible.
+blockExoticSubdeps: false
+
+# Lifecycle scripts run only for packages named here. esbuild fetches its
+# native build; the rest are Forge's macOS/Windows makers. electron is listed
+# for the releases that download their binary in postinstall (43 does not).
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: true
+  fs-xattr: true
+  fsevents: true
+  macos-alias: true
+
+# The darwin-x64 installer is cut on an arm64 runner. Fetching both cpus'
+# optional deps (the bare runtime, esbuild) on every install means that
+# cross-arch package step needs nothing special. os stays "current".
+supportedArchitectures:
+  os: [current]
+  cpu: [current, x64]

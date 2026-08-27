@@ -1,5 +1,5 @@
 /**
- * `npm run smoke` — proves the structured-output engine holds up under
+ * `pnpm run smoke` — proves the structured-output engine holds up under
  * repetition, and produces the first-try rate we report.
  *
  * A single clean generation proves nothing; small models fail intermittently.

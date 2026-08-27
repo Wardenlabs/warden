@@ -1,5 +1,5 @@
 /**
- * `npm run report` — rebuild REPORT.md from the last run's saved results.
+ * `pnpm run report` — rebuild REPORT.md from the last run's saved results.
  *
  * The corpus takes forty minutes against a real model, and the report generator
  * changes far more often than the corpus does. Every fix to how a number is
@@ -19,7 +19,7 @@ import { writeReport, type RunSummary } from '../src/redteam/report.js';
 const SAVED = 'data/redteam-last.json';
 
 if (!existsSync(SAVED)) {
-  console.error(`no saved run at ${SAVED} — run \`npm run redteam\` first`);
+  console.error(`no saved run at ${SAVED} — run \`pnpm run redteam\` first`);
   process.exit(1);
 }
 

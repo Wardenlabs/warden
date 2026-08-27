@@ -61,7 +61,7 @@ export type RunSummary = {
    * columns and earns neither: a poisoned document counts as stopped with
    * nothing having read it, and the clean invoices the same class carries as
    * controls count as false positives. `OCR_LATIN` resolves to
-   * `registry://s3/...` rather than HuggingFace, so `npm run setup` cannot fetch
+   * `registry://s3/...` rather than HuggingFace, so `pnpm run setup` cannot fetch
    * it and it arrives only over the P2P registry — which means a run can have
    * the model, lack it, or acquire it partway through.
    *
@@ -73,7 +73,7 @@ export type RunSummary = {
    * The commit the corpus actually ran under.
    *
    * Recorded at run time rather than read at render time, because those are not
-   * the same moment: `npm run report` rebuilds this file from saved results, and
+   * the same moment: `pnpm run report` rebuilds this file from saved results, and
    * stamping the rebuild would name a commit the measurement never saw. The
    * whole point of the stamp is `git log <sha>..HEAD -- src/redteam`, and that
    * check is worthless if the sha is from after the run.
@@ -105,7 +105,7 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   // The commit is here so a reader can tell whether the harness has changed
   // since these numbers were taken — see `Reproducing this` for the command.
   // Only ever the run's own commit. Falling back to this render's would name a
-  // commit the measurement never saw — `npm run report` rebuilds this file long
+  // commit the measurement never saw — `pnpm run report` rebuilds this file long
   // after the fact — and a stamp pointing past the run is worse than none, since
   // the whole use of it is to diff forward from the run.
   const code = s.codeCommit;
@@ -117,7 +117,7 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   if (s.adapter === 'mock') {
     w('> **These numbers are from the mock adapter, not a real model.** The mock is a');
     w('> deterministic stand-in used so the harness can run without a GPU. It says');
-    w('> nothing about how a real model performs. Re-run with `npm run redteam` on a');
+    w('> nothing about how a real model performs. Re-run with `pnpm run redteam` on a');
     w('> machine with the models installed before quoting anything here.');
     w();
   }
@@ -158,7 +158,7 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
     w('> controls count as false positives for the same reason.');
     w('>');
     w('> `OCR_LATIN` resolves to `registry://s3/...` rather than HuggingFace, so');
-    w('> `npm run setup` cannot fetch it over HTTPS and it arrives only over the');
+    w('> `pnpm run setup` cannot fetch it over HTTPS and it arrives only over the');
     w('> P2P registry. Compare this class against another run only if that run');
     w('> reports the same count.');
     w();
@@ -310,8 +310,8 @@ export function writeReport(s: RunSummary, path = 'REPORT.md'): void {
   w('## Reproducing this');
   w();
   w('```bash');
-  w('npm install && npm run setup       # downloads models, verifies inference');
-  w('npm run redteam -- --reps 3        # regenerates this file');
+  w('pnpm install && pnpm run setup       # downloads models, verifies inference');
+  w('pnpm run redteam -- --reps 3        # regenerates this file');
   w('```');
   w();
   /**

@@ -7,7 +7,7 @@
  * must not load the SDK, so the HTTPS form of each entry is mirrored here as
  * plain data.
  *
- * `npm run setup` cross-checks this table against MODEL_SPECS on every run and
+ * `pnpm run setup` cross-checks this table against MODEL_SPECS on every run and
  * warns loudly on drift, so a model change cannot quietly leave the desktop
  * app downloading the wrong weights.
  */

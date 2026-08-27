@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
+  "description": "Warden \u2014 the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
   "productName": "Warden",
   "author": "MartinPuli",
   "license": "Apache-2.0",
@@ -17,9 +17,9 @@
     "dev": "tsx watch src/server/index.ts",
     "build": "tsc -p tsconfig.build.json && tsc -p desktop/tsconfig.json && node scripts/copy-dist-assets.mjs",
     "start": "node dist/server/index.js",
-    "app:dev": "npm run build && electron .",
-    "app:package": "npm run build && electron-forge package",
-    "app:make": "npm run build && electron-forge make",
+    "app:dev": "pnpm run build && electron .",
+    "app:package": "pnpm run build && electron-forge package",
+    "app:make": "pnpm run build && electron-forge make",
     "redteam": "tsx src/redteam/runner.ts",
     "report": "tsx scripts/rerender-report.ts",
     "typecheck": "tsc --noEmit",
@@ -48,5 +48,6 @@
   },
   "bin": {
     "warden-hook": "./bin/warden-hook.mjs"
-  }
+  },
+  "packageManager": "pnpm@11.0.6"
 }

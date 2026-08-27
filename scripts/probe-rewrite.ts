@@ -13,8 +13,8 @@
  * the other side of the same run: those are legitimate requests the guard got
  * wrong, and a suggestion there is the feature working.
  *
- *   npx tsx scripts/probe-rewrite.ts
- *   npx tsx scripts/probe-rewrite.ts --class benign-controls --reps 2
+ *   pnpm tsx scripts/probe-rewrite.ts
+ *   pnpm tsx scripts/probe-rewrite.ts --class benign-controls --reps 2
  *
  * Read the numbers the way every number in this repo has to be read: one rep of
  * one class settles nothing, `parallel: 4` makes runs non-reproducible, and a
@@ -31,8 +31,8 @@ import type { PolicySpec, Quota, Rule } from '../src/policy/types.js';
  *
  * Two reasons a diagnostic must not share the gateway's log. It would append a
  * hundred synthetic decisions to a governance record — and worse, the tail hash
- * is cached in memory per process, so a probe running while `npm run dev` is up
- * interleaves two chains and leaves a log that fails `npm run verify-audit`.
+ * is cached in memory per process, so a probe running while `pnpm run dev` is up
+ * interleaves two chains and leaves a log that fails `pnpm run verify-audit`.
  * Measured the hard way: entry 177 of 375, a browser decision landing between
  * two of this script's.
  */
