@@ -31,11 +31,11 @@ Necesitás ~3 GB libres para los modelos.
 git clone https://github.com/Wardenlabs/warden
 cd warden
 git checkout main
-npm install
-npm run setup
+pnpm install
+pnpm run setup
 ```
 
-`npm run setup` diagnostica tu máquina, baja tres modelos por HTTPS (~1.8 GB) y
+`pnpm run setup` diagnostica tu máquina, baja tres modelos por HTTPS (~1.8 GB) y
 prueba que la inferencia funcione de verdad. Al final imprime esto:
 
 ```
@@ -64,12 +64,12 @@ de cada comando.
 ## 2. Levantarlo
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Fijate que diga `adapter=real`. Si dice `adapter=mock`, o si nunca corriste
 `setup`, no hay modelos y el primer prompt va a intentar bajarlos por P2P y
-colgarse. Corré `npm run setup` antes.
+colgarse. Corré `pnpm run setup` antes.
 
 ```
 Warden  (adapter=real)
@@ -324,7 +324,7 @@ Esto es lo más importante del producto y lo que **todavía no está verificado 
 to end** — ver [`HOOK-VERIFICATION.md`](HOOK-VERIFICATION.md).
 
 ```bash
-npm link
+pnpm link --global
 ```
 
 Probalo suelto primero:
@@ -382,7 +382,7 @@ IT despliega para que el empleado **no** lo pueda apagar.
 ## 6. La evidencia
 
 ```bash
-npm run redteam
+pnpm run redteam
 ```
 
 Corre 98 prompts en 12 clases de ataque contra Warden y contra un *baseline*
@@ -391,14 +391,14 @@ Corre 98 prompts en 12 clases de ataque contra Warden y contra un *baseline*
 listado con su prompt completo**.
 
 > ⏱ Con modelo real tarda **30–60 min**. Para una prueba rápida:
-> `npm run redteam -- --class benign-controls --no-baseline`
+> `pnpm run redteam -- --class benign-controls --no-baseline`
 
 Otros:
 
 ```bash
-npm run smoke          # confiabilidad del structured output, ~2 min
-npm run benchmark      # mide tu máquina → BENCHMARKS.md
-npm run verify-audit   # recomputa la cadena de hashes del audit log
+pnpm run smoke          # confiabilidad del structured output, ~2 min
+pnpm run benchmark      # mide tu máquina → BENCHMARKS.md
+pnpm run verify-audit   # recomputa la cadena de hashes del audit log
 ```
 
 ---
@@ -408,7 +408,7 @@ npm run verify-audit   # recomputa la cadena de hashes del audit log
 Una sola corre Warden y tiene los modelos. Las demás apuntan ahí — nadie más
 baja nada.
 
-En la máquina gateway, `npm run dev` te imprime la dirección de red. En las
+En la máquina gateway, `pnpm run dev` te imprime la dirección de red. En las
 otras:
 
 ```bash
@@ -434,7 +434,7 @@ port-forward, está en [`DESPLIEGUE.md`](DESPLIEGUE.md).
 
 ## Cuando algo falla
 
-**`npm run setup` se cuelga bajando modelos**
+**`pnpm run setup` se cuelga bajando modelos**
 No debería, porque baja por HTTPS. Si igual se cuelga, cortá con Ctrl-C y
 volvé a correrlo — retoma desde donde iba. Lo que **sí** se cuelga para siempre
 es la descarga P2P nativa del SDK (Hyperswarm/UDP), que es justamente lo que
@@ -453,7 +453,7 @@ comportamiento correcto, pero el modelo no está respondiendo.
 **Tarda muchísimo**
 Normal en CPU. Bajá las reglas evaluadas por prompt:
 ```bash
-WARDEN_TOP_K=1 npm run dev
+WARDEN_TOP_K=1 pnpm run dev
 ```
 Va a ser el doble de rápido y algo menos preciso. Si lo usás para el video,
 decilo en cámara como un trade-off medido — eso suma, no resta.
@@ -477,7 +477,7 @@ La política se vuelve a sembrar desde `data/seed/policies.seed.json` al arranca
 Todo funciona contra un stand-in determinístico:
 
 ```bash
-WARDEN_ADAPTER=mock npm run dev
+WARDEN_ADAPTER=mock pnpm run dev
 ```
 
 Sirve para la UI, para el corpus y para CI. **No sirve para juzgar nada** — el

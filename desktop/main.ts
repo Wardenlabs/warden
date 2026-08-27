@@ -3,7 +3,7 @@
  *
  * The main process never runs inference and never imports @qvac/sdk. It owns
  * exactly three things: the first-run model download, the lifecycle of the
- * gateway child process (the same dist/server/index.js that `npm start`
+ * gateway child process (the same dist/server/index.js that `pnpm start`
  * runs), and a BrowserWindow pointed at the gateway's own console over
  * 127.0.0.1 — same origin as the API, so the server's no-CORS stance stays
  * untouched.
@@ -90,7 +90,7 @@ if (!app.requestSingleInstanceLock()) {
 
 async function main(): Promise<void> {
   await app.whenReady();
-  // Packaged builds get the icon from the bundle; this covers `npm run
+  // Packaged builds get the icon from the bundle; this covers `pnpm run
   // app:dev`, where the dock would otherwise show Electron's own.
   if (!app.isPackaged && process.platform === 'darwin') {
     app.dock?.setIcon(ICON_PNG);

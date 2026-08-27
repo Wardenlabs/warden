@@ -77,7 +77,7 @@ function tailHash(): string {
     // a corrupt one — the writer would be papering over exactly the state the
     // verifier exists to catch. Refuse to append instead.
     throw new Error(
-      `audit log at ${AUDIT_PATH} has an unparseable final entry — run \`npm run verify-audit\` and repair it before recording new decisions`
+      `audit log at ${AUDIT_PATH} has an unparseable final entry — run \`pnpm run verify-audit\` and repair it before recording new decisions`
     );
   }
   return lastHash ?? GENESIS;
@@ -172,7 +172,7 @@ export function findDecision(auditId: string): AuditEntry | null {
  * entries". The witness file is what makes the missing two visible.
  *
  * Exposed because a tamper-evident log is only evidence if someone can check
- * it; `npm run verify-audit` runs this.
+ * it; `pnpm run verify-audit` runs this.
  */
 export function verifyChain(): {
   ok: boolean;

@@ -3,16 +3,16 @@
 La app de escritorio empaqueta **el gateway completo** — servidor, consola de
 admin, proxy OpenAI-compatible e inferencia on-device — en una aplicación
 instalable para macOS y Windows (y un zip para Linux). Es exactamente el mismo
-`dist/server/index.js` que corre `npm start`, envuelto en Electron: la ventana
+`dist/server/index.js` que corre `pnpm start`, envuelto en Electron: la ventana
 es la consola de siempre servida desde `127.0.0.1`, mismo origen, sin CORS.
 
 Lo que cambia respecto de correrlo con Node:
 
-| | `npm run dev` / `npm start` | App de escritorio |
+| | `pnpm run dev` / `pnpm start` | App de escritorio |
 |---|---|---|
 | Escucha en | `0.0.0.0` (toda la LAN) | `127.0.0.1` hasta que actives **Allow LAN access** |
 | Datos y auditoría | junto al repo (`data/`) | carpeta de datos del usuario (ver abajo) |
-| Modelos | `npm run setup` | pantalla de primer arranque con descarga y reanudación |
+| Modelos | `pnpm run setup` | pantalla de primer arranque con descarga y reanudación |
 | Puerto 8080 ocupado | el proceso muere | reintenta solo con un puerto libre |
 | Cierre | Ctrl-C | apagado limpio: descarga modelos y termina el worker de inferencia |
 
@@ -34,9 +34,9 @@ corresponda a tu máquina.
 Para construir localmente (en la plataforma de destino):
 
 ```bash
-npm ci
-npm run app:make        # deja el instalador en out/make/
-npm run app:dev         # correr la app sin empaquetar, para desarrollo
+pnpm install --frozen-lockfile
+pnpm run app:make        # deja el instalador en out/make/
+pnpm run app:dev         # correr la app sin empaquetar, para desarrollo
 ```
 
 ## Primer arranque
@@ -44,7 +44,7 @@ npm run app:dev         # correr la app sin empaquetar, para desarrollo
 1. La app detecta que faltan los modelos y ofrece **descargarlos (~1.8 GB)**
    desde HuggingFace, con barra de progreso por modelo. Una descarga cortada
    se reanuda donde quedó — es la misma lógica con `Range` que usa
-   `npm run setup`.
+   `pnpm run setup`.
 2. La alternativa es **modo demo (mock)**: toda la consola funciona con
    inferencia simulada, y podés descargar los modelos más tarde desde
    *Gateway → Download models & leave demo mode*.

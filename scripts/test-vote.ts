@@ -9,12 +9,12 @@
  * and it would look exactly like everything working.
  *
  * The vote is off by default — measured at 50% false positives against 44%
- * without it — so the npm script turns it on. The mechanism stays tested even
+ * without it — so the pnpm script turns it on. The mechanism stays tested even
  * though it stays disabled: it is one environment variable from being live
  * again, and semantics that only break when someone re-enables them break at
  * the worst possible moment.
  *
- * Run: npm run test:vote
+ * Run: pnpm run test:vote
  *
  * `main()` sets WARDEN_CONFIRM_VOTES and then imports the pass dynamically.
  * That order is the whole trick: adjudicate.ts reads the variable at module
@@ -60,7 +60,7 @@ function check(name: string, ok: boolean, detail: string): void {
 
 async function main(): Promise<void> {
   // Set before importing the pass: it reads this flag at module load. Keeping
-  // the setup here makes `npm run test:vote` portable across Unix and Windows.
+  // the setup here makes `pnpm run test:vote` portable across Unix and Windows.
   process.env['WARDEN_CONFIRM_VOTES'] = '2';
   const { adjudicate } = await import('../src/guard/passes/adjudicate.js');
   const iso = isolate('cuánto gana Ana?');

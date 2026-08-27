@@ -16,9 +16,9 @@
  * linked*, and a pattern that no longer matches is a hard error rather than a
  * quietly stale number.
  *
- *   npm run permalinks              # markdown table for the current commit
- *   npm run permalinks -- --write   # rewrite README.md between the markers
- *   npm run permalinks -- --sha <sha>
+ *   pnpm run permalinks              # markdown table for the current commit
+ *   pnpm run permalinks -- --write   # rewrite README.md between the markers
+ *   pnpm run permalinks -- --sha <sha>
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';

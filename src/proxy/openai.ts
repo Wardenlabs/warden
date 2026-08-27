@@ -184,7 +184,7 @@ async function forwardScreened(
         code: 'upstream_unreachable',
         message:
           `Could not reach the model at ${UPSTREAM}. ` +
-          `Start it with: npx @qvac/cli serve openai  (${err instanceof Error ? err.message : err})`
+          `Start it with: pnpm dlx @qvac/cli serve openai  (${err instanceof Error ? err.message : err})`
       }
     });
     return;
@@ -270,7 +270,7 @@ async function forward(res: Response, payload: unknown): Promise<void> {
         code: 'upstream_unreachable',
         message:
           `Could not reach the model at ${UPSTREAM}. ` +
-          `Start it with: npx @qvac/cli serve openai  (${err instanceof Error ? err.message : err})`
+          `Start it with: pnpm dlx @qvac/cli serve openai  (${err instanceof Error ? err.message : err})`
       }
     });
     return;

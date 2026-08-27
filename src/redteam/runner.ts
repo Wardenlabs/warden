@@ -10,8 +10,8 @@
  * prompt — what a team ships without this project — and the gap between the two
  * is the actual result.
  *
- *   npm run redteam
- *   npm run redteam -- --reps 3 --class guard-targeted
+ *   pnpm run redteam
+ *   pnpm run redteam -- --reps 3 --class guard-targeted
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';

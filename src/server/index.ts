@@ -54,7 +54,7 @@ const HOST = process.env['WARDEN_HOST'] ?? '0.0.0.0';
 /**
  * Where the read-only pieces that ship with Warden live: web/, integrations/,
  * data/seed/. In a checkout that is the repo root, resolved from this file's
- * own location so `npm run dev` (src/server) and `npm start` (dist/server)
+ * own location so `pnpm run dev` (src/server) and `pnpm start` (dist/server)
  * both land on it whatever the working directory. The desktop app runs the
  * server with its working directory pointed at a per-user data folder and
  * passes the bundle's location here explicitly. Writable state (data/*.json,
@@ -577,7 +577,7 @@ app.get('/api/audit', asyncRoute(async (req, res) => {
 }));
 
 // The chain is the product's whole evidence claim, and evidence nobody can see
-// is not evidence. `npm run verify-audit` recomputes it from the terminal; this
+// is not evidence. `pnpm run verify-audit` recomputes it from the terminal; this
 // is the same check, so the console can show it too.
 app.get('/api/audit/verify', asyncRoute(async (_req, res) => {
   const mod = await optional<{ verifyChain: () => unknown }>('../audit/log.js');
@@ -657,7 +657,7 @@ const RT_RESULT = isMock() ? 'data/redteam-last.mock.json' : 'data/redteam-last.
 
 app.get('/api/redteam/report', (_req, res) => {
   const last = readSeedJson<unknown | null>(RT_RESULT, null);
-  if (!last) return res.status(404).json({ error: 'no run yet — npm run redteam' });
+  if (!last) return res.status(404).json({ error: 'no run yet — pnpm run redteam' });
   res.json(last);
 });
 
@@ -674,7 +674,7 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
   redteamRunning = true;
   const { spawn } = await import('node:child_process');
   const { resolve } = await import('node:path');
-  // A compiled build (npm start, the desktop app) carries the runner as plain
+  // A compiled build (pnpm start, the desktop app) carries the runner as plain
   // JS next to this file; a source checkout runs the TS through the repo's
   // installed tsx instead. Either is invoked through this exact runtime,
   // because shell launchers (`npx`, `npm.cmd`) differ across platforms and can

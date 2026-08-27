@@ -1,5 +1,5 @@
 /**
- * `npm run verify-audit` — recompute the audit chain.
+ * `pnpm run verify-audit` — recompute the audit chain.
  *
  * A tamper-evident log only counts as evidence if someone can actually check
  * it, and that check has to be one command rather than a described procedure.

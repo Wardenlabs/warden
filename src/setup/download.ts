@@ -1,7 +1,7 @@
 /**
  * Model fetching, as a library.
  *
- * `npm run setup` and the desktop app's first-run screen download the same
+ * `pnpm run setup` and the desktop app's first-run screen download the same
  * files the same way — plain HTTPS with a Range header so an interrupted
  * 1.1 GB download resumes instead of restarting. The logic lives here once,
  * free of console output; callers render progress their own way through

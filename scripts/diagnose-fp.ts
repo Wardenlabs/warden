@@ -11,7 +11,7 @@
  * to the rule at all — and no amount of rewriting the rules can fix that,
  * because the rules are not being read.
  *
- *   npx tsx scripts/diagnose-fp.ts
+ *   pnpm tsx scripts/diagnose-fp.ts
  */
 import { readFileSync } from 'node:fs';
 import { adapter } from '../src/qvac/index.js';

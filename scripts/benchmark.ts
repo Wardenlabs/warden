@@ -1,5 +1,5 @@
 /**
- * `npm run benchmark` — measure this machine and write BENCHMARKS.md.
+ * `pnpm run benchmark` — measure this machine and write BENCHMARKS.md.
  *
  * The track asks for model, quantization, hardware and latency. Rather than
  * writing those down by hand and letting them drift, they are measured here and
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
   const code = provenanceLabel();
   const md = `# Warden — benchmarks
 ${mockBanner}
-Measured by \`npm run benchmark\` on ${new Date().toISOString()}${code ? `, from commit \`${code}\`` : ''}.
+Measured by \`pnpm run benchmark\` on ${new Date().toISOString()}${code ? `, from commit \`${code}\`` : ''}.
 
 These numbers describe the machine below and nothing else — regenerate on
 whichever one records the demo.${
@@ -273,7 +273,7 @@ ratified rule instead — instant, and it cannot fail to parse.
    * reads it the real measurement is gone and only re-running on the demo
    * machine brings it back.
    *
-   * Hit by hand, not reasoned about: one `WARDEN_ADAPTER=mock npm run benchmark`
+   * Hit by hand, not reasoned about: one `WARDEN_ADAPTER=mock pnpm run benchmark`
    * to check a formatting change clobbered the committed table. `runner.ts`
    * already keeps mock output on its own path for exactly this reason; this is
    * the same rule, arriving late.

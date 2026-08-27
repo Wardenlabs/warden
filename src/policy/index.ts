@@ -69,7 +69,7 @@ function cosine(a: number[], b: number[]): number {
  * **Defaults to 0, which is off.** A floor that is too high drops rules that
  * should have been checked, and this project has measured ±6% swings between
  * identical runs — a value picked from one trace would be picked from noise.
- * Set it, run `npm run redteam -- --reps 3`, and keep it only if the attack
+ * Set it, run `pnpm run redteam -- --reps 3`, and keep it only if the attack
  * column holds.
  */
 const MIN_RELEVANCE = Number(process.env['WARDEN_MIN_RELEVANCE'] ?? 0);

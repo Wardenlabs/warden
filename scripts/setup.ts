@@ -1,5 +1,5 @@
 /**
- * One command to get Warden running on any machine: `npm run setup`.
+ * One command to get Warden running on any machine: `pnpm run setup`.
  *
  * Diagnoses the host, fetches the models over plain HTTPS (resumable), proves
  * inference actually works, and writes the resolved paths to a local config the
@@ -281,7 +281,7 @@ async function main(): Promise<void> {
     await download(alternate, dir);
     console.log(
       `\n${bold('Done.')} Point a role at it, e.g.\n` +
-      `  WARDEN_MODEL_${alternate.role.toUpperCase()}=${dir}/${alternate.filename} npm run redteam\n`
+      `  WARDEN_MODEL_${alternate.role.toUpperCase()}=${dir}/${alternate.filename} pnpm run redteam\n`
     );
     return;
   }
@@ -306,10 +306,10 @@ async function main(): Promise<void> {
   printReport();
 
   if (report.adapter === 'mock') {
-    console.log(yellow('Running in mock mode. Start with:  WARDEN_ADAPTER=mock npm run dev\n'));
+    console.log(yellow('Running in mock mode. Start with:  WARDEN_ADAPTER=mock pnpm run dev\n'));
     process.exitCode = 1;
   } else {
-    console.log(green('Ready. Start with:  npm run dev\n'));
+    console.log(green('Ready. Start with:  pnpm run dev\n'));
   }
 }
 

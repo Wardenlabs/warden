@@ -16,10 +16,10 @@
  * two-prompt difference, and it has already produced a convincing false positive
  * — it reported the isolation preamble halving false positives on a change that
  * 32 corpus evaluations showed doing nothing. Use it to form a hypothesis, then
- * confirm with `npx tsx src/redteam/runner.ts --class benign-controls --reps 2`
+ * confirm with `pnpm tsx src/redteam/runner.ts --class benign-controls --reps 2`
  * before believing it.
  *
- *   npx tsx scripts/probe-rule.ts <ruleId>
+ *   pnpm tsx scripts/probe-rule.ts <ruleId>
  */
 import { readFileSync } from 'node:fs';
 import { adapter } from '../src/qvac/index.js';

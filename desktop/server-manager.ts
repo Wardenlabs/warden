@@ -1,7 +1,7 @@
 /**
  * Lifecycle of the gateway child process.
  *
- * The child is the exact dist/server/index.js that `npm start` runs — the
+ * The child is the exact dist/server/index.js that `pnpm start` runs — the
  * desktop app configures it entirely through environment variables and its
  * working directory. Pointing cwd at the user's app-data folder is what makes
  * every cwd-relative write (data/*.json, audit chains, red-team results) land

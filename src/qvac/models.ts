@@ -6,7 +6,7 @@
  * indefinitely behind a restrictive one — a corporate proxy, a locked-down
  * container, conference wifi. Since we cannot control which of those the team
  * is on during a hackathon, every model here is also resolvable to a plain
- * HTTPS URL that `npm run setup` can fetch, and `loadModel` accepts the
+ * HTTPS URL that `pnpm run setup` can fetch, and `loadModel` accepts the
  * resulting local path just as happily as a registry constant.
  */
 import {
@@ -85,8 +85,8 @@ export const MODEL_SPECS: ModelSpec[] = [
  * proposition from the 1.1 GB default, and nobody should get it by accident.
  * Fetch it deliberately and point the adjudicator at it:
  *
- *   npm run setup -- --model adjudicator-large
- *   WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf npm run redteam
+ *   pnpm run setup -- --model adjudicator-large
+ *   WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf pnpm run redteam
  *
  * Qwen3-4B would be the more proportionate step up and the SDK has a constant
  * for it, but its source is `registry://s3/...` rather than HuggingFace, so it

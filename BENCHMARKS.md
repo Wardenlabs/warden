@@ -1,6 +1,6 @@
 # Warden — benchmarks
 
-Measured by `npm run benchmark` on 2026-08-23T08:42:42.363Z, from commit `040f4e4`.
+Measured by `pnpm run benchmark` on 2026-08-23T08:42:42.363Z, from commit `040f4e4`.
 
 These numbers describe the machine below and nothing else — regenerate on
 whichever one records the demo. To find out whether the code has moved since, `git log 040f4e4..HEAD -- src/guard src/qvac`; anything listed means this table is describing something that no longer runs.
