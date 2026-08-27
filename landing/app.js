@@ -133,20 +133,23 @@ if (!('IntersectionObserver' in window)) {
 
 /* ── name the platform on the hero button ──────────────────────────────── */
 /*
- * Windows is the only case worth branching for; everything else keeps the
- * macOS default, and the two explicit buttons further down are always there
- * regardless of what this decides.
+ * The button names the visitor's platform and the quiet link beside it names
+ * the other one. Windows is the only case worth branching for; everything
+ * else keeps the macOS default. Sizes are the v0.1.2 release assets: the
+ * arm64 .dmg and the Squirrel .exe. There is no Intel Mac build in v0.1.2.
  */
 
-const primary = document.querySelector('.hero .btn-primary');
+const RELEASE = 'https://github.com/Wardenlabs/warden/releases/download/v0.1.2/';
+const MAC = { label: 'Download for macOS', size: '185 MB', file: 'Warden-0.1.0-arm64.dmg', other: 'Also on macOS' };
+const WIN = { label: 'Download for Windows', size: '273 MB', file: 'Warden-Setup.exe', other: 'Also on Windows' };
 
-if (primary && /Windows|Win64|Win32/i.test(navigator.userAgent || '')) {
-  const label = primary.querySelector('.txt');
-  const size = primary.querySelector('.sz');
-  if (label) label.textContent = 'Download for Windows';
-  if (size) size.textContent = '287 MB';
-  primary.setAttribute(
-    'href',
-    'https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-Setup.exe'
-  );
+const primary = document.querySelector('.hero .btn-primary');
+const alt = document.querySelector('.hero .cta .alt');
+
+if (primary && alt && /Windows|Win64|Win32/i.test(navigator.userAgent || '')) {
+  primary.querySelector('.txt').textContent = WIN.label;
+  primary.querySelector('.sz').textContent = WIN.size;
+  primary.setAttribute('href', RELEASE + WIN.file);
+  alt.textContent = MAC.other;
+  alt.setAttribute('href', RELEASE + MAC.file);
 }
