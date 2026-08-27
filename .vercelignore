@@ -1,0 +1,20 @@
+# Only landing/ is served — the product itself runs on the employee's machine,
+# which is the whole point of it. The repo's source is ~1 MB, so this does not
+# try to allow-list its way down to nothing; it names the heavy things that a
+# CLI deploy from a working copy would otherwise upload.
+#
+# An allow-list (`*` then `!landing/`) is the obvious shape here and does not
+# work: once `*` excludes a directory, nothing inside it can be re-included,
+# and the deploy builds an empty output.
+
+node_modules
+models
+*.gguf
+
+out
+dist
+web/dist
+desktop/dist
+
+.git
+.claude

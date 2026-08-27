@@ -73,3 +73,5 @@ REPORT.*.md
 
 # Mock benchmark output — never the real table.
 BENCHMARKS.mock.md
+.vercel
+.env*
