@@ -837,6 +837,10 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 /* Nobody is counting is a different statement from a bar at zero. */
 .quota-row.unmetered b { color: var(--muted); }
 
+/* The record kept a hash, not the text. A bare em dash reads as missing data;
+   this reads as a promise being kept. */
+.nokeep { font-style: normal; color: var(--muted); opacity: 0.65; }
+
 .person-top { display: flex; align-items: center; gap: var(--s-4); }
 .person-top .nm { font-size: var(--fs-4); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
 

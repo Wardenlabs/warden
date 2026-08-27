@@ -499,7 +499,9 @@ function decisionRows(entries, emptyState) {
     out += `<button type="button" class="row${open ? ' on' : ''}" data-toggle="${state.view}" data-sel="${attr(a.auditId)}" aria-expanded="${open}">
       <span class="dot ${esc(d.verdict ?? '')}"></span>
       <span class="who">${esc(actorName(a.actor))}</span>
-      <span class="txt">${esc(d.maskedPrompt || '—')}</span>
+      <span class="txt">${d.maskedPrompt
+        ? esc(d.maskedPrompt)
+        : '<i class="nokeep" title="The audit log keeps this prompt\'s SHA-256, not its text. The console can show the text only while the gateway that judged it is still running.">not stored</i>'}</span>
       ${fired ? `<span class="rule-ref">${esc(ruleName(fired.ruleId))}</span>` : ''}
       <span class="meta">${esc(hhmm(a.ts))}</span>
     </button>`;
@@ -519,11 +521,16 @@ function decisionRows(entries, emptyState) {
 function plainSummary(entry) {
   const d = entry.decision ?? {};
   const who = esc(actorName(entry.actor));
-  const asked = esc(clip(d.maskedPrompt, 130));
+  // Without this the sentence reads: asked “”. The record kept the hash and
+  // not the text, and saying so is better than quoting nothing as if it were
+  // the prompt.
+  const asked = d.maskedPrompt
+    ? `“${esc(clip(d.maskedPrompt, 130))}”`
+    : 'something this record no longer holds the text of';
   const rule = d.firedRules?.[0];
 
   if (d.verdict === 'ALLOW') {
-    return `<b>${who}</b> asked “${asked}”, and Warden let it through — nothing in the policy applies to it.`;
+    return `<b>${who}</b> asked ${asked}, and Warden let it through — nothing in the policy applies to it.`;
   }
   if (!rule) {
     // No rule fired, so the only account of the refusal is the explanation the
@@ -535,11 +542,11 @@ function plainSummary(entry) {
     const flagged = String(d.explanation ?? '').split('\n').find((l) => l.startsWith('Also flagged:'));
     const signal = flagged ? flagged.replace(/^Also flagged:\s*/, '').replace(/\.\s*$/, '') : '';
     if (d.verdict === 'ESCALATE') {
-      return `<b>${who}</b> asked “${asked}”. No rule matched it, but Warden noticed ${
+      return `<b>${who}</b> asked ${asked}. No rule matched it, but Warden noticed ${
         signal ? `<b>${esc(signal)}</b>` : 'something structural in the text'
       } and queued it for a person. They have not been refused — they are waiting.`;
     }
-    return `<b>${who}</b> asked “${asked}”, and Warden stopped it${
+    return `<b>${who}</b> asked ${asked}, and Warden stopped it${
       signal ? ` after noticing <b>${esc(signal)}</b>` : ''
     }. No rule in the policy matched it.`;
   }
@@ -547,8 +554,8 @@ function plainSummary(entry) {
   // The guidance stays out of this sentence on purpose. It is often three lines
   // long, and a lead that runs to six lines is no longer a lead.
   return d.verdict === 'BLOCK'
-    ? `<b>${who}</b> asked “${asked}”. The <b>${name}</b> rule forbids that, so Warden stopped it.`
-    : `<b>${who}</b> asked “${asked}”. The <b>${name}</b> rule says this needs a person to sign off, so Warden is holding it.`;
+    ? `<b>${who}</b> asked ${asked}. The <b>${name}</b> rule forbids that, so Warden stopped it.`
+    : `<b>${who}</b> asked ${asked}. The <b>${name}</b> rule says this needs a person to sign off, so Warden is holding it.`;
 }
 
 /**

@@ -136,7 +136,54 @@ app.get('/api/events', (_req, res) => {
 });
 
 /** Broadcast a decision to every connected trace viewer. */
+/**
+ * Prompts the console may still show, for as long as this process lives.
+ *
+ * The audit log deliberately does not keep prompt text — `recordDecision`
+ * strips it, because a log that kept it would be a transcript of everything
+ * employees typed, and the log's own header promises it is not one. That is the
+ * right call for the record and the wrong one for the screen: an operations
+ * lead watching a block happen has no way to see what was blocked, and a row
+ * that reads "—" looks like a bug rather than a promise being kept.
+ *
+ * So the text lives here instead: in memory, capped, gone on restart, never
+ * written anywhere. The console can show you what just happened; the record
+ * still cannot tell you what anyone typed last week. Anything that starts
+ * persisting this map has turned the console's convenience into the transcript
+ * the audit log refuses to be.
+ */
+const RECENT_PROMPTS_MAX = 300;
+const recentPrompts = new Map<string, string>();
+
+function rememberPrompt(decision: unknown): void {
+  if (!decision || typeof decision !== 'object') return;
+  const d = decision as { auditId?: unknown; maskedPrompt?: unknown };
+  if (typeof d.auditId !== 'string' || typeof d.maskedPrompt !== 'string') return;
+  if (!d.maskedPrompt) return;
+
+  // Insertion-ordered, so deleting the first key evicts the oldest.
+  recentPrompts.set(d.auditId, d.maskedPrompt);
+  while (recentPrompts.size > RECENT_PROMPTS_MAX) {
+    const oldest = recentPrompts.keys().next().value;
+    if (oldest === undefined) break;
+    recentPrompts.delete(oldest);
+  }
+}
+
+/** Put the remembered text back on entries that still have it in memory. */
+function withRememberedPrompts(entries: unknown): unknown {
+  if (!Array.isArray(entries)) return entries;
+  return entries.map((e) => {
+    const entry = e as { auditId?: unknown; decision?: Record<string, unknown> };
+    if (typeof entry.auditId !== 'string' || !entry.decision) return e;
+    const text = recentPrompts.get(entry.auditId);
+    if (text === undefined) return e;
+    return { ...entry, decision: { ...entry.decision, maskedPrompt: text } };
+  });
+}
+
 export function emitDecision(decision: unknown): void {
+  rememberPrompt(decision);
   const payload = `data: ${JSON.stringify({ type: 'decision', decision })}\n\n`;
   for (const client of sseClients) {
     // One dead viewer must not turn a finished guard decision into a 500.
@@ -526,7 +573,7 @@ app.get('/api/audit', asyncRoute(async (req, res) => {
   // chain. Clamp instead.
   const raw = Number(req.query['limit'] ?? 50);
   const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 1), 500) : 50;
-  res.json(await readAudit(limit));
+  res.json(withRememberedPrompts(await readAudit(limit)));
 }));
 
 // The chain is the product's whole evidence claim, and evidence nobody can see
