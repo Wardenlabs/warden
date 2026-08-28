@@ -29,23 +29,61 @@ const FS = `#version 300 es
 precision highp float; in vec2 v; out vec4 o;
 uniform vec2 R; uniform float T, Y0, S, GLOW, FRONT, HOVER, HX; uniform vec3 BASE, WARM, CORAL;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+/* smooth 1-D value noise, for the shimmer that runs along the line */
+float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+  return mix(hash(vec2(i, 0.)), hash(vec2(i + 1., 0.)), f); }
 void main(){
   vec2 px = vec2(v.x, 1. - v.y) * R;
   float dy = px.y - Y0;
-  float xn = abs(px.x - .5 * R.x) / (.5 * R.x);        // 0 at the centre, 1 at the edge
-  float xf = 1. - smoothstep(.60, 1., xn);              // the line fades toward the edges
+  float a  = abs(dy);
+  float xs = (px.x - .5 * R.x) / (.5 * R.x);            // -1 at the left edge, +1 at the right
+  float xn = abs(xs);                                    // 0 at the centre, 1 at either edge
+  // The line has to dissolve before it reaches the frame. Held to the edge it
+  // reads as a border; released early it reads as something emitting.
+  float xf = pow(1. - smoothstep(.30, 1.02, xn), 1.35);
   float br = 1. + .03 * sin(T * .5);                    // it breathes, barely
   // how much of the verdict this pixel of the line has taken: the front runs outward
   float k = GLOW * (1. - smoothstep(FRONT - .12, FRONT + .02, xn));
+  // and the front itself carries a crest, so the verdict reads as something
+  // travelling rather than a wipe passing over
+  float crest = GLOW * exp(-pow((xn - FRONT) / .05, 2.));
   // a little more light under the cursor: a soft bump along the line, nothing that moves the line
   float h = HOVER * exp(-pow((px.x - HX) / (.085 * R.x), 2.));
-  // the hairline. White it saturates; turned, it drops below white so the colour reads in the line itself
-  float line = exp(-abs(dy) / (S * (1. + .6 * h))) * (mix(1.4, .62, k) + .35 * h) * xf * br;
-  float glow = (dy < 0. ? exp(dy / (.075 * R.y)) * .026 : exp(-dy / (.02 * R.y)) * .010) * xf * br;
-  glow *= (1. + 1.6 * k) * (1. + 1.1 * h);              // it flares where it has turned, and a touch under the cursor
-  vec3 col = BASE + mix(WARM, CORAL, k) * (line + glow);
+
+  // Shimmer, and the sweep. The line is never quite uniform, and while no
+  // verdict has landed a faint packet runs along it — the gate reads as
+  // watching rather than waiting. Both settle once it has ruled.
+  float shim = n1(px.x / (.09 * R.x) + T * .07) * .65 + n1(px.x / (.031 * R.x) - T * .11) * .35;
+  shim = 1. + (shim - .5) * .22 * (1. - .6 * GLOW);
+  float sweep = (1. - GLOW) * exp(-pow((xs - (fract(T / 9.) * 2.8 - 1.4)) / .10, 2.));
+
+  // The hairline, in two lobes. One exponential is a gradient; a core and a
+  // shoulder are a light, because that is roughly the shape of a real one.
+  float w = S * (1. + .6 * h);
+  float line = (exp(-a / w) * 1.55 + exp(-a / (w * 3.4)) * .28)
+             * (mix(1., .68, k) + .4 * h) * xf * br * shim;
+  // the emission into the dark: near and far, and more above the line than below
+  float up = exp(dy / (.045 * R.y)) * .030 + exp(dy / (.20 * R.y)) * .009;
+  float dn = exp(-dy / (.014 * R.y)) * .012 + exp(-dy / (.05 * R.y)) * .005;
+  float glow = (dy < 0. ? up : dn) * xf * br;
+  glow *= (1. + 1.4 * k) * (1. + 1.1 * h);              // it flares where it has turned, and a touch under the cursor
+  line *= 1. + .55 * crest + .22 * sweep;
+  glow *= 1. + .9 * crest + .18 * sweep;
+
+  // Glare. A bright point on a line throws its spike across the line, not
+  // along it — along is where the line already is. Raised to a power so it
+  // narrows: left broad it reads as haze over the line rather than glare off it.
+  float hotx = pow(crest, 3.) * .8 + pow(h, 3.) * .6;
+  float glare = hotx * exp(-a / (.050 * R.y)) * .085;
+
+  vec3 col = BASE + mix(WARM, CORAL, k) * (line + glow + glare);
+  // Highlight rolloff. The core is brighter than the display can show, and a
+  // hard clip costs the line its roundness. Rolling off instead lets the centre
+  // desaturate toward white on its own, the way an overexposed emitter does,
+  // and leaves --bg untouched: at the floor this curve is the identity.
+  col = col * (1. + col * .25) / (1. + col);
   col = pow(col, vec3(1. / 2.2));
-  col += (hash(gl_FragCoord.xy + fract(T) * 91.) - .5) * (1.5 / 255.);                                  // dither: no banding
+  col += (hash(gl_FragCoord.xy + fract(T) * 91.) - .5) * (2. / 255.);                                   // dither: no banding
   col += (hash(gl_FragCoord.xy * 1.37 + fract(T * .7) * 53.) - .5) * .012 * (1. - clamp(line, 0., 1.)); // grain, barely
   o = vec4(col, 1.); }`;
 
@@ -157,7 +195,10 @@ export function mountLight(host) {
     state.raf = requestAnimationFrame(tick);
   };
 
-  new ResizeObserver(resize).observe(host);
+  // Redraw, not just resize: setting canvas.width clears it, and under
+  // reduced motion nothing is coming to draw the next frame. Without the
+  // loop() here the gate is wiped the first time the layout settles.
+  new ResizeObserver(() => { resize(); loop(); }).observe(host);
   new IntersectionObserver((entries) => {
     state.visible = entries[0].isIntersecting;
     if (state.visible) loop();
