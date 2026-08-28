@@ -308,6 +308,68 @@ The bar it has to clear is the one this log already priced: the pinned rule is
 worth **seven attacks for three false positives**. Anything that lowers the
 refusals has to keep the seven.
 
+## A floor that was never off
+
+`WARDEN_MIN_RELEVANCE` defaults to 0 and its own comment says "defaults to 0,
+which is off". It was not off. Cosine similarity runs from -1 to 1, and the
+filter read `score >= MIN_RELEVANCE`, so a floor of zero silently dropped every
+rule the prompt pointed away from.
+
+Two lines of the same function disagreed about what 0 meant: the early return
+tested `MIN_RELEVANCE <= 0` and treated it as absent, the filter compared
+against it and treated it as a floor. The comment three lines above the filter
+states the intended behaviour exactly — "Top-K ranks but never filters: the
+third-best rule is adjudicated whether it scored 0.70 or 0.05" — and the code
+under it filtered.
+
+It fails in the fail-open direction, and quietly. A rule that should have been
+judged is never asked about, and the trace records only the rules that
+survived, so nothing in the output says one is missing. It bites whenever more
+non-pinned rules apply than `TOP_K`, which is the benchmark policy's own shape:
+6 rules apply to the test actor, 1 is pinned, 5 remain, 3 are taken.
+
+Fixed by testing for the floor's absence rather than comparing against it. With
+the floor genuinely off, top-K now returns K; with `WARDEN_MIN_RELEVANCE=0.5` it
+filters exactly as before.
+
+### How much did it cost the runs above?
+
+**Unknown, and worth being precise about why.** The behaviour was found with the
+mock adapter, whose embeddings are hash-derived unit vectors and therefore
+negative about half the time — under it, 9 of 16 benign decisions judged fewer
+rules than they should have, 12 rule-evaluations skipped. That number says
+nothing about the real embedder. `embeddinggemma-300M` may produce negative
+cosines rarely or never for this policy, in which case every row above is
+unaffected.
+
+The audit log answers it directly, because the retrieve pass records the scores
+and the selection. On a machine that has run the corpus, against the log from
+before this fix:
+
+```
+node -e '
+const fs=require("fs"),K=3;let d=0,s=0,m=0;
+for(const l of fs.readFileSync("data/audit.jsonl","utf8").split("\n").filter(Boolean)){
+ const r=(JSON.parse(l).decision?.passes||[]).find(p=>p.pass==="retrieve");
+ if(!r?.detail?.scores)continue;const sc=r.detail.scores,n=Object.keys(sc).length;
+ if(!n)continue;d++;const picked=(r.detail.selected||[]).filter(i=>i in sc).length;
+ const short=Math.min(K,n)-picked;if(short>0){s++;m+=short}}
+console.log(`decisions ${d} · short ${s} · skipped rule-evaluations ${m}`)'
+```
+
+Zero means the reference rows are clean and this was a latent bug. Anything
+above zero means the attack column in those rows was measured with rules that
+were never checked, and the run has to be repeated before anything is compared
+against it.
+
+### What it changes going forward
+
+More rules adjudicated per prompt: one more model call in the common case, so
+slower, and one more chance for a rule to fire — which can move the
+false-positive rate in either direction. That is a real change and it is
+unmeasured, which is why it ships as its own commit: run the corpus before and
+after this one alone.
+
 ## Levers wired, off, and unmeasured
 
 Four levers are wired, defaulted off, and unmeasured. Each is a hypothesis with
