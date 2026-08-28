@@ -12,6 +12,7 @@
  */
 import type { Rule } from '../policy/types.js';
 import type { RuleVerdict } from './passes/adjudicate.js';
+import type { InjectionFinding } from './passes/injection.js';
 import type { IsolationFlags } from './isolate.js';
 import { tighten, type FiredRule, type Verdict } from './types.js';
 
@@ -21,6 +22,13 @@ export type AggregateInput = {
   flags: IsolationFlags;
   /** Rules that were meant to be judged. A missing verdict is not an absence of evidence. */
   expectedRuleIds: string[];
+  /**
+   * Findings from the injection pass, each already tied to the rule it answers
+   * for. Empty when the pass is off, which is the shipped default.
+   */
+  injections?: { ruleId: string; finding: InjectionFinding }[];
+  /** Pinned rules whose injection pass threw. Nobody judged them. */
+  unansweredPinned?: string[];
   /** Attachments whose text could not be extracted. */
   unreadableAttachments?: number;
 };
@@ -85,7 +93,15 @@ function structuralConcerns(flags: IsolationFlags, rules: Rule[]): string[] {
 }
 
 export function aggregate(input: AggregateInput): AggregateResult {
-  const { verdicts, rules, flags, expectedRuleIds, unreadableAttachments = 0 } = input;
+  const {
+    verdicts,
+    rules,
+    flags,
+    expectedRuleIds,
+    injections = [],
+    unansweredPinned = [],
+    unreadableAttachments = 0
+  } = input;
   const byId = new Map(rules.map((r) => [r.id, r]));
   const fired: FiredRule[] = [];
   /** Rules the model hedged on. Allowed alone; escalated alongside other signals. */
@@ -118,6 +134,45 @@ export function aggregate(input: AggregateInput): AggregateResult {
        */
       unclearRules.push(firedFrom(rule, v.reason, v.confidence));
     }
+  }
+
+  /**
+   * The injection pass, folded in through the same lattice as everything else.
+   *
+   * It fires the rule it was asked about, so the refusal names a rule the
+   * employee can read and the admin can edit — the property the whole design
+   * turns on. A model that answered WORK_REQUEST is not granting anything: it
+   * is one signal declining to fire, and the rest of the evidence still stands.
+   *
+   * `UNCLEAR` joins the hedged pile rather than refusing, for the reason
+   * measured on the adjudicator: escalating on every hedge put 16 of 16
+   * legitimate requests in front of a human, and a guard nobody can work with
+   * gets switched off.
+   */
+  for (const { ruleId, finding } of injections) {
+    const rule = byId.get(ruleId);
+    if (!rule) continue;
+
+    if (finding.attack) {
+      verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
+      fired.push(firedFrom(rule, 'this message is aimed at the assistant\'s rules rather than at a task', 0.9));
+    } else if (finding.unclear) {
+      unclearRules.push(firedFrom(rule, 'could not tell whether this is aimed at the rules or at a task', 0.4));
+    }
+  }
+
+  // A pinned rule whose only judge threw is unjudged, and unjudged is never
+  // clean. Kept separate from the adjudicator's list below because it failed in
+  // a different pass, and the trace should be able to say which.
+  for (const id of unansweredPinned) {
+    verdict = tighten(verdict, 'ESCALATE');
+    const rule = byId.get(id);
+    fired.push({
+      ruleId: id,
+      ruleText: rule?.text ?? id,
+      reason: 'the injection pass could not be evaluated — escalated rather than assumed clean',
+      confidence: 0
+    });
   }
 
   // A rule that was supposed to be checked and produced nothing is the
