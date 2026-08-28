@@ -166,7 +166,13 @@ function mockValue(
   // slots, and the mock has to exercise that same shape or it stops standing in
   // for anything.
   if (choices?.length) {
-    const negative = choices.find((c) => /^(COMPLIES|ORDINARY|ALLOW|NONE|false)$/i.test(c));
+    // `ORDINARY_REQUEST` is the benign label under the adjudicator's `choice`
+    // form. Anchored without it, this pattern found no negative for that form
+    // and fell through to `choices[0]` — VIOLATES — which made the mock report
+    // a total regression for a variant it simply did not recognise. A test
+    // double that fails a variant by not knowing its vocabulary is worse than
+    // no double at all.
+    const negative = choices.find((c) => /^(COMPLIES|ORDINARY(_REQUEST)?|ALLOW|NONE|false)$/i.test(c));
     const positive = choices.find((c) => /^(VIOLATES|MANIPULATION|BLOCK|true)$/i.test(c));
     if (ctx.flagged && positive) return positive;
     if (!ctx.flagged && negative) return negative;

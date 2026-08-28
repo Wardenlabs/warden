@@ -76,3 +76,10 @@ REPORT.*.md
 BENCHMARKS.mock.md
 .vercel
 .env*
+
+# The adjudicator bench: answers already paid for, and the last run's cells.
+# The cache is machine- and model-specific — it keys on which adjudicator
+# answered — so sharing it between machines would mean reading one laptop's
+# model through another's numbers.
+data/bench-cache.json
+data/bench-last.json

@@ -36,9 +36,10 @@ export type AggregateResult = {
 /**
  * Structural signals strong enough to escalate on their own.
  *
- * The first three are tamper evidence: invisible characters, faked conversation
- * turns, homoglyph mixes. Nobody types those by accident and no rule has to
- * authorise noticing them, so they stand on their own.
+ * Most of them are tamper evidence: invisible characters, faked conversation
+ * turns, homoglyph mixes, a forged delimiter, an order aimed at the classifier.
+ * Nobody types those by accident and no rule has to authorise noticing them, so
+ * they stand on their own.
  *
  * `hadMetaInstructions` is different, and the difference was found by an admin
  * deleting a rule and watching the behaviour survive it. That signal is *about*
@@ -55,11 +56,27 @@ export type AggregateResult = {
  *
  * An admin who pins an unrelated rule keeps the detector on. That is harmless:
  * it only ever adds evidence, and never blocks on its own.
+ *
+ * `hadEnvelopeForgery` and `hadGuardProtocol` are ungated, and the reason is
+ * the same one that admits the first three. They are not about a subject any
+ * policy governs — they are about this pipeline's own machinery: a forged copy
+ * of the delimiter that fences untrusted text, or a message writing the
+ * adjudicator's verdict label for it. There is no company that has "notice when
+ * someone forges our delimiter" as a business rule to delete, and an admin who
+ * removed every rule would still not be asking for that. Deleting a rule
+ * silences the signals that were about the rule; these were never about one.
+ *
+ * They are also the cheapest evidence in the system. Measured across the whole
+ * corpus and twenty held-out benign prompts written to trip them: 0 false
+ * flags, and 5 of the 8 `guard-targeted` attacks — the class the corpus calls
+ * the most valuable finding in the project, and the one that was at 50%.
  */
 function structuralConcerns(flags: IsolationFlags, rules: Rule[]): string[] {
   const concerns: string[] = [];
   if (flags.hadInvisibleChars) concerns.push('invisible characters');
   if (flags.hadRoleMarkers) concerns.push('embedded conversation-role markers');
+  if (flags.hadEnvelopeForgery) concerns.push("a forged copy of the guard's own delimiters");
+  if (flags.hadGuardProtocol) concerns.push("instructions addressed to the guard's own machinery");
   if (flags.hadMetaInstructions && rules.some((r) => r.pinned)) {
     concerns.push('phrasing aimed at the instruction layer');
   }

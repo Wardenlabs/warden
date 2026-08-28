@@ -712,10 +712,13 @@ believing anything either of them says.
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
-| `WARDEN_MIN_RELEVANCE` | `0.25` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. |
+| `WARDEN_MIN_RELEVANCE` | `0` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. Off by default: measured at `0.5` it moved nothing and lost an attack. |
 | `WARDEN_WARMUP` | — | `0` skips loading the models at boot. On by default: the first prompt used to pay for the model load inside the decision it was waiting on, which is how a cold check passed the hook's deadline. |
 | `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
 | `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
+| `WARDEN_WINDOW_CHARS` | `0` | Cut a message longer than this into overlapping windows and judge each one, taking the strictest label. Aimed at `volume-distraction`, the worst class in the corpus, where the payload is buried in a wall of business text. Off by default: the corpus has no long *legitimate* prompt, so a corpus run of this can only show its upside. Measure it against real long documents first. |
+| `WARDEN_WINDOW_OVERLAP` | `200` | How much each window repeats of the previous one, so a payload split by a cut is still whole in one of them. |
+| `WARDEN_ADJUDICATOR_FORM` | `compliance` | `choice` renames the benign label from COMPLIES to ORDINARY_REQUEST, so the model picks a positively-named answer instead of affirming a negation. Unmeasured — see `pnpm run bench`. |
 | `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
 | `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
 | `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
