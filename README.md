@@ -726,6 +726,7 @@ believing anything either of them says.
 |---|---|---|
 | `WARDEN_PORT` | `8080` | |
 | `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
+| `WARDEN_ADMIN_REQUIRE_KEY` | — | `1` drops loopback trust, so every administrative call must present the API key of a role the policy exempts. Set it where employees can log into the gateway host. |
 | `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
 | `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |

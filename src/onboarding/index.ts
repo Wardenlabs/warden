@@ -24,7 +24,7 @@
  * submissions that describe capabilities which do not exist, and an onboarding
  * page is exactly where an unverified claim would look most authoritative.
  */
-import type { Employee } from '../policy/people.js';
+import { installToken, type Employee } from '../policy/people.js';
 
 export type IntegrationKind = 'hook' | 'proxy';
 
@@ -92,7 +92,7 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
         'to the internet. It carries your API key, so treat the link as a secret. ' +
         'Safe to re-run: it replaces its own block rather than stacking a second one. ' +
         'Availability checks default to 2 seconds and full decisions to 30 seconds.',
-      code: `curl -fsSL ${gatewayUrl}/install/${employee.id} | sh`
+      code: `curl -fsSL ${gatewayUrl}/install/${installToken(employee)} | sh`
     },
     {
       title: 'Windows PowerShell alternative (current session)',
