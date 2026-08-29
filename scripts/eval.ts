@@ -25,16 +25,37 @@
  * were the numbers" and not "what was being tried", and six weeks later those
  * are the same question. `pnpm run measurements` renders the index from it.
  */
+/**
+ * Scoring writes decisions, and decisions are audited.
+ *
+ * `recordDecision` appends to a hash-chained log, so a run of 155 prompts times
+ * three repetitions appends 465 entries to whatever chain is configured. The
+ * real one is evidence about what the company's employees actually asked, and
+ * burying it under evaluation traffic makes it useless for the thing it exists
+ * for. `probe-rewrite.ts` already learned this — its note records being caught
+ * at entry 177 of 375.
+ *
+ * Set before importing anything that reads it: `src/audit/log.ts` resolves the
+ * path at module scope, so a later assignment is too late.
+ */
+process.env['WARDEN_AUDIT_PATH'] ??= 'data/audit-eval.jsonl';
+
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 
-import { evaluate } from '../src/guard/pipeline.js';
-import { hashPolicy } from '../src/policy/store.js';
-import { adapter, isMock } from '../src/qvac/index.js';
 import type { PolicySpec } from '../src/policy/types.js';
 import { loadAttackCorpus, loadEvalSets, type EvalPrompt } from './eval-lint.js';
+
+// Dynamic, and the assignment above is why: `src/audit/log.ts` resolves the
+// path at module scope, and static imports are hoisted above every statement in
+// this file — so a static import here would read the real path before the line
+// above ever runs. Node built-ins and the type-only imports are safe to leave
+// static; nothing in them touches the audit chain.
+const { evaluate } = await import('../src/guard/pipeline.js');
+const { hashPolicy } = await import('../src/policy/store.js');
+const { adapter, isMock } = await import('../src/qvac/index.js');
 
 const OUT_DIR = process.env['WARDEN_MEASUREMENTS_DIR'] ?? 'data/measurements';
 const POLICY_PATH =
