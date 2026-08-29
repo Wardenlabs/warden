@@ -128,6 +128,40 @@ export function findByApiKey(key: string): Employee | null {
 }
 
 /**
+ * The unguessable half of an onboarding link.
+ *
+ * The install route hands an employee their API key inside a shell script, so
+ * the URL is a credential. Addressed by employee id it was a credential anyone
+ * could guess: ids are people's first names, and `/install/ana` returned Ana's
+ * key to whoever asked. That route cannot simply be closed — the employee runs
+ * it from their own machine, before they have a key, which is the entire point
+ * of it — so the address itself has to become the secret.
+ *
+ * Derived from the key rather than stored, which buys three things at once. It
+ * survives a gateway restart, so a link sent on Friday still works on Monday.
+ * It needs no store to expire, leak or fall out of sync. And rotating the key
+ * invalidates every link ever issued for that person, which is exactly what
+ * rotation is supposed to mean.
+ *
+ * Domain-separated so this digest can never be confused with the one
+ * {@link keyMatches} compares, and truncated to 128 bits, which is far past
+ * guessing and short enough to paste.
+ */
+export function installToken(employee: Employee): string {
+  return createHash('sha256').update(`warden-install:${employee.apiKey}`).digest('hex').slice(0, 32);
+}
+
+/** The employee an install token belongs to, or null. */
+export function findByInstallToken(token: string): Employee | null {
+  if (!/^[0-9a-f]{32}$/.test(token)) return null;
+  return (
+    loadDirectory().employees.find((e) =>
+      timingSafeEqual(Buffer.from(installToken(e), 'hex'), Buffer.from(token, 'hex'))
+    ) ?? null
+  );
+}
+
+/**
  * Constant-time key comparison, over digests so length differences leak
  * nothing either. `===` short-circuits on the first differing byte, which is
  * measurable — and this string is the only credential on the proxy path.

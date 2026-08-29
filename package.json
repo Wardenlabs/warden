@@ -21,6 +21,7 @@
     "app:package": "pnpm run build && electron-forge package",
     "app:make": "pnpm run build && electron-forge make",
     "redteam": "tsx src/redteam/runner.ts",
+    "bench": "tsx scripts/bench-adjudicator.ts",
     "report": "tsx scripts/rerender-report.ts",
     "typecheck": "tsc --noEmit",
     "verify-audit": "tsx scripts/verify-audit.ts",

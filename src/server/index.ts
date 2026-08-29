@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, isMock } from '../qvac/index.js';
+import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
   loadDirectory,
@@ -25,6 +26,7 @@ import {
   removeRole,
   rotateApiKey,
   upsertEmployee,
+  findByInstallToken,
   findEmployee,
   actorForCredential
 } from '../policy/people.js';
@@ -68,12 +70,35 @@ const app = express();
 app.use(express.json({ limit: '4mb' }));
 
 /**
+ * Authorisation, ahead of every route so no route can forget it.
+ *
+ * Mounted here rather than annotated per handler because the failure mode of
+ * the per-handler version is silent: the route someone adds next month is
+ * public until they remember. `needsAdmin` decides from the path, and its list
+ * is of what stays open, so anything new is closed until it is named.
+ *
+ * See `admin-auth.ts` for what an administrator is and why loopback counts as
+ * one. Before this, every policy write, key issue and audit read on this server
+ * was reachable by anyone who could open the port.
+ */
+app.use((req, res, next) => {
+  if (!needsAdmin(req.path)) return next();
+  requireAdmin(req, res, next);
+});
+
+/**
  * The console is served by this same process, so same-origin needs no CORS at
  * all. The wildcard that used to sit here let any web page an admin happened to
- * visit read the directory and post policy changes cross-origin — the admin API
- * has no authentication, so the browser's origin check was the only thing
- * standing in the way. Serving web/ from a separate dev port is the one case
- * that needs an exception, and it is opt-in and explicit.
+ * visit read the directory and post policy changes cross-origin, with the
+ * browser's origin check the only thing standing in the way. Serving web/ from
+ * a separate dev port is the one case that needs an exception, and it is opt-in
+ * and explicit.
+ *
+ * `admin-auth.ts` is now the thing standing in the way, and it is the one that
+ * should be: an origin check only ever governed browsers, and the employee
+ * typing the URL was never one. This stays narrow anyway — a second lock on a
+ * door costs nothing, and a wildcard here would hand an attacker's page the
+ * administrator's own loopback trust.
  */
 const CORS_ORIGIN = process.env['WARDEN_CORS_ORIGIN'];
 if (CORS_ORIGIN) {
@@ -764,8 +789,8 @@ app.get('/warden-hook.mjs', (_req, res) => {
   }
 });
 
-app.get('/install/:employeeId', (req, res) => {
-  const id = String(req.params['employeeId']);
+app.get('/install/:credential', (req, res) => {
+  const id = String(req.params['credential']);
   // Resolved against the directory rather than echoed back. A made-up id must
   // not produce a script that configures somebody the gateway has never heard
   // of — that account would be judged as a stranger, which is the exact failure
@@ -773,7 +798,12 @@ app.get('/install/:employeeId', (req, res) => {
   // matches the shape `uniqueId` generates: this response is piped into `sh`,
   // so anything echoed back verbatim is one URL-encoded newline away from
   // being executed on an employee's laptop.
-  const person = /^[a-z0-9][a-z0-9-]*$/.test(id) ? findEmployee(id) : null;
+  // Token first: that is the form employees are given, and the only form that
+  // reaches here without an administrator behind it. The id form still works
+  // for the admin's own console and the quickstart, and `needsAdmin` is what
+  // keeps it to them.
+  const person =
+    findByInstallToken(id) ?? (/^[a-z0-9][a-z0-9-]*$/.test(id) ? findEmployee(id) : null);
   if (!person) {
     return res
       .status(404)

@@ -166,8 +166,21 @@ function mockValue(
   // slots, and the mock has to exercise that same shape or it stops standing in
   // for anything.
   if (choices?.length) {
-    const negative = choices.find((c) => /^(COMPLIES|ORDINARY|ALLOW|NONE|false)$/i.test(c));
-    const positive = choices.find((c) => /^(VIOLATES|MANIPULATION|BLOCK|true)$/i.test(c));
+    // Every label the guard's passes can emit has to appear in one of these two
+    // lists. `ORDINARY_REQUEST` (the adjudicator's `choice` form) and
+    // `WORK_REQUEST` / `RULE_ATTACK` (the injection pass) were each missing
+    // once, and the failure is silent and total: with no negative matched, the
+    // mock falls through to `choices[0]` and answers "attack" to everything,
+    // reporting a catastrophic regression for a pass it simply did not
+    // recognise. A test double that fails a variant by not knowing its
+    // vocabulary is worse than no double at all — add the label here when you
+    // add a pass.
+    const negative = choices.find((c) =>
+      /^(COMPLIES|ORDINARY(_REQUEST)?|WORK_REQUEST|ALLOW|NONE|false)$/i.test(c)
+    );
+    const positive = choices.find((c) =>
+      /^(VIOLATES|RULE_ATTACK|MANIPULATION|BLOCK|true)$/i.test(c)
+    );
     if (ctx.flagged && positive) return positive;
     if (!ctx.flagged && negative) return negative;
     return choices[0];

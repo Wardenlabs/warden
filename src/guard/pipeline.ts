@@ -19,6 +19,7 @@ import { aggregate } from './aggregate.js';
 import { checkBudget } from './budget.js';
 import { isolate, normalizeUntrusted } from './isolate.js';
 import { adjudicateAll } from './passes/adjudicate.js';
+import { detectInjection } from './passes/injection.js';
 import { checkQuota } from './quota.js';
 import { sanitize } from './sanitize.js';
 import { tighten } from './types.js';
@@ -26,6 +27,37 @@ import type { Decision, GuardInput, PassTrace } from './types.js';
 
 /** How many non-pinned rules to adjudicate. Each one is a model call. */
 const TOP_K = Number(process.env['WARDEN_TOP_K'] ?? 3);
+
+/**
+ * Whether the injection pass runs, and what it is allowed to replace.
+ *
+ * - `off` — the shipped behaviour. Pinned rules go through the adjudicator like
+ *   any other rule, and the `detector` model stays downloaded and unused.
+ * - `evidence` — the pass runs alongside adjudication. Either can fire the
+ *   pinned rule. Strictly more evidence, and therefore strictly more chances of
+ *   a false positive: this is the mode to be suspicious of.
+ * - `replace` — pinned rules are answered by the injection pass instead of the
+ *   adjudicator. One model call moves from the 1.7B to the 0.6B and the
+ *   question changes from "does this violate this rule" to "what is this
+ *   message aimed at". Not an extra check — the same decision, asked better.
+ *
+ * **Defaults to `off`, and that is not modesty.** `r-instruction-override` is
+ * pinned, so it is judged on 100% of traffic and it causes 14 of the 21
+ * refusals of legitimate work. Anything that changes how it is answered can
+ * move the whole system in either direction, and this one has never been run
+ * against a model. The measurement log's own rule is that a security-relevant
+ * default does not change on an argument, however good the argument is.
+ *
+ * `replace` is the mode with a mechanism behind it and the one worth measuring
+ * first:
+ *
+ *   pnpm run bench -- --a base --b injection
+ *   WARDEN_INJECTION_PASS=replace pnpm run redteam -- --reps 3
+ */
+const INJECTION_MODE = ((): 'off' | 'evidence' | 'replace' => {
+  const raw = process.env['WARDEN_INJECTION_PASS'];
+  return raw === 'evidence' || raw === 'replace' ? raw : 'off';
+})();
 
 export async function evaluate(
   qvac: QvacAdapter,
@@ -133,8 +165,44 @@ export async function evaluate(
     }
   });
 
+  // ── pass 1: injection ──────────────────────────────────────────────────────
+  // Only for pinned rules, and only because a pinned rule exists. That keeps
+  // the admin in control of it exactly as `hadMetaInstructions` is: the pass is
+  // about instruction override, the policy is where the company says whether it
+  // cares, and deleting the rule takes the pass with it rather than leaving a
+  // refusal that names nothing.
+  const pinned = INJECTION_MODE === 'off' ? [] : selected.rules.filter((r) => r.pinned);
+  const injections = await Promise.all(
+    pinned.map(async (rule) => {
+      try {
+        return await detectInjection(qvac, iso, rule);
+      } catch (err) {
+        // A pass that could not answer is never evidence that something is
+        // fine. In `replace` mode nothing else is judging this rule, so the
+        // failure has to carry the escalation itself.
+        return {
+          finding: null,
+          trace: {
+            pass: 'injection',
+            ms: 0,
+            verdict: 'ESCALATE' as const,
+            failedClosed: true,
+            detail: { ruleId: rule.id, error: err instanceof Error ? err.message : String(err) }
+          } satisfies PassTrace
+        };
+      }
+    })
+  );
+  passes.push(...injections.map((i) => i.trace));
+
   // ── pass 3: adjudicate (concurrent) ────────────────────────────────────────
-  const { verdicts, traces } = await adjudicateAll(qvac, iso, selected.rules);
+  // In `replace` mode the pinned rules are already answered, so asking the
+  // adjudicator about them too would be paying twice for the decision this
+  // change exists to move — and letting the worse answer of the two still fire.
+  const toAdjudicate = INJECTION_MODE === 'replace'
+    ? selected.rules.filter((r) => !r.pinned)
+    : selected.rules;
+  const { verdicts, traces } = await adjudicateAll(qvac, iso, toAdjudicate);
   passes.push(...traces);
 
   // ── pass 4: aggregate ──────────────────────────────────────────────────────
@@ -143,7 +211,16 @@ export async function evaluate(
     verdicts,
     rules: selected.rules,
     flags: iso.flags,
-    expectedRuleIds: selected.rules.map((r) => r.id),
+    // The rules the adjudicator was asked about. A pinned rule answered by the
+    // injection pass is not missing evidence, so it must not be counted as an
+    // unanswered pass and escalated on that basis.
+    expectedRuleIds: toAdjudicate.map((r) => r.id),
+    injections: injections.flatMap((i, index) =>
+      i.finding ? [{ ruleId: pinned[index]!.id, finding: i.finding }] : []
+    ),
+    // A pinned rule whose injection pass threw is unanswered in the sense that
+    // matters: nobody judged it.
+    unansweredPinned: injections.flatMap((i, index) => (i.finding ? [] : [pinned[index]!.id])),
     unreadableAttachments
   });
   passes.push({

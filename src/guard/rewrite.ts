@@ -123,7 +123,16 @@ function wasAimedAtTheInstructionLayer(decision: DecisionLike): boolean {
   const iso = decision.passes.find((p) => p.pass === 'isolate');
   const flags = iso?.detail as Partial<IsolationFlags> | undefined;
   if (!flags) return false;
-  return Boolean(flags.hadInvisibleChars || flags.hadRoleMarkers || flags.hadMetaInstructions);
+  return Boolean(
+    flags.hadInvisibleChars ||
+      flags.hadRoleMarkers ||
+      flags.hadMetaInstructions ||
+      // Forging the fence or dictating the verdict has no benign version to
+      // propose either, and a rewrite of one would just be the same attack in
+      // better words.
+      flags.hadEnvelopeForgery ||
+      flags.hadGuardProtocol
+  );
 }
 
 /** What this needs from a decision — the live one or the audited copy. */
