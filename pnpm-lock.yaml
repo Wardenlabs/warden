@@ -14,6 +14,9 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.2.1
+      require-asset:
+        specifier: ^1.2.2
+        version: 1.2.2(bare-url@2.5.2)
       zod:
         specifier: ^4.1.5
         version: 4.4.3
@@ -6686,7 +6689,6 @@ snapshots:
       bare-module-resolve: 1.12.4(bare-url@2.5.2)
     transitivePeerDependencies:
       - bare-url
-    optional: true
 
   require-directory@2.1.1: {}
 
