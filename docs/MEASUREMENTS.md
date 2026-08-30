@@ -52,6 +52,48 @@ reading `data/policies.json`. The older rows measured whatever rules happened to
 be in the live store on that machine, which is the bug that change fixed — they
 are kept for continuity, not for comparison.
 
+## 2026-08-30 — the first run against real models since the 23rd
+
+Everything between those dates was reasoned about and not measured: no machine
+in the loop had model weights on it. This run has them — Qwen3-1.7B adjudicator,
+embeddinggemma-300M embedder, on 4 CPU cores with no GPU — against the eval sets
+as they now stand, including the fifteen developer sentences added the same day.
+
+| | |
+|---|---|
+| False positives on legitimate work | **51/94 (54%)** |
+| Flaky (verdict varied across reps) | 0 |
+| Latency p50 / p95 | 10.5 s / 11.1 s |
+| Structured output | 380 first try, 0 repaired, 0 failed |
+| Commit | `b1c5a01`, every lever at its default |
+
+One repetition, so ±5 points. It is a baseline, not a comparison.
+
+**The attribution is the finding, and it is sharper than it has ever been:**
+
+| Rule | Legitimate requests it refused |
+|---|---|
+| `r-instruction-override` | **46 of 51** |
+| `r-credentials` | 21 of 51 |
+| `r-unreleased-financials` | 9 of 51 |
+| `r-payment-approval` | 8 of 51 |
+| `r-payroll` | 6 of 51 |
+| `r-customer-pii` | 5 of 51 |
+
+(A prompt can be refused by several rules, so the column does not sum to 51.)
+
+Two things follow. The pinned rule causes **90%** of the refusals, which is the
+same shape recorded in August at a larger n and against harder traffic — it
+survived adding developer prompts, which is what makes it a property of the rule
+rather than of the corpus. And `r-credentials` at 21 is new: coding-agent
+traffic talks about keys, tokens and secrets constantly, and the office corpus
+had almost none of it.
+
+Nothing in the day's work moved this number, which is what should have happened:
+every lever aimed at it ships off. The deterministic fixes removed false
+positives that had been *introduced* on the 29th; the adjudicator's own lean is
+untouched and is what the injection pass exists to test.
+
 ## Per-rule attribution
 
 Which rule refused legitimate work, from the run that added attribution:
