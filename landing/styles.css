@@ -138,6 +138,33 @@ body {
   overflow-x: hidden;
 }
 
+/*
+ * Grain. The hero's canvas dithers and grains itself so its gradients do not
+ * band, and everything below it is flat --bg; once sections sit under the hero
+ * that seam shows. This is the same idea in CSS, over the whole page.
+ *
+ * The alpha is raised to the fourth before it is used, which is what keeps the
+ * floor: skewed that hard the noise averages near nothing, so --bg stays where
+ * the palette put it and the visible grain is the rare bright speck rather than
+ * a grey veil. Fixed, because grain belongs to the screen and not to the
+ * content scrolling behind it.
+ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;          /* over everything; the sticky header is 40 */
+  pointer-events: none;
+  opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .33 .33 .33 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='gamma' exponent='4'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* The tile is sized in CSS px, so on a 2x display each grain would cover four
+   device pixels and read as mush. Halved, it stays grain. */
+@media (min-resolution: 2dppx) {
+  body::after { background-size: 70px 70px; }
+}
+
 h1, h2, h3, p, figure, pre, table { margin: 0; }
 a { color: inherit; }
 svg { display: block; }

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Warden \u2014 the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
+  "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
   "productName": "Warden",
   "author": "MartinPuli",
   "license": "Apache-2.0",
@@ -29,11 +29,16 @@
     "benchmark": "tsx scripts/benchmark.ts",
     "test:vote": "tsx scripts/test-vote.ts",
     "test:hook": "tsx scripts/test-hook.ts",
-    "test:auth": "tsx scripts/test-auth.ts"
+    "test:auth": "tsx scripts/test-auth.ts",
+    "eval": "tsx scripts/eval.ts",
+    "eval:lint": "tsx scripts/eval-lint.ts",
+    "compare": "tsx scripts/compare.ts",
+    "measurements": "tsx scripts/measurements.ts"
   },
   "dependencies": {
     "@qvac/sdk": "^0.17.1",
     "express": "^5.1.0",
+    "require-asset": "^1.2.2",
     "zod": "^4.1.5"
   },
   "devDependencies": {

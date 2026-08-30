@@ -83,3 +83,7 @@ BENCHMARKS.mock.md
 # model through another's numbers.
 data/bench-cache.json
 data/bench-last.json
+
+# Evaluation runs write decisions too — kept out of the real chain
+data/audit-eval.jsonl
+data/audit-eval.witness.json
