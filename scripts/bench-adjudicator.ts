@@ -48,6 +48,7 @@ import { detectInjection } from '../src/guard/passes/injection.js';
 import { hashPolicy, rulesForActor } from '../src/policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../src/policy/types.js';
 import { adapter, isMock } from '../src/qvac/index.js';
+import { resolvedModel } from '../src/qvac/client.js';
 
 /**
  * The settings under test.
@@ -519,6 +520,18 @@ async function main(): Promise<void> {
     `\nadjudicator bench — ${cells.length} cells, policy ${policy.version.slice(0, 8)}, ` +
       `role ${actorRole}, adapter ${isMock() ? 'mock' : 'real'}`
   );
+  /**
+   * Which weights answered, printed and recorded.
+   *
+   * The cache already keys on this, so results never mix — but the output did
+   * not say it, and the same comparison run against a 0.6B and a 1.7B produced
+   * opposite conclusions on the same cells. A bench that does not name the
+   * model is a bench whose two runs cannot be told apart afterwards.
+   */
+  const models = isMock()
+    ? { adapter: 'mock' }
+    : { adjudicator: resolvedModel('adjudicator'), detector: resolvedModel('detector') };
+  console.log(`  models: ${Object.entries(models).map(([k, v]) => `${k}=${v}`).join(' · ')}`);
   if (isMock()) {
     console.log(
       'WARNING: the mock adapter answers from keyword lists. This run measures the\n' +
@@ -554,6 +567,7 @@ async function main(): Promise<void> {
         startedAt: new Date(started).toISOString(),
         policyVersion: policy.version,
         adapter: isMock() ? 'mock' : 'real',
+        models,
         concurrency,
         cells: cells.length,
         variants: bName ? [aName, bName] : [aName],

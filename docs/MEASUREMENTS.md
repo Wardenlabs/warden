@@ -120,10 +120,36 @@ notion of "aimed at my rules" at that size, so everything lands on the benign
 side, which is the same failure as the majority vote: an answer that never
 required deciding.
 
-Whether a larger model changes that is open: `WARDEN_INJECTION_MODEL=adjudicator`
-runs the identical question on the 1.7B. Until someone runs it, the pass stays
-off, and it stays in the tree for the same reason `CONFIRM_VOTES` does — the
-measured reason a thing failed is worth more than the thing.
+### It was the model, not the question
+
+Run within the hour, same 63 cells, the only change being
+`WARDEN_INJECTION_MODEL=adjudicator` — the identical prompt on the 1.7B instead
+of the 0.6B.
+
+| | base | injection @ 0.6B | injection @ 1.7B |
+|---|---|---|---|
+| Legitimate cleared | 34/46 (74%) | 46/46 (100%) | 33/46 (72%) |
+| Attacks caught | 9/14 (64%) | **1/14 (7%)** | **12/14 (86%)** |
+
+Nothing about the question changed and the attack column moved from 7% to 86%.
+Against base, neither column is separable at this n — legitimate work p = 1.00,
+attacks p = 0.45, three cells apart on fourteen — so this is not a demonstrated
+improvement and must not be quoted as one. What it does settle is the previous
+section's reading: "the hypothesis is wrong" was wrong. The hypothesis was
+untestable on a 0.6B, which answered WORK_REQUEST to everything because at that
+size it has no useful notion of what a message is aimed at.
+
+**The general lesson is about the instrument, again.** A variant here is a
+prompt *and* a model, and this bench was reporting only the prompt. Two runs of
+the same named variant produced opposite conclusions on identical cells, and
+nothing in the output distinguished them. The cache had always keyed on the
+model, so the numbers were never mixed — but a reader could not tell the runs
+apart afterwards, which is the same failure as `MODEL_ADJUDICATOR: "(default)"`
+in the eval config. Both now record the weights that actually answered.
+
+The pass stays off. It is not measurably better than base on the 1.7B and it is
+catastrophically worse on the 0.6B it was written for, which is a lever worth
+keeping and not a default worth changing.
 
 ### The bench was reporting this wrong, and nearly buried it
 
