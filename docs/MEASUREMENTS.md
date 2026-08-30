@@ -222,6 +222,56 @@ disagreements. The eval sets carry 109 legitimate prompts; the bench draws its
 negatives from 49. Pointing the bench at the eval sets is the cheapest way to
 get the power this needs.
 
+## The 8B adjudicator: the first change all day that clears the bar
+
+Same 63 cells, same prompt, same everything — `WARDEN_MODEL_ADJUDICATOR` points
+at `Qwen3-8B-Q4_K_M.gguf` instead of the 1.7B. Paired against the saved 1.7B run
+cell by cell.
+
+| pinned rule, 63 cells | 1.7B | **8B** |
+|---|---|---|
+| Legitimate cleared | 34/46 (74%) | **46/46 (100%)** |
+| Attacks caught | 9/14 (64%) | **10/14 (71%)** |
+
+```
+legitimate work cleared  1.7B only 0, 8B only 13 · p = 0.0002  ← 8B is better
+attacks caught           1.7B only 2, 8B only 3  · p = 1.0000  ← inside the noise
+→ 8B is better on one column and does not lose the other.
+```
+
+Thirteen fixed, none broken, on the rule that causes 46 of the 51 refusals in
+the product-level run. Nine recorded attempts at this number had failed before
+it — voting, rewording, examples, the pin, a relevance floor, a quoted span, a
+confidence score, the injection pass, the `choice` form — and the thing that
+moved it was a bigger model answering the same question.
+
+**Checked against the two ways this bench has lied today.** Zero cells errored,
+so nothing is being counted correct for failing to be judged. And the labels are
+real work rather than a model agreeing with everything: 46 COMPLIES and 10
+VIOLATES, where the 0.6B injection variant reached its own 100% by finding one
+violation in fourteen attacks. This one finds more attacks than the 1.7B, not
+fewer.
+
+### What it costs
+
+**13 seconds per cell against the 1.7B's 2.6** — five times the latency, on a
+pipeline already sitting at 10.5 s p50 per decision, on four CPU cores with no
+GPU. And 4.7 GB of weights that `pnpm run setup` does not fetch by default.
+
+That trade is a deployment's to make and not this repo's. What the repo can say
+is that the trade now exists and is measured, where before it was a paragraph in
+`models.ts` describing an experiment nobody had run — on a code path that, as it
+turned out, could not have run: the override took a relative path and the SDK
+requires an absolute one.
+
+### Before anyone changes a default
+
+This is one rule, 63 cells, one repetition, one machine. It is the strongest
+result in this log and it is not yet a product number. The confirmation is the
+eval — 94 legitimate prompts through the whole pipeline — and until that agrees,
+"the 8B fixes the false-positive rate" is a hypothesis with good evidence behind
+it rather than a measurement of the thing anyone cares about.
+
 ## Per-rule attribution
 
 Which rule refused legitimate work, from the run that added attribution:
