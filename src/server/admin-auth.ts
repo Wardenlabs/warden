@@ -69,15 +69,48 @@ const EMPLOYEE_PATHS: ReadonlySet<string> = new Set([
   '/api/guard/appeal'
 ]);
 
+/**
+ * The path as Express will route it, not as it was typed.
+ *
+ * **This function is the whole check.** Express matches routes
+ * case-insensitively and non-strictly unless told otherwise, and this server
+ * does not tell it otherwise. So `GET /API/audit` reaches the handler
+ * registered for `/api/audit` — and a case-sensitive `startsWith('/api/')` here
+ * returned false for it, decided the path was not administrative, and waved it
+ * through. Measured against a running server before this existed:
+ * `/api/audit` refused with 403 and `/API/audit` answered 200 with the log.
+ *
+ * A guard that normalises differently from the router it guards is not a guard.
+ * Anything added here has to be checked against what Express actually matches,
+ * which is why the two normalisations applied below are the two Express
+ * applies: case-folding, and a tolerated trailing slash. Where a route resolves
+ * something case-sensitively of its own — the install token does — the check
+ * for it reads the unfolded path, so that it agrees with that route too.
+ */
+function withoutTrailingSlash(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+}
+
 /** Does this path require an administrator? */
-export function needsAdmin(path: string): boolean {
+export function needsAdmin(rawPath: string): boolean {
+  const raw = withoutTrailingSlash(rawPath);
+  const path = raw.toLowerCase();
+
   // Hands out an employee's API key in a shell script, so the URL is itself a
   // credential. It cannot simply be closed: the employee runs it from their own
   // machine before they have a key, which is what it is for. So the address
   // carries the secret — an install token, unguessable and derived from the key
   // it delivers — and that form is public. Addressed by employee id, where the
   // id is somebody's first name, it stays administrative.
-  if (path.startsWith('/install/')) return !INSTALL_TOKEN.test(path.slice('/install/'.length));
+  //
+  // Matched against the path as sent rather than the folded one, which is the
+  // opposite of the rule below it and for the same reason: agreement with what
+  // resolves the request. `installToken` mints lower-case hex and
+  // `findByInstallToken` accepts nothing else, so folding here would classify a
+  // token this server could never have issued as public and then hand it to a
+  // route that refuses it. Both answers are safe; only one of them is the same
+  // answer.
+  if (path.startsWith('/install/')) return !INSTALL_TOKEN.test(raw.slice('/install/'.length));
   if (path === '/install') return true;
   if (!path.startsWith('/api/') && path !== '/api') return false;
   return !EMPLOYEE_PATHS.has(path);

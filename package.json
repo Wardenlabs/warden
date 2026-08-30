@@ -28,7 +28,8 @@
     "permalinks": "tsx scripts/permalinks.ts",
     "benchmark": "tsx scripts/benchmark.ts",
     "test:vote": "tsx scripts/test-vote.ts",
-    "test:hook": "tsx scripts/test-hook.ts"
+    "test:hook": "tsx scripts/test-hook.ts",
+    "test:auth": "tsx scripts/test-auth.ts"
   },
   "dependencies": {
     "@qvac/sdk": "^0.17.1",
