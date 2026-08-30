@@ -37,6 +37,14 @@
  *   pnpm run bench -- --a base --b choice       # paired A/B with a p-value
  *   pnpm run bench -- --limit 60 --rule r-instruction-override
  *
+ * Comparing two *models* needs `--against`, because a role's weights load once
+ * per process and two of them cannot share a run:
+ *
+ *   pnpm run bench -- --rule r-instruction-override
+ *   cp data/bench-last.json data/bench-1.7b.json
+ *   WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf \
+ *     pnpm run bench -- --rule r-instruction-override --against data/bench-1.7b.json
+ *
  * Results are cached per cell, so a second variant only pays for the cells it
  * has not already answered, and an interrupted run resumes.
  */
@@ -497,6 +505,7 @@ async function main(): Promise<void> {
   const concurrency = Number(argValue(args, '--concurrency') ?? 1);
   const limit = Number(argValue(args, '--limit') ?? 0);
   const ruleFilter = argValue(args, '--rule');
+  const against = argValue(args, '--against');
   const actorRole = argValue(args, '--role') ?? 'analyst';
 
   const policy = benchmarkPolicy();
@@ -557,6 +566,45 @@ async function main(): Promise<void> {
     compare(aName, a, bName, b);
   }
 
+  /**
+   * Pair this run against one saved earlier.
+   *
+   * Two variants can share a process; two *models* cannot — a role's weights
+   * load once, so `WARDEN_MODEL_ADJUDICATOR` decides for the whole run. That
+   * left the one comparison this project most needs, "is a bigger model
+   * better", as two separate runs read side by side, which is exactly the
+   * unpaired reading this bench exists to replace.
+   *
+   * So a saved run is a first-class comparison partner. Cells are matched by
+   * key — the hash of the message and the rule — and any cell missing from
+   * either side is dropped with a count, because a pair needs both halves and
+   * quietly comparing different cell sets is worse than comparing fewer.
+   */
+  if (against) {
+    const prior = JSON.parse(readFileSync(against, 'utf8')) as {
+      models?: Record<string, string>;
+      variants?: string[];
+      results: { key: string; correct: boolean }[];
+    };
+    const byKey = new Map(prior.results.map((r) => [r.key, r.correct]));
+    const paired = a.filter((r) => byKey.has(r.cell.key));
+    const dropped = a.length - paired.length;
+
+    console.log(
+      `\nagainst ${against}` +
+        `\n  saved run: variant ${prior.variants?.[0] ?? '?'}, models ` +
+        `${Object.entries(prior.models ?? {}).map(([k, v]) => `${k}=${v}`).join(' · ') || 'unrecorded'}`
+    );
+    if (dropped > 0) console.log(`  ${dropped} cells are not in the saved run and were dropped`);
+
+    compare(
+      `saved(${prior.variants?.[0] ?? 'base'})`,
+      paired.map((r) => ({ ...r, correct: byKey.get(r.cell.key) as boolean })),
+      `${aName}@now`,
+      paired
+    );
+  }
+
   const elapsed = ((Date.now() - started) / 1000).toFixed(0);
   console.log(`\n${elapsed}s\n`);
 
@@ -571,7 +619,16 @@ async function main(): Promise<void> {
         concurrency,
         cells: cells.length,
         variants: bName ? [aName, bName] : [aName],
-        results: a.map((r) => ({ id: r.cell.id, rule: r.cell.rule.id, kind: r.cell.kind, label: r.label, correct: r.correct }))
+        // `key` is what makes a saved run poolable with a later one: ids repeat
+        // across sets, but the key is the hash of the message and the rule.
+        results: a.map((r) => ({
+          key: r.cell.key,
+          id: r.cell.id,
+          rule: r.cell.rule.id,
+          kind: r.cell.kind,
+          label: r.label,
+          correct: r.correct
+        }))
       },
       null,
       2
