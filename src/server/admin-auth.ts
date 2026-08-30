@@ -166,6 +166,25 @@ export function hasAdminKey(req: Request): boolean {
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if ((!REQUIRE_KEY && isLoopback(req)) || hasAdminKey(req)) return next();
 
+  // The onboarding route's whole output is piped into `sh`. A JSON body sent
+  // there is a syntax error arriving inside a shell, which reads to the
+  // employee as their machine breaking rather than as a link they should not
+  // have. The route already answers an unknown employee this way; a refusal
+  // deserves the same shape.
+  if (req.path.toLowerCase().startsWith('/install')) {
+    return void res
+      .status(403)
+      .type('text/plain')
+      .send(
+        [
+          '# This install link is not the one to use. Ask your admin for the link',
+          '# shown in the console, which carries a token rather than your name.',
+          'exit 1',
+          ''
+        ].join('\n')
+      );
+  }
+
   res.status(403).json({
     error: 'administrative endpoint',
     detail:

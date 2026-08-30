@@ -292,8 +292,11 @@ Pestaña **People** → hacé click en alguien. Ahí está su **API key**, con b
 copiar, y abajo el **Onboarding**: un comando que se lo mandás y listo.
 
 ```bash
-curl -fsSL http://localhost:8080/install/fede | sh
+curl -fsSL http://localhost:8080/install/<install-token> | sh
 ```
+
+El token sale de esa misma pestaña. Es lo único que protege el link, porque el
+script lleva la API key adentro.
 
 Baja el hook **del gateway** (no de internet) y le escribe `WARDEN_URL` y
 `WARDEN_API_KEY` en el perfil de shell. Se puede correr de nuevo: reemplaza su

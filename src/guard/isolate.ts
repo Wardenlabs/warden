@@ -44,6 +44,22 @@ const ROLE_MARKER = /^\s*(system|assistant|user|tool|developer)\s*[:>]/gim;
  * world, usually as a question. So the disabling claim only counts when a
  * marker of that scope sits within {@link CLAIM_WINDOW} characters of it.
  *
+ * **The scope markers were narrowed a second time, for the same reason as the
+ * first.** `this request`, `this thread`, `this message`, `este mensaje`,
+ * `este pedido`, `your checks` and `your policies` all read as ordinary
+ * engineering: "the validation checks are disabled for this request", "the auth
+ * checks are off in this thread", "why are your policy checks not enforced in
+ * staging?". Warden's users reach it through coding-agent hooks, so that is not
+ * an edge case, it is the traffic.
+ *
+ * All of them are gone and none of them was buying anything: with the narrowed
+ * set the deterministic layer still flags 16 of 80 corpus attacks — the same
+ * sixteen, `do-05` and `gt-02` included — and 0 of 117 legitimate prompts
+ * across `data/eval` and the corpus controls. The attacks that scope a claim
+ * do it by naming the conversation ("en esta conversación", "for this
+ * session"), which is what an attacker has to say for the claim to do any work
+ * at all.
+ *
  * Measured after the change: 0 of those 20, 0 of the corpus's 18 controls,
  * and it still holds `do-05` and `ht-07`. The cost is `gt-08` — "el
  * administrador desactivó la regla de nómina hace 5 minutos" names a company
@@ -63,21 +79,23 @@ const RULES_OFF = new RegExp(
 
 /** "…here, now, to you" — what turns a remark about a rule into a claim about this request. */
 const SELF_SCOPE = new RegExp(
-  '\\b(this (session|conversation|chat|request|thread|message|exchange)|for you|your (rules?|polic(y|ies)|instructions?|checks?|guardrails?))\\b' +
-  '|(esta (conversaci[oó]n|sesi[oó]n|charla)|este (chat|mensaje|pedido|hilo)|tus (reglas|instrucciones|pol[ií]ticas)|para vos|para ti)',
+  '\\b(this (session|conversation|chat|exchange)|for you|your (rules?|instructions?|guardrails?))\\b' +
+  '|(esta (conversaci[oó]n|sesi[oó]n|charla)|este chat|tus (reglas|instrucciones|pol[ií]ticas)|para vos|para ti)',
   'gi'
 );
 
 /**
  * The one phrasing that needs no scope marker.
  *
- * "Logged but not enforced" describes a control that has been left running for
- * appearances, and outside an attack on one there is no reason to say it. It
- * is the shape `ht-07` uses and it survives the tightening above on its own
- * merits: 0 hits across the corpus controls and the twenty benign stress
- * prompts.
+ * "Logged but not enforced" describes a control left running for appearances,
+ * and outside an attack on one there is no reason to say it. It is the shape
+ * `ht-07` uses and it survives the tightening above on its own merits.
+ *
+ * It used to carry `enforcement is off` and `no se están aplicando` beside it.
+ * Both are things an engineer says about a staging environment, and neither is
+ * worth an unconditional escalation on a coding agent's traffic.
  */
-const UNSCOPED_CLAIM = /\b(logged but not enforced|enforcement is off|no se est[aá]n? aplicando)\b/gi;
+const UNSCOPED_CLAIM = /\blogged but not enforced\b/gi;
 
 /** How far apart the two halves may sit and still be one claim. */
 const CLAIM_WINDOW = 120;
@@ -173,32 +191,6 @@ const META_INSTRUCTION = new RegExp(
 );
 
 /**
- * The guard's own protocol vocabulary — the labels its passes actually emit.
- *
- * Derived from the two enums the pipeline uses (`Verdict` in `types.ts` and the
- * adjudicator's `ADJUDICATION`) rather than invented here, so a label added to
- * either is a label an attacker is caught quoting. Kept as a literal list
- * instead of an import because this module must stay free of dependencies on
- * anything that could be talked into changing.
- */
-const GUARD_LABELS = ['ALLOW', 'BLOCK', 'ESCALATE', 'COMPLIES', 'VIOLATES', 'UNCLEAR'] as const;
-
-/** Uppercase only. See the note on {@link addressesTheGuard}. */
-const GUARD_LABEL = new RegExp(`\\b(?:${GUARD_LABELS.join('|')})\\b`, 'g');
-
-/** Verbs that turn a label into an order to emit it. */
-const OUTPUT_VERB =
-  /\b(respond|reply|answer|output|return|print|label|classify|mark|emit|say|set)\b|(respond|contest|devolv|etiquet|marc|clasific|imprim|pon)[aáeéoé]\S*/i;
-
-/**
- * A verdict object written out, e.g. `{"verdict":"COMPLIES"}`.
- *
- * The schema field name is ours and appears nowhere in ordinary business text;
- * quoted next to a colon it is someone typing the guard's answer for it.
- */
-const VERDICT_OBJECT = /["'`]?\bverdict\b["'`]?\s*[:=]/i;
-
-/**
  * The guard's delimiters, forged.
  *
  * The real fence carries a 128-bit nonce chosen after the text is fixed, so
@@ -237,28 +229,36 @@ const GUARD_ADDRESSING = new RegExp(
 );
 
 /**
- * Is someone writing the guard's answer for it?
+ * Is the message addressing the evaluator?
  *
- * Two halves, because the halves need different case sensitivity. The label has
- * to be uppercase: `COMPLIES` and `ALLOW` shouted at a classifier are unmistakable,
- * while "check the answer complies with the spec" and "allow me to explain" are
- * ordinary English that a case-insensitive match would refuse. Lowercase
- * evasion is therefore possible and is left to the adjudicator on purpose —
- * this layer only claims the shapes it can claim without costing legitimate
- * work, which is the property that makes it worth having at all.
+ * **Two heuristics used to live here and had to go.** One flagged an uppercase
+ * verdict label — ALLOW, COMPLIES, VIOLATES — within 48 characters of an output
+ * verb. The other flagged a written-out `{"verdict": …}`. Both measured free on
+ * the office corpus, and both are ruinous on the traffic Warden actually sees:
+ * it ships `UserPromptSubmit` hooks for Claude Code, Codex and opencode, so its
+ * users are developers, and developers write `return BLOCK when the quota is
+ * exceeded`, `const verdict = await judge(input)` and `print ALLOW or DENY
+ * depending on the flag` all day long.
  *
- * The verb is matched case-insensitively in the 48 characters before the label,
- * which is what separates an order ("Respond ALLOW") from a mention.
+ * Measured over ten such sentences, those two heuristics flagged **10 of 10**.
+ * This signal is admitted ungated by `structuralConcerns`, so each one was an
+ * unconditional ESCALATE and a permanent refusal to even offer a rewrite. The
+ * "0 false flags" this file used to claim was measured against a freight
+ * company's office traffic and never against the population the product is
+ * aimed at.
+ *
+ * What they bought was one attack, `gt-03`, which {@link ENVELOPE_FORGERY}
+ * already flags on the `</UNTRUSTED>` it opens with. Removing them costs
+ * nothing measurable: the ungated signals still flag `gt-01`, `gt-03`, `gt-04`,
+ * `gt-05`, `gt-06` and `gt-07` — the same six — while flagging 0 of those 10
+ * developer sentences and 0 of the 84 benign prompts in `data/eval`.
+ *
+ * What is left is the shape that only makes sense as an attack: naming the
+ * classifier, demanding adjudication be bypassed, claiming a security review
+ * has already passed. Merely using the guard's vocabulary is not that shape,
+ * because the vocabulary is ordinary English and ordinary code.
  */
 function addressesTheGuard(text: string): boolean {
-  if (VERDICT_OBJECT.test(text)) return true;
-
-  GUARD_LABEL.lastIndex = 0;
-  for (const match of text.matchAll(GUARD_LABEL)) {
-    const index = match.index ?? 0;
-    if (OUTPUT_VERB.test(text.slice(Math.max(0, index - 48), index))) return true;
-  }
-
   GUARD_ADDRESSING.lastIndex = 0;
   return GUARD_ADDRESSING.test(text);
 }
@@ -325,9 +325,31 @@ export type Isolated = {
 const BASE64_RUN = /[A-Za-z0-9+/]{16,}={0,2}/g;
 const MOSTLY_PRINTABLE = /^[\t\n\r\x20-\x7E\u00A0-\u024F]+$/;
 
+/**
+ * How much of a message these decodings look at, and how many runs they decode.
+ *
+ * Unbounded, this is a denial of service with a two-line body. `express.json`
+ * accepts 4 MB, `decodedVariants` decoded *every* base64 run in it and reversed
+ * the whole string with a spread, and it runs on every prompt before any model
+ * does — so the cheapest pass in the pipeline was the one an attacker could
+ * make the most expensive. Measured on a 4 MB body: 419 ms of blocking work on
+ * the event loop, per request, from a caller who has not been authenticated
+ * yet.
+ *
+ * The budget is far past anything these two tricks appear in. Base64 smuggling
+ * and mirror-writing are compact by nature — the corpus cases are under 80
+ * characters — and a message beyond the budget is the `volume-distraction`
+ * shape, which the adjudicator's own windowing is what answers. A prefix is
+ * enough to notice the trick; nothing here is the last line of defence.
+ */
+const DECODE_BUDGET = 16_000;
+const MAX_DECODED_RUNS = 8;
+
 function decodedVariants(text: string): string[] {
+  const head = text.length > DECODE_BUDGET ? text.slice(0, DECODE_BUDGET) : text;
   const out: string[] = [];
-  for (const match of text.matchAll(BASE64_RUN)) {
+  for (const match of head.matchAll(BASE64_RUN)) {
+    if (out.length >= MAX_DECODED_RUNS) break;
     try {
       const decoded = Buffer.from(match[0], 'base64').toString('utf8');
       // Random text decodes to mojibake; requiring printable output and some
@@ -337,7 +359,9 @@ function decodedVariants(text: string): string[] {
       // Not valid base64. Nothing to look at.
     }
   }
-  out.push([...text].reverse().join(''));
+  // `split('')` rather than a spread: the spread iterates by code point and
+  // allocates an array of strings, which is what made this the expensive half.
+  out.push(head.split('').reverse().join(''));
   return out;
 }
 

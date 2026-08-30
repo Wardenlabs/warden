@@ -81,7 +81,7 @@ operativo va a pedir permiso de firewall la primera vez (y macOS puede volver
 a pedirlo tras actualizar, mientras la app no esté firmada).
 
 Con LAN activo, **Copy network URL** copia la dirección que se le pasa a los
-empleados; el flujo de onboarding (`/install/<id>`, hooks, claves) es idéntico
+empleados; el flujo de onboarding (`/install/<install-token>`, hooks, claves) es idéntico
 al de siempre.
 
 ## Dónde viven los datos

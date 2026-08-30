@@ -93,8 +93,14 @@ El registro es el audit log.)
 ## 1 y 2. Un comando
 
 ```bash
-curl -fsSL http://192.168.1.42:8080/install/fede | sh
+curl -fsSL http://192.168.1.42:8080/install/<install-token> | sh
 ```
+
+El token lo genera la consola (**People → la persona → Onboarding**) y es toda
+la seguridad del link: el script que devuelve esta URL entrega la API key de esa
+persona. Con el id en su lugar, `/install/ana` le daba la key de Ana a
+cualquiera que adivinara un nombre. Rotar la key invalida todos los links
+emitidos.
 
 Eso baja el hook **del gateway** (no de internet — funciona en una red sin
 salida) y escribe `WARDEN_URL` y `WARDEN_API_KEY` en tu perfil de shell. Se puede

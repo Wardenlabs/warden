@@ -322,19 +322,32 @@ async function labelOverWindows(
   iso: Isolated,
   rule: Rule,
   opts: Resolved
-): Promise<{ label: Label; windowCount: number }> {
+): Promise<{ label: Label; windowCount: number; judged: Isolated }> {
   const slices = windows(iso, opts.windowChars, opts.windowOverlap);
-  if (slices.length === 1) return { label: await sampleLabel(qvac, iso, rule, opts), windowCount: 1 };
+  if (slices.length === 1) {
+    return { label: await sampleLabel(qvac, iso, rule, opts), windowCount: 1, judged: iso };
+  }
 
   let worst: Label = 'COMPLIES';
+  // The slice the answer came from, so a confirming vote can be asked the same
+  // question. Asked over the whole message instead, a confirmation is answering
+  // about text the first sample never saw: the payload this pass exists to find
+  // is a sentence buried in nine hundred characters, and re-diluting it is
+  // exactly how the window's VIOLATES gets voted back down to UNCLEAR — which
+  // the aggregator does not escalate on its own. Windowing and voting together
+  // were quietly worse than either alone.
+  let judged: Isolated = slices[0] ?? iso;
   let seen = 0;
   for (const slice of slices) {
     seen++;
     const label = await sampleLabel(qvac, slice, rule, opts);
-    if (LABEL_STRICTNESS[label] > LABEL_STRICTNESS[worst]) worst = label;
+    if (LABEL_STRICTNESS[label] > LABEL_STRICTNESS[worst]) {
+      worst = label;
+      judged = slice;
+    }
     if (worst === 'VIOLATES') break;
   }
-  return { label: worst, windowCount: seen };
+  return { label: worst, windowCount: seen, judged };
 }
 
 /** One labelled sample. */
@@ -412,7 +425,7 @@ export async function adjudicate(
   const started = Date.now();
   const opts = resolve(options);
 
-  const { label: first, windowCount } = await labelOverWindows(qvac, iso, rule, opts);
+  const { label: first, windowCount, judged } = await labelOverWindows(qvac, iso, rule, opts);
 
   let label = first;
   let votes: Label[] = [first];
@@ -420,7 +433,7 @@ export async function adjudicate(
   if (first === 'VIOLATES' && opts.confirmVotes > 0) {
     const extra = await Promise.all(
       Array.from({ length: opts.confirmVotes }, (_, i) =>
-        sampleLabel(qvac, iso, rule, opts, { temp: opts.confirmTemp, seed: 1000 + i }).catch(
+        sampleLabel(qvac, judged, rule, opts, { temp: opts.confirmTemp, seed: 1000 + i }).catch(
           // A confirmation we could not obtain does not get to acquit.
           (): Label => 'VIOLATES'
         )

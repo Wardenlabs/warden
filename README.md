@@ -325,8 +325,14 @@ whole thing as a message to paste into a chat.
 For the employee it is one command:
 
 ```bash
-curl -fsSL http://192.168.1.42:8080/install/fede | sh
+curl -fsSL http://192.168.1.42:8080/install/<install-token> | sh
 ```
+
+The token is the link's whole security. It is derived from the person's API key
+and the console fills it in for you, because the script this URL returns hands
+over that key — addressed by employee id instead, `/install/ana` would return
+Ana's key to anyone who guessed a first name. Rotating the key invalidates every
+link ever issued for that person.
 
 The gateway serves the script and the hook itself, so nobody needs a route to
 the public internet to be onboarded — on a network with no egress the GitHub

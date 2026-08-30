@@ -18,7 +18,78 @@
  */
 
 const $ = (id) => document.getElementById(id);
-const api = (path, opts) => fetch(path, opts).then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, j })));
+/**
+ * The administrator's key, when the console needs one.
+ *
+ * It usually does not: the gateway treats its own loopback interface as
+ * administrative, so a console opened on the machine running it never sees a
+ * 403. Two situations do need a key — an admin opening the console from another
+ * machine, and a deployment that has set `WARDEN_ADMIN_REQUIRE_KEY=1` because
+ * employees can log into the gateway host. Until this existed there was nowhere
+ * to put one, so the documented hardening switch made the console unusable and
+ * every call failed with a 403 the UI rendered as a broken request.
+ *
+ * `sessionStorage`, not `localStorage`. This key rewrites policy and mints
+ * credentials, and the difference is whether it survives the browser being
+ * closed on a shared machine. Re-entering it once per session is a small price
+ * for a credential that is not left lying in a profile directory.
+ */
+const ADMIN_KEY = 'warden.adminKey';
+
+const adminKey = () => {
+  try {
+    return sessionStorage.getItem(ADMIN_KEY) ?? '';
+  } catch {
+    // Private mode, or storage disabled. The console still works from loopback.
+    return '';
+  }
+};
+
+const askForAdminKey = () => {
+  const entered = window.prompt(
+    'This gateway wants an administrator key.\n\n' +
+      'Paste the API key of a person whose role the policy exempts — People → ' +
+      'that person → API key. It is kept for this browser tab only.'
+  );
+  if (!entered) return false;
+  try {
+    sessionStorage.setItem(ADMIN_KEY, entered.trim());
+  } catch {
+    return false;
+  }
+  return true;
+};
+
+/**
+ * One fetch helper, so the key is attached in one place.
+ *
+ * A 403 is answered by asking for a key once and retrying. Once, and tracked
+ * per call: retrying on the retry turns a wrong key into a prompt loop the
+ * admin cannot escape without closing the tab.
+ *
+ * The body is read as text and then parsed, because not every refusal is JSON —
+ * `/install` answers in shell so that its output stays safe to pipe — and
+ * `r.json()` on those used to throw inside the helper every caller depends on.
+ */
+const api = async (path, opts, retried) => {
+  const key = adminKey();
+  const init = key
+    ? { ...opts, headers: { ...(opts?.headers ?? {}), authorization: `Bearer ${key}` } }
+    : opts;
+
+  const r = await fetch(path, init);
+
+  if (r.status === 403 && !retried && askForAdminKey()) return api(path, opts, true);
+
+  const text = await r.text();
+  let j = null;
+  try {
+    j = text ? JSON.parse(text) : null;
+  } catch {
+    j = { error: text.slice(0, 400) };
+  }
+  return { ok: r.ok, status: r.status, j };
+};
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const attr = (s) => encodeURIComponent(String(s ?? ''));
 const val = (x) => (typeof x === 'function' ? x() : x);

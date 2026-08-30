@@ -218,10 +218,26 @@ async function main(): Promise<void> {
       ramGB: Math.round(totalmem() / 1024 ** 3),
       node: process.version
     },
+    /**
+     * Every lever that changes what the guard decides, recorded with the run.
+     *
+     * A stored run is only comparable to another if this says how each was
+     * configured, and three of these were added to the pipeline after this
+     * block was written — so a variant run was being filed as a baseline, and
+     * `pnpm run compare` would have read the difference as a change in the
+     * model. Anything that gates a decision belongs here on the day it lands.
+     */
     config: {
       MIN_RELEVANCE: process.env['WARDEN_MIN_RELEVANCE'] ?? '(default)',
       TOP_K: process.env['WARDEN_TOP_K'] ?? '(default)',
-      CONFIRM_VOTES: process.env['WARDEN_CONFIRM_VOTES'] ?? '(default)'
+      CONFIRM_VOTES: process.env['WARDEN_CONFIRM_VOTES'] ?? '(default)',
+      CONFIRM_TEMP: process.env['WARDEN_CONFIRM_TEMP'] ?? '(default)',
+      INJECTION_PASS: process.env['WARDEN_INJECTION_PASS'] ?? '(default)',
+      INJECTION_MODEL: process.env['WARDEN_INJECTION_MODEL'] ?? '(default)',
+      WINDOW_CHARS: process.env['WARDEN_WINDOW_CHARS'] ?? '(default)',
+      WINDOW_OVERLAP: process.env['WARDEN_WINDOW_OVERLAP'] ?? '(default)',
+      ADJUDICATOR_FORM: process.env['WARDEN_ADJUDICATOR_FORM'] ?? '(default)',
+      MODEL_ADJUDICATOR: process.env['WARDEN_MODEL_ADJUDICATOR'] ?? '(default)'
     },
     totals: {
       prompts: results.length,

@@ -218,9 +218,15 @@ export async function evaluate(
     injections: injections.flatMap((i, index) =>
       i.finding ? [{ ruleId: pinned[index]!.id, finding: i.finding }] : []
     ),
-    // A pinned rule whose injection pass threw is unanswered in the sense that
-    // matters: nobody judged it.
-    unansweredPinned: injections.flatMap((i, index) => (i.finding ? [] : [pinned[index]!.id])),
+    // A pinned rule whose injection pass threw is unanswered only when the
+    // injection pass was its only judge. In `evidence` mode the adjudicator
+    // judged it too, so escalating here would let a detector timeout overrule a
+    // rule the adjudicator answered cleanly — a control making the decision
+    // stricter by failing, on evidence nobody produced.
+    unansweredPinned:
+      INJECTION_MODE === 'replace'
+        ? injections.flatMap((i, index) => (i.finding ? [] : [pinned[index]!.id]))
+        : [],
     unreadableAttachments
   });
   passes.push({

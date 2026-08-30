@@ -70,23 +70,6 @@ const app = express();
 app.use(express.json({ limit: '4mb' }));
 
 /**
- * Authorisation, ahead of every route so no route can forget it.
- *
- * Mounted here rather than annotated per handler because the failure mode of
- * the per-handler version is silent: the route someone adds next month is
- * public until they remember. `needsAdmin` decides from the path, and its list
- * is of what stays open, so anything new is closed until it is named.
- *
- * See `admin-auth.ts` for what an administrator is and why loopback counts as
- * one. Before this, every policy write, key issue and audit read on this server
- * was reachable by anyone who could open the port.
- */
-app.use((req, res, next) => {
-  if (!needsAdmin(req.path)) return next();
-  requireAdmin(req, res, next);
-});
-
-/**
  * The console is served by this same process, so same-origin needs no CORS at
  * all. The wildcard that used to sit here let any web page an admin happened to
  * visit read the directory and post policy changes cross-origin, with the
@@ -110,6 +93,36 @@ if (CORS_ORIGIN) {
   });
   app.options(/.*/, (_req, res) => res.sendStatus(204));
 }
+
+/**
+ * Authorisation, ahead of every route so no route can forget it.
+ *
+ * Mounted here rather than annotated per handler because the failure mode of
+ * the per-handler version is silent: the route someone adds next month is
+ * public until they remember. `needsAdmin` decides from the path, and its list
+ * is of what stays open, so anything new is closed until it is named.
+ *
+ * **After the CORS block, not before it.** Mounted first, two things broke at
+ * once: an administrative 403 carried no `Access-Control-Allow-Origin`, so a
+ * browser reported it as an opaque CORS failure rather than as the refusal it
+ * is, and the preflight `OPTIONS` was itself authenticated — a preflight
+ * carries no `Authorization` header by definition, so with
+ * `WARDEN_ADMIN_REQUIRE_KEY=1` the documented separate-dev-port setup could
+ * never complete a single request. Order is part of the behaviour of
+ * middleware, and this is the order that lets a refusal be read as one.
+ *
+ * `OPTIONS` is skipped for the same reason: the browser is asking what it would
+ * be allowed to do, not doing it. The real request that follows is still
+ * checked, so nothing is granted by answering.
+ *
+ * See `admin-auth.ts` for what an administrator is and why loopback counts as
+ * one. Before this, every policy write, key issue and audit read on this server
+ * was reachable by anyone who could open the port.
+ */
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS' || !needsAdmin(req.path)) return next();
+  requireAdmin(req, res, next);
+});
 
 // Seed the demo policy on boot if the store is empty, so a fresh clone has
 // something to show without a manual step.
@@ -663,8 +676,13 @@ app.post('/v1/chat/completions', asyncRoute(async (req, res) => {
   if (!handleChatCompletion) {
     // Until the proxy lands, run the guard so the console's chat pane is live.
     const decision = await evaluateRequest(req);
+    // Null means nobody could be identified, and this branch used to fall
+    // straight through it into the 200 below: an unrecognised API key was
+    // answered "allowed" by the one path in the product that exists to refuse.
+    // The guard never ran, so there was not even a verdict to be wrong.
+    if (!decision) return res.status(401).json(UNKNOWN_KEY);
     emitDecision(decision);
-    if (decision && (decision as { verdict?: string }).verdict !== 'ALLOW') {
+    if ((decision as { verdict?: string }).verdict !== 'ALLOW') {
       return res.status(403).json({ error: { code: 'policy_block', decision } });
     }
     return res.json({
