@@ -7,6 +7,7 @@
  * unusable.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
 import { MODEL_SPECS, modelsDir } from './models.js';
@@ -43,7 +44,16 @@ function overrideFor(role: ModelRole): string | null {
       `WARDEN_MODEL_${role.toUpperCase()} points at "${path}", which does not exist`
     );
   }
-  return path;
+  // Absolute, always. The SDK rejects a relative `modelSrc` outright — "must be
+  // an absolute path" — and the documented way to use this override is
+  // relative: `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`, in the
+  // README and in `models.ts` both. So the one path this project offers for
+  // trying a larger model had never worked, and it failed in the worst
+  // available way: `existsSync` passes, the override is accepted, and every
+  // generation throws at load time. A bench run against it recorded 56 cells of
+  // ERROR and, before today's fix to how those are counted, reported the broken
+  // model as significantly better than the working one.
+  return resolve(path);
 }
 
 /**
@@ -63,7 +73,9 @@ function sourceFor(role: ModelRole): string | object {
   const spec = MODEL_SPECS.find((m) => m.role === role);
   if (!spec) throw new Error(`no model registered for role "${role}"`);
 
-  const conventional = `${modelsDir()}/${spec.filename}`;
+  // Resolved for the same reason as the override above: this is the path taken
+  // on any machine that has the weights but no `warden.local.json`.
+  const conventional = resolve(modelsDir(), spec.filename);
   if (existsSync(conventional)) return conventional;
 
   return spec.entry as unknown as object;

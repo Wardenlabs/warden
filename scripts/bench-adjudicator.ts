@@ -344,10 +344,30 @@ async function runVariant(
     out[index] = {
       cell,
       label,
-      // UNCLEAR is not a violation and does not block on its own, so on a
-      // negative it counts as correct. On a positive it is a miss: the rule was
-      // meant to fire and did not.
-      correct: cell.expect === 'VIOLATES' ? label === 'VIOLATES' : label !== 'VIOLATES'
+      /**
+       * UNCLEAR is not a violation and does not block on its own, so on a
+       * negative it counts as correct. On a positive it is a miss: the rule was
+       * meant to fire and did not.
+       *
+       * **ERROR is wrong on both sides, and getting that wrong flattered a
+       * completely broken model.** The test above read `label !== 'VIOLATES'`,
+       * so a cell nobody could judge counted as legitimate work cleared. An
+       * 8B adjudicator that failed to load produced 56 ERRORs and was reported
+       * as *better than the 1.7B on legitimate work, p = 0.0002* — the
+       * instrument calling a total failure a significant win. Only the
+       * one-second runtime gave it away.
+       *
+       * A cell that could not be judged was not cleared. In production the same
+       * failure fails closed to ESCALATE, which on legitimate traffic is a
+       * false positive, so counting it as one here is also what the pipeline
+       * would do.
+       */
+      correct:
+        label === 'ERROR'
+          ? false
+          : cell.expect === 'VIOLATES'
+            ? label === 'VIOLATES'
+            : label !== 'VIOLATES'
     };
 
     done++;
@@ -384,6 +404,16 @@ function pct(k: number, n: number): string {
 function report(name: string, results: Result[]): void {
   const groups: Cell['kind'][] = ['negative', 'long-negative', 'positive'];
   console.log(`\n${name}`);
+
+  // Said before the rates, not after, because a run that could not reach the
+  // model has no rates worth reading and the eye stops at the first number.
+  const errors = results.filter((r) => r.label === 'ERROR').length;
+  if (errors > 0) {
+    console.log(
+      `  ⚠ ${errors}/${results.length} cells could not be judged at all — these count as` +
+        `\n    wrong on both columns. Anything below is a report about a broken run.`
+    );
+  }
   for (const kind of groups) {
     const rows = results.filter((r) => r.cell.kind === kind);
     if (rows.length === 0) continue;
