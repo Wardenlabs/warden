@@ -173,6 +173,55 @@ columns or neither**, and a single pooled number is precisely a way of not
 applying it — the tool built to enforce the rule was breaking it. A variant is
 now only called better if it wins one column without losing the other.
 
+## `choice`: a clean 5-0 that did not survive more cells
+
+Naming the benign label — `ORDINARY_REQUEST` instead of `COMPLIES`, so the model
+picks something a message can positively *be* rather than affirming a negation.
+Same day, real models, 1.7B adjudicator.
+
+Restricted to `r-instruction-override`, the rule causing 46 of the 51 refusals,
+it looked like the best result of the day:
+
+| 63 cells, pinned rule | base | choice |
+|---|---|---|
+| Legitimate cleared | 34/46 (74%) | **38/46 (83%)** |
+| Attacks caught | 9/14 (64%) | **10/14 (71%)** |
+
+Better on both columns, and the shape was the appealing part: **fixed 5, broke
+0**. `p = 0.0625` is not a weak effect, it is the smallest p five discordant
+pairs can produce — six are needed to reach 0.05. So it read as an effect
+waiting for sample size.
+
+It was waiting for nothing. Over all 294 cells:
+
+```
+legitimate work cleared  base only 14, choice only 15 · p = 1.0000
+attacks caught           base only 2,  choice only 2  · p = 1.0000
+→ no measured difference on either column; 33 cells disagree.
+```
+
+Fifteen fixed, fourteen broken. The clean direction at n=63 was the sample, not
+the change — which is this file's oldest rule arriving in a new costume, and it
+caught me the same way it has caught everyone: the smaller run was not *wrong*,
+it was answering a smaller question than the one I read off it.
+
+### The post-hoc temptation, named so it can be resisted
+
+Both numbers are real, and together they say `choice` helps the pinned rule and
+hurts the others by about as much. The obvious move is to apply the form only
+where it wins — the adjudicator already takes per-call options, so it is an
+afternoon's work.
+
+**That is choosing the subset after seeing the data, which is how noise gets
+fitted.** Five-nil on one rule cannot clear 0.05 no matter how convincing it
+looks, and the rules it "hurts" are ten-fourteen, which is nothing. Anyone
+picking this up should treat it as one pre-registered hypothesis — the form is
+per-rule, the pinned rule takes `choice` — and test it on cells chosen *before*
+looking, with enough negatives on that rule to produce more than five
+disagreements. The eval sets carry 109 legitimate prompts; the bench draws its
+negatives from 49. Pointing the bench at the eval sets is the cheapest way to
+get the power this needs.
+
 ## Per-rule attribution
 
 Which rule refused legitimate work, from the run that added attribution:
