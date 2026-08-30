@@ -76,7 +76,11 @@ export async function compileRule(
     '- scope: "input" for what employees send, "output" for what the assistant returns, "both".',
     '- appliesTo: who the rule binds — role names, @employee tokens, or ["*"].',
     '  Bind it to a person only when the administrator named that person.',
-    '- severity: "block" to refuse outright, "escalate" to route to a human.',
+    '- severity: "block" to refuse outright, "escalate" to route to a human,',
+    '  "warn" to let the request through with a note saying why it was flagged.',
+    '  Choose "warn" when the admin asks to be told rather than protected — when',
+    '  they say to flag, note, remind, or keep an eye on something rather than',
+    '  stop it, or when the rule is a preference rather than a prohibition.',
     '- guidance: one sentence telling an employee who just hit this rule what to do',
     '  instead — who to ask, or which nearby request is fine. Write it to them, not',
     '  about them. Never restate the prohibition; they already saw it.',
@@ -168,7 +172,13 @@ export async function previewRule(
       try {
         const { verdict } = await adjudicate(qvac, iso, parsed);
         const decided = verdict.violates
-          ? parsed.severity === 'block' ? 'BLOCK' : 'ESCALATE'
+          ? parsed.severity === 'block'
+            ? 'BLOCK'
+            // A `warn` rule fires without stopping anything, so a preview of it
+            // firing has to read ALLOW. Showing ESCALATE here would preview a
+            // refusal the ratified rule will never produce, which is the one
+            // thing this preview exists to get right.
+            : parsed.severity === 'warn' ? 'ALLOW' : 'ESCALATE'
           : 'ALLOW';
         return {
           prompt, expected, source, verdict: decided,
