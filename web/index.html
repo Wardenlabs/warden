@@ -372,6 +372,9 @@ input.inline { padding-right: var(--s-3); }
 .badge.ALLOW    { background: var(--allow-bg);    color: var(--allow); }
 .badge.BLOCK    { background: var(--block-bg);    color: var(--block); }
 .badge.ESCALATE { background: var(--escalate-bg); color: var(--escalate); }
+/* `warn` fires without stopping anything, so it borrows the held-for-review
+   palette rather than the refusal one. Nothing was refused. */
+.badge.warn { background: var(--escalate-bg); color: var(--escalate); }
 .badge.block    { background: var(--block-bg);    color: var(--block); }
 .badge.escalate { background: var(--escalate-bg); color: var(--escalate); }
 

@@ -90,6 +90,27 @@ const api = async (path, opts, retried) => {
   }
   return { ok: r.ok, status: r.status, j };
 };
+/**
+ * What a severity actually does, in the admin's words.
+ *
+ * Written as a lookup rather than a ternary because a ternary has room for two
+ * answers and there are three. Both of the places this replaced assumed the
+ * pair: a `warn` rule rendered as "the request is stopped" in the rule detail
+ * and as "escalates" in the drafting flow. An admin reading either would have
+ * had exactly the wrong model of their own policy — believing a rule enforced
+ * something it had been set not to enforce, which is worse than not showing the
+ * severity at all.
+ */
+const SEVERITY_MEANS = {
+  block: 'the request is stopped',
+  escalate: 'held for a person to sign off',
+  warn: 'the request goes through, with a note saying why it was flagged'
+};
+const SEVERITY_VERB = { block: 'stops', escalate: 'escalates', warn: 'warns about' };
+
+const severityMeans = (s) => SEVERITY_MEANS[s] ?? `severity “${esc(s)}” — unknown to this console`;
+const severityVerb = (s) => SEVERITY_VERB[s] ?? 'flags';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const attr = (s) => encodeURIComponent(String(s ?? ''));
 const val = (x) => (typeof x === 'function' ? x() : x);
@@ -1092,7 +1113,7 @@ function ruleDetail(rule) {
 
     <div class="kv">
       <div class="r"><span class="k">If it fires</span><span class="v"><span class="badge ${esc(rule.severity)}">${esc(rule.severity)}</span>
-        ${rule.severity === 'escalate' ? 'held for a person to sign off' : 'the request is stopped'}</span></div>
+        ${severityMeans(rule.severity)}</span></div>
       <div class="r"><span class="k">Applies to</span><span class="v">${esc(audienceLabel(rule.appliesTo))}</span></div>
       <div class="r"><span class="k">Checked</span><span class="v">${rule.pinned ? 'on every request' : 'when the request looks related'}</span></div>
       ${guidance ? `<div class="r"><span class="k">Told instead</span><span class="v">“${esc(guidance)}”</span></div>` : ''}
@@ -1296,7 +1317,7 @@ async function sendRuleMessage(text) {
   state.draft = j;
   state.preview = null;
   const n = (j.examples?.violating?.length ?? 0) + (j.examples?.compliant?.length ?? 0);
-  say(`Here it is. It ${j.severity === 'block' ? 'stops' : 'escalates'} matching requests for <b>${esc(audienceLabel(j.appliesTo))}</b>. Let me check it against the ${n} examples I wrote.`);
+  say(`Here it is. It ${severityVerb(j.severity)} matching requests for <b>${esc(audienceLabel(j.appliesTo))}</b>. Let me check it against the ${n} examples I wrote.`);
   render();
 
   await runPreview();
