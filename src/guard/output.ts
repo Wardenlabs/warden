@@ -114,6 +114,10 @@ export async function screenOutput(
     policyVersion: policy.version,
     totalMs: Date.now() - started,
     firedRules: result.firedRules,
+    // An output-scoped `warn` rule fires about the answer rather than the
+    // prompt, and dropping its warning here would have made the severity work
+    // in one direction only — silently, since the verdict is ALLOW either way.
+    ...(result.warnings.length > 0 ? { warnings: result.warnings } : {}),
     passes,
     // The answer, not the prompt. Held on the live decision so the console's
     // trace can show what was judged; stripped before the log is written, by
