@@ -47,6 +47,7 @@ import { join } from 'node:path';
 
 import type { PolicySpec } from '../src/policy/types.js';
 import { loadAttackCorpus, loadEvalSets, type EvalPrompt } from './eval-lint.js';
+import { resolvedModel } from '../src/qvac/client.js';
 
 // Dynamic, and the assignment above is why: `src/audit/log.ts` resolves the
 // path at module scope, and static imports are hoisted above every statement in
@@ -124,6 +125,11 @@ function benchmarkPolicy(): PolicySpec {
 /** A verdict is right if it matches, and for ALLOW nothing but ALLOW will do. */
 function isCorrect(expect: string, got: string): boolean {
   return expect === 'ALLOW' ? got === 'ALLOW' : got !== 'ALLOW';
+}
+
+/** A whole-number percentage, or 0 when there is nothing to divide by. */
+function share(n: number, of: number): number {
+  return of === 0 ? 0 : Math.round((n / of) * 100);
 }
 
 async function main(): Promise<void> {
@@ -237,18 +243,48 @@ async function main(): Promise<void> {
       WINDOW_CHARS: process.env['WARDEN_WINDOW_CHARS'] ?? '(default)',
       WINDOW_OVERLAP: process.env['WARDEN_WINDOW_OVERLAP'] ?? '(default)',
       ADJUDICATOR_FORM: process.env['WARDEN_ADJUDICATOR_FORM'] ?? '(default)',
-      MODEL_ADJUDICATOR: process.env['WARDEN_MODEL_ADJUDICATOR'] ?? '(default)'
+      MODEL_ADJUDICATOR: process.env['WARDEN_MODEL_ADJUDICATOR'] ?? '(default)',
+      /**
+       * The weights that actually answered, not whether an override was set.
+       * "(default)" resolves differently on two machines, and filing both under
+       * the same name is how two incomparable runs get compared.
+       */
+      models: isMock()
+        ? { adapter: 'mock' }
+        : {
+            adjudicator: resolvedModel('adjudicator'),
+            detector: resolvedModel('detector'),
+            embedder: resolvedModel('embedder')
+          }
     },
+    /**
+     * Rates beside the counts, because a count needs its denominator to mean
+     * anything and the two get separated the moment anyone quotes one.
+     *
+     * Kept as a pair *and* a percentage rather than replacing one with the
+     * other: the pair is what a later run can be re-derived from, and the
+     * percentage is what stops `46` being read without the `of 51` beside it.
+     */
     totals: {
       prompts: results.length,
       falsePositivesAnyRep: [fpAny.length, allow.length],
+      falsePositivesAnyRepPct: share(fpAny.length, allow.length),
       falsePositivesEveryRep: [fpAll.length, allow.length],
+      falsePositivesEveryRepPct: share(fpAll.length, allow.length),
       attacksStopped: [stopped.length, attacks.length],
+      attacksStoppedPct: share(stopped.length, attacks.length),
       flaky: flaky.length,
       latencyMs: { p50: pct(0.5), p95: pct(0.95), max: latencies.at(-1) ?? 0 },
       structuredOutput: stats
     },
-    falsePositivesByRule: Object.fromEntries([...byRule].sort((a, b) => b[1] - a[1])),
+    falsePositivesByRule: Object.fromEntries(
+      [...byRule]
+        .sort((a, b) => b[1] - a[1])
+        // The share of *refusals* this rule accounts for, which is the number
+        // that says where to spend effort: one rule at 90% is a different
+        // problem from six rules at 15% each.
+        .map(([id, n]) => [id, { count: n, ofRefusalsPct: share(n, fpAny.length) }])
+    ),
     perPrompt: results
   };
 
@@ -266,7 +302,7 @@ async function main(): Promise<void> {
   if (byRule.size) {
     console.log('\nfalse positives by rule:');
     for (const [id, n] of [...byRule].sort((a, b) => b[1] - a[1])) {
-      console.log(`  ${String(n).padStart(3)} of ${fpAny.length}  ${id}`);
+      console.log(`  ${String(n).padStart(3)} of ${fpAny.length}  (${share(n, fpAny.length)}%)  ${id}`);
     }
   }
   console.log(`\nwritten → ${file}`);

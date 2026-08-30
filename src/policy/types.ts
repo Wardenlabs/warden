@@ -12,8 +12,32 @@ import { z } from 'zod';
 export const ruleScopeSchema = z.enum(['input', 'output', 'both']);
 export type RuleScope = z.infer<typeof ruleScopeSchema>;
 
-/** What happens when a rule fires. `escalate` routes to a human instead of hard-blocking. */
-export const ruleSeveritySchema = z.enum(['block', 'escalate']);
+/**
+ * What happens when a rule fires.
+ *
+ * `block` refuses. `escalate` routes to a human instead of refusing outright.
+ * `warn` lets the request through and says why it was flagged.
+ *
+ * **`warn` is not a fourth verdict, and that is the whole point.** The lattice
+ * is `ALLOW < ESCALATE < BLOCK` and every pass may only move a decision toward
+ * stricter; adding a level between ALLOW and ESCALATE would have meant auditing
+ * the forty-nine places in this codebase that compare verdicts, half of which
+ * ask `!== 'ALLOW'` and would have read a warning as a refusal. So a `warn`
+ * rule fires, attaches its explanation, and tightens nothing.
+ *
+ * That is not a loophole. Without the rule the request would be allowed too, so
+ * warning can never be looser than not having written it — it is strictly more
+ * information for the same verdict. And it is the admin's own choice, made
+ * inside the policy hash next to the rule text, which is where a decision to
+ * stop enforcing something belongs.
+ *
+ * It exists because of a measurement: the guard refuses 54% of legitimate work,
+ * and a guard people cannot work with gets switched off, which protects
+ * nothing. A rule that is right about the topic and wrong about the request —
+ * the shape causing most of those refusals — is far more useful saying "this
+ * looked like X, here is the rule, carry on" than blocking.
+ */
+export const ruleSeveritySchema = z.enum(['block', 'escalate', 'warn']);
 export type RuleSeverity = z.infer<typeof ruleSeveritySchema>;
 
 /**
@@ -139,7 +163,7 @@ export const RULE_DRAFT_JSON_SCHEMA = {
     text: { type: 'string' },
     scope: { type: 'string', enum: ['input', 'output', 'both'] },
     appliesTo: { type: 'array', items: { type: 'string' } },
-    severity: { type: 'string', enum: ['block', 'escalate'] },
+    severity: { type: 'string', enum: ['block', 'escalate', 'warn'] },
     guidance: { type: 'string' },
     examples: {
       type: 'object',

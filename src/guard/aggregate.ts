@@ -38,6 +38,8 @@ export type AggregateResult = {
   firedRules: FiredRule[];
   /** Recorded for the trace and the report even when they did not change the verdict. */
   unclearRules: FiredRule[];
+  /** Rules the admin set to `warn`. They fired, they explain themselves, and they let the request through. */
+  warnings: FiredRule[];
   explanation: string;
 };
 
@@ -106,6 +108,8 @@ export function aggregate(input: AggregateInput): AggregateResult {
   const fired: FiredRule[] = [];
   /** Rules the model hedged on. Allowed alone; escalated alongside other signals. */
   const unclearRules: FiredRule[] = [];
+  /** Rules that fired but whose severity is `warn`. They inform; they never refuse. */
+  const warnings: FiredRule[] = [];
 
   let verdict: Verdict = 'ALLOW';
 
@@ -114,8 +118,21 @@ export function aggregate(input: AggregateInput): AggregateResult {
     if (!rule) continue;
 
     if (v.violates) {
-      verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
-      fired.push(firedFrom(rule, v.reason, v.confidence));
+      /**
+       * A `warn` rule is separated here and nowhere else.
+       *
+       * It never reaches `tighten`, so it cannot move the verdict, and it is
+       * kept out of `firedRules` so that nothing downstream — the refusal
+       * message, the console's blocked list, the red-team runner's tally —
+       * mistakes an advisory for a refusal. The employee is told what fired and
+       * what the rule says; the request goes through.
+       */
+      if (rule.severity === 'warn') {
+        warnings.push(firedFrom(rule, v.reason, v.confidence));
+      } else {
+        verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
+        fired.push(firedFrom(rule, v.reason, v.confidence));
+      }
     } else if (v.unclear) {
       /**
        * A model that answered UNCLEAR did its job and expressed doubt. That is
@@ -154,8 +171,13 @@ export function aggregate(input: AggregateInput): AggregateResult {
     if (!rule) continue;
 
     if (finding.attack) {
-      verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
-      fired.push(firedFrom(rule, 'this message is aimed at the assistant\'s rules rather than at a task', 0.9));
+      const reason = 'this message is aimed at the assistant\'s rules rather than at a task';
+      if (rule.severity === 'warn') {
+        warnings.push(firedFrom(rule, reason, 0.9));
+      } else {
+        verdict = tighten(verdict, rule.severity === 'block' ? 'BLOCK' : 'ESCALATE');
+        fired.push(firedFrom(rule, reason, 0.9));
+      }
     } else if (finding.unclear) {
       unclearRules.push(firedFrom(rule, 'could not tell whether this is aimed at the rules or at a task', 0.4));
     }
@@ -222,7 +244,8 @@ export function aggregate(input: AggregateInput): AggregateResult {
     verdict,
     firedRules: fired,
     unclearRules,
-    explanation: explain(verdict, fired, concerns)
+    warnings,
+    explanation: explain(verdict, fired, concerns, warnings)
   };
 }
 
@@ -258,8 +281,27 @@ function firedFrom(rule: Rule, reason: string, confidence: number): FiredRule {
  * adjudicator was asked for a reason, and it would put a text generation in the
  * path of every refusal for prose that says less than the rule already does.
  */
-function explain(verdict: Verdict, fired: FiredRule[], concerns: string[]): string {
-  if (verdict === 'ALLOW') return 'No policy concerns.';
+function explain(
+  verdict: Verdict,
+  fired: FiredRule[],
+  concerns: string[],
+  warnings: FiredRule[] = []
+): string {
+  if (verdict === 'ALLOW') {
+    if (warnings.length === 0) return 'No policy concerns.';
+    /**
+     * An allowed request that still has something to say.
+     *
+     * Written as a note rather than a refusal, and it names the rule, because a
+     * warning nobody can act on is decoration. "Flagged" with no rule attached
+     * teaches people to ignore the next one.
+     */
+    const lines = warnings.map((w) => `Heads-up — "${w.ruleText}"`);
+    const top = warnings[0];
+    if (top?.guidance) lines.push(`If that applies here: ${top.guidance}`);
+    lines.push('Allowed. This is a note, not a refusal — nothing was blocked.');
+    return lines.join('\n');
+  }
 
   const lines: string[] = [];
   const top = fired[0];

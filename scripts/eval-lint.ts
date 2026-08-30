@@ -175,7 +175,17 @@ function main(): void {
   console.log(`  scored (split=test) : ${test.length}`);
   console.log(`  held out (train)    : ${prompts.length - test.length}`);
   console.log(`  ALLOW / BLOCK / ESC : ${byExpect('ALLOW')} / ${byExpect('BLOCK')} / ${byExpect('ESCALATE')}`);
-  console.log(`  es / en             : ${byLang('es')} / ${byLang('en')}`);
+  /**
+   * Every language present, not the two the sets started with.
+   *
+   * Hardcoding `es / en` meant a set could be added in five other languages and
+   * the summary would still describe the corpus as bilingual — the numbers that
+   * would show whether the guard travels are exactly the ones it hid. The
+   * ordering puts the largest first, so a language with two prompts reads as
+   * the thin evidence it is.
+   */
+  const langs = [...new Set(test.map((p) => p.lang))].sort((a, b) => byLang(b) - byLang(a));
+  console.log(`  languages           : ${langs.map((l) => `${l} ${byLang(l)}`).join(' · ')}`);
 
   // The sampling error on a proportion, which is what decides whether a change
   // is readable at all. Printed so nobody quotes a delta smaller than it.

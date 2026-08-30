@@ -225,6 +225,16 @@ answer
 
 ### The invariant
 
+A rule's `severity` decides what its firing costs: `block` refuses, `escalate`
+routes to a human, and `warn` lets the request through with a note naming the
+rule and what to do if it applies. `warn` is not a fourth verdict — a warning
+tightens nothing and the lattice below is untouched — which is what keeps it
+from being a hole: without the rule the request would be allowed anyway, so
+warning is strictly more information for the same verdict, and it is the admin's
+own choice, recorded inside the policy hash. It exists because a guard that
+refuses 54% of legitimate work gets switched off, and a rule that is right about
+the topic and wrong about the request is worth far more saying so than blocking.
+
 > Verdicts are ordered `ALLOW < ESCALATE < BLOCK`. Every model pass can only push
 > a decision **toward stricter**, never toward looser. A pass that errors, times
 > out, or returns unparseable output resolves to `ESCALATE`.

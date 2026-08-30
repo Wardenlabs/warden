@@ -326,6 +326,9 @@ function validateDecision(value) {
   if (typeof value.auditId !== 'string' || !value.auditId.trim()) {
     throw new Error('gateway decision has no audit id');
   }
+  if (value.warnings !== undefined && !Array.isArray(value.warnings)) {
+    return 'warnings must be an array when present';
+  }
   if (value.firedRules !== undefined && !Array.isArray(value.firedRules)) {
     throw new Error('gateway decision has invalid fired rules');
   }
@@ -556,9 +559,30 @@ async function main() {
     return;
   }
 
-  // Silence on the happy path. A gateway that comments on every prompt becomes
-  // noise people learn to scroll past.
-  if (res.verdict === 'ALLOW') return;
+  /**
+   * Silence on the happy path. A gateway that comments on every prompt becomes
+   * noise people learn to scroll past.
+   *
+   * The exception is a rule the admin set to `warn`: it fired, it did not stop
+   * anything, and staying quiet about it would waste the one thing that makes
+   * warning worth having over deleting the rule. Printed to stderr and exiting
+   * zero, so the prompt goes through untouched — this is a note beside the
+   * work, not a gate in front of it.
+   */
+  if (res.verdict === 'ALLOW') {
+    const warnings = Array.isArray(res.warnings) ? res.warnings : [];
+    if (warnings.length > 0) {
+      const lines = ['', `⚠ Warden — allowed, with a note`, ''];
+      for (const w of warnings.slice(0, 2)) {
+        lines.push(...wrap(`Rule: "${w.ruleText ?? w.ruleId ?? 'unnamed rule'}"`));
+        if (w.guidance) lines.push(...wrap(`If that applies here: ${w.guidance}`));
+      }
+      if (warnings.length > 2) lines.push(`   (${warnings.length - 2} more)`);
+      lines.push('', `   Nothing was blocked. Audit ${res.auditId ?? '—'}`, '');
+      process.stderr.write(lines.join('\n') + '\n');
+    }
+    return;
+  }
 
   const message = render(res);
   process.stderr.write(message + '\n');

@@ -21,6 +21,13 @@ fully compromises every model in the pipeline still cannot manufacture an
 **Do not add a code path where a model's answer clears a request.** If you find
 yourself writing one, the design has been misunderstood somewhere upstream.
 
+`warn` severity is the one thing that looks like an exception and is not. A rule
+the admin set to `warn` fires, attaches its explanation, and tightens nothing —
+so it never reaches `tighten`, never lands in `firedRules`, and the request is
+allowed exactly as it would have been if the rule did not exist. It adds
+information to a verdict; it cannot subtract from one. Keep it that way: the
+moment a warning can lower something, it has become a model clearing a request.
+
 ## Layout
 
 ```

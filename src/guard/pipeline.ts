@@ -245,6 +245,7 @@ export async function evaluate(
     verdict, policy, passes, started, input,
     maskedPrompt: masked, maskedSpans: spans,
     firedRules: result.firedRules,
+    warnings: result.warnings,
     quota: { used: quota.used, limit: quota.limit ?? 0 },
     budget: budget.status,
     explanation
@@ -260,6 +261,7 @@ function finish(args: {
   maskedPrompt: string;
   maskedSpans: Decision['maskedSpans'];
   firedRules: Decision['firedRules'];
+  warnings?: Decision['warnings'];
   quota: { used: number; limit: number };
   budget?: Decision['budget'];
   explanation: string;
@@ -269,6 +271,7 @@ function finish(args: {
     policyVersion: args.policy.version,
     totalMs: Date.now() - args.started,
     firedRules: args.firedRules,
+    ...(args.warnings && args.warnings.length > 0 ? { warnings: args.warnings } : {}),
     passes: args.passes,
     maskedPrompt: args.maskedPrompt,
     maskedSpans: args.maskedSpans,

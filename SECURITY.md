@@ -96,6 +96,12 @@ restarted often does not enforce a daily ceiling.
 85% of attacks. The other 15% went through. Warden raises the cost of an attack
 and produces a record of it; it is not a proof.
 
+**A `warn` rule does not enforce anything.** It is the admin choosing to be told
+rather than protected, for a rule where refusing costs more than it saves.
+Warnings never tighten a verdict, so they cannot be a bypass — but a rule moved
+from `block` to `warn` is a rule that has stopped stopping anything, and the
+change is visible in the policy hash precisely so that it is reviewable.
+
 **False positives are the live problem.** That same run refused 58% of
 legitimate traffic. A guard people cannot work with gets switched off, and a
 guard that is switched off protects nothing — so this is a security property,

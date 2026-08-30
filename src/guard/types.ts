@@ -114,6 +114,12 @@ export type Decision = {
   quota?: { used: number; limit: number };
   /** Session consumption against the role's ceilings, when the client reported any. */
   budget?: BudgetStatus;
+  /**
+   * Rules that fired at `warn` severity. These did not change the verdict — the
+   * request goes through — and they carry why it was flagged so the employee
+   * can see the concern instead of guessing at it.
+   */
+  warnings?: FiredRule[];
   /** Human-readable summary of why, shown to the employee on a block. */
   explanation: string;
 };

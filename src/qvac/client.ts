@@ -187,6 +187,32 @@ export function modelFor(role: ModelRole): Promise<string> {
   return loading;
 }
 
+/**
+ * Which weights a role actually resolves to, as a name a report can print.
+ *
+ * A measurement that does not say which model answered is not comparable to
+ * any other measurement, and the levers that change it — `WARDEN_MODEL_<ROLE>`,
+ * `WARDEN_INJECTION_MODEL`, the optional 8B adjudicator — are exactly the ones
+ * someone reaches for when tuning. Runs were recording `MODEL_ADJUDICATOR:
+ * "(default)"`, which says only that no override was set: two machines with
+ * different files on disk both wrote "(default)" and their numbers were filed
+ * as the same configuration.
+ *
+ * Resolution order is `sourceFor`'s, so this is what will be loaded rather than
+ * what someone hoped would be. A registry constant has no path, so it is named
+ * by its own identity instead.
+ */
+export function resolvedModel(role: ModelRole): string {
+  try {
+    const src = sourceFor(role);
+    if (typeof src === 'string') return src.split('/').pop() ?? src;
+    const entry = src as { name?: string; src?: string };
+    return entry.name ?? entry.src ?? 'registry';
+  } catch (err) {
+    return `unresolved (${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
 /** Load roles ahead of first request so the demo doesn't pay for it on camera. */
 export async function warmup(roles: ModelRole[]): Promise<void> {
   await Promise.all(roles.map((r) => modelFor(r)));
