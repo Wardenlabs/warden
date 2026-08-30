@@ -744,7 +744,7 @@ believing anything either of them says.
 | `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
 | `WARDEN_ADMIN_REQUIRE_KEY` | — | `1` drops loopback trust, so every administrative call must present the API key of a role the policy exempts. Set it where employees can log into the gateway host. |
 | `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
-| `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. |
+| `WARDEN_ADAPTER` | `real` | `mock` runs everything with no model. `llamacpp` runs the same weights under node-llama-cpp instead of the QVAC SDK — an experiment, not a supported mode: it needs `pnpm add node-llama-cpp`, has no OCR, and runs one sequence where the QVAC path runs four. It exists so "would this be better off QVAC" can be answered with a paired bench run rather than an argument. |
 | `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
 | `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
 | `WARDEN_MIN_RELEVANCE` | `0` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. Off by default: measured at `0.5` it moved nothing and lost an attack. |

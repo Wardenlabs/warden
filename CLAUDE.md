@@ -120,6 +120,13 @@ pnpm run verify-audit             # walk the audit chain
 The mock adapter is a test double, never a fallback. If the real adapter fails,
 Warden escalates — it does not downgrade to keyword matching and keep answering.
 
+`src/qvac/` is the only place `@qvac/sdk` is imported, and the adapter interface
+is six methods. That is what makes "is the runtime the problem" answerable
+rather than arguable: `llamacpp.ts` runs the same weights under a different
+engine, and `pnpm run bench -- --against` pairs the two over identical cells.
+Keep the boundary that tight — the moment a guard pass imports the SDK, the
+question stops being cheap to ask.
+
 **When you add a pass with a new enum label, add that label to the mock.** Its
 `mockValue` picks from the enum by matching known benign and hostile names; a
 label it does not recognise falls through to `choices[0]` and makes the mock
