@@ -225,6 +225,41 @@ export function resolvedModel(role: ModelRole): string {
   }
 }
 
+/**
+ * The marker that switches a model's chain-of-thought off, when it has one.
+ *
+ * `/no_think` is Qwen3's control token. Four prompt builders in this repo ended
+ * every system block with it — the adjudicator, the injection pass, the rewriter
+ * and the policy compiler — which is correct for the models `setup` downloads
+ * and is a defect for every other one: on a Llama or a Mistral it is not a
+ * control token, it is the literal string "/no_think" appended to the
+ * instructions, and an instruction-following model has to decide what to do
+ * with it. A guard whose prompts carry another vendor's private syntax is tuned
+ * to a model rather than written for the job.
+ *
+ * So it is emitted only where it means something. Recognition is by the
+ * resolved weights rather than by the role, because the role is a job and the
+ * file behind it is whatever the deployment pointed at:
+ * `WARDEN_MODEL_ADJUDICATOR` can put a Llama in the adjudicator's seat.
+ *
+ * `WARDEN_THINKING_MARKER` overrides it — a string to emit for every model, or
+ * `off` to emit nothing. That is the escape hatch for a model whose marker this
+ * function has never heard of, and it is why the list below not being
+ * exhaustive is survivable.
+ *
+ * The generation parameter beside it, `reasoning_budget: 0`, is the SDK's own
+ * and not a vendor's, so it stays unconditional.
+ */
+const THINKING_MARKERS: [RegExp, string][] = [[/qwen\s*3/i, '/no_think']];
+
+export function thinkingMarker(role: ModelRole): string {
+  const override = process.env['WARDEN_THINKING_MARKER'];
+  if (override !== undefined) return override === 'off' ? '' : override;
+
+  const model = resolvedModel(role);
+  return THINKING_MARKERS.find(([pattern]) => pattern.test(model))?.[1] ?? '';
+}
+
 /** Load roles ahead of first request so the demo doesn't pay for it on camera. */
 export async function warmup(roles: ModelRole[]): Promise<void> {
   await Promise.all(roles.map((r) => modelFor(r)));

@@ -9,6 +9,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { QvacAdapter } from '../qvac/types.js';
+import { thinkingMarker } from '../qvac/client.js';
 import { isolate, isolationPreamble } from '../guard/isolate.js';
 import { adjudicate } from '../guard/passes/adjudicate.js';
 import { EVERYONE, employeeIdOf, employeeToken, sanitiseAudience } from './audience.js';
@@ -90,7 +91,7 @@ export async function compileRule(
     '',
     'Write examples in the same language the administrator used.',
     isolationPreamble(iso.nonce),
-    '/no_think'
+    thinkingMarker('adjudicator')
   ]
     .filter(Boolean)
     .join('\n');

@@ -40,6 +40,7 @@
  */
 import { z } from 'zod';
 import type { QvacAdapter } from '../../qvac/types.js';
+import { thinkingMarker } from '../../qvac/client.js';
 import type { Rule } from '../../policy/types.js';
 import { isolationPreamble, type Isolated } from '../isolate.js';
 import type { PassTrace } from '../types.js';
@@ -121,7 +122,7 @@ function systemPrompt(rule: Rule, nonce: string): string {
     shots,
     '',
     isolationPreamble(nonce),
-    '/no_think'
+    thinkingMarker(ROLE)
   ].join('\n');
 }
 

@@ -12,6 +12,7 @@
  */
 import { z } from 'zod';
 import type { QvacAdapter } from '../../qvac/types.js';
+import { thinkingMarker } from '../../qvac/client.js';
 import type { Rule } from '../../policy/types.js';
 import { isolationPreamble, windows, type Isolated } from '../isolate.js';
 import type { PassTrace } from '../types.js';
@@ -214,7 +215,7 @@ function systemPrompt(rule: Rule, nonce: string, opts: Resolved): string {
     shots,
     '',
     isolationPreamble(nonce),
-    '/no_think'
+    thinkingMarker('adjudicator')
   ].join('\n');
 }
 

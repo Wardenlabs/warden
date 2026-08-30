@@ -29,6 +29,7 @@ import { z } from 'zod';
 import type { PolicySpec, Rule } from '../policy/types.js';
 import type { QvacAdapter } from '../qvac/types.js';
 import { isolate, isolationPreamble, type IsolationFlags } from './isolate.js';
+import { thinkingMarker } from '../qvac/client.js';
 import { evaluate } from './pipeline.js';
 import type { Actor, Decision, PassTrace } from './types.js';
 
@@ -170,7 +171,7 @@ function systemPrompt(rule: Rule, nonce: string): string {
     '',
     'Answer with the rewritten request and nothing else.',
     isolationPreamble(nonce),
-    '/no_think'
+    thinkingMarker('adjudicator')
   ].join('\n');
 }
 
