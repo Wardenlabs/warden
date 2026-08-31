@@ -1,8 +1,7 @@
 /*
- * Everything on this page that needs JavaScript, which is five things:
+ * Everything on this page that needs JavaScript, which is four things:
  * the light, the prompt that types itself in the hero, reveal-on-scroll,
- * the count-up on the two headline numbers, and naming the visitor's
- * platform on the download button.
+ * and naming the visitor's platform on the download button.
  *
  * No build step and no dependencies — see README.md. These are ES modules
  * served from the same origin, which is the same property the console has:
@@ -76,59 +75,6 @@ if (reduced || !('IntersectionObserver' in window)) {
     { rootMargin: '0px 0px -12% 0px', threshold: 0.05 }
   );
   revealables.forEach((el) => io.observe(el));
-}
-
-/* ── count-up ──────────────────────────────────────────────────────────── */
-/*
- * Only the two numbers in the argument. A page that animates every figure on
- * it is asking to be watched rather than read, and the honest section below
- * would then be competing with its own decoration.
- */
-
-function countUp(el) {
-  const target = Number(el.dataset.count);
-  const suffix = el.dataset.suffix || '';
-  if (!Number.isFinite(target)) return;
-
-  if (reduced || target === 0) {
-    el.textContent = target + suffix;
-    return;
-  }
-
-  const DURATION = 1100;
-  let start;
-
-  const step = (now) => {
-    if (start === undefined) start = now;
-    const t = Math.min((now - start) / DURATION, 1);
-    // easeOutExpo — fast off the line, settles rather than stops.
-    const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-    el.textContent = Math.round(target * eased) + suffix;
-    if (t < 1) requestAnimationFrame(step);
-  };
-
-  requestAnimationFrame(step);
-}
-
-const counters = document.querySelectorAll('[data-count]');
-
-if (!('IntersectionObserver' in window)) {
-  counters.forEach(countUp);
-} else {
-  const co = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        countUp(entry.target);
-        co.unobserve(entry.target);
-      }
-    },
-    { threshold: 0.6 }
-  );
-  counters.forEach((el) => {
-    el.textContent = '0' + (el.dataset.suffix || '');
-    co.observe(el);
-  });
 }
 
 /* ── name the platform on the hero button ──────────────────────────────── */

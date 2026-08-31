@@ -201,8 +201,6 @@ section { position: relative; padding-block: var(--s-11); border-top: var(--guid
 @media (max-width: 700px) { section { padding-block: var(--s-9); } }
 
 .stack   { display: grid; gap: var(--s-5); }
-.two     { display: grid; gap: var(--s-5); }
-@media (min-width: 860px) { .two { grid-template-columns: 1fr 1fr; } }
 
 /* ═══ type ═══════════════════════════════════════════════════════════════ */
 
@@ -276,35 +274,6 @@ a.link:hover { border-bottom-color: var(--ink); }
 .btn-secondary:hover { background: var(--hover); }
 
 .btn-sm { height: 32px; padding-inline: var(--s-4); font-size: var(--fs-2); }
-
-/* The announcement pill. Both references open with one; it is the page's
-   only place for something that changes week to week. */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-3);
-  height: 30px;
-  padding-inline: var(--s-4) var(--s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  background: var(--bg);
-  font-size: var(--fs-2);
-  color: var(--ink-2);
-  text-decoration: none;
-  transition: border-color .15s ease, background .15s ease;
-}
-.pill:hover { border-color: var(--line-firm); background: var(--hover); }
-.pill .chev { color: var(--faint); font-size: var(--fs-2); }
-.pill .tag {
-  font-family: var(--mono);
-  font-size: var(--fs-0);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 2px var(--s-2);
-  border-radius: var(--r-sm);
-  background: var(--sunken);
-}
 
 .dot {
   width: 6px; height: 6px;
@@ -422,7 +391,7 @@ header nav .btn { color: var(--accent-ink); }
 }
 .hero > * { position: relative; }
 .hero .copy { grid-area: copy; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; }
-.hero h1 { max-width: 15ch; margin-inline: auto; }
+.hero h1 { max-width: 20ch; margin-inline: auto; }
 .hero .sub {
   margin: var(--s-6) auto 0;
   max-width: 72ch;
@@ -476,155 +445,7 @@ header nav .btn { color: var(--accent-ink); }
   .judge .verdict { flex: 1 1 100%; margin-left: 0; }
 }
 
-/* ═══ product surfaces ═══════════════════════════════════════════════════ */
-/*
- * The mockups are DOM, not screenshots — which is why --fs-0 exists. Both
- * references do this and it is the single thing that makes a marketing page
- * look like it was made by the people who made the product.
- */
-
-.ui {
-  border: 1px solid var(--line);
-  border-radius: var(--r-xl);
-  background: var(--bg);
-  overflow: hidden;
-  position: relative;
-}
-
-/* A light that travels the top edge once the surface is on screen. Vercel
-   does this with offset-path; a moving background is cheaper and reads the
-   same at 1px tall. */
-.ui-lit::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--beam) 22%, var(--ink-2) 50%, var(--beam) 78%, transparent 100%);
-  background-size: 220% 100%;
-  animation: edge-light 7s linear infinite;
-  opacity: .55;
-}
-@keyframes edge-light {
-  from { background-position: 130% 0; }
-  to   { background-position: -130% 0; }
-}
-
-.ui-chrome {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  height: 34px;
-  padding-inline: var(--s-4);
-  border-bottom: 1px solid var(--line);
-  background: var(--sunken);
-  font-family: var(--mono);
-  font-size: var(--fs-0);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.ui-chrome .spacer { margin-left: auto; }
-.ui-body { padding: var(--s-6); display: grid; gap: var(--s-5); }
-.ui-split { display: grid; }
-@media (min-width: 760px) { .ui-split { grid-template-columns: 220px 1fr; } .ui-split > * + * { border-left: 1px solid var(--line); } }
-
-.ui-list { display: grid; }
-.ui-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-4) var(--s-5);
-  border-bottom: 1px solid var(--line-soft);
-  font-size: var(--fs-2);
-}
-.ui-item:last-child { border-bottom: 0; }
-.ui-item.on { background: var(--hover); }
-.ui-item .t {
-  color: var(--ink);
-  letter-spacing: var(--ls-tight);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ui-item .m { font-family: var(--mono); font-size: var(--fs-0); color: var(--faint); }
-
-.avatar {
-  width: 20px; height: 20px;
-  border-radius: var(--r-pill);
-  background: var(--selected);
-  color: var(--ink-2);
-  display: grid; place-items: center;
-  font-size: var(--fs-0);
-  font-weight: var(--fw-semi);
-  flex: none;
-}
-
-.kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-5); font-family: var(--mono); font-size: var(--fs-1); }
-.kv dt { color: var(--faint); letter-spacing: var(--ls-label); text-transform: uppercase; }
-.kv dd { margin: 0; color: var(--ink-2); }
-
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
-
-/* ── the surfaces strip: social proof, except the proof is integrations ── */
-.strip { padding-block: var(--s-8); }
-.strip p { text-align: center; font-size: var(--fs-2); color: var(--faint); margin-bottom: var(--s-7); }
-.strip ul {
-  list-style: none; margin: 0; padding: 0;
-  display: flex; flex-wrap: wrap; justify-content: center;
-  gap: var(--s-4) var(--s-9);
-}
-.strip li {
-  display: flex; align-items: center; gap: var(--s-3);
-  font-size: var(--fs-3); color: var(--muted);
-  letter-spacing: var(--ls-tight);
-}
-.strip li .how {
-  font-family: var(--mono); font-size: var(--fs-0);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--faint);
-  border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: 1px var(--s-2);
-}
-
-/* ── the argument: two columns, one number each ─────────────────────────── */
-.versus { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
-@media (min-width: 760px) { .versus { grid-template-columns: 1fr 1fr; } }
-.versus > div { padding: var(--s-8); display: grid; gap: var(--s-3); align-content: start; }
-.versus > div + div { border-top: 1px solid var(--line); }
-@media (min-width: 760px) { .versus > div + div { border-top: 0; border-left: 1px solid var(--line); } }
-.versus .who { font-family: var(--mono); font-size: var(--fs-1); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted); }
-.versus .n {
-  font-size: var(--fs-stat);
-  font-weight: var(--fw-semi);
-  line-height: 1;
-  letter-spacing: var(--ls-hero);
-  font-variant-numeric: tabular-nums;
-}
-.versus .cap { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); max-width: 34ch; }
-.versus .win { background: var(--bg); }
-.versus .win .n { color: var(--ink); }
-.versus .baseline { background: var(--sunken); }
-.versus .baseline .n, .versus .baseline .who { color: var(--faint); }
-.versus b { font-weight: var(--fw-semi); color: var(--ink-2); }
-.versus-note { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); max-width: var(--prose); }
-.versus-note a { color: var(--muted); }
-
-/* ── feature blocks: eyebrow, claim, one sentence, a surface ───────────── */
-.feat { display: grid; gap: var(--s-8); align-items: center; }
-@media (min-width: 940px) {
-  .feat { grid-template-columns: minmax(0, 390px) minmax(0, 1fr); gap: var(--s-10); }
-  .feat.flip { grid-template-columns: minmax(0, 1fr) minmax(0, 390px); }
-  .feat.flip > .feat-copy { order: 2; }
-}
-.feat + .feat { margin-top: var(--s-10); padding-top: var(--s-10); border-top: 1px solid var(--line); }
-.feat-copy { display: grid; gap: var(--s-4); align-content: start; }
-.feat-copy h2 { font-size: var(--fs-7); }
-.feat-copy p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
-.feat-copy .bul { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: var(--s-3); }
-.feat-copy .bul li { display: grid; grid-template-columns: auto 1fr; gap: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
-.feat-copy .bul svg { width: 14px; height: 14px; margin-top: 4px; color: var(--faint); }
 
 /* ── the refusal, rendered as the employee sees it ─────────────────────── */
 .term {
@@ -659,40 +480,6 @@ tbody tr:last-child td { border-bottom: 0; }
 td b { font-weight: var(--fw-medium); color: var(--ink); }
 th.n, td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.n { color: var(--ink-2); }
-
-.rows { display: grid; gap: var(--s-5); }
-.row {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--s-7);
-  display: grid; gap: var(--s-3); align-content: start;
-  background: var(--bg);
-  transition: border-color .18s ease, background .18s ease;
-}
-.row:hover { border-color: var(--line-firm); background: var(--sunken); }
-.row .tag {
-  justify-self: start;
-  font-family: var(--mono); font-size: var(--fs-0);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px var(--s-2);
-}
-.row p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
-
-/* ── the honest section. Same visual weight as everything else, on purpose ─ */
-#honest { background: var(--sunken); }
-.candid {
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--escalate);
-  border-radius: var(--r-lg);
-  background: var(--bg);
-  padding: var(--s-8);
-  display: grid; gap: var(--s-4);
-  max-width: var(--read);
-}
-.candid h3 { font-size: var(--fs-5); letter-spacing: var(--ls-display); }
-.candid p { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-body); }
-.candid code { font-family: var(--mono); font-size: var(--fs-mono-adj); background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px 4px; color: var(--ink-2); }
-.candid a { color: var(--ink-2); }
 
 /* ── download ──────────────────────────────────────────────────────────── */
 .dl { display: grid; gap: var(--s-4); }
@@ -739,7 +526,6 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .judge .cur,
-  .ui-lit::before,
   .dot-live { animation: none; }
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
@@ -747,19 +533,6 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 /* ═══ pieces the sections above call for ═════════════════════════════════ */
 
 .hero-zone { position: relative; overflow: hidden; }
-.hero-surface { margin-top: var(--s-9); }
-.hero-surface { position: relative; z-index: 1; padding-bottom: var(--s-11); }
-
-/* the verdict panel in the hero surface */
-.verdict-head { display: flex; flex-wrap: wrap; gap: var(--s-3); }
-.verdict-rule {
-  font-size: var(--fs-3);
-  line-height: var(--lh-snug);
-  color: var(--ink);
-  letter-spacing: var(--ls-tight);
-  max-width: 52ch;
-}
-
 /* the pipeline */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
 .steps li {
@@ -784,35 +557,10 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 .steps .never { background: var(--sunken); color: var(--faint); }
 .steps .never .stepn { border-style: dashed; }
 
-/* the audit list foot */
-.ui-foot {
-  display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-4) var(--s-6);
-  border-top: 1px solid var(--line);
-  background: var(--sunken);
-  font-family: var(--mono); font-size: var(--fs-0);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-}
-.hashes .m { font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); }
-.hashes .t { font-size: var(--fs-2); color: var(--ink-2); }
-
-/* The refusal sits in a surface, so it loses the surface's own padding. */
-.ui > .term { border-radius: 0; }
-
-/* A feature headline is a claim, not the page's headline. */
-.feat-copy h2 { font-size: var(--fs-h3); }
-
-.gap-t   { margin-top: var(--s-5); }
-.gap-t-l { margin-top: var(--s-9); }
 .note    { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); }
-.dot-off { background: var(--line-firm); }
 
 /* ── responsive trims ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .hero-surface { padding-bottom: var(--s-9); }
-  .feat + .feat { margin-top: var(--s-9); padding-top: var(--s-9); }
-  .ui-body { padding: var(--s-5); }
   .term { padding: var(--s-5); font-size: var(--fs-1); }
-  .steps li, .ui-item { padding-inline: var(--s-5); }
-  .strip ul { gap: var(--s-4) var(--s-6); }
+  .steps li { padding-inline: var(--s-5); }
 }
