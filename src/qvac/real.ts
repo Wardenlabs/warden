@@ -27,7 +27,14 @@ import {
 
 /** Small models drift and pad without a cap; verdicts are short by nature. */
 const DEFAULT_MAX_TOKENS = 256;
-const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * The ceiling for a call that names no deadline of its own.
+ *
+ * Overridable because it silently capped the pass-level one: a pass asking for
+ * 180 seconds still died at 30, and the error read "generation did not end
+ * within 30000ms" out of a run configured for three minutes.
+ */
+const DEFAULT_TIMEOUT_MS = Number(process.env['WARDEN_GENERATION_TIMEOUT_MS'] ?? 30_000);
 
 /** How long after asking a generation to cancel we wait before giving up on it. */
 const CANCEL_GRACE_MS = 5_000;

@@ -351,6 +351,35 @@ async function labelOverWindows(
   return { label: worst, windowCount: seen, judged };
 }
 
+/**
+ * How long one adjudication may take.
+ *
+ * Twenty-five seconds was hardcoded and is right for the 1.7B that ships, where
+ * a call takes about two and a half. It is wrong for anything larger, and wrong
+ * in a way that reads as the model being bad rather than slow: the 8B
+ * adjudicator wins the bench outright — 46 of 46 legitimate cells against the
+ * 1.7B's 34, p = 0.0002 — then scores 1 of 55 through the pipeline, because
+ * `adjudicateAll` runs four rules at once against a model loaded with
+ * `parallel: 4`, and four concurrent 8B generations on four CPU cores do not
+ * finish inside the deadline. 136 passes failed closed with "generation did not
+ * end within 30000ms"; each became an ESCALATE, and the run read as a
+ * catastrophic false-positive rate rather than as a stopwatch.
+ *
+ * So it is a knob, and it stays bounded rather than becoming optional. A guard
+ * with no deadline does not fail late, it fails open: the hook waits 30 seconds
+ * and then lets the prompt through unchecked, so an unbounded pass turns "make
+ * the request expensive to judge" into a bypass. Past the hook's own deadline
+ * raising this buys nothing in production.
+ *
+ * Where it buys something is measurement. `pnpm run eval` and the bench have no
+ * hook in front of them, so a larger model can be given the time it needs and
+ * judged on its judgement rather than on this machine's core count:
+ *
+ *   WARDEN_ADJUDICATE_TIMEOUT_MS=180000 WARDEN_GENERATION_TIMEOUT_MS=200000 \
+ *     WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf pnpm run eval
+ */
+const ADJUDICATE_TIMEOUT_MS = Number(process.env['WARDEN_ADJUDICATE_TIMEOUT_MS'] ?? 25_000);
+
 /** One labelled sample. */
 async function sampleLabel(
   qvac: QvacAdapter,
@@ -385,7 +414,7 @@ async function sampleLabel(
        * mode is silent: every answer is well-formed, plausible, and wrong.
        * Prompt-processing time is worth paying to avoid that.
        */
-      timeoutMs: 25_000
+      timeoutMs: ADJUDICATE_TIMEOUT_MS
     },
     schema.zod,
     schema.json
