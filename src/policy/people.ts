@@ -274,6 +274,49 @@ export function rotateApiKey(id: string): Employee | null {
 
 // ── roles ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Rename the company.
+ *
+ * The seeded directory is a demo — "Northwind Logistics SA" with seven invented
+ * people — and until this existed there was no way out of it from the console.
+ * Someone who installed the app was looking at another company's name in their
+ * own title bar with nothing to click, which reads like the product is stuck in
+ * a demo because it was.
+ */
+export function renameCompany(name: string): Directory {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('the company needs a name');
+  if (trimmed.length > 120) throw new Error('that name is too long');
+  return save({ ...loadDirectory(), name: trimmed });
+}
+
+/**
+ * Clear the demo and keep the door open.
+ *
+ * Removes every seeded person and every role that came with them, leaving the
+ * roles an empty policy still needs. It deliberately does not touch the policy
+ * — rules and people are separate decisions, and someone starting fresh on
+ * staff usually wants to keep the rules they have been reading.
+ *
+ * Keeps at least one administrator, because a directory with no exempt role is
+ * a console nobody can get back into once `WARDEN_ADMIN_REQUIRE_KEY` is set.
+ * The kept admin gets a fresh key: the point of starting over is that the
+ * demo's credentials stop working.
+ */
+export function clearDemoDirectory(companyName?: string): Directory {
+  const current = loadDirectory();
+  const admin = current.employees.find((e) => e.role === 'admin');
+  const kept = admin
+    ? [{ ...admin, name: admin.name, apiKey: newApiKey(admin.id) }]
+    : [];
+  return save({
+    ...current,
+    name: (companyName ?? current.name).trim() || current.name,
+    roles: current.roles,
+    employees: kept
+  });
+}
+
 export function roles(): string[] {
   return loadDirectory().roles;
 }

@@ -136,6 +136,8 @@ const state = {
   compilerDraft: null,
   compilerTest: null,
   compilerBusy: false,
+  /** Last thing the Company block did, shown under it until the next render. */
+  orgNote: '',
 
   /**
    * Blocks an employee said were wrong.
@@ -997,10 +999,13 @@ VIEWS.compiler = {
 function compilerDraft() {
   if (!state.compilerDraft) {
     const c = state.compiler ?? { provider: 'local', baseUrl: '', model: '', redactNames: false };
+    const preset = (c.providers ?? []).find((p) => p.id === (c.provider ?? 'local'));
     state.compilerDraft = {
       provider: c.provider ?? 'local',
-      baseUrl: c.baseUrl ?? '',
-      model: c.model ?? '',
+      // Falls back to the provider's own endpoint so a half-saved setting shows
+      // the right host rather than an empty box.
+      baseUrl: c.baseUrl || preset?.baseUrl || '',
+      model: c.model || preset?.models?.[0] || '',
       apiKey: '',
       redactNames: Boolean(c.redactNames)
     };
@@ -1027,20 +1032,15 @@ function compilerPage() {
     <div class="section">
       <div class="label">Which model writes your rules</div>
 
-      <p class="lede">Warden turns a sentence you type into a draft rule.
-        <b>You still have to activate it</b>, so this model never decides anything on its
-        own — which is why it is the one you may run somewhere else.</p>
-
-      <div class="where ${remote ? 'off' : 'on'}">
+      <div class="where">
         <span class="dot ${remote ? 'ESCALATE' : 'ALLOW'}"></span>
         <span>${remote
-          ? `Drafting runs at <b>${esc(host || 'the endpoint below')}</b>. Judging your team's prompts still runs here, and cannot be moved.`
-          : `Everything runs on this machine, on <b>${esc(c.localModel ?? 'the local model')}</b>.`}</span>
+          ? `Drafting runs at <b>${esc(host || 'the endpoint below')}</b>. Judging your team's prompts stays on this machine.`
+          : `Drafting and judging both run here, on <b>${esc(c.localModel ?? 'the local model')}</b>.`}</span>
       </div>
 
       ${c.overriddenByEnv ? `<div class="banner warn">
-        <b>The environment is setting this.</b> <code>WARDEN_COMPILER_API</code> wins over
-        anything saved here; what you save applies once those variables are unset.
+        <b>The environment is setting this.</b> <code>WARDEN_COMPILER_API</code> wins over what you save here.
       </div>` : ''}
 
       <div class="field">
@@ -1048,14 +1048,13 @@ function compilerPage() {
         <div class="hero-sugg tight">
           ${providers.map((p) => `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}</button>`).join('')}
         </div>
-        ${chosen?.note ? `<span class="note">${esc(chosen.note)}</span>` : ''}
       </div>
 
       ${remote ? `
       <div class="grid2">
         <div class="field">
           <label for="cBase">Endpoint</label>
-          <input id="cBase" type="text" spellcheck="false" value="${esc(d.baseUrl || chosen?.baseUrl || '')}" placeholder="https://…/v1">
+          <input id="cBase" type="text" spellcheck="false" value="${esc(d.baseUrl)}" placeholder="https://…/v1">
         </div>
         <div class="field">
           <label for="cModel">Model</label>
@@ -1064,25 +1063,19 @@ function compilerPage() {
           ${chosen?.models?.length ? `<datalist id="cModelList">${chosen.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>` : ''}
         </div>
       </div>
-      <span class="note">Any endpoint that speaks the OpenAI <code>/chat/completions</code> shape, including one on this machine. Must be https unless it is.</span>
 
       <div class="field">
         <label for="cKey">API key</label>
         <input id="cKey" type="password" spellcheck="false" autocomplete="off" value=""
                placeholder="${c.hasKey ? `saved ${esc(c.keyHint)} — leave blank to keep it` : 'paste your key'}">
-        <span class="note">Kept on this machine in <code>data/settings.json</code>, readable only by you, and never sent back to this page.</span>
+        <span class="note">${chosen?.note ? `${esc(chosen.note)}. ` : ''}Kept on this machine, never shown again.</span>
       </div>
 
-      <div class="leaves">
-        <div class="leaves-head">What leaves this machine</div>
-        <ul>
-          <li>The sentence you type.</li>
-          <li>Your role names.</li>
-          <li>Your staff list — <b>names included</b>, so “Ana cannot ask for payroll” becomes a rule about Ana rather than about everyone.</li>
-        </ul>
+      <div class="field">
         <label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}>
-          <span>Send <code>@ana</code> instead of names</span></label>
-        <p class="note">Expect rules about a named person to get worse. Employee prompts, the audit log and your policy are never sent under any setting.</p>
+          <span>Send <code>@ana</code> instead of employee names</span></label>
+        <span class="note">Sent: your sentence, your role names, your staff list.
+          Never sent: employee prompts, the audit log, your policy.</span>
       </div>
       ` : ''}
 
@@ -1102,17 +1095,39 @@ function bindCompiler() {
   const d = compilerDraft();
   const providers = state.compiler?.providers ?? [];
 
+  /**
+   * Switching provider rewrites the endpoint and model boxes, and has to say so
+   * explicitly.
+   *
+   * `render()` restores every field by id *after* replacing the pane, which is
+   * right while someone is typing and wrong when the re-render is happening
+   * *because* the values changed: the new provider's endpoint went into the
+   * HTML and was immediately overwritten with the old one. The page then showed
+   * Google selected next to `api.anthropic.com`, which is not a cosmetic
+   * disagreement — it is the wrong host in the box that decides where the staff
+   * list gets sent. `adopt` marks the one render that must win over the restore,
+   * and `bindCompiler` runs after it.
+   */
+  if (d.adopt) {
+    const base = document.getElementById('cBase');
+    const model = document.getElementById('cModel');
+    if (base) base.value = d.baseUrl;
+    if (model) model.value = d.model;
+    delete d.adopt;
+  }
+
   for (const b of document.querySelectorAll('[data-prov]')) {
     b.onclick = () => {
       const next = providers.find((p) => p.id === b.dataset.prov);
-      // Switching provider adopts that provider's own endpoint and first model,
-      // so the common case is one click. It does not clear a typed key —
-      // changing the model of the same provider is the other common case.
+      // Adopts that provider's own endpoint and first model, so the common case
+      // is one click. It does not clear a typed key — changing the model of the
+      // same provider is the other common case.
       state.compilerDraft = {
         ...d,
         provider: b.dataset.prov,
         baseUrl: next?.baseUrl ?? '',
-        model: next?.models?.[0] ?? ''
+        model: next?.models?.[0] ?? '',
+        adopt: true
       };
       state.compilerTest = null;
       render();
@@ -1739,8 +1754,37 @@ function renderAudienceChips() {
 
 // ═══ TEAM ════════════════════════════════════════════════════════════════════
 
+/**
+ * The company's own name, and the way out of the demo.
+ *
+ * A fresh install ships a seeded directory — another company's name and seven
+ * invented people — because an empty console teaches nobody anything. Until
+ * this existed there was no way to leave it: the name in the title bar was not
+ * editable and the demo staff could only be deleted one at a time. That reads
+ * as a product stuck in a demo, and it was.
+ *
+ * "Start fresh" keeps one administrator and issues them a new key, because a
+ * directory with nobody in an exempt role is a console that cannot be opened
+ * again once `WARDEN_ADMIN_REQUIRE_KEY` is set — and because the point of
+ * starting over is that the demo's keys stop working. It leaves the policy
+ * alone: rules and people are separate decisions.
+ */
+function companyBlock() {
+  return `<div class="section company">
+    <div class="label">Company</div>
+    <div class="chips">
+      <input type="text" id="orgInput" class="inline" value="${esc(state.company.name ?? '')}" placeholder="Your company's name">
+      <button type="button" class="btn" id="orgSave">Rename</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="orgReset">Start fresh…</button>
+    </div>
+    <div class="note" id="orgNote">${state.orgNote ? esc(state.orgNote) : ''}</div>
+  </div>`;
+}
+
 VIEWS.people = {
   body: () => `<div class="sheet">
+    ${companyBlock()}
     ${state.company.employees.length
       ? state.company.employees.map(personRow).join('')
       : '<div class="empty"><b>Nobody yet</b><span>Add the first person below to issue them a key.</span></div>'}
@@ -1798,6 +1842,39 @@ function personRow(e) {
 }
 
 function bindPeopleList() {
+  const orgSave = $('orgSave');
+  if (orgSave) orgSave.onclick = async () => {
+    const name = $('orgInput').value.trim();
+    if (!name) return;
+    const { ok, j } = await api('/api/company', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    state.orgNote = ok ? 'Renamed.' : (j?.error ?? 'could not rename');
+    if (ok) await refreshPeople();
+    render();
+  };
+
+  const orgReset = $('orgReset');
+  if (orgReset) orgReset.onclick = async () => {
+    const name = $('orgInput').value.trim() || state.company.name;
+    // Irreversible and it revokes keys, so it asks. The wording names both
+    // consequences rather than asking "are you sure" about nothing in
+    // particular.
+    const people = state.company.employees.length;
+    if (!confirm(
+      `Remove ${people === 1 ? 'the 1 person' : `all ${people} people`} and issue the administrator a new key?\n\n` +
+      'Their existing keys stop working immediately. Your rules are left alone.'
+    )) return;
+    const { ok, j } = await api('/api/company/reset', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    state.orgNote = ok ? 'Started fresh. Add your team below.' : (j?.error ?? 'could not reset');
+    if (ok) await refreshPeople();
+    render();
+  };
+
   const add = $('addPerson');
   if (add) add.onclick = async () => {
     const name = $('newName').value.trim();

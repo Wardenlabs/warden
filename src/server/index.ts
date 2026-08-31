@@ -30,7 +30,9 @@ import {
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
+  clearDemoDirectory,
   loadDirectory,
+  renameCompany,
   removeEmployee,
   removeRole,
   rotateApiKey,
@@ -448,6 +450,29 @@ app.get('/api/people', (_req, res) => {
  * this gateway is actually reachable at — which is the value most likely to be
  * copied wrong by hand, and the one whose mistakes are silent.
  */
+/**
+ * The company's own name, and the way out of the demo.
+ *
+ * Administrative, like everything not on the employee allowlist. Both are
+ * destructive in the small: a rename is visible to everyone, and the reset
+ * revokes the seeded keys on purpose.
+ */
+app.put('/api/company', asyncRoute(async (req, res) => {
+  const name = String(req.body?.name ?? '');
+  try {
+    const dir = renameCompany(name);
+    res.json({ name: dir.name });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}));
+
+app.post('/api/company/reset', asyncRoute(async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name : undefined;
+  const dir = clearDemoDirectory(name);
+  res.json({ name: dir.name, employees: dir.employees.length });
+}));
+
 app.get('/api/people/:id/onboarding', (req, res) => {
   const person = findEmployee(String(req.params['id']));
   if (!person) return res.status(404).json({ error: 'no such employee' });
