@@ -582,19 +582,12 @@ td.n { color: var(--ink-2); }
 .dl .t { display: block; font-size: var(--fs-4); font-weight: var(--fw-medium); }
 .dl .m { display: block; font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); margin-top: 2px; }
 
-.cmd {
-  font-family: var(--mono); font-size: var(--fs-2); line-height: var(--lh-snug);
-  background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: var(--s-6); color: var(--ink-2); overflow-x: auto;
-  margin-top: var(--s-4);
-}
-
 /* ── footer ────────────────────────────────────────────────────────────── */
 footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size: var(--fs-2); color: var(--muted); }
-.foot { display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: space-between; align-items: center; }
+.foot { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); justify-content: center; align-items: center; }
+.foot .sep { color: var(--line-firm); }
 .foot a { color: var(--muted); text-decoration: none; }
 .foot a:hover { color: var(--ink); }
-.foot nav { display: flex; flex-wrap: wrap; gap: var(--s-5); }
 
 /* ═══ motion ═════════════════════════════════════════════════════════════ */
 
