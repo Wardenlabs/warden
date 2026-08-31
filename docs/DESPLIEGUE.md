@@ -337,19 +337,46 @@ hostname:
 WARDEN_PUBLIC_URL=https://warden.tuempresa.com npm run dev
 ```
 
-⚠️ Con una URL pública, cualquiera puede llegar al endpoint. Lo que lo protege
-es que **una key desconocida se rechaza** — pero la consola de admin en `/`
-queda accesible también. Para uso real ponele Cloudflare Access adelante, o usá
-la opción A.
+> ### ⚠️ Antes de levantar el túnel: `WARDEN_ADMIN_REQUIRE_KEY=1`
+>
+> Esto no es una recomendación, es el paso que falta.
+>
+> ```bash
+> WARDEN_ADMIN_REQUIRE_KEY=1 pnpm run dev
+> ```
+>
+> `requireAdmin` le da administración a loopback, y lee la dirección del socket
+> justamente para que no se pueda falsificar con un header. **Un túnel se
+> conecta desde `127.0.0.1`**, así que sin esa variable *toda* request que
+> entra por la URL pública pasa el chequeo: el directorio con las API keys de
+> todos en texto plano, editar la política, borrar gente. La key desconocida
+> que se rechaza protege el gateway (`/v1/chat/completions`), no la consola.
+>
+> Con la variable puesta, todo lo administrativo pide una key de un rol que la
+> política exima (`exemptRoles`, `admin` por defecto) — la misma key que ya usa
+> ese administrador. Medido contra un gateway corriendo: sin la variable, la
+> API de admin contestaba sin credencial; con ella, `/api/people` da 403 sin key
+> y 200 con ella.
+>
+> Vale igual para nginx, Caddy, un load balancer o cualquier cosa que se
+> conecte al gateway desde la misma máquina.
 
 ## Lo que falta para producción de verdad
 
 Dicho derecho, porque el gateway todavía no lo hace solo:
 
 - **No termina TLS.** Depende de que el túnel o la VPN lo hagan.
-- **La consola de admin no tiene login.** Cualquiera que llegue al puerto la
-  abre y puede editar la política. En LAN de confianza es aceptable; expuesta,
-  no.
+- **La consola de admin confía en loopback por defecto.** Ya no es "no tiene
+  login": [`src/server/admin-auth.ts`](../src/server/admin-auth.ts) exige una
+  key de un rol exento para todo lo que no sean las tres rutas de guard que usa
+  un empleado. Pero por defecto acepta loopback sin credencial, que es lo
+  correcto en una máquina de escritorio y **falso detrás de cualquier proxy**.
+  Ponele `WARDEN_ADMIN_REQUIRE_KEY=1` y deja de serlo.
+- **El modelo todavía no da los dos números a la vez.** Ninguna configuración
+  medida pasa las dos columnas: el 1.7B refusa el 63% del trabajo legítimo, y el
+  8B que lo baja a 6% detiene 71% de los ataques en vez de 89%. Está en
+  [`docs/MEASUREMENTS.md`](MEASUREMENTS.md) con las corridas atrás. Es la razón
+  principal por la que esto todavía no se deja prendido solo en una empresa.
 - **Las keys se guardan en claro** en `data/company.json`. Un hash serviría para
   autenticar, pero el admin no podría volver a mostrarlas, y mostrarlas es lo
   que hace usable el onboarding. Es un intercambio consciente para un gateway

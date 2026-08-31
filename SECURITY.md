@@ -150,7 +150,16 @@ guess whether it came off their own machine.
 - `WARDEN_HOST` defaults to `0.0.0.0` so employees can reach the gateway. The
   administrative surface is authenticated, but set `127.0.0.1` if the gateway
   serves only the machine it runs on.
-- Set `WARDEN_ADMIN_REQUIRE_KEY=1` where the gateway host is shared.
+- **Set `WARDEN_ADMIN_REQUIRE_KEY=1` behind any proxy, tunnel or load
+  balancer.** Not only on a shared host — this one is sharper than it reads.
+  `requireAdmin` grants administration to loopback, and it reads the peer
+  address off the socket precisely so a header cannot forge it. A reverse proxy
+  connects from `127.0.0.1`, so *every* request arriving through it satisfies
+  that check and everyone who can reach the proxy is an administrator: the
+  directory with every employee's API key in plain text, policy edits, deleting
+  people. Confirmed against a running gateway while preparing a tunnel — with
+  the flag off the admin API answered unauthenticated; with it on, `/api/people`
+  returned 403 without a key and 200 with one.
 - `WARDEN_CORS_ORIGIN` is unset by default and should stay that way. The console
   is served by the same process and needs no cross-origin access.
 - Keep `data/` off shared storage. It holds the directory, the policy and the

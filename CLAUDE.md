@@ -159,11 +159,25 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 
 - Both hook integrations are **NOT VERIFIED** end to end. See
   [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
-- The false-positive rate is **58%** in the last recorded run. That is the
-  number that decides whether anyone can leave the guard switched on, and it is
-  the most valuable thing in the project to improve.
+- **No shipped configuration passes both columns.** On the 185-prompt paired run
+  the 1.7B refuses 63% of legitimate requests, and the 8B that fixes that
+  (down to 6%) drops attacks caught from 89% to 71%, losing thirteen of sixteen
+  in `hypothetical-testing`, `multi-turn-escalation` and `roleplay-fiction`.
+  A guard refusing two of every three honest requests gets switched off; a guard
+  missing half the attacks that need judgement is not a guard. This is the
+  thing to fix, and `docs/MEASUREMENTS.md` records where the remaining error
+  lives: all 7 of the 8B's false positives are `r-instruction-override`, all 7
+  are developer sentences about code, and the split is grammatical rather than
+  semantic.
+- The 8B also costs **46 s per decision** on four CPU cores, against a hook that
+  gives up at 30 and fails open. That is a fact about the machine, and it is why
+  the number is worth having: a deployment with a GPU should measure it again.
+- Six attachment-bearing corpus prompts are skipped in every run, because the
+  OCR model resolves only over the P2P registry. `document-borne` has never been
+  measured.
 - Quota counters live in memory and reset with the process.
-- API keys are stored in plaintext in the directory file.
+- API keys are stored in plaintext in the directory file, and so is the compiler
+  provider key in `data/settings.json` (written `0600`, gitignored).
 
 If you fix one of these, add the row to `docs/MEASUREMENTS.md` with the run
 behind it.
