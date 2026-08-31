@@ -11,6 +11,11 @@
 
 import { mountLight } from './light.js';
 
+/* Tell the watchdog in <head> that the module got here, so it leaves the
+   reveal-on-scroll hiding in place. If this line is never reached the page
+   un-hides itself rather than staying blank. */
+window.__wardenReady = true;
+
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ── the light ─────────────────────────────────────────────────────────── */

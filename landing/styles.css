@@ -38,7 +38,6 @@
   --accent:       #f0f0f2;
   --accent-hover: #ffffff;
   --accent-ink:   #050507;
-  --accent-line:  #3c3f47;
 
   /* ── verdict: the only saturated colour in the product ─────────────── */
   --allow:       #55b483;
@@ -88,21 +87,18 @@
   /* Type below the console's floor. A marketing page renders the product
      at a quarter size, and the console has no tier for that. */
   --fs-0:  9px;
-  --fs-05: 10px;
 
   /* And above its ceiling. Fluid, because a 78px headline on a phone is
      not a headline. */
   --fs-9:  clamp(40px, 5vw, 72px);     /* hero */
   --fs-h2: clamp(27px, 3.9vw, 44px);   /* section heads */
-  --fs-stat: clamp(44px, 7vw, 84px);   /* the count-up numerals */
-  --fs-h3: clamp(24px, 3.3vw, 34px);   /* a feature's claim */
   --fs-sub: 16px;                      /* the hero's one sentence under the headline */
 
   --ls-hero: -.02em;
   --lh-hero: 1.05;
 
   --s-11: 128px;  --s-12: 168px;
-  --r-xl: 16px;   --r-2xl: 22px;
+  --r-xl: 16px;
 
   --wide: 1140px;
   --guide-w: 1px;
@@ -200,8 +196,6 @@ section { position: relative; padding-block: var(--s-11); border-top: var(--guid
 
 @media (max-width: 700px) { section { padding-block: var(--s-9); } }
 
-.stack   { display: grid; gap: var(--s-5); }
-
 /* Every section body stacks on the same rhythm, so the five of them cannot
    drift apart as they are written. */
 .stack-lg { display: grid; gap: var(--s-6); }
@@ -250,8 +244,6 @@ h3 {
 .mono { font-family: var(--mono); font-size: var(--fs-mono-adj); }
 .dim  { color: var(--faint); }
 
-a.link { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line-firm); }
-a.link:hover { border-bottom-color: var(--ink); }
 
 /* ═══ buttons and pills ══════════════════════════════════════════════════ */
 
@@ -276,41 +268,8 @@ a.link:hover { border-bottom-color: var(--ink); }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary .sz { font-family: var(--mono); font-size: var(--fs-1); opacity: .55; }
 
-.btn-secondary { background: var(--bg); color: var(--ink); border-color: var(--line-firm); }
-.btn-secondary:hover { background: var(--hover); }
 
 .btn-sm { height: 32px; padding-inline: var(--s-4); font-size: var(--fs-2); }
-
-.dot {
-  width: 6px; height: 6px;
-  border-radius: var(--r-pill);
-  background: var(--allow);
-  flex: none;
-}
-.dot-live { animation: pulse 2.4s ease-in-out infinite; }
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
-  50%      { box-shadow: 0 0 0 4px var(--allow-bg); opacity: .75; }
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  height: 22px;
-  padding-inline: var(--s-3);
-  border-radius: var(--r-sm);
-  background: var(--sunken);
-  border: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: var(--fs-0);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.chip-block { background: var(--block-bg); border-color: transparent; color: var(--block); }
-.chip-allow { background: var(--allow-bg); border-color: transparent; color: var(--allow); }
-.chip-escalate { background: var(--escalate-bg); border-color: transparent; color: var(--escalate); }
 
 /* ═══ header ═════════════════════════════════════════════════════════════ */
 
@@ -518,7 +477,6 @@ header nav .btn { color: var(--accent-ink); }
 .term .you  { color: var(--faint); }
 .term .stop { color: var(--block); font-weight: var(--fw-semi); }
 .term .rule { color: var(--ink); }
-.term .ok   { color: var(--allow); }
 .term .dim  { color: var(--faint); }
 .term .h    { color: var(--ink-2); }
 
@@ -605,8 +563,7 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .judge .cur,
-  .term::before,
-  .dot-live { animation: none; }
+  .term::before { animation: none; }
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
 
@@ -650,8 +607,12 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   flex: none;
 }
 .steps .m { font-family: var(--mono); font-size: var(--fs-0); color: var(--faint); white-space: nowrap; }
-.steps .never { background: var(--sunken); color: var(--faint); }
-.steps .never .stepn { border-style: dashed; }
+/* The three verdicts, in their own colours — the only saturation below the
+   hero besides the refusal itself, and the only place the page says out loud
+   that a verdict has three values rather than two. */
+.steps .m .v-allow    { color: var(--allow); }
+.steps .m .v-block    { color: var(--block); }
+.steps .m .v-escalate { color: var(--escalate); }
 
 .note    { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); }
 

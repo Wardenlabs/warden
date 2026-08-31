@@ -4,21 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden — the local AI gateway</title>
-<meta name="description" content="Your admin writes the rules. Every prompt is judged against them before a model sees it. All inference runs on-device. Free and open source, Apache-2.0.">
+<meta name="description" content="Your admin writes the rules. Every prompt is checked against them before a model sees it, on the machine and before it is sent. 136 of 160 attacks stopped. Free and open source, Apache-2.0.">
 
 <meta property="og:title" content="Warden — the local AI gateway">
-<meta property="og:description" content="A system prompt is a request, not a control. Warden judges every prompt against ratified policy before a model sees it — on-device.">
+<meta property="og:description" content="Asking a model to follow your rules is not the same as enforcing them. Warden checks every prompt against your rules before a model sees it — on the machine, before it is sent.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#050507">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2317181c'/%3E%3Cpath d='M50 18 82 30v26c0 22-18 34-32 40C36 90 18 78 18 56V30z' fill='none' stroke='%23fff' stroke-width='7'/%3E%3C/svg%3E">
 <!-- Reveal-on-scroll hides things, so it may only arm itself once something
-     is around to un-hide them. Without this the page is blank below the
-     hero whenever the module fails to run. Inline and parser-blocking on
-     purpose: it has to win the race against first paint, and it is one
-     statement, not a fetch. -->
-<script>document.documentElement.classList.add('js');</script>
+     is around to un-hide them. Inline and parser-blocking on purpose: it has
+     to win the race against first paint, and it is two statements, not a
+     fetch.
+
+     The second one is the way back. With scripting off this never runs and
+     the page is simply visible; with scripting on but the module broken —
+     a syntax error, a bad deploy, a blocked request — the page would
+     otherwise be blank below the hero forever. app.js raises the flag as
+     soon as it is running, and if it has not by then, the hiding is undone
+     and the page renders in full. -->
+<script>
+document.documentElement.classList.add('js');
+setTimeout(function () {
+  if (!window.__wardenReady) document.documentElement.classList.remove('js');
+}, 2500);
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -95,7 +106,7 @@
       </div>
     </div>
 
-    <p class="note">Every line of the refusal below is read from that rule and composed by the hook. Nothing in it is written at the moment of the decision.</p>
+    <p class="note" data-reveal>Every line of the refusal below is read from that rule and composed by the hook. Nothing in it is written at the moment of the decision.</p>
 
     <div class="term" data-reveal>
       <div class="term-bar">claude code</div>
@@ -138,7 +149,7 @@
         <li><span class="stepn">1</span><span>The employee presses Enter.</span><span class="m">claude code · codex</span></li>
         <li><span class="stepn">2</span><span>The tool's own hook fires, on their machine, before anything is sent.</span><span class="m">UserPromptSubmit</span></li>
         <li><span class="stepn">3</span><span>Warden judges the prompt against the ratified rules.</span><span class="m">on-device</span></li>
-        <li><span class="stepn">4</span><span>Allowed, it continues. Blocked, the model never receives it.</span><span class="m">allow · block · escalate</span></li>
+        <li><span class="stepn">4</span><span>Allowed, it continues. Blocked, the model never receives it.</span><span class="m"><span class="v-allow">allow</span> · <span class="v-block">block</span> · <span class="v-escalate">escalate</span></span></li>
       </ol>
     </div>
 
@@ -243,7 +254,7 @@
 
     <!-- Two facts someone finds out on their own machine if we do not say
          them here, and both of them cost more discovered that way. -->
-    <p class="note">No Intel Mac build yet. First launch downloads the models — that part needs the network once, and only once.</p>
+    <p class="note" data-reveal>No Intel Mac build yet. First launch downloads the models — that part needs the network once, and only once.</p>
 
     <p class="receipt" data-reveal>git clone github.com/Wardenlabs/warden · pnpm install · pnpm run setup · pnpm run dev</p>
 
