@@ -91,6 +91,17 @@ export type ReportedUsage = {
   contextTokens?: number;
   /** Which tool reported it, for the trace. Never used to pick rules. */
   source?: string;
+  /**
+   * The model that tool is running, as the tool itself names it.
+   *
+   * Reported, like everything else in this type, and therefore not evidence:
+   * an employee can edit their own transcript, so this is never allowed to
+   * pick rules or move a verdict. What it is good for is the question an
+   * administrator actually asks — *what is my company sending, and to what* —
+   * which until now the governance record could not answer. It sat one field
+   * away in the same transcript entry the token counts are read from.
+   */
+  model?: string;
 };
 
 export type GuardInput = {
@@ -125,7 +136,21 @@ export type Decision = {
 };
 
 /** One ceiling and where this session sits against it. `limit: null` means unmetered. */
-export type BudgetGauge = { used: number; limit: number | null; over: boolean; warn: boolean };
+/**
+ * A ceiling and how much of it is gone.
+ *
+ * `pct` is derived rather than asked for, and it is here because `used` and
+ * `limit` are two numbers a person has to divide in their head — which is
+ * exactly the arithmetic that stops being done when a console is glanced at
+ * rather than read. Null when there is no limit: no ceiling is not 0% of one.
+ */
+export type BudgetGauge = {
+  used: number;
+  limit: number | null;
+  pct: number | null;
+  over: boolean;
+  warn: boolean;
+};
 
 export type BudgetStatus = {
   output: BudgetGauge;

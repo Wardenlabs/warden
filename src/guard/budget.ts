@@ -39,9 +39,15 @@ function gauge(used: number | undefined, limit: number | undefined, warnAt: numb
   // A ceiling nobody set is not a ceiling of zero. An unset limit is unmetered,
   // for the same reason an actor whose role carries no quota is unlimited:
   // absence of a rule is not a reason to refuse.
-  if (!limit) return { used: used ?? 0, limit: null, over: false, warn: false };
+  if (!limit) return { used: used ?? 0, limit: null, pct: null, over: false, warn: false };
   const u = used ?? 0;
-  return { used: u, limit, over: u >= limit, warn: u >= limit * warnAt };
+  return {
+    used: u,
+    limit,
+    pct: Math.round((u / limit) * 100),
+    over: u >= limit,
+    warn: u >= limit * warnAt
+  };
 }
 
 export function checkBudget(
@@ -94,8 +100,19 @@ export function checkBudget(
       detail: {
         reported: !unreported,
         source: usage?.source ?? null,
-        output: { used: output.used, limit: output.limit, warn: output.warn },
-        context: { used: context.used, limit: context.limit, warn: context.warn }
+        /**
+         * Which model the employee's tool is running, recorded on the decision.
+         *
+         * The trace is what the console renders and what the audit log keeps,
+         * so this is the field that lets an administrator answer "what is my
+         * company sending, and to what" — a question the governance record
+         * could not answer at all, while the answer sat one field away in the
+         * transcript the token counts already come from. Null when the tool did
+         * not say, which is honest and not the same as "no model".
+         */
+        model: usage?.model ?? null,
+        output: { used: output.used, limit: output.limit, pct: output.pct, warn: output.warn },
+        context: { used: context.used, limit: context.limit, pct: context.pct, warn: context.warn }
       }
     }
   };

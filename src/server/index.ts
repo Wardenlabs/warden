@@ -1080,7 +1080,9 @@ async function optional<T>(specifier: string): Promise<T | null> {
  * There is no path here that widens a ceiling. The numbers only ever push a
  * decision toward ESCALATE.
  */
-function reportedUsage(body: unknown): { outputTokens?: number; contextTokens?: number; source?: string } | undefined {
+function reportedUsage(
+  body: unknown
+): { outputTokens?: number; contextTokens?: number; source?: string; model?: string } | undefined {
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>)['usage'] : undefined;
   if (!raw || typeof raw !== 'object') return undefined;
   const u = raw as Record<string, unknown>;
@@ -1093,12 +1095,23 @@ function reportedUsage(body: unknown): { outputTokens?: number; contextTokens?: 
   const outputTokens = count(u['outputTokens']);
   const contextTokens = count(u['contextTokens']);
   const source = typeof u['source'] === 'string' ? u['source'].slice(0, 40) : undefined;
+  /**
+   * Truncated and never trusted, like `source` beside it.
+   *
+   * A model name is self-reported by a tool reading a file on the employee's
+   * own machine, so it belongs in the record and nowhere near a decision.
+   * Bounded because it lands in the audit log: an unbounded string from a
+   * caller is a way to write megabytes into the governance chain one request
+   * at a time.
+   */
+  const model = typeof u['model'] === 'string' ? u['model'].slice(0, 60) : undefined;
   if (outputTokens === undefined && contextTokens === undefined) return undefined;
 
   return {
     ...(outputTokens !== undefined ? { outputTokens } : {}),
     ...(contextTokens !== undefined ? { contextTokens } : {}),
-    ...(source ? { source } : {})
+    ...(source ? { source } : {}),
+    ...(model ? { model } : {})
   };
 }
 

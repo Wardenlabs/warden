@@ -94,6 +94,7 @@ function readUsage(payload, tool) {
 
     let outputTokens = 0;
     let last = null;
+    let model;
     for (const line of readFileSync(path, 'utf8').split('\n')) {
       // Most lines are user turns and tool results. Skipping them before
       // JSON.parse is what keeps this in the tens of milliseconds.
@@ -108,6 +109,12 @@ function readUsage(payload, tool) {
       if (!u) continue;
       outputTokens += u.output_tokens ?? 0;
       last = u;
+      // The model sits beside the token counts in the same entry, and the
+      // governance record could not previously answer "what is my company
+      // sending, and to what". Taken from the most recent assistant turn
+      // rather than the first: a session that switched models is described by
+      // the one it is on now.
+      if (typeof entry?.message?.model === 'string') model = entry.message.model;
     }
 
     if (!last) return undefined;
@@ -120,7 +127,7 @@ function readUsage(payload, tool) {
       (last.cache_read_input_tokens ?? 0) +
       (last.cache_creation_input_tokens ?? 0);
 
-    return { outputTokens, contextTokens, source: tool };
+    return { outputTokens, contextTokens, source: tool, ...(model ? { model } : {}) };
   } catch {
     return undefined;
   }
