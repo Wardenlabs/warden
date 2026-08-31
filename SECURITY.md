@@ -107,6 +107,44 @@ legitimate traffic. A guard people cannot work with gets switched off, and a
 guard that is switched off protects nothing — so this is a security property,
 not a usability one.
 
+## The one thing that may run off-machine, and what it is not
+
+Inference is local. The single exception is **rule compilation**, and it is
+opt-in, off by default, and enforced by role rather than by convention.
+
+Compilation turns one sentence an administrator typed into a draft rule that
+the same administrator then reads and ratifies. It never sees an employee
+prompt and it cannot enact policy — `src/policy/compile.ts` states that split in
+its first paragraph and `ratifyRule` is the only path that changes what anyone
+is judged against. **Judging stays local under every configuration.** There is
+no environment variable, flag, or fallback that sends a prompt under judgement
+anywhere, and `pnpm run test:remote` asserts it: every guard role delegates to
+the local adapter and performs zero network calls, with `fetch` replaced by a
+recorder.
+
+Enable it with `WARDEN_COMPILER_API` (an OpenAI-shaped `/chat/completions` base
+URL) and `WARDEN_COMPILER_API_KEY`. Both are required — a URL without a key
+stays local rather than posting to an unauthenticated endpoint. Plain `http` to
+a non-loopback host is refused outright.
+
+**What leaves the machine when it is on**, stated without qualification:
+
+1. The administrator's sentence.
+2. The role names.
+3. **The employee roster** — id and display name for everyone in the directory
+   — because the compiler injects it so that "Ana cannot ask for payroll"
+   compiles into a rule about Ana rather than about the whole company.
+
+Point 3 is the reason this is a security note and not a feature note. Set
+`WARDEN_COMPILER_REDACT_NAMES=1` and the provider sees `@e-01` and never the
+person; that costs accuracy exactly where the roster was earning it, so it is a
+choice rather than a default. No employee prompt, audit entry, policy hash or
+API key is sent under any setting.
+
+The console reports which model drafted a rule, and whether it was remote, on
+every draft it returns. An administrator ratifying a rule should not have to
+guess whether it came off their own machine.
+
 ## Deployment notes
 
 - `WARDEN_HOST` defaults to `0.0.0.0` so employees can reach the gateway. The

@@ -10,8 +10,25 @@
  */
 import type { ZodType } from 'zod';
 
-/** Which loaded model a request should be routed to. */
-export type ModelRole = 'detector' | 'adjudicator' | 'assistant' | 'embedder' | 'ocr';
+/**
+ * Which loaded model a request should be routed to.
+ *
+ * `compiler` is the odd one out and is separate on purpose. Every other role is
+ * guard-side work that sees employee traffic and must run on the machine;
+ * `compiler` only ever sees a sentence an administrator typed, and produces a
+ * draft that same administrator has to ratify before it binds anyone. That is
+ * what makes it the one role a deployment may point at a model it does not own
+ * — see `remote.ts`. Splitting it out of `adjudicator` is what turns "only the
+ * compiler goes remote" into something the type system and one `if` can
+ * enforce, rather than a convention.
+ */
+export type ModelRole =
+  | 'detector'
+  | 'adjudicator'
+  | 'compiler'
+  | 'assistant'
+  | 'embedder'
+  | 'ocr';
 
 /** Per-call telemetry, sourced from the SDK's `final.stats`. Feeds BENCHMARKS.md. */
 export type GenStats = {

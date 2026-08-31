@@ -33,7 +33,8 @@
     "eval": "tsx scripts/eval.ts",
     "eval:lint": "tsx scripts/eval-lint.ts",
     "compare": "tsx scripts/compare.ts",
-    "measurements": "tsx scripts/measurements.ts"
+    "measurements": "tsx scripts/measurements.ts",
+    "test:remote": "tsx scripts/test-remote-boundary.ts"
   },
   "dependencies": {
     "@qvac/sdk": "^0.17.1",

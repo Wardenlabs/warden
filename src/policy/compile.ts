@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import type { QvacAdapter } from '../qvac/types.js';
 import { thinkingMarker } from '../qvac/client.js';
+import { redactNames, remoteCompilerConfig } from '../qvac/remote.js';
 import { isolate, isolationPreamble } from '../guard/isolate.js';
 import { adjudicate } from '../guard/passes/adjudicate.js';
 import { EVERYONE, employeeIdOf, employeeToken, sanitiseAudience } from './audience.js';
@@ -68,7 +69,7 @@ export async function compileRule(
     // model has no token for a person and defaults to the whole company, which
     // is a much broader rule than the admin asked for.
     people.length > 0
-      ? `Named employees, referred to with an @ prefix: ${people.map((p) => `${employeeToken(p.id)} (${p.name})`).join(', ')}.`
+      ? `Named employees, referred to with an @ prefix: ${people.map((p) => roster(p)).join(', ')}.`
       : '',
     'Use ["*"] when the rule binds everyone.',
     '',
@@ -91,14 +92,23 @@ export async function compileRule(
     '',
     'Write examples in the same language the administrator used.',
     isolationPreamble(iso.nonce),
-    thinkingMarker('adjudicator')
+    // The compiler's marker, not the adjudicator's. They are the same local
+    // model by default, and they are not the same model at all once
+    // compilation is remote: this was emitting Qwen's `/no_think` control
+    // token into a request bound for another vendor's API, which is the exact
+    // failure `thinkingMarker` was written to prevent, one role over.
+    thinkingMarker('compiler')
   ]
     .filter(Boolean)
     .join('\n');
 
   const res = await qvac.completeJSON<RuleDraft>(
     {
-      role: 'adjudicator',
+      // Not 'adjudicator', though it is the same local weights by default.
+      // The distinct role is what lets a deployment put compilation on a model
+      // it does not own without putting a single employee prompt there — see
+      // `qvac/remote.ts`. Judging is not configurable in that direction.
+      role: 'compiler',
       system,
       user: `${iso.envelope}\n\nConvert the statement above into a rule.`,
       maxTokens: 640,
@@ -273,6 +283,23 @@ function tryDirectory(): { roles: string[]; employees: { id: string }[] } | null
   } catch {
     return null;
   }
+}
+
+/**
+ * How one employee is named to the model.
+ *
+ * The display name is what makes "Ana cannot ask for payroll" compile into a
+ * rule about Ana, so it is sent by default and the rule is better for it. When
+ * compilation is remote, `WARDEN_COMPILER_REDACT_NAMES=1` reduces this to the
+ * opaque token: the provider then sees `@e-01` and never the person. That is a
+ * real accuracy cost paid deliberately, which is why it is a setting and not a
+ * default — and why redaction is ignored when the model is local, where there
+ * is no third party to withhold anything from.
+ */
+function roster(p: { id: string; name: string }): string {
+  const token = employeeToken(p.id);
+  const withhold = redactNames() && remoteCompilerConfig() !== null;
+  return withhold ? token : `${token} (${p.name})`;
 }
 
 function slug(text: string): string {

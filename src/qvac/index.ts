@@ -5,6 +5,7 @@
 import { MockQvacAdapter } from './mock.js';
 import { LlamaCppAdapter } from './llamacpp.js';
 import { RealQvacAdapter } from './real.js';
+import { RemoteCompilerAdapter, remoteCompilerConfig } from './remote.js';
 import type { QvacAdapter } from './types.js';
 
 let instance: QvacAdapter | null = null;
@@ -22,11 +23,31 @@ let instance: QvacAdapter | null = null;
 export function adapter(): QvacAdapter {
   if (!instance) {
     const choice = process.env['WARDEN_ADAPTER'];
-    if (choice === 'mock') instance = new MockQvacAdapter();
-    else if (choice === 'llamacpp') instance = new LlamaCppAdapter();
-    else instance = new RealQvacAdapter();
+    let local: QvacAdapter;
+    if (choice === 'mock') local = new MockQvacAdapter();
+    else if (choice === 'llamacpp') local = new LlamaCppAdapter();
+    else local = new RealQvacAdapter();
+
+    // The wrap is additive and role-scoped: everything the guard does still
+    // runs on `local`, and only the rule compiler is routed off-machine. When
+    // the feature is unconfigured this returns the local adapter untouched, so
+    // a default install has no network path from any model call.
+    const remote = remoteCompilerConfig();
+    instance = remote ? new RemoteCompilerAdapter(local, remote) : local;
   }
   return instance;
+}
+
+/**
+ * Where rule compilation runs, for the console and the measurement records.
+ *
+ * An administrator ratifying a draft should be able to see whether the model
+ * that wrote it was theirs, and a recorded run should say the same. Returns
+ * null when compilation is local, which is the default.
+ */
+export function remoteCompiler(): string | null {
+  const a = adapter();
+  return a instanceof RemoteCompilerAdapter ? a.describe() : null;
 }
 
 export function isMock(): boolean {

@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
 import { MODEL_SPECS, modelsDir } from './models.js';
+import { remoteCompilerConfig } from './remote.js';
 import type { ModelRole } from './types.js';
 
 /** Written by `pnpm run setup` — resolved absolute paths per role. */
@@ -70,7 +71,14 @@ function sourceFor(role: ModelRole): string | object {
   const fromConfig = config()?.models[role];
   if (fromConfig && existsSync(fromConfig)) return fromConfig;
 
-  const spec = MODEL_SPECS.find((m) => m.role === role);
+  // The compiler has no weights of its own. It ran on the adjudicator's model
+  // before it was a separate role and it still does when nothing else is
+  // configured, so splitting the role changed no defaults — it only made the
+  // seat something a deployment can fill separately, locally with
+  // `WARDEN_MODEL_COMPILER` or off-machine with `WARDEN_COMPILER_API`.
+  const specRole: ModelRole = role === 'compiler' ? 'adjudicator' : role;
+
+  const spec = MODEL_SPECS.find((m) => m.role === specRole);
   if (!spec) throw new Error(`no model registered for role "${role}"`);
 
   // Resolved for the same reason as the override above: this is the path taken
@@ -94,6 +102,11 @@ function configFor(role: ModelRole): Record<string, unknown> {
       return { ctx_size: 4096, parallel: 2 };
     case 'adjudicator':
       return { ctx_size: 8192, parallel: 4 };
+    // Compilation is one call with an administrator waiting on it, so there is
+    // nothing to batch. A wider context because a rule draft carries the role
+    // list and the roster on the way in and six fields on the way out.
+    case 'compiler':
+      return { ctx_size: 8192, parallel: 1 };
     case 'assistant':
       return { ctx_size: 8192 };
     case 'embedder':
@@ -215,6 +228,14 @@ export function modelFor(role: ModelRole): Promise<string> {
  * by its own identity instead.
  */
 export function resolvedModel(role: ModelRole): string {
+  // Compilation may not be running on anything in `models/`. When it is remote
+  // the local weights are not who answers, and reporting them would file a
+  // draft under a model that never saw it — the same failure `sourceFor` is
+  // careful about, one layer up.
+  if (role === 'compiler') {
+    const remote = remoteCompilerConfig();
+    if (remote) return remote.model;
+  }
   try {
     const src = sourceFor(role);
     if (typeof src === 'string') return src.split('/').pop() ?? src;

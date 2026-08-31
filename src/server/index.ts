@@ -17,7 +17,8 @@ import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
-import { adapter, adapterName, isMock } from '../qvac/index.js';
+import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
+import { resolvedModel } from '../qvac/client.js';
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
@@ -255,7 +256,15 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   // `lockTo` is set when the admin writes a rule from inside one person's page.
   // They already said who it is for by being there.
   const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
-  res.json(await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {}));
+  const rule = await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {});
+  // Who wrote the draft, so the administrator ratifying it can see whether it
+  // came off their own machine. `null` means local, which is the default.
+  const remote = remoteCompiler();
+  res.json({
+    ...(rule as object),
+    draftedBy: remote ?? resolvedModel('compiler'),
+    draftedRemotely: remote !== null
+  });
 }));
 
 app.post('/api/policy/preview', asyncRoute(async (req, res) => {
