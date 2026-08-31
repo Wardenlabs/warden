@@ -517,7 +517,18 @@ function renderNav() {
       ${n > 0 ? `<span class="nav-count">${n}</span>` : ''}
     </button>`;
   }).join('');
-  $('orgName').textContent = state.company.name ? `· ${state.company.name}` : '';
+  // A demo directory has a company name, and it is not the user's. Showing it
+  // in the title bar is the product asserting something false about whoever
+  // installed it, so the seeded name stays out of the chrome until someone
+  // claims it on Team.
+  // While it is the sample, the chrome says so and offers the one click that
+  // fixes it — the console opens on Activity, so nobody finds the Company block
+  // on Team by accident.
+  if (state.company.demo) {
+    $('orgName').innerHTML = '<button type="button" class="linkish" data-go="people">· sample data</button>';
+  } else {
+    $('orgName').textContent = state.company.name ? `· ${state.company.name}` : '';
+  }
 }
 
 // One delegated listener for the whole document: every navigation is a
@@ -1770,13 +1781,20 @@ function renderAudienceChips() {
  * alone: rules and people are separate decisions.
  */
 function companyBlock() {
+  const demo = Boolean(state.company.demo);
   return `<div class="section company">
     <div class="label">Company</div>
+    ${demo ? `<div class="banner warn">
+      <b>This is the sample company that ships with Warden.</b>
+      ${esc(state.company.name)} and everyone below are made up, and their keys are
+      demo keys. Put your own name in and the sample goes away.
+    </div>` : ''}
     <div class="chips">
-      <input type="text" id="orgInput" class="inline" value="${esc(state.company.name ?? '')}" placeholder="Your company's name">
-      <button type="button" class="btn" id="orgSave">Rename</button>
+      <input type="text" id="orgInput" class="inline" value="${demo ? '' : esc(state.company.name ?? '')}"
+             placeholder="Your company's name">
+      <button type="button" class="btn${demo ? ' primary' : ''}" id="orgSave">${demo ? 'This is us' : 'Rename'}</button>
       <span class="spacer"></span>
-      <button type="button" class="btn" id="orgReset">Start fresh…</button>
+      <button type="button" class="btn" id="orgReset">${demo ? 'Clear the sample team' : 'Start fresh…'}</button>
     </div>
     <div class="note" id="orgNote">${state.orgNote ? esc(state.orgNote) : ''}</div>
   </div>`;

@@ -38,7 +38,23 @@ export const directorySchema = z.object({
   name: z.string().default(''),
   description: z.string().default(''),
   roles: z.array(z.string().min(1)).min(1),
-  employees: z.array(employeeSchema)
+  employees: z.array(employeeSchema),
+  /**
+   * True while this is still the shipped demo — a freight company nobody
+   * installing Warden works at, and seven people who do not exist.
+   *
+   * The seed exists because an empty console teaches nobody what the product
+   * does, and it is genuinely useful for that. What was wrong is that it
+   * *asserted* the company: every install opened claiming to be Northwind
+   * Logistics SA, and the console had no way to say otherwise. A default that
+   * states a fact about the user which is false for every user is worse than
+   * no default.
+   *
+   * So the seed now announces itself, and the console asks instead of
+   * pretending. The flag clears the moment anyone names their company or
+   * starts fresh, and it is absent from directories that were never seeded.
+   */
+  demo: z.boolean().optional()
 });
 export type Directory = z.infer<typeof directorySchema>;
 
@@ -82,6 +98,7 @@ export function loadDirectory(): Directory {
    */
   const issued: Directory = {
     ...seeded,
+    demo: true,
     employees: seeded.employees.map((e) => ({ ...e, apiKey: newApiKey(e.id) }))
   };
 
@@ -287,7 +304,9 @@ export function renameCompany(name: string): Directory {
   const trimmed = name.trim();
   if (!trimmed) throw new Error('the company needs a name');
   if (trimmed.length > 120) throw new Error('that name is too long');
-  return save({ ...loadDirectory(), name: trimmed });
+  // Naming it is what makes it theirs, so the demo flag goes with the rename.
+  const { demo: _was, ...rest } = loadDirectory();
+  return save({ ...rest, name: trimmed });
 }
 
 /**
@@ -309,8 +328,9 @@ export function clearDemoDirectory(companyName?: string): Directory {
   const kept = admin
     ? [{ ...admin, name: admin.name, apiKey: newApiKey(admin.id) }]
     : [];
+  const { demo: _was, ...rest } = current;
   return save({
-    ...current,
+    ...rest,
     name: (companyName ?? current.name).trim() || current.name,
     roles: current.roles,
     employees: kept
