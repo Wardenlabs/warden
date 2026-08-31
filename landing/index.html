@@ -124,6 +124,54 @@
   </div>
 </section>
 
+<!-- ── §2 how it works ─────────────────────────────────────────────────── -->
+<section id="how" class="rails">
+  <div class="wrap stack-lg">
+
+    <div class="sec-head" data-reveal>
+      <span class="label">How it works</span>
+      <h2>It runs before the prompt leaves the machine.</h2>
+    </div>
+
+    <div class="card" data-reveal>
+      <ol class="steps">
+        <li><span class="stepn">1</span><span>The employee presses Enter.</span><span class="m">claude code · codex</span></li>
+        <li><span class="stepn">2</span><span>The tool's own hook fires, on their machine, before anything is sent.</span><span class="m">UserPromptSubmit</span></li>
+        <li><span class="stepn">3</span><span>Warden judges the prompt against the ratified rules.</span><span class="m">on-device</span></li>
+        <li><span class="stepn">4</span><span>Allowed, it continues. Blocked, the model never receives it.</span><span class="m">allow · block · escalate</span></li>
+      </ol>
+    </div>
+
+    <!-- The commercial argument, and the reason a gateway that sits in front
+         of an API would not work here at all. -->
+    <p class="lead" data-reveal>A Claude Max or ChatGPT Plus session authenticates over OAuth against a fixed endpoint. There is no base URL to redirect. The hook does not care — it runs first.</p>
+
+    <p class="receipt" data-reveal>UserPromptSubmit · integrations/warden-hook.mjs</p>
+
+  </div>
+</section>
+
+<!-- ── §3 where it runs ────────────────────────────────────────────────── -->
+<!--
+     Not "we do not send your data", which a web page cannot prove. The
+     verifiable claim is the shape of the record: the log that makes the
+     governance auditable cannot itself become the leak, because it does not
+     hold the prompts. It answers legal before legal asks.
+-->
+<section id="local" class="rails">
+  <div class="wrap stack-lg">
+
+    <div class="sec-head" data-reveal>
+      <span class="label">Where everything runs</span>
+      <h2>The record of a decision does not contain the prompt.</h2>
+      <p>Every model runs on the machine, through QVAC. The audit log is append-only and hash-chained, and it stores the hash of a prompt, not the prompt — altering a past decision breaks every hash after it.</p>
+    </div>
+
+    <p class="receipt" data-reveal>Qwen3-1.7B-Instruct Q4_0 · EmbeddingGemma-300M Q8_0 · OCR_LATIN · llama.cpp via @qvac/sdk · pnpm run verify-audit</p>
+
+  </div>
+</section>
+
 </main>
 
 <script type="module" src="app.js"></script>

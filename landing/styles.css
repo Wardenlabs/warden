@@ -246,7 +246,7 @@ h3 {
 .sec-head { max-width: var(--read); display: grid; gap: var(--s-4); margin-bottom: var(--s-9); }
 .sec-head p { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-body); max-width: var(--prose); }
 
-.lead { font-size: var(--fs-4); color: var(--muted); }
+.lead { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-body); max-width: var(--prose); }
 .mono { font-family: var(--mono); font-size: var(--fs-mono-adj); }
 .dim  { color: var(--faint); }
 
@@ -620,6 +620,21 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 /* ═══ pieces the sections above call for ═════════════════════════════════ */
 
 .hero-zone { position: relative; overflow: hidden; }
+/* ── the receipt ───────────────────────────────────────────────────────── */
+/*
+ * Where the evidence lives. The person deciding reads the prose above it and
+ * goes past; the person they forward the page to stops here. It is the whole
+ * reason the page does not have to be written twice.
+ */
+.receipt {
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  line-height: var(--lh-body);
+  color: var(--faint);
+  max-width: var(--read);
+  overflow-wrap: anywhere;
+}
+
 /* the pipeline */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
 .steps li {
@@ -633,10 +648,11 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   color: var(--ink-2);
 }
 .steps li:last-child { border-bottom: 0; }
+.card > .steps li { padding-inline: var(--s-7); }
 .steps .stepn {
   width: 20px; height: 20px;
   display: grid; place-items: center;
-  border: 1px solid var(--line); border-radius: var(--r-pill);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
   font-family: var(--mono); font-size: var(--fs-0); color: var(--muted);
   flex: none;
 }
@@ -650,5 +666,8 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 @media (max-width: 760px) {
   .term pre { padding: var(--s-5); font-size: var(--fs-1); }
   .term-bar, .card-head, .card-body { padding-inline: var(--s-5); }
-  .steps li { padding-inline: var(--s-5); }
+  .steps li, .card > .steps li { padding-inline: var(--s-5); }
+  /* the metadatum drops under the step rather than squeezing it */
+  .steps li { grid-template-columns: auto minmax(0, 1fr); }
+  .steps .m { grid-column: 2; white-space: normal; }
 }
