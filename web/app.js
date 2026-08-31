@@ -128,6 +128,16 @@ const state = {
   mock: false,
 
   /**
+   * Where rule compilation runs. Never holds the API key — the server returns
+   * `hasKey` and the last four characters, so this page can say "a key is
+   * saved" without a secret living in a browser tab.
+   */
+  compiler: null,
+  compilerDraft: null,
+  compilerTest: null,
+  compilerBusy: false,
+
+  /**
    * Blocks an employee said were wrong.
    *
    * The only place a false positive is visible. In the audit log a correct
@@ -314,7 +324,7 @@ async function boot() {
     return;
   }
 
-  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations()]);
+  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations(), refreshCompiler()]);
   window.addEventListener('hashchange', route);
   route();
   subscribe();
@@ -340,6 +350,11 @@ async function refreshAudit() {
 async function refreshChain() {
   const { ok, j } = await api('/api/audit/verify').catch(() => ({ ok: false }));
   state.chain = ok ? j : null;
+}
+
+async function refreshCompiler() {
+  const { ok, j } = await api('/api/settings/compiler').catch(() => ({ ok: false }));
+  state.compiler = ok ? j : null;
 }
 
 async function loadPresets() {
@@ -958,6 +973,201 @@ VIEWS.policy = {
   bind: bindPolicy
 };
 
+/**
+ * Where rule compilation runs, as a page rather than four environment
+ * variables and a restart.
+ *
+ * It sits under Rules, and the line that leads here sits in the composer,
+ * because that is where the cost of a weak compiler is felt: a rule whose
+ * compliant examples are generic is a rule that blocks honest work, and the
+ * local 1.7B writes generic ones. Asked to allow something it has produced a
+ * rule prohibiting it.
+ *
+ * The judge is deliberately absent from this page. It is not a model anyone
+ * gets to move from a browser — it sees every employee prompt — and offering
+ * the choice here would suggest otherwise.
+ */
+VIEWS.compiler = {
+  railParent: 'policy',
+  body: compilerPage,
+  bind: bindCompiler
+};
+
+/** The draft being edited, seeded from what the server reports. */
+function compilerDraft() {
+  if (!state.compilerDraft) {
+    const c = state.compiler ?? { provider: 'local', baseUrl: '', model: '', redactNames: false };
+    state.compilerDraft = {
+      provider: c.provider ?? 'local',
+      baseUrl: c.baseUrl ?? '',
+      model: c.model ?? '',
+      apiKey: '',
+      redactNames: Boolean(c.redactNames)
+    };
+  }
+  return state.compilerDraft;
+}
+
+function compilerPage() {
+  const c = state.compiler;
+  if (!c) return `<div class="sheet settings">${rulesTabs()}<div class="note">Could not read the compiler settings.</div></div>`;
+
+  const d = compilerDraft();
+  const providers = c.providers ?? [];
+  const chosen = providers.find((p) => p.id === d.provider) ?? providers[0];
+  const remote = d.provider !== 'local';
+  const t = state.compilerTest;
+
+  return `<div class="sheet settings">
+    ${rulesTabs()}
+
+    <div class="section">
+      <div class="label">Which model writes your rules</div>
+      <p class="note">Compilation turns one sentence you type into a draft that
+        <b>you still have to activate</b>, so it never decides anything on its own — which
+        is why it is the one model here that may run somewhere else. The model that
+        <b>judges</b> your team's prompts always runs on this machine and is not
+        configurable from this page.</p>
+
+      ${c.overriddenByEnv ? `<div class="banner warn">
+        The environment sets <code>WARDEN_COMPILER_API</code>, and that wins over anything saved here.
+        What you save on this page will apply once those variables are unset.
+      </div>` : ''}
+
+      <div class="field">
+        <label for="cProvider">Provider</label>
+        <select id="cProvider">
+          ${providers.map((p) => `<option value="${esc(p.id)}"${p.id === d.provider ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}
+        </select>
+        ${chosen?.note ? `<span class="note">${esc(chosen.note)}</span>` : ''}
+      </div>
+
+      ${remote ? `
+      <div class="field">
+        <label for="cBase">Endpoint</label>
+        <input id="cBase" type="text" spellcheck="false" value="${esc(d.baseUrl || chosen?.baseUrl || '')}" placeholder="https://…/v1">
+        <span class="note">Anything that speaks the OpenAI <code>/chat/completions</code> shape. Must be https unless it is on this machine.</span>
+      </div>
+
+      <div class="field">
+        <label for="cModel">Model</label>
+        ${chosen?.models?.length
+          ? `<input id="cModel" type="text" spellcheck="false" list="cModelList" value="${esc(d.model)}" placeholder="${esc(chosen.models[0])}">
+             <datalist id="cModelList">${chosen.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>`
+          : `<input id="cModel" type="text" spellcheck="false" value="${esc(d.model)}" placeholder="model name">`}
+      </div>
+
+      <div class="field">
+        <label for="cKey">API key</label>
+        <input id="cKey" type="password" spellcheck="false" autocomplete="off" value=""
+               placeholder="${c.hasKey ? `saved ${esc(c.keyHint)} — leave blank to keep it` : 'paste your key'}">
+        <span class="note">Stored on this machine in <code>data/settings.json</code>, readable only by this user, and never sent back to this page.</span>
+      </div>
+
+      <div class="field">
+        <label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}>
+          Send <code>@ana</code> instead of employee names</label>
+        <span class="note"><b>What leaves this machine:</b> your sentence, the role names, and the
+          staff list. Names are included by default so "Ana cannot ask for payroll" becomes a rule
+          about Ana rather than about everyone — tick this to withhold them, and expect rules about
+          a named person to get worse. Employee prompts, the audit log and your policy are never sent.</span>
+      </div>
+      ` : `<p class="note">Rule drafting runs on <b>${esc(c.localModel ?? 'the local model')}</b>, here. Nothing leaves the machine.</p>`}
+
+      <div class="actions">
+        ${remote ? '<button type="button" class="btn" id="cTest">Test connection</button>' : ''}
+        <button type="button" class="btn primary" id="cSave">Save</button>
+        ${t ? `<span class="note ${t.ok ? 'good' : 'bad'}">${
+          t.saved ? 'Saved.'
+          : t.ok ? `answered in ${t.ms} ms${t.reply ? ` — “${esc(String(t.reply).slice(0, 40))}”` : ''}`
+          : esc(String(t.error ?? `HTTP ${t.status}`).slice(0, 160))}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindCompiler() {
+  const d = compilerDraft();
+  const providers = state.compiler?.providers ?? [];
+
+  const prov = document.getElementById('cProvider');
+  if (prov) prov.onchange = () => {
+    const next = providers.find((p) => p.id === prov.value);
+    // Switching provider replaces the endpoint with that provider's own, so the
+    // common case is two clicks. It does not clear a typed key: swapping the
+    // model of the same provider is the other common case.
+    state.compilerDraft = {
+      ...d,
+      provider: prov.value,
+      baseUrl: next?.baseUrl ?? '',
+      model: next?.models?.[0] ?? ''
+    };
+    state.compilerTest = null;
+    render();
+  };
+
+  const readForm = () => ({
+    provider: prov ? prov.value : d.provider,
+    baseUrl: document.getElementById('cBase')?.value.trim() ?? '',
+    model: document.getElementById('cModel')?.value.trim() ?? '',
+    apiKey: document.getElementById('cKey')?.value ?? '',
+    redactNames: Boolean(document.getElementById('cRedact')?.checked)
+  });
+
+  const test = document.getElementById('cTest');
+  if (test) test.onclick = async () => {
+    state.compilerDraft = readForm();
+    test.disabled = true;
+    test.textContent = 'Testing…';
+    const { j } = await api('/api/settings/compiler/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(state.compilerDraft)
+    }).catch(() => ({ j: { ok: false, error: 'could not reach Warden' } }));
+    state.compilerTest = j;
+    render();
+  };
+
+  const save = document.getElementById('cSave');
+  if (save) save.onclick = async () => {
+    state.compilerDraft = readForm();
+    save.disabled = true;
+    save.textContent = 'Saving…';
+    const { ok, j } = await api('/api/settings/compiler', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(state.compilerDraft)
+    }).catch(() => ({ ok: false, j: { error: 'could not reach Warden' } }));
+    if (!ok) {
+      state.compilerTest = { ok: false, error: j?.error ?? 'could not save' };
+      render();
+      return;
+    }
+    await refreshCompiler();
+    state.compilerDraft = null;
+    state.compilerTest = { ok: true, saved: true };
+    render();
+    // Clear the key box by hand. `restoreFields` reinstates form values across
+    // a re-render, which is right for every other field and wrong for this one:
+    // dropping the draft is not enough to get the secret back out of the DOM,
+    // and the placeholder already says a key is saved and shows its last four.
+    const box = document.getElementById('cKey');
+    if (box) box.value = '';
+  };
+}
+
+/** One line in the composer saying who is about to write the rule. */
+function compilerLine() {
+  const c = state.compiler;
+  if (!c) return '';
+  const remote = c.activeSource !== 'local';
+  const where = remote
+    ? `${esc(c.model || 'a remote model')} · off this machine`
+    : `${esc(c.localModel ?? 'local model')} · on this machine`;
+  return `<div class="note compiler-line">Drafting with ${where}
+    <button type="button" class="linkish" data-go="compiler">Change</button></div>`;
+}
+
 /** The switch between the two, at the top of the column in both. A dot on the
  *  New rule side when a draft is waiting there — leaving the tab does not
  *  throw the conversation away. */
@@ -1065,6 +1275,7 @@ function heroComposer() {
       <textarea id="ruleMsg" rows="2" placeholder="Describe it the way you would to a colleague…"></textarea>
       <button type="button" class="btn primary send" id="ruleSend">Write it</button>
     </div>
+    ${compilerLine()}
 
     <div class="hero-sugg" id="cats">
       ${state.presets.map((c, i) => `
@@ -1239,6 +1450,15 @@ function draftCard() {
   return `<div class="artifact">
     <div class="detail-head">
       <span class="badge ${esc(d.severity)}">${esc(d.severity)}</span>
+      ${
+        // Who wrote this, at the moment it is about to bind people. The
+        // composer says it before you type, but by the time the Activate button
+        // is on screen the composer is gone — and this is the point where it
+        // matters whether the sentence came off this machine.
+        d.draftedBy
+          ? `<span class="when">written by ${esc(d.draftedBy)}${d.draftedRemotely ? ' · off this machine' : ''}</span>`
+          : ''
+      }
       <span class="when">not active yet</span>
     </div>
 

@@ -87,3 +87,6 @@ data/bench-last.json
 # Evaluation runs write decisions too — kept out of the real chain
 data/audit-eval.jsonl
 data/audit-eval.witness.json
+
+# Operational settings set from the console. Holds a provider API key.
+data/settings.json

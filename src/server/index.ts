@@ -19,6 +19,14 @@ import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
 import { resolvedModel } from '../qvac/client.js';
+import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
+import {
+  COMPILER_PROVIDERS,
+  compilerSettingsSchema,
+  loadCompilerSettings,
+  redactedCompilerSettings,
+  saveCompilerSettings
+} from '../settings.js';
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
@@ -244,6 +252,116 @@ app.get('/api/policy/presets', (_req, res) => {
   // the console renders an empty catalog rather than erroring.
   res.json(readSeedJson(join(ASSETS, 'data', 'seed', 'presets.json'), []));
 });
+
+/**
+ * Where rule compilation runs.
+ *
+ * Administrative, like everything not on the employee allowlist — the body of
+ * a PUT here carries an API key, and the response would otherwise disclose
+ * which provider a company uses. The key is never returned; the console gets
+ * `hasKey` and the last four characters, which is enough to tell "a key is
+ * saved" from "the field is empty" without putting the secret back on the wire
+ * on every page load.
+ */
+app.get('/api/settings/compiler', (_req, res) => {
+  const source = remoteCompilerSource();
+  res.json({
+    ...redactedCompilerSettings(loadCompilerSettings()),
+    providers: COMPILER_PROVIDERS,
+    // Which source is actually in force. An administrator whose saved settings
+    // are overridden by the environment should see that rather than conclude
+    // the page did not save.
+    activeSource: source ?? 'local',
+    overriddenByEnv: source === 'env',
+    localModel: resolvedModel('adjudicator')
+  });
+});
+
+app.put('/api/settings/compiler', asyncRoute(async (req, res) => {
+  const body = req.body ?? {};
+  const current = loadCompilerSettings();
+  const next = compilerSettingsSchema.safeParse({
+    provider: String(body.provider ?? 'local'),
+    baseUrl: String(body.baseUrl ?? ''),
+    // An empty key means "keep the one already saved", so the console never has
+    // to hold a secret in order to change the model beside it.
+    apiKey: typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : current.apiKey,
+    model: String(body.model ?? ''),
+    redactNames: Boolean(body.redactNames)
+  });
+  if (!next.success) {
+    return res.status(400).json({ error: next.error.issues.map((i) => i.message).join('; ') });
+  }
+
+  // Held to the same bar as the environment variables: https unless loopback,
+  // and both halves present. Rejecting here means an unusable configuration
+  // never reaches disk, so the compiler cannot be left silently broken.
+  if (next.data.provider !== 'local') {
+    try {
+      validateCompilerEndpoint({ ...next.data, timeoutMs: 60_000 });
+    } catch (err) {
+      return res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+    if (!next.data.apiKey) return res.status(400).json({ error: 'an API key is required for a remote compiler' });
+  }
+
+  res.json(redactedCompilerSettings(saveCompilerSettings(next.data)));
+}));
+
+/**
+ * Try the endpoint before committing to it.
+ *
+ * Without this the first sign of a wrong key or a wrong base URL is a rule
+ * draft that fails a minute later, in the middle of writing policy. It sends
+ * one trivial completion and reports what came back — never the roster, and
+ * never anything from the policy.
+ */
+app.post('/api/settings/compiler/test', asyncRoute(async (req, res) => {
+  const body = req.body ?? {};
+  const current = loadCompilerSettings();
+  const apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : current.apiKey;
+  if (!apiKey) return res.status(400).json({ ok: false, error: 'no API key to test with' });
+
+  let endpoint: { baseUrl: string; apiKey: string; model: string; timeoutMs: number };
+  try {
+    endpoint = validateCompilerEndpoint({
+      baseUrl: String(body.baseUrl ?? ''),
+      apiKey,
+      model: String(body.model ?? '') || 'claude-sonnet-5',
+      timeoutMs: 20_000
+    });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+
+  const started = Date.now();
+  try {
+    const upstream = await fetch(`${endpoint.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${endpoint.apiKey}` },
+      body: JSON.stringify({
+        model: endpoint.model,
+        messages: [{ role: 'user', content: 'Reply with the single word: ready' }],
+        max_tokens: 8,
+        temperature: 0
+      }),
+      signal: AbortSignal.timeout(endpoint.timeoutMs)
+    });
+    const text = await upstream.text();
+    if (!upstream.ok) {
+      return res.json({ ok: false, status: upstream.status, error: text.slice(0, 300) });
+    }
+    let reply = '';
+    try {
+      reply = String(JSON.parse(text)?.choices?.[0]?.message?.content ?? '').trim().slice(0, 80);
+    } catch {
+      return res.json({ ok: false, error: 'the endpoint answered, but not in the OpenAI shape' });
+    }
+    res.json({ ok: true, ms: Date.now() - started, model: endpoint.model, reply });
+  } catch (err) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+}));
 
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const text = String(req.body?.text ?? '').trim();

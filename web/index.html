@@ -868,7 +868,39 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   .detail { padding: var(--s-5); }
   .row .rule-ref { display: none; }
 }
+/* ── compiler settings ────────────────────────────────────────────────────
+   Scoped to `.settings` throughout. An earlier pass here redefined `.field`,
+   `.field > label` and `.row` at the top level, which are house classes used
+   by every other form in the console — `.row` alone appears fifteen times in
+   this file. Styling one new page must not restyle the pages nobody asked to
+   change, so the only global additions are the two `.note` colours and the
+   composer line, which are new names. */
+.settings .field { margin-bottom: var(--s-4); max-width: 46rem; }
+.settings input[type="text"], .settings input[type="password"], .settings select {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+/* Not the console's uppercase field label: this one contains `@ana`, and an
+   upper-cased token is a different token to anyone reading it literally. */
+.settings .check {
+  display: flex; align-items: center; gap: var(--s-2);
+  font-weight: var(--fw-medium);
+  text-transform: none; letter-spacing: normal; font-size: var(--fs-3); color: var(--ink);
+}
+.settings .actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.note.good { color: var(--ok, #157f3d); }
+.note.bad { color: var(--danger, #b3261e); }
+.compiler-line { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-2); }
+.linkish {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--accent, #2a5bd7);
+  text-decoration: underline; cursor: pointer;
+}
 </style>
+
 </head>
 <body>
 
