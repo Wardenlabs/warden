@@ -308,9 +308,38 @@ async function main(): Promise<void> {
   if (report.adapter === 'mock') {
     console.log(yellow('Running in mock mode. Start with:  WARDEN_ADAPTER=mock pnpm run dev\n'));
     process.exitCode = 1;
-  } else {
-    console.log(green('Ready. Start with:  pnpm run dev\n'));
+    return;
   }
+
+  /**
+   * "Ready" was printed whenever the adapter was real, without ever asking
+   * whether the models arrived.
+   *
+   * A real setup finished with `adjudicator terminated` and `embedder fetch
+   * failed` — the model that judges every prompt and the one that decides which
+   * rules to judge against — and still said "Ready. Start with: pnpm run dev",
+   * and exited 0. Starting there gets a gateway that escalates everything,
+   * which is the safe direction and a useless product, and the person has no
+   * reason to connect it to the two failures scrolled off the top.
+   *
+   * Downloads resume, so the fix is genuinely just running it again; that is
+   * worth saying rather than leaving someone to guess whether a 1.1 GB retry
+   * starts from zero.
+   */
+  const missing = report.models.filter((m) => !m.ok);
+  if (missing.length > 0) {
+    console.log(red(`\n${missing.length} model(s) did not download:`));
+    for (const m of missing) console.log(red(`  ${m.role.padEnd(13)} ${m.note ?? 'failed'}`));
+    console.log(
+      `\nWarden cannot judge anything without ${missing.some((m) => m.role === 'adjudicator') ? 'the adjudicator' : 'these'}.\n` +
+      `${bold('Run `pnpm run setup` again')} — partial files resume, so it picks up where it stopped\n` +
+      'rather than starting the download over.\n'
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(green('Ready. Start with:  pnpm run dev\n'));
 }
 
 main().catch((err) => {

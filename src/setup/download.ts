@@ -34,8 +34,56 @@ export type DownloadOutcome = {
 
 export type ByteProgress = { role: string; file: string; received: number; total: number };
 
-/** Fetch one model into `dir`, resuming a partial file rather than restarting. */
+/**
+ * Fetch one model into `dir`, resuming a partial file rather than restarting,
+ * and retrying a dropped connection rather than giving up on the model.
+ *
+ * The retry is not defensive programming for its own sake. These files are
+ * 0.3–1.1 GB over plain HTTPS, and a single dropped socket used to end that
+ * model's download for the whole run: a real setup on a laptop came back with
+ * `adjudicator terminated` and `embedder fetch failed` — the judge and the
+ * retriever, the two models the guard cannot run without — while the 382 MB
+ * detector beside them succeeded. Nothing was wrong with the machine or the
+ * URLs; the transfers were interrupted.
+ *
+ * Because the resume above is real, a retry costs only the bytes that had not
+ * arrived yet, which makes it the cheapest possible fix and the reason the
+ * attempts are worth spending. Errors that will not improve on a second
+ * attempt — a 404, a server with no content-length — are not retried.
+ */
 export async function downloadModel(
+  spec: DownloadSpec,
+  dir: string,
+  onProgress?: (p: ByteProgress) => void,
+  attempts = 4
+): Promise<DownloadOutcome> {
+  let last: DownloadOutcome | null = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    last = await runDownload(spec, dir, onProgress);
+    if (last.ok || !worthRetrying(last.note)) return last;
+    if (attempt < attempts) {
+      // 2s, 4s, 8s. Long enough for a flapping connection to come back,
+      // short enough that a person watching a progress bar stays put.
+      await new Promise((r) => setTimeout(r, 2000 * 2 ** (attempt - 1)));
+    }
+  }
+  return last!;
+}
+
+/**
+ * Is this failure the kind another attempt could fix?
+ *
+ * Allowlist rather than blocklist: an unrecognised failure is retried, because
+ * the cost of a wasted attempt is a few seconds and the cost of not retrying is
+ * a setup that hands someone a gateway with no judge. The exclusions are the
+ * cases where the answer will be identical next time.
+ */
+function worthRetrying(note: string | undefined): boolean {
+  if (!note) return true;
+  return !/HTTP (4\d\d)|no HTTPS URL|content-length/.test(note);
+}
+
+async function runDownload(
   spec: DownloadSpec,
   dir: string,
   onProgress?: (p: ByteProgress) => void
