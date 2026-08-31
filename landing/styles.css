@@ -202,6 +202,12 @@ section { position: relative; padding-block: var(--s-11); border-top: var(--guid
 
 .stack   { display: grid; gap: var(--s-5); }
 
+/* Every section body stacks on the same rhythm, so the five of them cannot
+   drift apart as they are written. */
+.stack-lg { display: grid; gap: var(--s-6); }
+.stack-lg > .sec-head { margin-bottom: var(--s-2); }
+.stack-lg > .note { margin-top: 0; }
+
 /* ═══ type ═══════════════════════════════════════════════════════════════ */
 
 .label {
@@ -447,15 +453,65 @@ header nav .btn { color: var(--accent-ink); }
 
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
+/* ── the card: a hairline and a sunken face, never a shadow ────────────── */
+/*
+ * Sunken rather than floating. A shadow would put the card in front of the
+ * page; this puts it in the page, which is the only relationship the hero
+ * established and so the only one the rest may use.
+ */
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--sunken);
+  overflow: hidden;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-5);
+  padding: var(--s-4) var(--s-7);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono); font-size: var(--fs-1);
+  letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--faint);
+}
+.card-head .id { text-transform: none; letter-spacing: 0; color: var(--ink-2); }
+.card-body { padding: var(--s-7); }
+.card-body p {
+  font-size: var(--fs-4);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  max-width: var(--prose);
+}
+
 /* ── the refusal, rendered as the employee sees it ─────────────────────── */
+/*
+ * The bar exists for one reason: without the tool's name on it, a reader
+ * assumes the block happens inside some Warden app, and the page's strongest
+ * claim — that it happens inside Claude Code — is lost in silence. No traffic
+ * lights, no fake buttons; a drawn window would be a shape the hero does not
+ * have.
+ */
 .term {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--sunken);
+  overflow: hidden;
+}
+.term-bar {
+  padding: var(--s-3) var(--s-7);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono); font-size: var(--fs-1);
+  letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--faint);
+}
+.term pre {
   font-family: var(--mono);
   font-size: var(--fs-2);
   line-height: var(--lh-snug);
   white-space: pre-wrap;
   padding: var(--s-7);
-  color: var(--ink-2);
-  background: var(--sunken);
+  color: var(--muted);
   margin: 0;
   overflow-x: auto;
 }
@@ -464,6 +520,36 @@ header nav .btn { color: var(--accent-ink); }
 .term .rule { color: var(--ink); }
 .term .ok   { color: var(--allow); }
 .term .dim  { color: var(--faint); }
+.term .h    { color: var(--ink-2); }
+
+/*
+ * The one light outside the hero. It runs the top edge once, when the section
+ * arrives, and then it is over — the reader learned upstairs that light here
+ * means the gate just decided, and a light that repeated would go back to
+ * being decoration. Driven by .is-in, which the reveal observer already sets,
+ * so this costs no JavaScript.
+ */
+.term::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--beam) 20%, var(--ink-2) 50%, var(--beam) 80%, transparent 100%);
+  background-size: 200% 100%;
+  background-position: 150% 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.js [data-reveal].term.is-in::before {
+  animation: edge-light 1.5s cubic-bezier(.3,0,.2,1) .35s 1 both;
+}
+@keyframes edge-light {
+  from { background-position: 150% 0;  opacity: 0; }
+  20%  { opacity: .85; }
+  80%  { opacity: .85; }
+  to   { background-position: -150% 0; opacity: 0; }
+}
 
 /* ── numbers ───────────────────────────────────────────────────────────── */
 .tbl { border: 1px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
@@ -526,6 +612,7 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .judge .cur,
+  .term::before,
   .dot-live { animation: none; }
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
@@ -561,6 +648,7 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 
 /* ── responsive trims ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .term { padding: var(--s-5); font-size: var(--fs-1); }
+  .term pre { padding: var(--s-5); font-size: var(--fs-1); }
+  .term-bar, .card-head, .card-body { padding-inline: var(--s-5); }
   .steps li { padding-inline: var(--s-5); }
 }
