@@ -1017,69 +1017,81 @@ function compilerPage() {
   const chosen = providers.find((p) => p.id === d.provider) ?? providers[0];
   const remote = d.provider !== 'local';
   const t = state.compilerTest;
+  const host = (() => {
+    try { return new URL(d.baseUrl || chosen?.baseUrl || '').host; } catch { return ''; }
+  })();
 
   return `<div class="sheet settings">
     ${rulesTabs()}
 
     <div class="section">
       <div class="label">Which model writes your rules</div>
-      <p class="note">Compilation turns one sentence you type into a draft that
-        <b>you still have to activate</b>, so it never decides anything on its own — which
-        is why it is the one model here that may run somewhere else. The model that
-        <b>judges</b> your team's prompts always runs on this machine and is not
-        configurable from this page.</p>
+
+      <p class="lede">Warden turns a sentence you type into a draft rule.
+        <b>You still have to activate it</b>, so this model never decides anything on its
+        own — which is why it is the one you may run somewhere else.</p>
+
+      <div class="where ${remote ? 'off' : 'on'}">
+        <span class="dot ${remote ? 'ESCALATE' : 'ALLOW'}"></span>
+        <span>${remote
+          ? `Drafting runs at <b>${esc(host || 'the endpoint below')}</b>. Judging your team's prompts still runs here, and cannot be moved.`
+          : `Everything runs on this machine, on <b>${esc(c.localModel ?? 'the local model')}</b>.`}</span>
+      </div>
 
       ${c.overriddenByEnv ? `<div class="banner warn">
-        The environment sets <code>WARDEN_COMPILER_API</code>, and that wins over anything saved here.
-        What you save on this page will apply once those variables are unset.
+        <b>The environment is setting this.</b> <code>WARDEN_COMPILER_API</code> wins over
+        anything saved here; what you save applies once those variables are unset.
       </div>` : ''}
 
       <div class="field">
-        <label for="cProvider">Provider</label>
-        <select id="cProvider">
-          ${providers.map((p) => `<option value="${esc(p.id)}"${p.id === d.provider ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}
-        </select>
+        <label>Provider</label>
+        <div class="hero-sugg tight">
+          ${providers.map((p) => `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}</button>`).join('')}
+        </div>
         ${chosen?.note ? `<span class="note">${esc(chosen.note)}</span>` : ''}
       </div>
 
       ${remote ? `
-      <div class="field">
-        <label for="cBase">Endpoint</label>
-        <input id="cBase" type="text" spellcheck="false" value="${esc(d.baseUrl || chosen?.baseUrl || '')}" placeholder="https://…/v1">
-        <span class="note">Anything that speaks the OpenAI <code>/chat/completions</code> shape. Must be https unless it is on this machine.</span>
+      <div class="grid2">
+        <div class="field">
+          <label for="cBase">Endpoint</label>
+          <input id="cBase" type="text" spellcheck="false" value="${esc(d.baseUrl || chosen?.baseUrl || '')}" placeholder="https://…/v1">
+        </div>
+        <div class="field">
+          <label for="cModel">Model</label>
+          <input id="cModel" type="text" spellcheck="false" list="cModelList" value="${esc(d.model)}"
+                 placeholder="${esc(chosen?.models?.[0] ?? 'model name')}">
+          ${chosen?.models?.length ? `<datalist id="cModelList">${chosen.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>` : ''}
+        </div>
       </div>
-
-      <div class="field">
-        <label for="cModel">Model</label>
-        ${chosen?.models?.length
-          ? `<input id="cModel" type="text" spellcheck="false" list="cModelList" value="${esc(d.model)}" placeholder="${esc(chosen.models[0])}">
-             <datalist id="cModelList">${chosen.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>`
-          : `<input id="cModel" type="text" spellcheck="false" value="${esc(d.model)}" placeholder="model name">`}
-      </div>
+      <span class="note">Any endpoint that speaks the OpenAI <code>/chat/completions</code> shape, including one on this machine. Must be https unless it is.</span>
 
       <div class="field">
         <label for="cKey">API key</label>
         <input id="cKey" type="password" spellcheck="false" autocomplete="off" value=""
                placeholder="${c.hasKey ? `saved ${esc(c.keyHint)} — leave blank to keep it` : 'paste your key'}">
-        <span class="note">Stored on this machine in <code>data/settings.json</code>, readable only by this user, and never sent back to this page.</span>
+        <span class="note">Kept on this machine in <code>data/settings.json</code>, readable only by you, and never sent back to this page.</span>
       </div>
 
-      <div class="field">
+      <div class="leaves">
+        <div class="leaves-head">What leaves this machine</div>
+        <ul>
+          <li>The sentence you type.</li>
+          <li>Your role names.</li>
+          <li>Your staff list — <b>names included</b>, so “Ana cannot ask for payroll” becomes a rule about Ana rather than about everyone.</li>
+        </ul>
         <label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}>
-          Send <code>@ana</code> instead of employee names</label>
-        <span class="note"><b>What leaves this machine:</b> your sentence, the role names, and the
-          staff list. Names are included by default so "Ana cannot ask for payroll" becomes a rule
-          about Ana rather than about everyone — tick this to withhold them, and expect rules about
-          a named person to get worse. Employee prompts, the audit log and your policy are never sent.</span>
+          <span>Send <code>@ana</code> instead of names</span></label>
+        <p class="note">Expect rules about a named person to get worse. Employee prompts, the audit log and your policy are never sent under any setting.</p>
       </div>
-      ` : `<p class="note">Rule drafting runs on <b>${esc(c.localModel ?? 'the local model')}</b>, here. Nothing leaves the machine.</p>`}
+      ` : ''}
 
       <div class="actions">
         ${remote ? '<button type="button" class="btn" id="cTest">Test connection</button>' : ''}
         <button type="button" class="btn primary" id="cSave">Save</button>
         ${t ? `<span class="note ${t.ok ? 'good' : 'bad'}">${
           t.saved ? 'Saved.'
-          : t.ok ? `answered in ${t.ms} ms${t.reply ? ` — “${esc(String(t.reply).slice(0, 40))}”` : ''}`
+          : t.ok ? `Answered in ${t.ms} ms.`
           : esc(String(t.error ?? `HTTP ${t.status}`).slice(0, 160))}</span>` : ''}
       </div>
     </div>
@@ -1090,24 +1102,25 @@ function bindCompiler() {
   const d = compilerDraft();
   const providers = state.compiler?.providers ?? [];
 
-  const prov = document.getElementById('cProvider');
-  if (prov) prov.onchange = () => {
-    const next = providers.find((p) => p.id === prov.value);
-    // Switching provider replaces the endpoint with that provider's own, so the
-    // common case is two clicks. It does not clear a typed key: swapping the
-    // model of the same provider is the other common case.
-    state.compilerDraft = {
-      ...d,
-      provider: prov.value,
-      baseUrl: next?.baseUrl ?? '',
-      model: next?.models?.[0] ?? ''
+  for (const b of document.querySelectorAll('[data-prov]')) {
+    b.onclick = () => {
+      const next = providers.find((p) => p.id === b.dataset.prov);
+      // Switching provider adopts that provider's own endpoint and first model,
+      // so the common case is one click. It does not clear a typed key —
+      // changing the model of the same provider is the other common case.
+      state.compilerDraft = {
+        ...d,
+        provider: b.dataset.prov,
+        baseUrl: next?.baseUrl ?? '',
+        model: next?.models?.[0] ?? ''
+      };
+      state.compilerTest = null;
+      render();
     };
-    state.compilerTest = null;
-    render();
-  };
+  }
 
   const readForm = () => ({
-    provider: prov ? prov.value : d.provider,
+    provider: d.provider,
     baseUrl: document.getElementById('cBase')?.value.trim() ?? '',
     model: document.getElementById('cModel')?.value.trim() ?? '',
     apiKey: document.getElementById('cKey')?.value ?? '',

@@ -870,20 +870,59 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 }
 /* ── compiler settings ────────────────────────────────────────────────────
    Scoped to `.settings` throughout. An earlier pass here redefined `.field`,
-   `.field > label` and `.row` at the top level, which are house classes used
-   by every other form in the console — `.row` alone appears fifteen times in
-   this file. Styling one new page must not restyle the pages nobody asked to
-   change, so the only global additions are the two `.note` colours and the
-   composer line, which are new names. */
+   `.field > label` and `.row` at the top level — house classes, `.row` alone
+   used fifteen times — so styling one new page would have restyled every form
+   in the console. The only global additions are new names.
+
+   The page borrows `.pill` for the provider row and the verdict dot for the
+   on/off-machine line rather than introducing a second visual language: this
+   product has exactly one saturated colour family and it means "what happened
+   to a request", which is close enough to "does this leave the building". */
+.settings .lede { max-width: 46rem; color: var(--ink-2); font-size: var(--fs-3); margin: 0 0 var(--s-4); }
 .settings .field { margin-bottom: var(--s-4); max-width: 46rem; }
-.settings input[type="text"], .settings input[type="password"], .settings select {
+.settings .hero-sugg.tight { margin: 0; justify-content: flex-start; }
+.settings input[type="text"], .settings input[type="password"] {
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--line);
-  border-radius: var(--r-2);
+  border-radius: var(--r-2, 6px);
   background: var(--bg);
   color: var(--ink);
   font: inherit;
+  width: 100%;
 }
+.settings input:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+.settings .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--s-4); max-width: 46rem; }
+/* Notes that sit outside a `.field` still belong to the same column. */
+.settings > .section > .note, .settings .section > .note { display: block; max-width: 46rem; }
+
+/* Where compilation runs, stated once and at a glance. */
+.settings .where {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  max-width: 46rem; margin-bottom: var(--s-4);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2, 6px);
+  background: var(--sunken);
+  font-size: var(--fs-3); color: var(--ink-2); line-height: var(--lh-body, 1.5);
+}
+.settings .where .dot { margin-top: 5px; flex: none; }
+
+/* The most important text on the page, so it gets a container of its own
+   rather than a third paragraph of grey notes. */
+.settings .leaves {
+  max-width: 46rem; margin: var(--s-5) 0 var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--line-firm);
+  border-radius: var(--r-2, 6px);
+}
+.settings .leaves-head {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--faint);
+  margin-bottom: var(--s-3);
+}
+.settings .leaves ul { margin: 0 0 var(--s-4); padding-left: 1.1rem; color: var(--ink-2); font-size: var(--fs-3); }
+.settings .leaves li { margin-bottom: var(--s-2); }
+.settings .leaves .note { margin: var(--s-2) 0 0; }
 /* Not the console's uppercase field label: this one contains `@ana`, and an
    upper-cased token is a different token to anyone reading it literally. */
 .settings .check {
@@ -891,13 +930,19 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   font-weight: var(--fw-medium);
   text-transform: none; letter-spacing: normal; font-size: var(--fs-3); color: var(--ink);
 }
-.settings .actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.note.good { color: var(--ok, #157f3d); }
-.note.bad { color: var(--danger, #b3261e); }
-.compiler-line { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-2); }
+.settings .actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-5); }
+
+.note.good { color: var(--allow); }
+.note.bad { color: var(--block); }
+.compiler-line { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); }
 .linkish {
-  background: none; border: 0; padding: 0; font: inherit; color: var(--accent, #2a5bd7);
-  text-decoration: underline; cursor: pointer;
+  background: none; border: 0; padding: 0; font: inherit; color: var(--muted);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.linkish:hover { color: var(--ink); }
+
+@media (max-width: 640px) {
+  .settings .grid2 { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 
