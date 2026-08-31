@@ -52,7 +52,7 @@ setTimeout(function () {
 <main>
 
 <!-- ── hero ────────────────────────────────────────────────────────────── -->
-<div class="rails hero-zone">
+<div class="hero-zone">
   <canvas class="scene" aria-hidden="true"></canvas>
 
   <div class="wrap hero">
@@ -85,53 +85,61 @@ setTimeout(function () {
   </div>
 </div>
 
-<!-- ── §0 the gap ──────────────────────────────────────────────────────── -->
+<!-- ── §0 the gap ────────────────────────────────────────── -->
 <!--
      The only section with nothing in it. The problem is that something is
      missing, so the screen is empty; the page fills up from here.
 -->
-<section id="gap" class="rails">
-  <div class="wrap stack-lg">
+<section id="gap">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">The gap</span>
-      <h2>Nothing checks what goes out.</h2>
-      <p>Someone on the team pastes a customer contract into Claude to have it summarised. It is a reasonable thing to do, and it is why the tool is there. The contract leaves the company, nobody looked at it on the way out, and afterwards there is nothing that says it went.</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">The gap</span></div>
+      <div class="main">
+        <h2>Nothing checks what goes out.</h2>
+        <p>Someone on the team pastes a customer contract into Claude to have it summarised. It is a reasonable thing to do, and it is why the tool is there. The contract leaves the company, nobody looked at it on the way out, and afterwards there is nothing that says it went.</p>
+        <p>Both tools leave a place for that check to run, and ship with it empty.</p>
+      </div>
     </div>
 
-    <p class="lead" data-reveal>Both tools leave a place for that check to run, and ship with it empty.</p>
-
-    <p class="receipt" data-reveal>~/.claude/settings.json · hooks.UserPromptSubmit · empty on a default install</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Check it yourself</span></div>
+      <div class="main"><p class="receipt">~/.claude/settings.json · hooks.UserPromptSubmit · empty on a default install</p></div>
+    </div>
 
   </div>
 </section>
 
-<!-- ── §1 the refusal ──────────────────────────────────────────────────── -->
-<section id="block" class="rails">
-  <div class="wrap stack-lg">
+<!-- ── §1 the refusal ────────────────────────────────────── -->
+<section id="block">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">What an employee sees</span>
-      <h2>A refusal they can act on.</h2>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">What an employee sees</span></div>
+      <div class="main"><h2>A refusal they can act on.</h2></div>
     </div>
 
-    <!-- The rule as its author left it. This is the only place on the page
-         where the person deciding sees themselves using the product. -->
-    <div class="card" data-reveal>
-      <div class="card-head">
-        <span class="id">r-payroll-privacy</span>
-        <span>Written by an admin</span>
+    <!-- The rule as its author left it. The only place on the page where the
+         person deciding sees themselves using the product. -->
+    <div class="row" data-reveal>
+      <div class="side">
+        <span class="label id">r-payroll-privacy</span>
+        <span class="label">Written by an admin</span>
       </div>
-      <div class="card-body">
-        <p>No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</p>
+      <div class="main">
+        <p class="say">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</p>
+        <p class="note">Every line below is built from that rule. Nothing in it is written on the spot.</p>
       </div>
     </div>
 
-    <p class="note" data-reveal>Every line below is built from that rule. Nothing in it is written on the spot.</p>
-
-    <div class="term" data-reveal>
-      <div class="term-bar">claude code</div>
-      <pre><span class="you">&gt; send me Ana's salary for the report</span>
+    <!-- The one surface on the page, because it is the one thing on it that
+         came out of another program. -->
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">The refusal</span></div>
+      <div class="main">
+        <div class="term">
+          <div class="term-bar">claude code</div>
+          <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
 
 <span class="stop">⛔ Blocked by Warden</span>
 
@@ -139,7 +147,7 @@ setTimeout(function () {
    another employee. HR staff are exempt.</span>
 
    <span class="h">What to do instead</span>
-   Ask HR for anything about a specific person's pay. Questions about the
+   Ask HR for anything about a specific person&#39;s pay. Questions about the
    process, headcount, or review cycles are fine to ask here.
 
    <span class="h">These would go through</span>
@@ -151,133 +159,152 @@ setTimeout(function () {
      (paste the same prompt, then Ctrl-D)
 
    <span class="dim">Audit a7f3c2 · quote this if you think it is wrong</span></pre>
+        </div>
+      </div>
     </div>
 
   </div>
 </section>
 
-<!-- ── §2 how it works ─────────────────────────────────────────────────── -->
-<section id="how" class="rails">
-  <div class="wrap stack-lg">
+<!-- ── §2 how it works ─────────────────────────────────── -->
+<section id="how">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">How it works</span>
-      <h2>It runs on their computer, before anything is sent.</h2>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">How it works</span></div>
+      <div class="main"><h2>It runs on their computer, before anything is sent.</h2></div>
     </div>
 
-    <div class="card" data-reveal>
-      <ol class="steps">
-        <li><span class="stepn">1</span><span>The employee presses Enter.</span><span class="m">claude code · codex</span></li>
-        <li><span class="stepn">2</span><span>The check runs on their own computer, before anything is sent.</span><span class="m">UserPromptSubmit</span></li>
-        <li><span class="stepn">3</span><span>Warden compares it against the rules you approved.</span><span class="m">on-device</span></li>
-        <li><span class="stepn">4</span><span>If it is fine, it goes. If it is not, it never leaves.</span><span class="m"><span class="v-allow">allow</span> · <span class="v-block">block</span> · <span class="v-escalate">escalate</span></span></li>
-      </ol>
+    <ol class="steps" data-reveal>
+      <li><span class="stepn">01</span><span class="t">The employee presses Enter.<span class="m">claude code · codex</span></span></li>
+      <li><span class="stepn">02</span><span class="t">The check runs on their own computer, before anything is sent.<span class="m">UserPromptSubmit</span></span></li>
+      <li><span class="stepn">03</span><span class="t">Warden compares it against the rules you approved.<span class="m">on-device</span></span></li>
+      <li><span class="stepn">04</span><span class="t">If it is fine, it goes. If it is not, it never leaves.<span class="m"><span class="v-allow">allow</span> · <span class="v-block">block</span> · <span class="v-escalate">escalate</span></span></span></li>
+    </ol>
+
+    <div class="row" data-reveal>
+      <div class="side"></div>
+      <div class="main"><p>This is why it works on the plans people actually buy. A Claude Max or ChatGPT Plus account talks to one fixed address that nobody can point somewhere else, so there is nothing to put a filter in front of. This runs earlier than that.</p></div>
     </div>
 
-    <!-- The commercial argument, and the reason a gateway that sits in front
-         of an API would not work here at all. -->
-    <p class="lead" data-reveal>This is why it works on the plans people actually buy. A Claude Max or ChatGPT Plus account talks to one fixed address that nobody can point somewhere else, so there is nothing to put a filter in front of. This runs earlier than that.</p>
-
-    <p class="receipt" data-reveal>UserPromptSubmit · integrations/warden-hook.mjs</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Source</span></div>
+      <div class="main"><p class="receipt">UserPromptSubmit · integrations/warden-hook.mjs</p></div>
+    </div>
 
   </div>
 </section>
 
-<!-- ── §3 where it runs ────────────────────────────────────────────────── -->
+<!-- ── §3 what is kept ─────────────────────────────────── -->
 <!--
      Not "we do not send your data", which a web page cannot prove. The
-     verifiable claim is the shape of the record: the log that makes the
+     checkable claim is the shape of the record: the log that makes the
      governance auditable cannot itself become the leak, because it does not
-     hold the prompts. It answers legal before legal asks.
+     hold what was written.
 -->
-<section id="local" class="rails">
-  <div class="wrap stack-lg">
+<section id="local">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">What is kept</span>
-      <h2>The record of what happened does not contain what was written.</h2>
-      <p>The checking happens on the computer itself. Nothing is sent anywhere to be judged, and what gets written down afterwards is that a decision was made — not a copy of what was written. The records are chained to each other, so changing an old one breaks every record that came after it.</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">What is kept</span></div>
+      <div class="main">
+        <h2>The record of what happened does not contain what was written.</h2>
+        <p>The checking happens on the computer itself. Nothing is sent anywhere to be judged, and what gets written down afterwards is that a decision was made — not a copy of what was written. The records are chained to each other, so changing an old one breaks every record that came after it.</p>
+      </div>
     </div>
 
-    <p class="receipt" data-reveal>Qwen3-1.7B-Instruct Q4_0 · EmbeddingGemma-300M Q8_0 · OCR_LATIN · llama.cpp via @qvac/sdk · pnpm run verify-audit</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Source</span></div>
+      <div class="main"><p class="receipt">Qwen3-1.7B-Instruct Q4_0 · EmbeddingGemma-300M Q8_0 · OCR_LATIN · llama.cpp via @qvac/sdk · pnpm run verify-audit</p></div>
+    </div>
 
   </div>
 </section>
 
-<!-- ── §4 the numbers ──────────────────────────────────────────────────── -->
+<!-- ── §4 the numbers ──────────────────────────────────── -->
 <!--
-     All eleven classes, uncurated. Cutting the table would mean choosing
-     which rows to keep, and any cut that hides guard-targeted and
+     All eleven classes, uncurated. Any cut that hides guard-targeted and
      volume-distraction teaches an evaluator to distrust the nine above them.
-     No latency column: it is a real number and it is not this reader's
-     question.
 -->
-<section id="numbers" class="rails">
-  <div class="wrap stack-lg">
+<section id="numbers">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">Measured, not claimed</span>
-      <h2>136 of 160 attempts stopped. Without it, none.</h2>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Measured, not claimed</span></div>
+      <div class="main"><h2>136 of 160 attempts stopped. Without it, none.</h2></div>
     </div>
 
-    <div class="tbl" data-reveal>
-      <table>
-        <thead>
-          <tr><th scope="col">Attack class</th><th scope="col" class="n">Stopped</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><span class="mono">multi-turn-escalation</span></td><td class="n">16/16</td></tr>
-          <tr><td><span class="mono">language-switch</span></td><td class="n">16/16</td></tr>
-          <tr><td><span class="mono">paraphrase-evasion</span></td><td class="n">16/16</td></tr>
-          <tr><td><span class="mono">document-borne</span></td><td class="n">8/8</td></tr>
-          <tr><td><span class="mono">direct-override</span></td><td class="n">15/16</td></tr>
-          <tr><td><span class="mono">authority-spoofing</span></td><td class="n">14/16</td></tr>
-          <tr><td><span class="mono">roleplay-fiction</span></td><td class="n">14/16</td></tr>
-          <tr><td><span class="mono">obfuscation</span></td><td class="n">14/16</td></tr>
-          <tr><td><span class="mono">hypothetical-testing</span></td><td class="n">13/16</td></tr>
-          <tr><td><span class="mono">guard-targeted</span></td><td class="n">8/16</td></tr>
-          <tr><td><span class="mono">volume-distraction</span></td><td class="n">2/8</td></tr>
-        </tbody>
-      </table>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Every class, uncut</span></div>
+      <div class="main">
+        <table>
+          <thead>
+            <tr><th scope="col">Attack class</th><th scope="col" class="n">Stopped</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="mono">multi-turn-escalation</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">language-switch</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">paraphrase-evasion</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">document-borne</span></td><td class="n">8/8</td></tr>
+            <tr><td><span class="mono">direct-override</span></td><td class="n">15/16</td></tr>
+            <tr><td><span class="mono">authority-spoofing</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">roleplay-fiction</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">obfuscation</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">hypothetical-testing</span></td><td class="n">13/16</td></tr>
+            <tr><td><span class="mono">guard-targeted</span></td><td class="n">8/16</td></tr>
+            <tr><td><span class="mono">volume-distraction</span></td><td class="n">2/8</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <p class="receipt" data-reveal>REPORT.md · commit 040f4e4 · Intel Xeon 2.1GHz x4, 17 GB, no GPU · 21 of 36 legitimate requests were also refused; --rewrite exists for that.</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Source</span></div>
+      <div class="main"><p class="receipt">REPORT.md · commit 040f4e4 · Intel Xeon 2.1GHz x4, 17 GB, no GPU · 21 of 36 legitimate requests were also refused; --rewrite exists for that.</p></div>
+    </div>
 
   </div>
 </section>
 
-<!-- ── §5 get it ───────────────────────────────────────────────────────── -->
-<section id="get" class="rails">
-  <div class="wrap stack-lg">
+<!-- ── §5 get it ──────────────────────────────────────── -->
+<section id="get">
+  <div class="wrap sec">
 
-    <div class="sec-head" data-reveal>
-      <span class="label">Get Warden</span>
-      <h2>Install it on one machine, or on everyone's.</h2>
-      <p>Same installer either way. There is no server to set up and no account to create.</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Get Warden</span></div>
+      <div class="main">
+        <h2>Install it on one machine, or on everyone&#39;s.</h2>
+        <p>Same installer either way. There is no server to set up and no account to create.</p>
+      </div>
     </div>
 
-    <div class="dl" data-reveal>
-      <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-0.1.0-arm64.dmg">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
-        <span>
-          <span class="t">macOS</span>
-          <span class="m">Apple Silicon · .dmg · 185 MB</span>
-        </span>
-      </a>
-      <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-Setup.exe">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3zM11.1 4.5 21 3v8.5h-9.9zM3 12.4h7.2v6.9L3 18.4zM11.1 12.4H21V21l-9.9-1.4z"/></svg>
-        <span>
-          <span class="t">Windows</span>
-          <span class="m">x64 · .exe · 273 MB</span>
-        </span>
-      </a>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Download</span></div>
+      <div class="main">
+        <div class="dl">
+          <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-0.1.0-arm64.dmg">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
+            <span>
+              <span class="t">macOS</span>
+              <span class="m">Apple Silicon · .dmg · 185 MB</span>
+            </span>
+          </a>
+          <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-Setup.exe">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3zM11.1 4.5 21 3v8.5h-9.9zM3 12.4h7.2v6.9L3 18.4zM11.1 12.4H21V21l-9.9-1.4z"/></svg>
+            <span>
+              <span class="t">Windows</span>
+              <span class="m">x64 · .exe · 273 MB</span>
+            </span>
+          </a>
+        </div>
+        <p class="note">No Intel Mac build yet. The first time it opens it downloads what it needs — that part uses the internet once, and only once.</p>
+      </div>
     </div>
 
-    <!-- Two facts someone finds out on their own machine if we do not say
-         them here, and both of them cost more discovered that way. -->
-    <p class="note" data-reveal>No Intel Mac build yet. The first time it opens it downloads what it needs — that part uses the internet once, and only once.</p>
-
-    <p class="receipt" data-reveal>git clone github.com/Wardenlabs/warden · pnpm install · pnpm run setup · pnpm run dev</p>
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">From source</span></div>
+      <div class="main"><p class="receipt">git clone github.com/Wardenlabs/warden · pnpm install · pnpm run setup · pnpm run dev</p></div>
+    </div>
 
   </div>
 </section>

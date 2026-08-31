@@ -91,7 +91,7 @@
   /* And above its ceiling. Fluid, because a 78px headline on a phone is
      not a headline. */
   --fs-9:  clamp(40px, 5vw, 72px);     /* hero */
-  --fs-h2: clamp(27px, 3.9vw, 44px);   /* section heads */
+  --fs-h2: clamp(30px, 4.4vw, 52px);   /* section heads */
   --fs-sub: 16px;                      /* the hero's one sentence under the headline */
 
   --ls-hero: -.02em;
@@ -182,25 +182,54 @@ svg { display: block; }
   position: relative;
 }
 
-/* The vertical guides that run the length of the page. Vercel's grid system
-   is DOM elements with a 1px border, not a canvas; this is the same idea at
-   the only scale this page needs — the container edge itself is the guide. */
-@media (min-width: 900px) {
-  .rails > .wrap {
-    border-inline: var(--guide-w) solid var(--line);
-    padding-inline: var(--s-8);
-  }
+/*
+ * The hero's own note says it: "no rails through it — the light is the only
+ * line here." Nothing under it has them either. What the vertical guides were
+ * doing — giving the eye a hard left edge to run down — is done instead by a
+ * narrow column of small mono type: the section's label, a rule id, the word
+ * SOURCE. Structure out of something already on the page for another reason,
+ * rather than a border drawn to stand in for structure.
+ *
+ * The air is a fraction of the screen rather than a pixel count, which is the
+ * one measurement the hero actually makes.
+ */
+section {
+  position: relative;
+  padding-block: clamp(var(--s-10), 13vh, var(--s-12));
+  border-top: var(--guide-w) solid var(--line);
 }
 
-section { position: relative; padding-block: var(--s-11); border-top: var(--guide-w) solid var(--line); }
+.sec { display: grid; gap: var(--s-9); }
 
-@media (max-width: 700px) { section { padding-block: var(--s-9); } }
+.row {
+  display: grid;
+  grid-template-columns: var(--s-12) minmax(0, 1fr);
+  gap: var(--s-7);
+  align-items: start;
+}
+@media (max-width: 940px) {
+  .row { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+}
 
-/* Every section body stacks on the same rhythm, so the five of them cannot
-   drift apart as they are written. */
-.stack-lg { display: grid; gap: var(--s-6); }
-.stack-lg > .sec-head { margin-bottom: var(--s-2); }
-.stack-lg > .note { margin-top: 0; }
+/* The rail. Small, quiet, and the same distance from the top of its row every
+   time — the repetition is the whole mechanism. */
+.side { display: grid; gap: var(--s-2); align-content: start; padding-top: var(--s-2); }
+.side .label { display: block; }
+.side .id { text-transform: none; letter-spacing: 0; color: var(--ink-2); }
+
+.main { display: grid; gap: var(--s-6); }
+.main p { font-size: var(--fs-4); line-height: var(--lh-body); color: var(--muted); max-width: var(--prose); }
+
+/* The rule in the words its author used. The only prose on the page set at
+   display weight, because it is the one sentence the reader is meant to
+   picture someone having written. */
+.main p.say {
+  font-size: var(--fs-5);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-tight);
+  color: var(--ink);
+  max-width: 34ch;
+}
 
 /* ═══ type ═══════════════════════════════════════════════════════════════ */
 
@@ -237,10 +266,6 @@ h3 {
   letter-spacing: var(--ls-tight);
 }
 
-.sec-head { max-width: var(--read); display: grid; gap: var(--s-4); margin-bottom: var(--s-9); }
-.sec-head p { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-body); max-width: var(--prose); }
-
-.lead { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-body); max-width: var(--prose); }
 .mono { font-family: var(--mono); font-size: var(--fs-mono-adj); }
 .dim  { color: var(--faint); }
 
@@ -412,36 +437,6 @@ header nav .btn { color: var(--accent-ink); }
 
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
-/* ── the card: a hairline and a sunken face, never a shadow ────────────── */
-/*
- * Sunken rather than floating. A shadow would put the card in front of the
- * page; this puts it in the page, which is the only relationship the hero
- * established and so the only one the rest may use.
- */
-.card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-xl);
-  background: var(--sunken);
-  overflow: hidden;
-}
-.card-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--s-5);
-  padding: var(--s-4) var(--s-7);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--mono); font-size: var(--fs-1);
-  letter-spacing: var(--ls-label); text-transform: uppercase;
-  color: var(--faint);
-}
-.card-head .id { text-transform: none; letter-spacing: 0; color: var(--ink-2); }
-.card-body { padding: var(--s-7); }
-.card-body p {
-  font-size: var(--fs-4);
-  line-height: var(--lh-body);
-  color: var(--ink);
-  max-width: var(--prose);
-}
-
 /* ── the refusal, rendered as the employee sees it ─────────────────────── */
 /*
  * The bar exists for one reason: without the tool's name on it, a reader
@@ -510,16 +505,18 @@ header nav .btn { color: var(--accent-ink); }
 }
 
 /* ── numbers ───────────────────────────────────────────────────────────── */
-.tbl { border: 1px solid var(--line); border-radius: var(--r-xl); overflow: hidden; }
+/* Rules between the rows and nothing around them. A box here would be the
+   page's second surface, and the terminal is the only thing on it that came
+   out of another program. */
 table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
 thead th {
-  text-align: left; padding: var(--s-4) var(--s-6);
+  text-align: left; padding: 0 0 var(--s-4);
   font-family: var(--mono); font-size: var(--fs-1);
   letter-spacing: var(--ls-label); text-transform: uppercase;
-  font-weight: var(--fw-medium); color: var(--muted);
-  background: var(--sunken); border-bottom: 1px solid var(--line);
+  font-weight: var(--fw-medium); color: var(--faint);
+  border-bottom: 1px solid var(--line-firm);
 }
-tbody td { padding: var(--s-4) var(--s-6); border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+tbody td { padding: var(--s-4) 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
 tbody tr:last-child td { border-bottom: 0; }
 td b { font-weight: var(--fw-medium); color: var(--ink); }
 th.n, td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -585,6 +582,55 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   overflow-wrap: anywhere;
 }
 
+/*
+ * The pipeline. Each step is a row of the section's own grid, so its numeral
+ * lands in the rail beside the labels rather than in a box of its own. No
+ * borders: four short lines with a mono numeral against them read as a list
+ * without needing to be drawn as one.
+ */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-7); }
+.steps li {
+  display: grid;
+  grid-template-columns: var(--s-12) minmax(0, 1fr);
+  gap: var(--s-7);
+  align-items: start;
+}
+.steps .stepn {
+  font-family: var(--mono); font-size: var(--fs-1);
+  letter-spacing: var(--ls-label); color: var(--faint);
+  padding-top: .35em;
+}
+.steps .t { display: block; font-size: var(--fs-4); line-height: var(--lh-body); color: var(--ink-2); max-width: var(--prose); }
+.steps .m {
+  display: block; margin-top: var(--s-3);
+  font-family: var(--mono); font-size: var(--fs-1); color: var(--faint);
+}
+/* The three verdicts, in their own colours — the only saturation below the
+   hero besides the refusal itself, and the only place the page says out loud
+   that a verdict has three values rather than two. */
+.steps .m .v-allow    { color: var(--allow); }
+.steps .m .v-block    { color: var(--block); }
+.steps .m .v-escalate { color: var(--escalate); }
+@media (max-width: 940px) {
+  .steps li { grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+  .steps .stepn { padding-top: 0; }
+}
+
+/* ── the receipt ───────────────────────────────────────────────────────── */
+/*
+ * Where the evidence lives. The person deciding reads the prose above it and
+ * goes past; the person they forward the page to stops here. It is the whole
+ * reason the page does not have to be written twice.
+ */
+.receipt {
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  line-height: var(--lh-body);
+  color: var(--faint);
+  max-width: var(--read);
+  overflow-wrap: anywhere;
+}
+
 /* the pipeline */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
 .steps li {
@@ -597,8 +643,6 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
   font-size: var(--fs-2);
   color: var(--ink-2);
 }
-.steps li:last-child { border-bottom: 0; }
-.card > .steps li { padding-inline: var(--s-7); }
 .steps .stepn {
   width: 20px; height: 20px;
   display: grid; place-items: center;
@@ -614,14 +658,10 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 .steps .m .v-block    { color: var(--block); }
 .steps .m .v-escalate { color: var(--escalate); }
 
-.note    { margin-top: var(--s-6); font-size: var(--fs-2); color: var(--faint); }
+.note { font-size: var(--fs-2); line-height: var(--lh-body); color: var(--faint); max-width: var(--prose); }
 
 /* ── responsive trims ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .term pre { padding: var(--s-5); font-size: var(--fs-1); }
-  .term-bar, .card-head, .card-body { padding-inline: var(--s-5); }
-  .steps li, .card > .steps li { padding-inline: var(--s-5); }
-  /* the metadatum drops under the step rather than squeezing it */
-  .steps li { grid-template-columns: auto minmax(0, 1fr); }
-  .steps .m { grid-column: 2; white-space: normal; }
+  .term-bar { padding-inline: var(--s-5); }
 }
