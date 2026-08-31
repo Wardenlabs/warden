@@ -372,6 +372,61 @@ evidence the verdicts are stable but not a substitute for reps.
 Runs: `2026-08-31T03-59-22Z-204c582.json` (8B),
 `2026-08-31T04-32-22Z-541270a.json` (1.7B).
 
+## Is QVAC the problem? No.
+
+`llamacpp.ts` existed so this could be answered by a paired run rather than by
+argument. Same GGUF weights, same 63 cells, same pinned rule, same machine, a
+different inference engine underneath.
+
+| `r-instruction-override`, 63 cells | QVAC | llama.cpp |
+|---|---|---|
+| Legitimate cleared | 32/46 (70%) | 28/46 (61%) |
+| Attacks caught | 11/14 (79%) | 9/14 (64%) |
+| Wall clock | 159 s | 179 s |
+
+```
+legitimate work cleared  QVAC only 6, llama.cpp only 3 · p = 0.5078  ← inside the noise
+attacks caught           QVAC only 3, llama.cpp only 1 · p = 0.6250  ← inside the noise
+→ no measured difference on either column; 13 cells disagree.
+```
+
+Thirteen disagreements splitting 6–3 and 3–1 is what nondeterminism looks like,
+not what a better engine looks like. And llama.cpp was **slower** — 179 s
+against 159 s — while running one sequence against QVAC's `parallel: 4`, so it
+does not even buy determinism for free.
+
+So the runtime is not what is wrong here. Every result in this log that looked
+like it might be the engine's fault — the temperature-0 wobble, the
+false-positive rate, the classes that fail — survives changing the engine. What
+moves those numbers is the model, which the section above measures at 63
+refusals recovered and 16 attacks lost.
+
+### Three attempts before this one measured nothing
+
+Worth recording, because each failed silently and produced a clean-looking
+number:
+
+1. **The bench cache could not tell the two engines apart.** Its key stored
+   `isMock() ? 'mock' : 'real'`, and both runtimes are "real", so the llama.cpp
+   run would have read QVAC's stored answers back and reported perfect agreement
+   at p = 1.0 without loading llama.cpp at all. Caught by reading the key before
+   trusting the run, not by the result looking odd.
+2. **`node-llama-cpp` was not installed, because running `pnpm run typecheck`
+   uninstalled it.** pnpm's pre-script dependency check reinstalls from the
+   lockfile, and the package is deliberately absent from `package.json`. The
+   run failed all 63 cells in 0 seconds.
+3. **The adapter leaked its only sequence**, so it answered the first cell in
+   17.7 s and failed the other 62 for want of one. The run took 20 seconds
+   total, which is the tell.
+
+All three were caught by the bench refusing to publish a broken run: ERROR
+counts as wrong on both columns and prints `anything below is a report about a
+broken run` above the rates. Without that line this comparison would have been
+recorded three separate times as a result.
+
+Run: 63 cells, cache purged for the llamacpp variant beforehand so every cell
+was computed rather than read.
+
 ## Per-rule attribution
 
 Which rule refused legitimate work, from the run that added attribution:
