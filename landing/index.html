@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden — the local AI gateway</title>
-<meta name="description" content="Your admin writes the rules. Every prompt is checked against them before a model sees it, on the machine and before it is sent. 136 of 160 attacks stopped. Free and open source, Apache-2.0.">
+<meta name="description" content="You write the rules. Warden checks what your team sends against them, on their own computer, before it goes anywhere. 136 of 160 attempts stopped. Free and open source, Apache-2.0.">
 
 <meta property="og:title" content="Warden — the local AI gateway">
-<meta property="og:description" content="Asking a model to follow your rules is not the same as enforcing them. Warden checks every prompt against your rules before a model sees it — on the machine, before it is sent.">
+<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#050507">
@@ -57,9 +57,9 @@ setTimeout(function () {
 
   <div class="wrap hero">
     <div class="copy">
-    <h1>Asking a model to follow your rules is not the same as enforcing them.</h1>
+    <h1>Writing the rules down is not the same as enforcing them.</h1>
 
-    <p class="sub">Warden checks every prompt against your rules before a model sees it.</p>
+    <p class="sub">Warden checks what your team sends, on their own computer, before it goes anywhere.</p>
 
     <div class="cta">
       <a class="btn btn-primary" href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-0.1.0-arm64.dmg">
@@ -85,6 +85,27 @@ setTimeout(function () {
   </div>
 </div>
 
+<!-- ── §0 the gap ──────────────────────────────────────────────────────── -->
+<!--
+     The only section with nothing in it. The problem is that something is
+     missing, so the screen is empty; the page fills up from here.
+-->
+<section id="gap" class="rails">
+  <div class="wrap stack-lg">
+
+    <div class="sec-head" data-reveal>
+      <span class="label">The gap</span>
+      <h2>Nothing checks what goes out.</h2>
+      <p>Someone on the team pastes a customer contract into Claude to have it summarised. It is a reasonable thing to do, and it is why the tool is there. The contract leaves the company, nobody looked at it on the way out, and afterwards there is nothing that says it went.</p>
+    </div>
+
+    <p class="lead" data-reveal>Both tools leave a place for that check to run, and ship with it empty.</p>
+
+    <p class="receipt" data-reveal>~/.claude/settings.json · hooks.UserPromptSubmit · empty on a default install</p>
+
+  </div>
+</section>
+
 <!-- ── §1 the refusal ──────────────────────────────────────────────────── -->
 <section id="block" class="rails">
   <div class="wrap stack-lg">
@@ -106,7 +127,7 @@ setTimeout(function () {
       </div>
     </div>
 
-    <p class="note" data-reveal>Every line of the refusal below is read from that rule and composed by the hook. Nothing in it is written at the moment of the decision.</p>
+    <p class="note" data-reveal>Every line below is built from that rule. Nothing in it is written on the spot.</p>
 
     <div class="term" data-reveal>
       <div class="term-bar">claude code</div>
@@ -141,21 +162,21 @@ setTimeout(function () {
 
     <div class="sec-head" data-reveal>
       <span class="label">How it works</span>
-      <h2>It runs before the prompt leaves the machine.</h2>
+      <h2>It runs on their computer, before anything is sent.</h2>
     </div>
 
     <div class="card" data-reveal>
       <ol class="steps">
         <li><span class="stepn">1</span><span>The employee presses Enter.</span><span class="m">claude code · codex</span></li>
-        <li><span class="stepn">2</span><span>The tool's own hook fires, on their machine, before anything is sent.</span><span class="m">UserPromptSubmit</span></li>
-        <li><span class="stepn">3</span><span>Warden judges the prompt against the ratified rules.</span><span class="m">on-device</span></li>
-        <li><span class="stepn">4</span><span>Allowed, it continues. Blocked, the model never receives it.</span><span class="m"><span class="v-allow">allow</span> · <span class="v-block">block</span> · <span class="v-escalate">escalate</span></span></li>
+        <li><span class="stepn">2</span><span>The check runs on their own computer, before anything is sent.</span><span class="m">UserPromptSubmit</span></li>
+        <li><span class="stepn">3</span><span>Warden compares it against the rules you approved.</span><span class="m">on-device</span></li>
+        <li><span class="stepn">4</span><span>If it is fine, it goes. If it is not, it never leaves.</span><span class="m"><span class="v-allow">allow</span> · <span class="v-block">block</span> · <span class="v-escalate">escalate</span></span></li>
       </ol>
     </div>
 
     <!-- The commercial argument, and the reason a gateway that sits in front
          of an API would not work here at all. -->
-    <p class="lead" data-reveal>A Claude Max or ChatGPT Plus session authenticates over OAuth against a fixed endpoint. There is no base URL to redirect. The hook does not care — it runs first.</p>
+    <p class="lead" data-reveal>This is why it works on the plans people actually buy. A Claude Max or ChatGPT Plus account talks to one fixed address that nobody can point somewhere else, so there is nothing to put a filter in front of. This runs earlier than that.</p>
 
     <p class="receipt" data-reveal>UserPromptSubmit · integrations/warden-hook.mjs</p>
 
@@ -173,9 +194,9 @@ setTimeout(function () {
   <div class="wrap stack-lg">
 
     <div class="sec-head" data-reveal>
-      <span class="label">Where everything runs</span>
-      <h2>The record of a decision does not contain the prompt.</h2>
-      <p>Every model runs on the machine, through QVAC. The audit log is append-only and hash-chained, and it stores the hash of a prompt, not the prompt — altering a past decision breaks every hash after it.</p>
+      <span class="label">What is kept</span>
+      <h2>The record of what happened does not contain what was written.</h2>
+      <p>The checking happens on the computer itself. Nothing is sent anywhere to be judged, and what gets written down afterwards is that a decision was made — not a copy of what was written. The records are chained to each other, so changing an old one breaks every record that came after it.</p>
     </div>
 
     <p class="receipt" data-reveal>Qwen3-1.7B-Instruct Q4_0 · EmbeddingGemma-300M Q8_0 · OCR_LATIN · llama.cpp via @qvac/sdk · pnpm run verify-audit</p>
@@ -196,7 +217,7 @@ setTimeout(function () {
 
     <div class="sec-head" data-reveal>
       <span class="label">Measured, not claimed</span>
-      <h2>136 of 160 attacks stopped. The baseline stopped none.</h2>
+      <h2>136 of 160 attempts stopped. Without it, none.</h2>
     </div>
 
     <div class="tbl" data-reveal>
@@ -232,7 +253,7 @@ setTimeout(function () {
     <div class="sec-head" data-reveal>
       <span class="label">Get Warden</span>
       <h2>Install it on one machine, or on everyone's.</h2>
-      <p>Same installer either way. There is no server to provision and no account to create.</p>
+      <p>Same installer either way. There is no server to set up and no account to create.</p>
     </div>
 
     <div class="dl" data-reveal>
@@ -254,7 +275,7 @@ setTimeout(function () {
 
     <!-- Two facts someone finds out on their own machine if we do not say
          them here, and both of them cost more discovered that way. -->
-    <p class="note" data-reveal>No Intel Mac build yet. First launch downloads the models — that part needs the network once, and only once.</p>
+    <p class="note" data-reveal>No Intel Mac build yet. The first time it opens it downloads what it needs — that part uses the internet once, and only once.</p>
 
     <p class="receipt" data-reveal>git clone github.com/Wardenlabs/warden · pnpm install · pnpm run setup · pnpm run dev</p>
 
