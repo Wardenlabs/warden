@@ -22,7 +22,7 @@ import type { Verdict } from '../guard/types.js';
 import { hashPolicy, rulesForRole } from '../policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../policy/types.js';
 import { provenanceLabel } from '../provenance.js';
-import { adapter, isMock } from '../qvac/index.js';
+import { adapter, adapterName, isMock } from '../qvac/index.js';
 import { writeReport, type ClassResult, type RunSummary } from './report.js';
 
 // Next to this module in both layouts — src/redteam/corpus in a checkout,
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
   }
   const total = corpus.reduce((n, c) => n + c.prompts.length, 0) * reps * modes.length;
 
-  console.log(`\nred team — ${corpus.length} classes, ${total} evaluations, adapter=${isMock() ? 'mock' : 'real'}`);
+  console.log(`\nred team — ${corpus.length} classes, ${total} evaluations, adapter=${adapterName()}`);
   console.log(`policy ${policy.version.slice(0, 8)} · ${policy.rules.length} rules · ` +
               `${rulesForRole(policy, 'analyst').length} apply to the test actor\n`);
 
@@ -262,7 +262,7 @@ async function main(): Promise<void> {
     startedAt: new Date(started).toISOString(),
     durationMs: Date.now() - started,
     reps,
-    adapter: isMock() ? 'mock' : 'real',
+    adapter: adapterName(),
     policyVersion: policy.version,
     ruleCount: policy.rules.length,
     warden: results['warden'] ?? [],

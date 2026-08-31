@@ -48,7 +48,8 @@ export type RunSummary = {
   startedAt: string;
   durationMs: number;
   reps: number;
-  adapter: 'mock' | 'real';
+  /** Which engine produced these verdicts. See `adapterName()`. */
+  adapter: 'mock' | 'llamacpp' | 'qvac';
   policyVersion: string;
   ruleCount: number;
   warden: ClassResult[];

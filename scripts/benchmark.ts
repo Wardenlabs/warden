@@ -12,7 +12,7 @@ import { isolate } from '../src/guard/isolate.js';
 import { evaluate } from '../src/guard/pipeline.js';
 import { adjudicate } from '../src/guard/passes/adjudicate.js';
 import { loadPolicy, seedIfEmpty } from '../src/policy/store.js';
-import { adapter, isMock } from '../src/qvac/index.js';
+import { adapter, adapterName, isMock } from '../src/qvac/index.js';
 import { provenanceLabel } from '../src/provenance.js';
 
 const RUNS = Number(process.env['BENCH_RUNS'] ?? 8);
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   const policy = loadPolicy();
   const qvac = adapter();
 
-  console.log(`\nbenchmark — ${RUNS} runs each, adapter=${isMock() ? 'mock' : 'real'}\n`);
+  console.log(`\nbenchmark — ${RUNS} runs each, adapter=${adapterName()}\n`);
 
   // Warm the model first. A cold load is several seconds and would dominate
   // every number after it, describing startup rather than steady state.

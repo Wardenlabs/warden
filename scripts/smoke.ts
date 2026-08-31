@@ -16,7 +16,7 @@
  * code path uses would diagnose a design that was already deleted.
  */
 import { z } from 'zod';
-import { adapter, isMock } from '../src/qvac/index.js';
+import { adapter, adapterName, isMock } from '../src/qvac/index.js';
 import { isolate, isolationPreamble } from '../src/guard/isolate.js';
 
 const RUNS = Number(process.env['SMOKE_RUNS'] ?? 20);
@@ -59,7 +59,7 @@ const SYSTEM = (nonce: string) =>
 
 async function main(): Promise<void> {
   const qvac = adapter();
-  console.log(`\nsmoke — ${RUNS} runs, adapter=${isMock() ? 'mock' : 'real'}\n`);
+  console.log(`\nsmoke — ${RUNS} runs, adapter=${adapterName()}\n`);
 
   let firstTry = 0;
   let repaired = 0;

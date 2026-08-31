@@ -33,4 +33,19 @@ export function isMock(): boolean {
   return process.env['WARDEN_ADAPTER'] === 'mock';
 }
 
+/**
+ * Which engine is answering, as a name rather than a boolean.
+ *
+ * `isMock()` splits the world into mock and not-mock, which was enough while
+ * there was one real runtime and is a trap now that there are two: a bench
+ * cache keyed on "real" hands a `llamacpp` run the answers QVAC already gave,
+ * and the paired comparison the second runtime exists for reports a perfect
+ * tie without running a single generation. Anything caching or recording a
+ * result must key on this, not on `isMock()`.
+ */
+export function adapterName(): 'mock' | 'llamacpp' | 'qvac' {
+  const choice = process.env['WARDEN_ADAPTER'];
+  return choice === 'mock' ? 'mock' : choice === 'llamacpp' ? 'llamacpp' : 'qvac';
+}
+
 export * from './types.js';

@@ -55,7 +55,7 @@ import { adjudicate, type AdjudicateOptions } from '../src/guard/passes/adjudica
 import { detectInjection } from '../src/guard/passes/injection.js';
 import { hashPolicy, rulesForActor } from '../src/policy/store.js';
 import type { PolicySpec, Quota, Rule } from '../src/policy/types.js';
-import { adapter, isMock } from '../src/qvac/index.js';
+import { adapter, adapterName, isMock } from '../src/qvac/index.js';
 import { resolvedModel } from '../src/qvac/client.js';
 
 /**
@@ -208,7 +208,11 @@ function cellKey(text: string, ruleId: string): string {
  * Keyed on the variant's settings and the cell, so a cache hit is the same
  * question with the same settings and never a stale answer to a changed one.
  * The model identity goes into the key too: the same cell judged by a 1.7B and
- * an 8B are different measurements and must not share a slot.
+ * an 8B are different measurements and must not share a slot. So does the
+ * engine — this key once stored only whether the adapter was the mock, which
+ * put QVAC and `llamacpp` in the same slot and would have answered "the two
+ * runtimes agree on every cell" out of the cache, without loading llama.cpp at
+ * all.
  */
 type Cache = Record<string, 'VIOLATES' | 'COMPLIES' | 'UNCLEAR' | 'ERROR'>;
 
@@ -234,7 +238,7 @@ function variantKey(name: string, variant: { options: AdjudicateOptions; injecti
         injection: variant.injection ?? false,
         model,
         detector,
-        adapter: isMock() ? 'mock' : 'real'
+        adapter: adapterName()
       })
     )
     .digest('hex')
@@ -557,7 +561,7 @@ async function main(): Promise<void> {
 
   console.log(
     `\nadjudicator bench — ${cells.length} cells, policy ${policy.version.slice(0, 8)}, ` +
-      `role ${actorRole}, adapter ${isMock() ? 'mock' : 'real'}`
+      `role ${actorRole}, adapter ${adapterName()}`
   );
   /**
    * Which weights answered, printed and recorded.
@@ -644,7 +648,7 @@ async function main(): Promise<void> {
       {
         startedAt: new Date(started).toISOString(),
         policyVersion: policy.version,
-        adapter: isMock() ? 'mock' : 'real',
+        adapter: adapterName(),
         models,
         concurrency,
         cells: cells.length,

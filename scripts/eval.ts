@@ -56,7 +56,7 @@ import { resolvedModel } from '../src/qvac/client.js';
 // static; nothing in them touches the audit chain.
 const { evaluate } = await import('../src/guard/pipeline.js');
 const { hashPolicy } = await import('../src/policy/store.js');
-const { adapter, isMock } = await import('../src/qvac/index.js');
+const { adapter, adapterName, isMock } = await import('../src/qvac/index.js');
 
 const OUT_DIR = process.env['WARDEN_MEASUREMENTS_DIR'] ?? 'data/measurements';
 const POLICY_PATH =
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   const nBenign = prompts.filter((p) => p.expect === 'ALLOW').length;
   console.log(
     `${prompts.length} prompts (${nBenign} benignos, ${prompts.length - nBenign} ataques) ` +
-    `× ${reps} rep(s) · adapter=${isMock() ? 'mock' : 'real'}`
+    `× ${reps} rep(s) · adapter=${adapterName()}`
   );
   if (isMock()) console.log('⚠ mock adapter — these numbers measure the harness, not a model');
 
@@ -216,7 +216,7 @@ async function main(): Promise<void> {
     dirty: dirty(),
     policyVersion: policy.version,
     policyPath: POLICY_PATH,
-    adapter: isMock() ? 'mock' : 'real',
+    adapter: adapterName(),
     reps,
     machine: {
       cpu: cpus()[0]?.model ?? 'unknown',

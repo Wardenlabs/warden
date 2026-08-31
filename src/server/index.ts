@@ -17,7 +17,7 @@ import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
-import { adapter, isMock } from '../qvac/index.js';
+import { adapter, adapterName, isMock } from '../qvac/index.js';
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
@@ -897,7 +897,7 @@ app.get('/health', (_req, res) =>
 );
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`\nWarden  (adapter=${isMock() ? 'mock' : 'real'})`);
+  console.log(`\nWarden  (adapter=${adapterName()})`);
   console.log(`  local     http://localhost:${PORT}`);
   for (const ip of lanAddresses()) {
     console.log(`  network   http://${ip}:${PORT}   <- teammates point here`);
