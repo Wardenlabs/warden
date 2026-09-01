@@ -1191,24 +1191,15 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 }
 #how .main + .chapter, #spend .main + .chapter { margin-top: var(--s-9); }
 
-/* The caption: a big mono clock as the scene's visual anchor, the scene's
-   name small beside it, and a hairline that fills with --p as the reader
-   crosses the chapter — the page's only continuous, finger-linked line. */
+/* The caption: the scene's name, small, and a hairline that fills with --p
+   as the reader crosses the chapter — the page's continuous, finger-linked
+   line. The clock lives in the narration now, where an hour means something. */
 .chapter > .cap {
   grid-column: 1 / -1;
   display: flex;
   align-items: baseline;
   gap: var(--s-5);
   margin-bottom: var(--s-5);
-}
-.cap .tclock {
-  font-family: var(--mono);
-  font-size: var(--fs-7);
-  font-weight: var(--fw-medium);
-  letter-spacing: -.03em;
-  line-height: 1;
-  color: var(--line-firm);
-  font-variant-numeric: tabular-nums;
 }
 .cap .scene { color: var(--faint); }
 .js .cap::after {
@@ -1221,7 +1212,8 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
     var(--line-soft) calc(var(--p, 0) * 100%));
 }
 
-/* Narration is one statement per step now — the panels carry the detail. */
+/* Narration: one statement per step, and one quiet line under it that says
+   what to watch for in the panel. The panels carry the rest. */
 .chapter > .step {
   grid-column: 1;
   display: grid;
@@ -1236,8 +1228,16 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   line-height: var(--lh-snug);
   letter-spacing: var(--ls-tight);
   color: var(--ink);
-  max-width: 16ch;
+  max-width: 20ch;
   text-wrap: balance;
+}
+.step p {
+  margin: var(--s-3) 0 0;
+  font-size: var(--fs-4);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  max-width: 38ch;
+  text-wrap: pretty;
 }
 .step .mono { color: var(--ink-2); }
 
@@ -1349,12 +1349,35 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   padding-block: var(--s-5);
   border-top-color: var(--line-soft);
 }
-/* last beat: the eye moves to the rules, the composer steps back, and each
-   row takes the console's ground in turn — activation shown as focus, not
-   as invented UI */
+/* last beat: the composer steps back and the admin's calls land one at a
+   time — "activated", "activated", and one "skipped", because ratifying
+   one by one includes leaving one off. Grey chips, not verdict colours:
+   activation is an admin's decision, not a judgement of a prompt. */
 .js [data-chapter="write"] .shot { transition: opacity .5s var(--ease-out), transform .5s var(--ease-out); }
 [data-chapter="write"][data-step="2"] .shot { opacity: .55; transform: scale(.985); }
-[data-chapter="write"][data-step="2"] .ru { background: var(--hover); }
+
+.ru .ract {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  padding: 1px var(--s-2);
+  border: 1px solid var(--line-firm);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.ru .ract.off { color: var(--faint); border-style: dashed; }
+.js .ru .ract { opacity: 0; transform: scale(.9); transition: opacity .35s var(--ease-out), transform .35s var(--ease-out); }
+[data-chapter="write"][data-step="2"] .ru .ract { opacity: 1; transform: none; }
+[data-chapter="write"][data-step="2"] .ru:nth-child(1) .ract { transition-delay: .2s; }
+[data-chapter="write"][data-step="2"] .ru:nth-child(2) .ract { transition-delay: .7s; }
+[data-chapter="write"][data-step="2"] .ru:nth-child(3) .ract { transition-delay: 1.2s; }
+/* the skipped rule dims the moment its chip says so */
+.js .ru.skip .rid, .js .ru.skip .rtx { transition: color .45s ease .7s; }
+.js .ru.skip .badge { transition: opacity .45s ease .7s; }
+[data-chapter="write"][data-step="2"] .ru.skip .rid,
+[data-chapter="write"][data-step="2"] .ru.skip .rtx { color: var(--faint); }
+[data-chapter="write"][data-step="2"] .ru.skip .badge { opacity: .45; }
 
 /* ── scene 03: the ledger fills, and a spotlight follows the narration ─── */
 .js [data-chapter="log"] .day {
@@ -1385,6 +1408,9 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 }
 [data-chapter="log"][data-step="0"] .console .row:nth-child(2),
 [data-chapter="log"][data-step="1"] .console .row:nth-child(3) { background: var(--selected); }
+@keyframes vpulse { 0% { transform: scale(1); } 40% { transform: scale(1.55); } 100% { transform: scale(1); } }
+[data-chapter="log"][data-step="0"] .console .row:nth-child(2) .dot,
+[data-chapter="log"][data-step="1"] .console .row:nth-child(3) .dot { animation: vpulse .8s var(--ease-out) .4s 2; }
 [data-chapter="log"][data-step="1"] .console .row:nth-child(2) { opacity: .55; }
 .js [data-chapter="log"] .tally { opacity: 0; transition: opacity .6s var(--ease-out); }
 [data-chapter="log"][data-step="2"] .tally { opacity: 1; }
@@ -1414,7 +1440,6 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   .chapter > .step:nth-child(4) { order: 4; }
   .chapter > .step { min-height: 0; padding-block: var(--s-5); }
   .pstick { position: static; }
-  .cap .tclock { font-size: var(--fs-6); }
 }
 
 /* ── reduced motion: the day, already over ─────────────────────────────── */
@@ -1428,6 +1453,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   .term pre .tg-a { margin-top: 0; }
   .js [data-chapter="log"] .day, .js [data-chapter="log"] .tally, .js .ceilings { opacity: 1; transform: none; }
   .js .chapter > .step { filter: none; }
+  .js .ru .ract { opacity: 1; transform: none; transition: none; }
   .js .main[data-reveal] h2.loud .ln > span { transform: none; transition: none; }
   .js .pstick { transform: none; }
 }
