@@ -99,6 +99,7 @@
      quiet because nothing was loud. The quiet tier is the default and carries
      four of the six. `.loud` is spent where the headline is itself the
      event — the gap, the count, and the closing line. */
+  --fs-say:     clamp(27px, 3.3vw, 42px);   /* a scene's statement */
   --fs-h2:      clamp(23px, 2.3vw, 30px);
   --fs-h2-loud: clamp(32px, 4.4vw, 52px);
 
@@ -143,6 +144,10 @@
   --gate-fallback: #fff5e6bf;  /* the line when there is no WebGL: the same white, at the alpha the canvas would render it */
   --gate-fallback-block: #ef6b70cc;
   --gate-fallback-hold: #d29b34cc;  /* the same line when the verdict is a hold */
+
+  /* The ground under a scene: --bg raised one step, only ever the far end of
+     a gradient. The floor of the palette does not move. */
+  --lift: #0b0c11;
 }
 
 /* ═══ base ═══════════════════════════════════════════════════════════════ */
@@ -1147,6 +1152,14 @@ footer::before {
 
 #how, #spend { scroll-margin-top: 64px; }
 
+/* Below the hero the page was one flat value of black for four screens. The
+   hero earns its depth from a canvas; these earn theirs from the ground
+   lifting toward the middle of each section and settling back at the seams,
+   which is also what keeps one section from butting against the next. */
+#how, #spend {
+  background: linear-gradient(180deg, var(--bg) 0%, var(--lift) 38%, var(--lift) 62%, var(--bg) 100%);
+}
+
 /* Section heads sit on the hero's centre line now, in the hero's weight. */
 #how .main, #spend .main { display: block; max-width: none; text-align: center; }
 .kicker { margin: 0 0 var(--s-4); color: var(--faint); }
@@ -1185,11 +1198,11 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   content: "";
   position: absolute;
   left: 50%;
-  top: 34%;
-  width: min(1100px, 96vw);
-  height: min(560px, 62svh);
+  top: 26%;
+  width: min(1300px, 104vw);
+  height: min(680px, 74svh);
   transform: translateX(-50%);
-  background: radial-gradient(52% 50% at 50% 40%, rgba(255, 245, 230, .038), transparent 72%);
+  background: radial-gradient(58% 54% at 50% 42%, rgba(255, 245, 230, .055), transparent 74%);
   pointer-events: none;
 }
 .cap .scene { color: var(--faint); }
@@ -1199,7 +1212,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 .says { display: grid; justify-items: center; align-items: end; min-height: clamp(104px, 17svh, 168px); }
 .say { max-width: min(92vw, 900px); }
 .say h3 {
-  font-size: var(--fs-h2-loud);
+  font-size: var(--fs-say);
   font-weight: var(--fw-normal);
   line-height: var(--lh-hero);
   letter-spacing: var(--ls-hero);
@@ -1207,7 +1220,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   /* em, not ch: the measure has to answer to this heading's own size, or it
      is computed against the 15px parent and shreds a statement into five
      ragged lines — which is exactly what it did. */
-  max-width: 17em;
+  max-width: 14em;
   margin-inline: auto;
   text-wrap: balance;
 }
@@ -1255,13 +1268,13 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   height: 1px;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent 8%, var(--beam) 50%, transparent 92%);
+  background: linear-gradient(90deg, transparent 22%, color-mix(in srgb, var(--beam) 58%, transparent) 50%, transparent 78%);
 }
 /* The ledger gets the terminal's frame, so the two machines on this page
    are held the same way — and it keeps its window height from the first
    beat. A log is a frame that rows fill, not a box that grows one row tall;
    growing it left a screen of black under a single line. */
-.shot.log { border: 1px solid var(--line); }
+.shot.log { border: 1px solid var(--line); background: var(--sunken); }
 @media (min-width: 900px) { .shot.log { min-height: 244px; } }
 
 /* The composer sheds its tray: one sunken box, the way the hero holds one
