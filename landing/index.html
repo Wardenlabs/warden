@@ -193,8 +193,8 @@ setTimeout(function () {
         <p>Your rule, quoted back — with what to ask instead.</p>
       </div>
       <div class="say">
-        <h3>Same hook in Codex and opencode.</h3>
-        <p>Watch the tabs — one hook, the same words in all three.</p>
+        <h3>The same hook, everywhere.</h3>
+        <p>Watch the tabs — Claude Code, Codex, opencode: the same words in all three.</p>
       </div>
       </div>
       <div class="sgate" aria-hidden="true"></div>
@@ -269,12 +269,12 @@ setTimeout(function () {
         <p>Fede&#39;s block on the top line, 14:22.</p>
       </div>
       <div class="say">
-        <h3>The morning&#39;s rule already held a payment.</h3>
-        <p>USD 12,400, waiting on <span class="mono">r-payment-approval</span> — the sentence you wrote this morning.</p>
+        <h3>The morning&#39;s rule already fired.</h3>
+        <p>USD 12,400 held by <span class="mono">r-payment-approval</span> — the sentence you wrote at 09:04.</p>
       </div>
       <div class="say">
-        <h3>Honest questions pass. The chain signs it all.</h3>
-        <p><span class="mono">pnpm run verify-audit</span> fails loudly if a row was touched.</p>
+        <h3>Honest questions just pass.</h3>
+        <p>And the chain signs the lot — <span class="mono">pnpm run verify-audit</span> fails loudly if a row was touched.</p>
       </div>
       </div>
       <div class="sgate" aria-hidden="true"></div>
@@ -293,6 +293,7 @@ setTimeout(function () {
               <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz&#39;s salary for the report</span><span class="rule-ref mono">r-payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ESCALATE"></span><span class="who">Sofía Márquez</span><span class="txt">aprobá el pago de USD 12.400 al proveedor</span><span class="rule-ref mono">r-payment-approval</span><span class="meta">14:21</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref mono">r-customer-pii</span><span class="meta">13:58</span></div>
             </div>
           </div>
+          <p class="pnote"><span>Top line, 14:22 — the refusal you just watched happen.</span><span>14:21, amber: your morning rule holding a payment until someone answers.</span><span>Eight honest questions went through untouched. Every row, refused or not, is a link in the chain.</span></p>
         </div>
       </div>
       <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -328,8 +329,8 @@ setTimeout(function () {
         <p>&ldquo;Keep going&rdquo; — 128,400 tokens by mid-morning.</p>
       </div>
       <div class="say">
-        <h3>Over the ceiling — held on the machine.</h3>
-        <p>The request stops before the tokens are bought.</p>
+        <h3>Over the ceiling.</h3>
+        <p>The request stops on the machine, before the tokens are bought.</p>
       </div>
       <div class="say">
         <h3>Held, never refused.</h3>
@@ -349,7 +350,18 @@ setTimeout(function () {
    when they answer, ask again and it is judged on its merits.</span><span class="tg tg-d">   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></span></pre>
           </div>
 
-          <p class="ceilings"><span class="label">Ceilings, per role</span> <span class="mono">intern 20/day · analyst 100/day · <b class="ceil-eng">engineer 200/day + 100k tokens a session</b> · finance 150/day · admin 500/day</span></p>
+          <p class="pnote"><span>128,400 tokens spent this session — the ceiling for the role is 100,000.</span><span>Warden knows the key&#39;s role, so the ceiling that applies is the engineer&#39;s.</span><span>Held, not refused: it waits for an administrator instead of dying mid-task.</span></p>
+
+          <div class="ceilings">
+            <span class="label">Ceilings, per role</span>
+            <ul>
+              <li><span class="r">intern</span><span class="v">20 prompts a day</span></li>
+              <li><span class="r">analyst</span><span class="v">100 prompts a day</span></li>
+              <li class="ceil-eng"><span class="r">engineer</span><span class="v">200 a day · 100k tokens a session</span></li>
+              <li><span class="r">finance</span><span class="v">150 prompts a day</span></li>
+              <li><span class="r">admin</span><span class="v">500 prompts a day</span></li>
+            </ul>
+          </div>
         </div>
       </div>
       <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>

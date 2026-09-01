@@ -1173,25 +1173,42 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 
 .chapter { position: relative; }
 .stage {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: start;
   text-align: center;
-  gap: var(--s-6);
-  padding-top: clamp(16px, 5svh, 56px);
+  gap: var(--s-5);
+  padding-top: clamp(12px, 4svh, 44px);
+}
+.stage::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: min(1100px, 96vw);
+  height: min(560px, 62svh);
+  transform: translateX(-50%);
+  background: radial-gradient(52% 50% at 50% 40%, rgba(255, 245, 230, .038), transparent 72%);
+  pointer-events: none;
 }
 .cap .scene { color: var(--faint); }
 
 /* The statements share one cell and trade places as the step changes —
    the same spot on screen, the way the hero holds one headline. */
-.says { display: grid; justify-items: center; align-items: end; min-height: clamp(110px, 19svh, 180px); }
-.say { max-width: 30ch; }
+.says { display: grid; justify-items: center; align-items: end; min-height: clamp(104px, 17svh, 168px); }
+.say { max-width: min(92vw, 900px); }
 .say h3 {
   font-size: var(--fs-h2-loud);
   font-weight: var(--fw-normal);
   line-height: var(--lh-hero);
   letter-spacing: var(--ls-hero);
   color: var(--ink);
+  /* em, not ch: the measure has to answer to this heading's own size, or it
+     is computed against the 15px parent and shreds a statement into five
+     ragged lines — which is exactly what it did. */
+  max-width: 17em;
+  margin-inline: auto;
   text-wrap: balance;
 }
 .say p {
@@ -1199,7 +1216,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   font-size: var(--fs-sub);
   line-height: var(--lh-body);
   color: var(--muted);
-  max-width: 52ch;
+  max-width: 46ch;
   text-wrap: balance;
 }
 .say .mono { color: var(--ink-2); }
@@ -1207,9 +1224,9 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 /* The scene's gate: the hero's line, carried down as a hairline. It takes
    the scene's verdict the moment the verdict lands. */
 .sgate {
-  width: min(560px, 74vw);
+  width: min(760px, 88vw);
   height: 1px;
-  margin-block: var(--s-2) var(--s-3);
+  margin-block: var(--s-3) var(--s-5);
   background: linear-gradient(90deg, transparent, var(--gate-fallback) 30%, var(--gate-fallback) 70%, transparent);
   transition: background .7s ease;
 }
@@ -1222,7 +1239,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   background: linear-gradient(90deg, transparent, var(--gate-fallback-hold) 30%, var(--gate-fallback-hold) 70%, transparent);
 }
 
-.chapter .panel { width: min(100%, 720px); text-align: left; }
+.chapter .panel { width: min(100%, 820px); text-align: left; }
 .pstick { display: grid; gap: var(--s-6); }
 .pstick .ruleset { margin-top: 0; }
 
@@ -1241,8 +1258,11 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   background: linear-gradient(90deg, transparent 8%, var(--beam) 50%, transparent 92%);
 }
 /* The ledger gets the terminal's frame, so the two machines on this page
-   are held the same way. */
+   are held the same way — and it keeps its window height from the first
+   beat. A log is a frame that rows fill, not a box that grows one row tall;
+   growing it left a screen of black under a single line. */
 .shot.log { border: 1px solid var(--line); }
+@media (min-width: 900px) { .shot.log { min-height: 244px; } }
 
 /* The composer sheds its tray: one sunken box, the way the hero holds one
    line — not a box on a mat on a panel. */
@@ -1455,15 +1475,56 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 .js [data-chapter="log"] .tally { opacity: 0; transition: opacity .6s var(--ease-out); }
 [data-chapter="log"][data-step="2"] .tally { opacity: 1; }
 
-/* ── scene 04's ceilings: the line lands, the engineer's own lights up ─── */
-.js .ceilings {
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
+/* ── the panel's own caption ───────────────────────────────────────────── */
+/*
+ * A log and a quota are the two things on this page that do not explain
+ * themselves, so each gets one line in the page's voice under the panel,
+ * naming the row or the number the statement is about. It sits outside the
+ * .console subtree deliberately: the product's markup stays the product's,
+ * and this is the page pointing at it.
+ */
+.pnote {
+  margin: 0;
+  min-height: 2.9em;
+  display: grid;
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  text-wrap: pretty;
 }
+.pnote span { grid-area: 1 / 1; }
+.js .pnote span { opacity: 0; transition: opacity .4s var(--ease-out); }
+.js .chapter:not([data-step]) .pnote span:nth-child(1),
+.js [data-step="0"] .pnote span:nth-child(1),
+.js [data-step="1"] .pnote span:nth-child(2),
+.js [data-step="2"] .pnote span:nth-child(3) { opacity: 1; }
+
+/* ── scene 04's ceilings: one line per role, the crossed one lit ───────── */
+/* It was a single mono run-on, which is not what "a ceiling is a sentence
+   about a role" looks like. Five rows are. */
+.ceilings { margin: 0; display: grid; gap: var(--s-3); }
+.ceilings ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s-2); }
+.ceilings li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: var(--fs-2);
+  color: var(--faint);
+  transition: color .5s var(--ease-out);
+}
+.ceilings li:last-child { border-bottom: 0; }
+.ceilings .r { flex: 0 0 84px; }
+.ceilings .v { flex: 1; text-align: right; }
+.js .ceilings { opacity: 0; transform: translateY(8px); transition: opacity .5s var(--ease-out), transform .5s var(--ease-out); }
+[data-chapter="spend"][data-step="1"] .ceilings,
 [data-chapter="spend"][data-step="2"] .ceilings { opacity: 1; transform: none; }
-.ceilings .ceil-eng { font-weight: inherit; color: inherit; transition: color .5s var(--ease-out); }
+[data-chapter="spend"][data-step="1"] .ceil-eng,
 [data-chapter="spend"][data-step="2"] .ceil-eng { color: var(--ink); }
+[data-chapter="spend"][data-step="1"] .ceil-eng .v,
+[data-chapter="spend"][data-step="2"] .ceil-eng .v { color: var(--escalate); }
 
 /* ── the phone ─────────────────────────────────────────────────────────── */
 /*
@@ -1492,6 +1553,8 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   .term pre .tg { margin-top: .72em; }
   .term pre .tg-a { margin-top: 0; }
   .js [data-chapter="log"] .day, .js [data-chapter="log"] .tally, .js .ceilings { opacity: 1; transform: none; }
+  .js .pnote span { opacity: 0; }
+  .js .pnote span:nth-child(1) { opacity: 1; }
   .js .ru .ract { opacity: 1; transform: none; transition: none; }
   .js .main[data-reveal] h2.loud .ln > span { transform: none; transition: none; }
 }
