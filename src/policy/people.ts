@@ -67,35 +67,50 @@ const EMPTY: Directory = {
 
 let cached: Directory | null = null;
 
-/** The directory as it stands, seeding from the demo company on first use. */
+/**
+ * The directory as it stands. **A fresh install has none, and that is correct.**
+ *
+ * This used to seed itself from `data/seed/company.json` on first read, so
+ * every install opened as Northwind Logistics SA with seven people who do not
+ * exist. An earlier pass tried to soften that with a `demo: true` flag so the
+ * console could "announce itself and ask instead of pretending" — and it still
+ * put a freight company's name in the header of somebody else's product on the
+ * very first screen they ever saw. A default that states a fact about the user
+ * which is false for every user is worse than no default, which the comment on
+ * that flag already said; the flag was the wrong conclusion to draw from it.
+ *
+ * So there is no seeding here any more. An install starts empty, the console's
+ * empty states are the first thing an administrator sees, and the sample
+ * company is a button they can press — `loadSampleCompany()` below. Nobody
+ * gets handed a fictional payroll they then have to work out how to delete.
+ */
 export function loadDirectory(): Directory {
   if (cached) return cached;
+  cached = readIfPresent(COMPANY_PATH) ?? EMPTY;
+  return cached;
+}
 
-  const fromDisk = readIfPresent(COMPANY_PATH);
-  if (fromDisk) {
-    cached = fromDisk;
-    return cached;
-  }
-
+/**
+ * Install the shipped sample company, on purpose, because somebody asked.
+ *
+ * This is what `loadDirectory` used to do silently on first read. It is worth
+ * keeping — an empty console teaches nobody what the product does, and being
+ * able to click through a populated one is genuinely how people evaluate this.
+ * It is only ever reached by an explicit request.
+ *
+ * Every key is issued here and never shipped. The seed is a committed file in
+ * a public repository, so a key written into it would be a published
+ * credential: the same string would authenticate on every install that had not
+ * rotated it. That is sharpest for the seeded admin, whose role sits in
+ * `exemptRoles` and is therefore measured against no rules at all — a working
+ * bypass, printed in the repo, for a product whose whole claim is that prompts
+ * are judged. So the seed carries placeholders and this issues the real ones,
+ * which also means no two installs share a key.
+ */
+export function loadSampleCompany(): Directory {
   const seeded = readIfPresent(SEED_PATH);
-  if (!seeded) {
-    cached = EMPTY;
-    return cached;
-  }
+  if (!seeded) throw new Error('no sample company is bundled with this build');
 
-  /**
-   * Every key is issued here, on first run, and never shipped.
-   *
-   * The seed is a committed file in a public repository, so a key written into
-   * it is a published credential: the same string would authenticate on every
-   * install that had not rotated it. That is sharpest for the seeded admin,
-   * whose role sits in `exemptRoles` and is therefore measured against no rules
-   * at all — a working bypass, printed in the repo, for a product whose whole
-   * claim is that prompts are judged.
-   *
-   * So the seed carries placeholders and this issues the real ones, which also
-   * means no two installs share a key and the demo company can stay committed.
-   */
   const issued: Directory = {
     ...seeded,
     demo: true,

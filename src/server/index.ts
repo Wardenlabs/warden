@@ -31,7 +31,9 @@ import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
   clearDemoDirectory,
+  invalidate as invalidatePeople,
   loadDirectory,
+  loadSampleCompany,
   renameCompany,
   removeEmployee,
   removeRole,
@@ -145,7 +147,11 @@ app.use((req, res, next) => {
 // Seed the demo policy on boot if the store is empty, so a fresh clone has
 // something to show without a manual step.
 try {
-  seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
+  // Nothing is seeded at boot. A fresh install has no company, no people and
+  // no rules — which is also the only honest starting state for a thing whose
+  // job is to enforce rules somebody wrote: it should not arrive holding eight
+  // it invented. The console's empty states say so, and the sample company is
+  // a button (POST /api/company/sample) rather than a fact about you.
 } catch {
   /* seed file not present yet — the store stays empty, which is a valid state */
 }
@@ -503,6 +509,24 @@ app.put('/api/company', asyncRoute(async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
+}));
+
+/**
+ * Install the shipped sample company, because somebody pressed the button.
+ *
+ * The demo used to be the default and it is now a request. Both halves arrive
+ * together — a directory of people with no rules to judge them by teaches less
+ * than either half alone — and both are the committed seed files, so pressing
+ * this twice gives the same company with fresh keys rather than two companies.
+ *
+ * Administrative, like everything not in the employee allowlist: this writes
+ * the directory every key in the deployment is resolved against.
+ */
+app.post('/api/company/sample', asyncRoute(async (_req, res) => {
+  const dir = loadSampleCompany();
+  const policy = seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
+  invalidatePeople();
+  res.json({ name: dir.name, employees: dir.employees.length, rules: policy.rules.length });
 }));
 
 app.post('/api/company/reset', asyncRoute(async (req, res) => {
