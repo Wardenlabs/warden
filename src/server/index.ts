@@ -92,6 +92,33 @@ const HOST = process.env['WARDEN_HOST'] ?? '0.0.0.0';
  */
 const ASSETS = process.env['WARDEN_ASSETS_DIR'] ?? fileURLToPath(new URL('../..', import.meta.url));
 
+/*
+ * Children this process spawns must run as Node, not as a second Electron app.
+ *
+ * Under the desktop app the gateway is an Electron `utilityProcess`, so
+ * `process.execPath` is the Electron binary. The QVAC SDK spawns its inference
+ * worker from that path, and without this the worker comes up as a whole
+ * Electron app that never speaks the RPC protocol the SDK is waiting on: after
+ * 30 seconds the SDK reports "RPC initialization timed out, the worker process
+ * may have failed to start" and every rule and every judgement fails on a
+ * machine whose models are sitting right there on disk.
+ *
+ * Set here rather than on the env `server-manager.ts` hands to
+ * `utilityProcess.fork`, because that is read when the utility process starts
+ * and with it set the gateway never becomes healthy at all. Set after boot it
+ * is inert for this process (Electron read it long ago) and inherited by
+ * everything spawned from here, which is the only place it was ever needed.
+ * The red-team spawn below sets the same variable for the same reason and
+ * predates this; that one can stay, it is explicit and it costs nothing.
+ *
+ * NOT VERIFIED as the cure for the reported timeout. It explains the symptom
+ * and nothing else in the packaged app explains it as well, but confirming it
+ * needs a build with the models downloaded, which has not been run. What is
+ * verified is that it does not stop the gateway starting: that is what the
+ * linux smoke job checks, and it is what the first attempt at this failed.
+ */
+if (process.versions.electron) process.env['ELECTRON_RUN_AS_NODE'] = '1';
+
 const app = express();
 app.use(express.json({ limit: '4mb' }));
 

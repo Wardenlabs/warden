@@ -90,29 +90,26 @@ export function startServer(
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];
   /*
-   * Set, not deleted, and the reason is the one thing in this file that decides
-   * whether on-device inference runs at all.
+   * Deleted here, and set again inside the gateway once it is running. Both
+   * halves are needed and they are not interchangeable.
    *
    * The gateway is an Electron `utilityProcess`, so its `process.execPath` is
-   * the Electron binary, not node. Anything it spawns from that path launches a
-   * whole Electron app unless this variable says otherwise, and a whole Electron
-   * app does not speak the QVAC worker's RPC protocol: it just sits there until
-   * the SDK gives up with "RPC initialization timed out after 30000ms, the
-   * worker process may have failed to start". Which is the error reported from
-   * a packaged install that had finished downloading its models.
+   * the Electron binary. Anything it spawns from that path comes up as a whole
+   * Electron app unless this variable says otherwise, and a whole Electron app
+   * does not speak the QVAC worker's RPC protocol; it sits there until the SDK
+   * gives up with "RPC initialization timed out after 30000ms". That is the
+   * error reported from a packaged install with its models downloaded.
    *
-   * This line used to delete the variable, to stop an oddly-started shell from
-   * leaking it. That is worth nothing here (the gateway's one other spawn, the
-   * red-team runner in `server/index.ts`, sets it explicitly for exactly this
-   * reason) and it costs the SDK's worker.
+   * Setting it here looked like the fix and is not: `utilityProcess.fork` reads
+   * this variable when it starts the child, and with it set the gateway never
+   * answers its health check at all. The linux smoke job caught that within
+   * four minutes, which is the entire reason that job exists.
    *
-   * NOT VERIFIED. It explains the symptom exactly and it matches what this repo
-   * already does one directory over, but reproducing it needs a packaged build
-   * with the models downloaded, and that has not been done. If a gateway log
-   * still shows the RPC timeout after this, the cause is somewhere else and
-   * this line is not it.
+   * So the variable stays off the utility process's own startup env, and
+   * `server/index.ts` puts it into `process.env` after boot, where nothing
+   * rereads it for this process and every child the SDK spawns inherits it.
    */
-  env['ELECTRON_RUN_AS_NODE'] = '1';
+  delete env['ELECTRON_RUN_AS_NODE'];
 
   const child: Child = utilityProcess.fork(config.entry, [], {
     cwd: config.cwd,
