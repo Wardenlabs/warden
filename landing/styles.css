@@ -241,8 +241,8 @@ section {
    the argument and the demo; soft, it is a detail. And §how used to hand off
    to the section below it across ~500px of black — its own bottom air plus the section
    gap — which read as the page ending twice. Both trimmed. */
-#how { padding-bottom: var(--s-9); }
-#spend { padding-block: var(--s-10); }
+#how { padding-bottom: var(--s-8); }
+#spend { padding-block: var(--s-8) var(--s-10); }
 
 .sec { display: grid; gap: var(--s-9); }
 
@@ -890,11 +890,11 @@ footer::before {
    at the narration's own size — a page that buries its own caveat in --faint
    has technically said it and practically hidden it. */
 #how .how-note {
-  max-width: 62ch;
-  margin-top: var(--s-7);
-  font-size: var(--fs-3);
+  max-width: 60ch;
+  margin-top: 0;
+  font-size: var(--fs-2);
   line-height: var(--lh-body);
-  color: var(--muted);
+  color: var(--faint);
   text-wrap: pretty;
 }
 
@@ -1223,12 +1223,41 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 }
 
 .chapter .panel { width: min(100%, 720px); text-align: left; }
-.pstick { display: grid; gap: var(--s-5); }
+.pstick { display: grid; gap: var(--s-6); }
 .pstick .ruleset { margin-top: 0; }
+
+/* ── the panels, dressed like objects under the light ─────────────────── */
+/* The machine surfaces carry --beam across their top edge — the token was
+   minted for exactly this and had been waiting for a surface to run on.
+   One line of light per object, under the saturation law: steel, not a
+   verdict. */
+.term::before, .shot.log::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 8%, var(--beam) 50%, transparent 92%);
+}
+/* The ledger gets the terminal's frame, so the two machines on this page
+   are held the same way. */
+.shot.log { border: 1px solid var(--line); }
+
+/* The composer sheds its tray: one sunken box, the way the hero holds one
+   line — not a box on a mat on a panel. */
+[data-chapter="write"] .shot { background: transparent; overflow: visible; }
+.pstick .console .composer { padding: 0; }
+.pstick .console .hero-box {
+  background: var(--sunken);
+  border-color: var(--line);
+  padding: var(--s-6) var(--s-6) var(--s-9);
+}
+.pstick .console .hero-box textarea { font-size: var(--fs-4); }
 
 /* Wide screens: the stage pins a full screen and the scroll drives it. */
 @media (min-width: 900px) {
-  .chapter { min-height: 280vh; min-height: 280svh; }
+  .chapter { min-height: 235vh; min-height: 235svh; }
   .stage {
     position: sticky;
     top: 56px;
@@ -1247,6 +1276,30 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   .js [data-step="1"] .say:nth-child(2),
   .js [data-step="2"] .say:nth-child(3) { opacity: 1; transform: none; }
 }
+
+/* The stage's own scroll affordance: three dots at its foot, the active one
+   stretched to a pill. Greys only — a beat is not a verdict. */
+.dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: clamp(12px, 3.2svh, 30px);
+  display: none;
+  gap: var(--s-3);
+}
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--line-firm);
+  transition: background .3s ease, width .3s var(--ease-out);
+}
+.chapter:not([data-step]) .dots i:nth-child(1),
+[data-step="0"] .dots i:nth-child(1),
+[data-step="1"] .dots i:nth-child(2),
+[data-step="2"] .dots i:nth-child(3) { width: 20px; background: var(--ink-2); }
+@media (min-width: 900px) { .js .dots { display: flex; } }
+@media (prefers-reduced-motion: reduce) { .js .dots { display: none; } }
 
 /* Short screens: the tallest terminal still has to fit under the statement. */
 @media (min-width: 900px) and (max-height: 780px) {
