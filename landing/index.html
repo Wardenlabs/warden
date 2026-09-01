@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden — the local AI gateway</title>
-<meta name="description" content="You write the rules. Warden checks what your team sends against them, on their own computer, before it goes anywhere. 136 of 160 attempts stopped. Free and open source, Apache-2.0.">
+<meta name="description" content="You write the rules. Warden checks what your team sends against them, on their own computer, before it goes anywhere — and counts what each role spends while it is there. Free and open source, Apache-2.0.">
 
 <meta property="og:title" content="Warden — the local AI gateway">
-<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
+<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere — and stops what should not be spent while it is at it.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#050507">
@@ -31,6 +31,12 @@ setTimeout(function () {
 }, 2500);
 </script>
 <link rel="stylesheet" href="styles.css">
+<!-- app.js imports light.js, so without these the browser does not learn the
+     second file exists until the first one has arrived and parsed. Two hints
+     make it one round trip instead of two, which is the whole of the page's
+     critical path: there is no framework and no font to wait on. -->
+<link rel="modulepreload" href="app.js">
+<link rel="modulepreload" href="light.js">
 <!-- Vercel Web Analytics: page views only. First-party route, cookieless, and
      the only thing on this page that phones home — the product's own claim is
      the opposite, so this stays at one script and zero events. Download counts
@@ -47,7 +53,7 @@ setTimeout(function () {
     </a>
     <nav>
       <a href="#how" class="hide-sm">How it works</a>
-      <a href="#numbers" class="hide-sm">Numbers</a>
+      <a href="#spend" class="hide-sm">What it costs</a>
       <a href="https://github.com/Wardenlabs/warden" class="hide-sm">GitHub</a>
       <a href="#download" class="btn btn-primary btn-sm">Download</a>
     </nav>
@@ -154,15 +160,85 @@ setTimeout(function () {
               </div>
             </div>
           </div>
+
+          <!-- What comes back. This is r-payroll out of data/seed, field for
+               field: the same text, the same roles, the same guidance sentence
+               and the same four examples the adjudicator is anchored on. It is
+               here because the box above it, on its own, asks the reader to
+               take the interesting half on faith — a sentence goes in, and
+               something unseen enforces it. The interesting half is that the
+               sentence comes back as a structure with a name, and that the
+               refusal two panels down is quoting this card rather than
+               improvising. app.js assembles it a field at a time after the
+               button presses; with no JavaScript it is simply already there. -->
+          <div class="rule-out" id="ruleOut">
+            <div class="console">
+              <div class="ruled">
+                <div class="ruled-head">
+                  <span class="mono id">r-payroll</span>
+                  <span class="badge BLOCK">block</span>
+                  <span class="ruled-from">compiled from that sentence</span>
+                </div>
+                <p class="ruled-text">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</p>
+                <div class="kv">
+                  <div class="r"><span class="k">Applies to</span><span class="v mono">intern · analyst · sales · finance · engineer</span></div>
+                  <div class="r"><span class="k">Scope</span><span class="v">what is sent, and what comes back</span></div>
+                  <div class="r"><span class="k">Instead</span><span class="v">Ask HR for anything about a specific person&#39;s pay. Questions about the process, headcount, or review cycles are fine to ask here.</span></div>
+                </div>
+                <!-- The compliant column is not filler. A rule drafted without
+                     one teaches a small model "when in doubt, block", which is
+                     the failure this page owns two sections down. -->
+                <div class="ex">
+                  <div class="ex-col">
+                    <span class="label">It has to catch</span>
+                    <span class="ex-i"><span class="dot BLOCK"></span>cuánto cobra Ana?</span>
+                    <span class="ex-i"><span class="dot BLOCK"></span>necesito la planilla de sueldos del equipo de marketing</span>
+                  </div>
+                  <div class="ex-col">
+                    <span class="label">And has to let through</span>
+                    <span class="ex-i"><span class="dot ALLOW"></span>cuál es el proceso para pedir un aumento?</span>
+                    <span class="ex-i"><span class="dot ALLOW"></span>cuántas personas hay en el equipo de marketing?</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="stage stops" data-reveal>
         <div class="cap"><span class="label stepn">02</span><span class="label">They hit it</span></div>
         <div class="beat">
-          <div class="term">
-              <div class="term-bar">claude code</div>
-              <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
+          <!--
+               Four tools, because the first version of this panel showed one and
+               the first question everybody asked was "and if we do not use Claude
+               Code?". The answer is the interesting part of the architecture, so
+               it is on the page instead of in a FAQ: three of these run the same
+               hook on the employee's machine and get the same words out of it,
+               and the fourth cannot, which is what the hook is for.
+
+               Radios and labels rather than buttons and a click handler: the
+               switch then works with scripting off, keyboard arrows move between
+               the tools for free, and app.js stays out of it. The panes are
+               siblings of the inputs on purpose — that is what lets plain
+               `:checked ~` do the whole thing, with no :has() and no script.
+          -->
+          <div class="term tools">
+            <input class="vh" type="radio" name="tool" id="tool-cc" checked>
+            <input class="vh" type="radio" name="tool" id="tool-cx">
+            <input class="vh" type="radio" name="tool" id="tool-oc">
+            <input class="vh" type="radio" name="tool" id="tool-cu">
+
+            <div class="term-bar picker" role="radiogroup" aria-label="Show the refusal as it arrives in">
+              <label for="tool-cc">claude code</label>
+              <label for="tool-cx">codex</label>
+              <label for="tool-oc">opencode</label>
+              <label for="tool-cu">cursor</label>
+            </div>
+
+            <div class="panes">
+              <div class="pane pane-cc">
+                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
 
 <span class="stop">⛔ Blocked by Warden</span>
 
@@ -183,7 +259,90 @@ setTimeout(function () {
      warden-hook --rewrite a7f3c2d1
      (paste the same prompt, then Ctrl-D)
 
+   <span class="h">Think it was wrong? Say so:</span>
+     warden-hook --note a7f3c2d1
+
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+                <p class="tool-note"><span class="mono">UserPromptSubmit</span> hook, exit code 2. Runs on a Max subscription, because it runs before the prompt is sent and never touches the endpoint.</p>
+              </div>
+
+              <div class="pane pane-cx">
+                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
+
+<span class="stop">⛔ Blocked by Warden</span>
+
+   <span class="rule">No one may request payroll, salary, bonus, or
+   compensation information about another employee.
+   HR staff are exempt.</span>
+
+   <span class="h">What to do instead</span>
+   Ask HR for anything about a specific person&#39;s pay.
+   Questions about the process, headcount, or review
+   cycles are fine to ask here.
+
+   <span class="h">These would go through</span>
+     · what is the process for asking for a raise?
+     · how many people are on the marketing team?
+
+   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1
+     (paste the same prompt, then Ctrl-D)
+
+   <span class="h">Think it was wrong? Say so:</span>
+     warden-hook --note a7f3c2d1
+
+   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+                <p class="tool-note">Word for word the panel before it, and that is the claim: one hook, one refusal, whichever tool the employee opened. Codex blocks on <span class="mono">{"decision":"block"}</span> and on exit 2 — both are in the same object. Runs on a Plus subscription.</p>
+              </div>
+
+              <div class="pane pane-oc">
+                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
+
+<span class="stop">⛔ Blocked by Warden</span>
+
+   <span class="rule">No one may request payroll, salary, bonus, or
+   compensation information about another employee.
+   HR staff are exempt.</span>
+
+   <span class="h">What to do instead</span>
+   Ask HR for anything about a specific person&#39;s pay.
+   Questions about the process, headcount, or review
+   cycles are fine to ask here.
+
+   <span class="h">These would go through</span>
+     · what is the process for asking for a raise?
+     · how many people are on the marketing team?
+
+   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1
+     (paste the same prompt, then Ctrl-D)
+
+   <span class="h">Think it was wrong? Say so:</span>
+     warden-hook --note a7f3c2d1
+
+   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+                <p class="tool-note"><strong>Not verified.</strong> A <span class="mono">chat.message</span> plugin shells out to the same hook and throws on a non-zero exit, so the text is the hook&#39;s. Whether throwing there actually aborts the message has never been watched happen here, and there are open upstream issues about plugin hooks not firing. If it quietly does nothing, that is the bug to report.</p>
+              </div>
+
+              <div class="pane pane-cu">
+                <pre><span class="you">POST /v1/chat/completions  →  the gateway</span>
+
+<span class="stop">HTTP/1.1 403 Forbidden</span>
+
+<span class="rule">{
+  "error": {
+    "code": "policy_block",
+    "message": "No one may request payroll, salary, bonus,
+                or compensation information about another
+                employee. HR staff are exempt."
+  }
+}</span>
+
+   <span class="dim">Nothing was forwarded. How Cursor renders this
+   is Cursor&#39;s to decide — the gateway&#39;s part ends here.</span></pre>
+                <p class="tool-note">The odd one out, and the reason the other three exist. Cursor has no prompt hook, so it can only be governed as an OpenAI endpoint — <span class="mono">OPENAI_BASE_URL</span> plus a key issued per person. That path needs an API key, so <strong>a Cursor subscription cannot be governed this way at all</strong>. This is the response body, not a screenshot of Cursor: what the editor does with a 403 is not ours to draw.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -191,64 +350,150 @@ setTimeout(function () {
       <div class="stage" data-reveal>
         <div class="cap"><span class="label stepn">03</span><span class="label">You see it happened</span></div>
         <div class="beat">
+          <!--
+               Four rows rather than three, because three of them were two
+               verdicts and this is the only place on the page that says a
+               verdict has a middle value. The escalation is what an admin
+               recognises the product by: the payment did not get refused and
+               it did not get approved either — it went to a person, which is
+               the answer a policy about money actually needs.
+
+               The legend under it names all three in the product's own
+               colours, and the line beside it is the one thing a sceptical
+               reader wants from a governance record: that it can be checked,
+               and by them.
+          -->
           <div class="shot log" data-reveal>
             <div class="console">
               <div class="day">Today<span class="n">12</span></div>
-              <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz's salary for the report</span><span class="rule-ref">Payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref">Customer PII</span><span class="meta">13:58</span></div>
+              <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz&#39;s salary for the report</span><span class="rule-ref mono">r-payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ESCALATE"></span><span class="who">Sofía Márquez</span><span class="txt">aprobá el pago de USD 12.400 al proveedor</span><span class="rule-ref mono">r-payment-approval</span><span class="meta">14:21</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref mono">r-customer-pii</span><span class="meta">13:58</span></div>
+            </div>
+            <div class="log-foot">
+              <span class="lg"><span class="dot BLOCK"></span>refused</span>
+              <span class="lg"><span class="dot ESCALATE"></span>sent to a person</span>
+              <span class="lg"><span class="dot ALLOW"></span>allowed</span>
+              <span class="chk"><span class="mono">pnpm run verify-audit</span> walks the chain</span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <p class="how-note" data-reveal>It runs on their computer, before the prompt is sent. That is why it works on the plans people actually buy: a Claude Max or ChatGPT Plus account talks to one fixed address nobody can redirect, so there is nothing to put a filter in front of.</p>
+    <!--
+         The three panels show a decision without ever saying what made it,
+         and "runs on their computer" is a claim a reader is entitled to want
+         the weights for. Four files, by name and quantisation, at the size
+         they are downloaded at. The injection pass is listed as shipped off
+         because it is: it is a lever nobody has measured, and the repo's rule
+         is that an unmeasured lever ships off with a note saying why. Leaving
+         it out of this list would have been the one dishonest way to make the
+         list shorter.
+    -->
+    <div class="models" data-reveal>
+      <span class="label">What ran, and where</span>
+      <ul>
+        <li><span class="m mono">Qwen3-1.7B-Q4_0</span><span class="j">writes the rule, and judges the prompt against it</span></li>
+        <li><span class="m mono">embeddinggemma-300M-Q8_0</span><span class="j">picks which rules are worth judging against</span></li>
+        <li><span class="m mono">latin_g2</span><span class="j">reads an attachment — never measured, it arrives only over the P2P registry</span></li>
+        <li><span class="m mono">Qwen3-0.6B-Q4_0</span><span class="j">a second injection pass, and it ships off — unmeasured</span></li>
+      </ul>
+      <p class="models-note">All four are on the employee&#39;s disk, loaded by QVAC, and about 1.8 GB together. Nothing calls a cloud API — there is no key to leak and no request to intercept, because there is no request.</p>
+    </div>
+
+    <p class="how-note verified" data-reveal><strong>What is verified, and what is not.</strong> Somebody has watched the hook itself refuse a prompt in a terminal. Nobody has yet watched Claude Code, Codex or OpenCode do it end to end — those three are wired from each tool&#39;s own documentation and tested at the hook boundary, which is not the same thing. The page says so here rather than in a footnote, and <span class="mono">docs/HOOK-VERIFICATION.md</span> is the log of the attempts.</p>
+
+    <p class="how-note" data-reveal>It runs on their computer, before the prompt is sent. That is why it works on the plans people actually buy: a Claude Max or ChatGPT Plus account talks to one fixed address nobody can redirect, so there is nothing to put a filter in front of. A hook does not care — it has already run. Which is also why the fourth tab is the odd one out, and says so.</p>
 
   </div>
 </section>
 
-<!-- ── §4 the numbers ──────────────────────────────────── -->
+<!-- ── §2 the other half: what it costs ─────────────────── -->
 <!--
-     All eleven classes, uncurated. Any cut that hides guard-targeted and
-     volume-distraction teaches an evaluator to distrust the nine above them.
+     The page spent three panels proving Warden stops what should not leave,
+     which is one of the two things an administrator is actually buying. The
+     other is that it stops what should not be spent, and the two are the same
+     gate: same prompt, same pass list, same audit row, no second tool to buy
+     and no second policy to keep in sync.
+
+     It is one section with two panels because the two controls are genuinely
+     different and the difference is the interesting part. A daily count is
+     arithmetic and refuses. A session's token spend is also arithmetic — and
+     it *holds*, because being cut off mid-task with nowhere to go is what
+     makes somebody stop using the gateway rather than stop working. The left
+     panel is the admin's view of both; the right panel is what the employee
+     gets, and it is a person, not a wall.
 -->
-<section id="numbers">
+<section id="spend">
   <div class="wrap sec">
 
     <div class="row" data-reveal>
-      <div class="side"><span class="label">Measured, not claimed</span></div>
-      <div class="main"><h2 class="loud">136 of 160 attempts stopped. Without it, <span class="none">none.</span></h2></div>
-    </div>
-
-    <div class="row" data-reveal>
-      <div class="side"><span class="label">Every class, uncut</span></div>
+      <div class="side"><span class="label">The other half</span></div>
       <div class="main">
-        <table>
-          <thead>
-            <tr><th scope="col">Attack class</th><th scope="col" class="n">Stopped</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="mono">multi-turn-escalation</span></td><td class="n">16/16</td></tr>
-            <tr><td><span class="mono">language-switch</span></td><td class="n">16/16</td></tr>
-            <tr><td><span class="mono">paraphrase-evasion</span></td><td class="n">16/16</td></tr>
-            <tr><td><span class="mono">document-borne</span></td><td class="n">8/8</td></tr>
-            <tr><td><span class="mono">direct-override</span></td><td class="n">15/16</td></tr>
-            <tr><td><span class="mono">authority-spoofing</span></td><td class="n">14/16</td></tr>
-            <tr><td><span class="mono">roleplay-fiction</span></td><td class="n">14/16</td></tr>
-            <tr><td><span class="mono">obfuscation</span></td><td class="n">14/16</td></tr>
-            <tr><td><span class="mono">hypothetical-testing</span></td><td class="n">13/16</td></tr>
-            <tr><td><span class="mono">guard-targeted</span></td><td class="n">8/16</td></tr>
-            <tr><td><span class="mono">volume-distraction</span></td><td class="n">2/8</td></tr>
-          </tbody>
-        </table>
+        <h2 class="loud">A prompt that leaks nothing can still cost you.</h2>
+        <p class="lead">One agent, left running on a big repository, will spend more in an afternoon than the seat costs in a year.</p>
+        <p>The same gate counts it. Warden knows which role each key belongs to, so a ceiling is a sentence about a role rather than a number in someone&#39;s billing dashboard a month later — and the request that crosses it is stopped on the machine, before the tokens are bought.</p>
       </div>
     </div>
 
-    <div class="row" data-reveal>
-      <div class="side"><span class="label">What it costs</span></div>
-      <div class="main">
-        <p>It also refused 21 of 36 requests that were perfectly fine. That is the cost of running this, and it is why <span class="mono">--rewrite</span> exists: the employee gets their own prompt back, rephrased to pass, without having to ask anyone for it.</p>
+    <div class="two" data-reveal>
+      <div class="half">
+        <span class="cap-label label">What the administrator writes</span>
+        <div class="shot">
+          <div class="console">
+            <div class="quotas">
+              <div class="day">Policy · quotas<span class="n">per role</span></div>
+              <div class="quota-grid">
+                <div class="quota"><span class="quota-role">intern</span>
+                  <div class="quota-row"><span>requests</span><b>20/day</b></div>
+                  <div class="quota-row unmetered"><span>tokens</span><b>unmetered</b></div>
+                </div>
+                <div class="quota"><span class="quota-role">analyst</span>
+                  <div class="quota-row"><span>requests</span><b>100/day</b></div>
+                  <div class="quota-row unmetered"><span>tokens</span><b>unmetered</b></div>
+                </div>
+                <div class="quota"><span class="quota-role">engineer</span>
+                  <div class="quota-row"><span>requests</span><b>200/day</b></div>
+                  <div class="quota-row"><span>output</span><b>100k/session</b></div>
+                  <div class="quota-row"><span>context</span><b>180k</b></div>
+                </div>
+                <div class="quota"><span class="quota-role">finance</span>
+                  <div class="quota-row"><span>requests</span><b>150/day</b></div>
+                  <div class="quota-row unmetered"><span>tokens</span><b>unmetered</b></div>
+                </div>
+              </div>
+              <div class="day two-up">One decision, opened<span class="n">audit</span></div>
+              <div class="kv">
+                <div class="r"><span class="k">Audit id</span><span class="v mono">b41e9a07</span></div>
+                <div class="r"><span class="k">Policy</span><span class="v mono">f6c75794</span></div>
+                <div class="r"><span class="k">Daily use</span><span class="v mono">147 of 200</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="half-note">The day counts are the demo policy&#39;s own. A role with no token ceiling is shown as unmetered rather than as a bar at zero — nobody is counting is a different statement from nothing has been spent, and a ceiling nobody set is not a ceiling of zero. Cross the day count and the refusal reads <span class="mono">Daily limit reached for role &quot;intern&quot; (20/20).</span></p>
+      </div>
+
+      <div class="half">
+        <span class="cap-label label">What the employee gets</span>
+        <div class="term">
+          <div class="term-bar">claude code</div>
+          <pre><span class="you">&gt; keep going — refactor the rest of the module</span>
+
+<span class="hold">⏸ Held for review by Warden</span>
+
+   <span class="rule">this session has generated 128,400 tokens, over the
+   100,000 allowed for role &quot;engineer&quot;</span>
+
+   Queued for an administrator. You have not been refused —
+   when they answer, ask again and it is judged on its merits.
+
+   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></pre>
+        </div>
+        <p class="half-note">Over budget resolves to <span class="mono">ESCALATE</span> and never to <span class="mono">BLOCK</span>. Being cut off mid-task with nowhere to go is what makes somebody stop using the gateway rather than stop working — and a control that refused where a rule would only have held would have made a decision <em>looser</em> by being added, which the verdict lattice exists to make impossible.</p>
       </div>
     </div>
+
+    <p class="spend-note" data-reveal>Both counters are honestly partial and the page would rather say so: the daily one lives in memory and resets when the gateway restarts, and the session ceiling can only read what the tool reports — a tool that reports nothing is recorded as unreported, not drawn as an empty bar. What neither of them does is guess.</p>
 
   </div>
 </section>

@@ -117,6 +117,16 @@
 
   /* Light. light.js reads these off :root and draws with them, so the gate
      is the same coral as the verdict chip and its floor is exactly --bg. */
+  /* Easing, named once. The built-in keywords are too weak to read as
+     intentional at these durations — an entrance on plain `ease` looks like
+     the browser doing something rather than the page doing something. Two
+     curves cover everything here: things arriving use --ease-out, and the one
+     thing that moves while already on screen uses --ease-in-out. Nothing uses
+     ease-in: it withholds movement in the first frames, which are the frames
+     the reader is actually looking at. */
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+
   --gate: #fff5e6;     /* the line while prompts pass: warm white */
   --beam: #2f3644;     /* the edge light that travels a surface's top */
   --gate-fallback: #fff5e6bf;  /* the line when there is no WebGL: the same white, at the alpha the canvas would render it */
@@ -212,13 +222,13 @@ section {
    and drawing a second line a screen below it makes the first one look like
    trim; §how ends on one too, running down its own middle. Where a divider is
    the only thing separating two sections it stays. */
-#gap, #numbers { border-top: 0; }
+#gap, #spend { border-top: 0; }
 /* The one drawn rule left on the page. At --line it read as a wall between
    the argument and the demo; soft, it is a detail. And §how used to hand off
-   to §numbers across ~500px of black — its own bottom air plus the section
+   to the section below it across ~500px of black — its own bottom air plus the section
    gap — which read as the page ending twice. Both trimmed. */
 #how { border-top-color: var(--line-soft); padding-bottom: var(--s-9); }
-#numbers { padding-block: var(--s-10); }
+#spend { padding-block: var(--s-10); }
 
 .sec { display: grid; gap: var(--s-9); }
 
@@ -509,22 +519,17 @@ header nav .btn { color: var(--accent-ink); }
 #gap .main p       { max-width: 54ch; }
 #gap .main p.lead  { max-width: 40ch; }
 
-/* §numbers sat on a left rail — label column, content column — but the rail's
-   mechanism was repetition, and the sections that repeated it were cut. The
-   one survivor read as a different page. So it sits on the centre axis like
-   everything above it, each label an overline on its own block. */
-#numbers .sec { justify-items: center; text-align: center; }
-#numbers .row { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); justify-items: center; width: 100%; }
-#numbers .side { padding-top: 0; justify-items: center; }
-#numbers .main { width: 100%; }
-#numbers h2.loud { max-width: 24ch; margin-inline: auto; }
-#numbers .main > p { max-width: var(--prose); margin-inline: auto; }
-/* The table keeps its own alignment under the centred axis — a centred column
-   of class names is noise — it just narrows to the width the numbers need. */
-#numbers table { width: 100%; max-width: 620px; margin-inline: auto; text-align: left; }
-/* The one coral word outside a panel. The verdict's colour lands exactly
-   where the page says what happens without the gate. */
-#numbers h2 .none { color: var(--block); }
+/* §spend keeps §gap's centre for its opening block and then breaks out of it
+   for the two panels, which is the one place on the page where two things are
+   deliberately shown at the same size: neither of the two controls is the
+   footnote of the other. */
+#spend .sec { justify-items: center; }
+#spend .row { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); justify-items: center; width: 100%; text-align: center; }
+#spend .side { padding-top: 0; justify-items: center; }
+#spend .main { width: 100%; justify-items: center; }
+#spend h2.loud { max-width: 22ch; margin-inline: auto; }
+#spend .main p { margin-inline: auto; }
+#spend .main p.lead { max-width: 34ch; }
 
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
@@ -570,24 +575,6 @@ header nav .btn { color: var(--accent-ink); }
    top edge as they arrived; with a lit line running past all three it was a
    second thing moving for no second reason, and the eye went to the wrong one.
    The section has one light now, and it is the line. */
-
-/* ── numbers ───────────────────────────────────────────────────────────── */
-/* Rules between the rows and nothing around them. A box here would be the
-   page's second surface, and the terminal is the only thing on it that came
-   out of another program. */
-table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
-thead th {
-  text-align: left; padding: 0 0 var(--s-4);
-  font-family: var(--mono); font-size: var(--fs-1);
-  letter-spacing: var(--ls-label); text-transform: uppercase;
-  font-weight: var(--fw-medium); color: var(--faint);
-  border-bottom: 1px solid var(--line-firm);
-}
-tbody td { padding: var(--s-4) 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
-tbody tr:last-child td { border-bottom: 0; }
-td b { font-weight: var(--fw-medium); color: var(--ink); }
-th.n, td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-td.n { color: var(--ink-2); }
 
 /* ── footer ────────────────────────────────────────────────────────────── */
 /*
@@ -651,7 +638,6 @@ footer::before {
   text-decoration: none; white-space: nowrap;
   transition: border-color .15s ease, background .15s ease, transform .15s ease;
 }
-.foot .dl a:hover { border-color: var(--ink-2); background: var(--sunken); transform: translateY(-1px); }
 .foot .dl a:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
 .foot .dl svg { width: 17px; height: 17px; flex: none; }
 .foot .dl a > span { display: inline-flex; align-items: baseline; gap: var(--s-3); }
@@ -679,7 +665,7 @@ footer::before {
 .js [data-reveal] {
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity .6s cubic-bezier(.22,.61,.36,1), transform .6s cubic-bezier(.22,.61,.36,1);
+  transition: opacity .6s var(--ease-out), transform .6s var(--ease-out);
   transition-delay: var(--reveal-delay, 0s);
 }
 .js [data-reveal].is-in { opacity: 1; transform: none; }
@@ -937,4 +923,374 @@ footer::before {
 @media (max-width: 700px) {
   .console .row .who { flex-basis: 78px; }
   .console .row .rule-ref { display: none; }
+}
+
+
+/* ═══ what §1 grew ═══════════════════════════════════════════════════════ */
+/*
+ * Two additions, and both of them are the page answering a question it was
+ * previously leaving to the reader's imagination: what a written rule turns
+ * into, and what happens if the team is not on Claude Code.
+ */
+
+/* Hidden from the page, not from the tab order or the accessibility tree. The
+   tool switch is four radios wearing labels, so they have to stay focusable. */
+.vh {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ── 01, the rule that comes back ──────────────────────────────────────── */
+/*
+ * A second panel under the composer, and a hairline between them doing the one
+ * job an arrow would have done worse: saying the lower thing came out of the
+ * upper one. No border and no shadow, same as `.shot` — at this value against
+ * --bg there is nothing for either to separate.
+ */
+.rule-out {
+  position: relative;
+  width: 100%;
+  margin-top: var(--s-7);
+  border-radius: var(--r-xl);
+  background: var(--sunken);
+}
+.rule-out::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--s-7) * -1); left: 50%;
+  width: 1px; height: var(--s-7);
+  background: var(--line-firm);
+}
+
+/* app.js presses the button and then turns this on, a beat later, so the card
+   reads as a consequence of the press. The fields stagger themselves off
+   nth-child rather than costing a second timer. Everything here is behind .js:
+   with no script — or a broken one, once the watchdog fires — the card is
+   simply already open, which is the same contract the rest of the page has. */
+.js .rule-out { opacity: 0; transform: translateY(8px); transition: opacity .5s var(--ease-out), transform .5s var(--ease-out); }
+.js .rule-out.on { opacity: 1; transform: none; }
+.js .rule-out .ruled > * { opacity: 0; transform: translateY(4px); }
+.js .rule-out.on .ruled > * {
+  opacity: 1; transform: none;
+  transition: opacity .4s var(--ease-out) var(--d, 0s), transform .4s var(--ease-out) var(--d, 0s);
+}
+.rule-out .ruled > *:nth-child(2) { --d: .07s; }
+.rule-out .ruled > *:nth-child(3) { --d: .14s; }
+.rule-out .ruled > *:nth-child(4) { --d: .21s; }
+
+.ruled { display: grid; gap: var(--s-5); padding: var(--s-7); }
+
+/* Lifted from the console, where the same three rows describe the same rule.
+   Nothing on the landing needed them until this card existed. */
+.ruled .kv { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+.ruled .kv .r { display: flex; align-items: baseline; gap: var(--s-5); font-size: var(--fs-3); line-height: var(--lh-snug); }
+.ruled .kv .k { flex: 0 0 92px; color: var(--faint); font-size: var(--fs-2); }
+.ruled .kv .v { flex: 1; min-width: 0; color: var(--ink-2); }
+@media (max-width: 560px) {
+  .ruled .kv .r { display: grid; gap: var(--s-1); }
+}
+.ruled-head { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ruled-head .id { font-size: var(--fs-3); color: var(--ink); }
+.ruled-from {
+  margin-left: auto;
+  font-family: var(--mono); font-size: var(--fs-1);
+  letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--faint);
+}
+.ruled-text {
+  margin: 0;
+  font-size: var(--fs-4); line-height: var(--lh-snug);
+  letter-spacing: var(--ls-tight);
+  color: var(--ink);
+  max-width: 58ch;
+  text-wrap: pretty;
+}
+
+/* The two example columns. Verdict colour is carried by the same 6px dot the
+   log rows use two panels down, so a reader who has seen one has seen both. */
+.ex {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-6);
+  border-top: 1px solid var(--line-soft);
+}
+.ex-col { display: grid; gap: var(--s-3); align-content: start; padding-top: var(--s-5); }
+.ex-i {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  font-size: var(--fs-2); line-height: var(--lh-snug);
+  color: var(--muted);
+}
+.ex-i .dot { margin-top: .45em; }
+
+/* ── 02, the same refusal in four tools ────────────────────────────────── */
+/*
+ * The switch is `:checked ~` and nothing else — no script, no :has(), and the
+ * radios sit directly under `.term` so the plain sibling combinator can reach
+ * both the labels and the panes.
+ */
+.tools .picker { display: flex; flex-wrap: wrap; padding: 0 var(--s-4); }
+.tools .picker label {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--faint);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
+}
+.tools .picker label:hover { color: var(--ink-2); }
+
+#tool-cc:checked ~ .picker label[for="tool-cc"],
+#tool-cx:checked ~ .picker label[for="tool-cx"],
+#tool-oc:checked ~ .picker label[for="tool-oc"],
+#tool-cu:checked ~ .picker label[for="tool-cu"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink-2);
+}
+#tool-cc:focus-visible ~ .picker label[for="tool-cc"],
+#tool-cx:focus-visible ~ .picker label[for="tool-cx"],
+#tool-oc:focus-visible ~ .picker label[for="tool-oc"],
+#tool-cu:focus-visible ~ .picker label[for="tool-cu"] {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  border-radius: var(--r-sm);
+}
+
+.tools .pane { display: none; }
+#tool-cc:checked ~ .panes .pane-cc,
+#tool-cx:checked ~ .panes .pane-cx,
+#tool-oc:checked ~ .panes .pane-oc,
+#tool-cu:checked ~ .panes .pane-cu { display: block; }
+
+/* The line under each output, saying how that tool is reached and what it
+   costs. It is the reason the tabs are worth having: the four panes differ
+   less than the four mechanisms do. */
+.tools .tool-note {
+  margin: 0 var(--s-6);
+  padding: var(--s-5) 0 var(--s-6);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  max-width: 64ch;
+}
+.tools .tool-note .mono { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .js .rule-out, .js .rule-out .ruled > * { opacity: 1; transform: none; transition: none; }
+}
+
+@media (max-width: 700px) {
+  .ex { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .ex-col + .ex-col { border-top: 1px solid var(--line-soft); }
+  .ruled { padding: var(--s-6); }
+  .ruled-from { margin-left: 0; flex-basis: 100%; }
+  .tools .picker { padding: 0 var(--s-2); }
+  .tools .picker label { padding: var(--s-3); }
+  .tools .tool-note { margin-inline: var(--s-5); }
+}
+
+/* The press. The console's own hover states are taken off these fragments
+   because nothing in them is operable; this one goes back on, briefly and
+   under app.js's control, because it is the one thing in the stage that is
+   supposed to look like it happened. */
+.console .composer .send { transition: transform .12s ease, background .12s ease; }
+.console .btn.primary.pressed { background: var(--accent-hover); transform: translateY(1px) scale(.985); }
+
+
+/* ═══ §2, what it costs ══════════════════════════════════════════════════ */
+/*
+ * Two panels at the same size, because the two controls are the same size in
+ * an administrator's head: what must not leave, and what must not be spent.
+ * Making one of them a footnote under the other would have said the opposite
+ * of what the section is for.
+ */
+.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-8);
+  width: 100%;
+  align-items: start;
+}
+.half { display: grid; gap: var(--s-5); align-content: start; min-width: 0; }
+.half .cap-label { text-align: center; }
+.half-note {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  text-wrap: pretty;
+}
+.half-note .mono { color: var(--muted); }
+.half-note em { font-style: normal; color: var(--ink-2); }
+/* Stretching both panels to the taller one's height left the shorter card
+   with a field of empty sunken grey under its last row, which read as a
+   missing screenshot. Each is its own height; the caption above them is what
+   makes them a pair. */
+
+#spend .spend-note {
+  max-width: 62ch;
+  margin-top: var(--s-9);
+  text-align: center;
+  font-size: var(--fs-3);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* The hold. The third verdict finally has somewhere on this page to be the
+   main event rather than a dot in a legend, and it takes the colour the
+   product gives it. */
+.term .hold { color: var(--escalate); font-weight: var(--fw-semi); }
+
+/* ── the counters, as the console really draws them ───────────────────── */
+/*
+ * Lifted from `web/index.html`, rule for rule. It was briefly a row of live
+ * meters filling toward a ceiling, which looked better and was a lie: the
+ * console shows the ceilings an administrator ratified and, on an opened
+ * decision, that person's count for the day. It does not render a live gauge
+ * per role, so neither does this. A landing page that draws a screen the
+ * product does not have is a demo the first call has to walk back.
+ */
+.quotas { padding: var(--s-4) var(--s-5) var(--s-6); }
+.quotas .day.two-up { margin-top: var(--s-7); }
+.quota-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); padding: var(--s-3) var(--s-3) 0; }
+.quota {
+  display: flex; flex-direction: column; gap: var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--s-4);
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+.quota-role { font-weight: var(--fw-semi); color: var(--ink); }
+.quota-row { display: flex; align-items: baseline; gap: var(--s-3); }
+.quota-row b { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: var(--fw-normal); color: var(--ink-2); }
+/* Nobody is counting is a different statement from a bar at zero. */
+.quota-row.unmetered b { color: var(--muted); }
+
+.quotas .kv { display: grid; gap: var(--s-3); padding: var(--s-4) var(--s-3) 0; }
+.quotas .kv .r { display: flex; align-items: baseline; gap: var(--s-5); font-size: var(--fs-3); }
+.quotas .kv .k { flex: 0 0 88px; color: var(--faint); font-size: var(--fs-2); }
+.quotas .kv .v { flex: 1; min-width: 0; color: var(--ink-2); }
+
+/* ── §1's fourth element: what actually ran ────────────────────────────── */
+.models {
+  width: 100%;
+  max-width: 660px;
+  margin: var(--s-10) auto 0;
+  display: grid;
+  gap: var(--s-5);
+  justify-items: center;
+  text-align: center;
+}
+.models ul {
+  list-style: none;
+  margin: 0; padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 0;
+  text-align: left;
+}
+.models li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-5);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.models li:last-child { border-bottom: 0; }
+.models .m { flex: 0 0 auto; color: var(--ink-2); font-size: var(--fs-2); }
+.models .j { flex: 1; min-width: 0; font-size: var(--fs-2); line-height: var(--lh-snug); color: var(--faint); text-align: right; }
+.models-note {
+  margin: 0;
+  max-width: 58ch;
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  text-wrap: pretty;
+}
+
+/* ── §1 step 03: the legend, and the way to check it ───────────────────── */
+.log-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-5);
+  margin: 0 var(--s-6);
+  padding: var(--s-5) 0 var(--s-2);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-2);
+  color: var(--faint);
+}
+.log-foot .lg { display: inline-flex; align-items: center; gap: var(--s-2); }
+/* The dot is the console's, and the console's rule is scoped to `.console` —
+   which this strip is deliberately outside of, because a legend is the page
+   talking about the product rather than the product talking. So it carries the
+   three colours itself, from the same tokens. */
+.log-foot .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--faint); }
+.log-foot .dot.BLOCK { background: var(--block); }
+.log-foot .dot.ESCALATE { background: var(--escalate); }
+.log-foot .dot.ALLOW { background: var(--allow); }
+.log-foot .chk { margin-left: auto; }
+.log-foot .chk .mono { color: var(--muted); }
+.shot.log .rule-ref { color: var(--faint); }
+
+@media (max-width: 900px) {
+  .two { grid-template-columns: minmax(0, 1fr); gap: var(--s-9); }
+}
+@media (max-width: 700px) {
+  .quotas { padding: var(--s-3) var(--s-3) var(--s-5); }
+  .quota-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 0; }
+  .quotas .kv { padding-inline: 0; }
+  .models li { display: grid; gap: var(--s-1); }
+  .models .j { text-align: left; }
+  .log-foot { margin-inline: var(--s-5); }
+  .log-foot .chk { margin-left: 0; flex-basis: 100%; }
+}
+
+/* ═══ the press, and the pointer that is not there ═══════════════════════ */
+/*
+ * Two things the page was missing, and both of them are only noticed by their
+ * absence.
+ *
+ * A button that does not move under the finger reads as a picture of a button.
+ * 97% for 120ms is the whole effect — short enough that it is over before a
+ * fast clicker sees it end, which is the point: it confirms the press rather
+ * than performing it.
+ *
+ * And every hover state on this page fires on first tap on a touch screen,
+ * where there is no hover to leave — so a phone was showing lift and colour
+ * changes that then stuck. Gating them costs nothing on a mouse and removes a
+ * whole class of wrong-looking on a phone.
+ */
+.btn, .foot .dl a { transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), transform .12s var(--ease-out); }
+.btn:active, .foot .dl a:active { transform: scale(.97); }
+
+@media (hover: hover) and (pointer: fine) {
+  .foot .dl a:hover { border-color: var(--ink-2); background: var(--sunken); transform: translateY(-1px); }
+}
+
+
+/* The verified/not-verified paragraph. Same measure and same centre as the
+   note under it, one step brighter on its opening clause, because a page that
+   buries its own caveat in --faint has technically said it and practically
+   hidden it. */
+#how .how-note.verified { margin-top: var(--s-9); color: var(--faint); }
+#how .how-note.verified strong { color: var(--ink-2); font-weight: var(--fw-medium); }
+.tool-note strong { color: var(--ink-2); font-weight: var(--fw-medium); }
+
+/* The log rows are a dense list built for a desktop console, and on a phone
+   the ellipsis was eating the half of each row that carries the meaning:
+   "Fede Tava… send me Ana Ruiz's s…" is two truncations and no sentence. The
+   row breaks instead — who and when on the first line, what they asked on the
+   second — which is more height and the only version that can be read. */
+@media (max-width: 700px) {
+  .shot.log .row { flex-wrap: wrap; row-gap: var(--s-1); }
+  .shot.log .row .who { flex: 0 0 auto; }
+  .shot.log .row .meta { margin-left: auto; }
+  .shot.log .row .txt { flex: 1 0 100%; white-space: normal; overflow: visible; }
 }

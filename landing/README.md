@@ -8,34 +8,55 @@ its place doing.
 |---|---|
 | `index.html` | Structure and copy. The mark and wordmark are inlined from `brand/`, path for path. |
 | `styles.css` | The whole design system. `:root` first, then everything that reads from it. |
-| `app.js` | The prompt that types itself in the hero, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
+| `app.js` | The prompt that types itself in the hero, the rule that writes itself and compiles in `#how`, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
 | `light.js` | The light: the gate line under the hero, on a canvas. Nothing else imports from it and it touches nothing outside `.hero-zone`. |
 
 ## What is on the page
 
-Six screens, in this order. The hero is centred and nothing else is; the five
-sections hang off the same left rail, and the footer is centred again to close
-the bracket the hero opened.
+Five screens, in this order. The hero is centred and nothing else is; the
+sections below it hang off the same axis, and the footer closes the bracket the
+hero opened.
 
 | | | Earns its scroll with |
 |---|---|---|
-| Hero | Asking a model to follow your rules is not the same as enforcing them. | the gate line, and the prompt being judged on it |
-| `#block` | A refusal they can act on. | the rule as its author wrote it, and the hook's literal output |
-| `#how` | It runs before the prompt leaves the machine. | `UserPromptSubmit`, and why OAuth leaves nowhere else to stand |
-| `#local` | The record of a decision does not contain the prompt. | the models by name and quantization, and `pnpm run verify-audit` |
-| `#numbers` | 136 of 160 attacks stopped. The baseline stopped none. | all eleven attack classes, uncut, and the 58% false-positive rate |
-| `#get` | Install it on one machine, or on everyone's. | two installers, and the four commands that run it from source |
+| Hero | Writing the rules down is not the same as enforcing them. | the gate line, and the prompt being judged on it |
+| `#gap` | Nothing checks what goes out. | the empty hook both Claude Code and Codex ship with |
+| `#how` | Write a rule, it stops the request, you see that it did. | the compiled rule as `data/seed` holds it, the hook's literal output in four tools, and the four models by name |
+| `#spend` | A prompt that leaks nothing can still cost you. | the console's own quota cards, and the hold an over-budget session gets |
+| `#download` | Install it. | two installers, from this repo's own CI |
 
 Two people open this URL: whoever is deciding, and whoever they forward it to.
 The page is not written twice for them. The prose is in business language and
-in sans; the evidence sits beside it in mono, in a `.receipt` line at the foot
-of a section. The first reader goes past it and the second one stops there.
-That split is the whole layout.
+in sans; the evidence sits beside it in mono, in a note at the foot of a block.
+The first reader goes past it and the second one stops there. That split is the
+whole layout.
 
 Nothing is on the page that the page cannot show: no logo strip, no
-testimonials, no pricing, no versus panel, no drawn console, and no
-interactive demo — the model runs on-device, so anything a browser could
-demonstrate would be a fake, which is the opposite of the argument.
+testimonials, no pricing, no versus panel, and no interactive demo of the
+guard — the model runs on-device, so anything a browser could demonstrate
+would be a fake, which is the opposite of the argument. The two things that
+*do* move on a click are a tool switch and a typing animation over content
+that is already in the markup, which is a different claim.
+
+### The rule about drawn product
+
+Every console fragment on this page is `web/`'s own markup under `web/`'s own
+rules, lifted class for class, and every terminal is the hook's literal
+output. That is the whole constraint, and it is what the honesty of the page
+rests on:
+
+- The quota panel in `#spend` was briefly a row of live meters filling toward
+  a ceiling. It looked better and it was a lie — the console renders the
+  ceilings an administrator ratified and, on an opened decision, that person's
+  count for the day. It does not draw a live gauge per role, so neither does
+  this.
+- The `cursor` tab shows the gateway's 403 body and not a picture of Cursor,
+  because what that editor does with a 403 is not ours to draw.
+- The `opencode` tab prints the same words as the other two, because it is the
+  same hook — and says, on the page, that nobody has watched it abort a
+  message.
+
+If a panel here cannot be traced to a file in this repo, it does not ship.
 
 ## Why four files and not one
 
@@ -61,10 +82,17 @@ would drift the moment they were copied into a repo of their own:
   `.github/workflows/desktop.yml` publishes them to GitHub Releases on `v*`
   tags. Same repo means the button and the artifact cannot disagree.
 
-Every number on the page is from `REPORT.md` and `BENCHMARKS.md`. When those
-are regenerated, the page is stale until someone updates it; there is no
-mechanism keeping them in sync, which is the honest tradeoff for having no
-build step.
+- **The product's own surfaces.** Every console fragment is `web/`'s markup,
+  every terminal is `integrations/warden-hook.mjs`'s output, and the compiled
+  rule in `#how` is `data/seed/benchmark-policy.json` field for field. Copies
+  in another repo would drift within a week and nobody would notice until a
+  prospect did.
+
+The corpus numbers were on the page and are not any more — they are one run of
+`pnpm run redteam` and the page had no mechanism keeping them in sync, so the
+footer links to `REPORT.md` and `BENCHMARKS.md` instead of quoting them. If
+they come back, they come back with that problem unsolved, which is the thing
+to decide first.
 
 ## Design
 
@@ -85,15 +113,18 @@ block —
   the rule too.
 
 The verdict colours stay the only saturated thing on the page, exactly as in
-the product. Below the hero they appear twice: the refusal in `#block`, and
-the three verdict names in the last step of `#how`, which is the only place
-the page says out loud that a verdict has three values and not two.
+the product. Below the hero they appear in `#how` — coral on the refusal in
+step 02, and all three named in the legend under step 03, which is the only
+place the page says out loud that a verdict has three values and not two — and
+once more in `#spend`, on the amber hold, which is the one screen where the
+middle value is the main event rather than an entry in a legend.
 
 Six rules hold the rest of it together, and each one is a thing the page is
 *not* allowed to do:
 
-1. **The light is an event, not decoration.** The hero is its home. It appears
-   exactly once below the hero, and that appearance is spent in `#block`.
+1. **The light is an event, not decoration.** The hero is its home, and it does
+   not appear below it at all any more — mounted a second time the gate stopped
+   reading as a gate and started reading as a divider.
 2. **Saturation means a verdict.** Never a heading, never a hover, never an
    icon.
 3. **Mono is the machine and sans is us.** Prompts, verdicts, rule ids, hashes,
@@ -146,12 +177,15 @@ Three things move: the prompt that types itself, reveal on scroll, and the
 beam. Every one of them is off under `prefers-reduced-motion` — the hero then
 shows the finished state, prompt typed and verdict on.
 
-The beam is the light's one appearance below the hero. It runs the top edge of
-the terminal in `#block` once, when the section arrives, and then it is over.
-It is a CSS animation keyed on `.is-in`, the class the reveal observer already
-sets, so it costs no JavaScript of its own. It does not loop, because the
-reader learned in the hero that light here means the gate just decided, and a
-light that repeated would go back to being decoration.
+Below the hero, motion is only ever a thing arriving: a panel revealing, a rule
+typing itself, the compiled card opening a beat after the button presses. Every
+one of them is keyed on `.is-in` or on one short chain of timers in `app.js`,
+none of them loops, and all of them are off under `prefers-reduced-motion` —
+which shows the finished state, card open and prompt typed.
+
+The tool switch in `#how` has no animation and no JavaScript at all. It is four
+radios and `:checked ~`, so it works with scripting off, takes arrow keys for
+free, and cannot be the thing that breaks.
 
 The page is complete without JavaScript. The typed prompt and its verdict are
 in the markup as text, and `[data-reveal]` only hides anything once `.js` is on

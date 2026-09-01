@@ -35,6 +35,13 @@ try {
  * so the hero reads without this. With it, the line types itself once, is
  * judged, and stays: the gate turns and holds. A verdict that kept resetting
  * read as a screensaver. Under reduced motion the finished state simply stays.
+ *
+ * The timings were halved. At 900ms before the first character and 38-78ms
+ * between them the hero took about three and a half seconds to say anything,
+ * which is longer than a visitor gives a page they have not decided about yet
+ * — the whole sequence was landing after the scroll had already started. It
+ * now reaches the verdict in under two, which is still slower than a person
+ * types and no longer slower than a person waits.
  */
 
 const judge = document.getElementById('judge');
@@ -54,27 +61,42 @@ if (judge && !reduced) {
   const step = () => {
     if (i < text.length) {
       typed.textContent = text.slice(0, ++i);
-      setTimeout(step, 38 + Math.random() * 40);
+      setTimeout(step, 20 + Math.random() * 26);
     } else {
-      setTimeout(() => verdict(true), 650);
+      setTimeout(() => verdict(true), 380);
     }
   };
-  setTimeout(step, 900);
+  setTimeout(step, 320);
 }
 
-/* ── the rule being written ────────────────────────────────────────────── */
+/* ── the rule being written, and the rule that comes back ─────────────── */
 /*
  * Same contract as the hero: the markup holds the finished state, so with no
- * JavaScript the box simply shows the sentence already written. With it, the
- * sentence types itself once, when the stage arrives — not on load, because it
- * is three screens down and would be over before anyone got there.
+ * JavaScript the box shows the sentence already written and the compiled rule
+ * under it is already open. With it, the stage plays once when it arrives —
+ * not on load, because it is three screens down and would be over before
+ * anyone got there.
  *
- * It types the rule the way a person would say it out loud, which is the claim
- * that screen is making: what you write is a sentence, and Warden compiles it.
- * The formal version is downstairs in the refusal, in the words it came out as.
+ * It types the rule the way a person would say it out loud, presses the
+ * button, and a beat later the card opens. That beat is the only claim this
+ * stage makes and it is worth spending a timer on: a card that were simply
+ * present would read as a second screenshot placed under the first, and what
+ * the reader has to see is that one produced the other.
+ *
+ * The card is `r-payroll` out of data/seed, field for field. Nothing here is
+ * generated in the browser — the page has no model in it, and a fake compiler
+ * on a page arguing that inference happens on the employee's machine would be
+ * the wrong kind of demo.
  */
 
 const ruleBox = document.getElementById('ruleMsg');
+const ruleOut = document.getElementById('ruleOut');
+const sendBtn = document.querySelector('#how .composer .send');
+
+/* Reduced motion, or a browser with no IntersectionObserver, gets the finished
+   state immediately — including the card, which is hidden by CSS the moment
+   `.js` is on and would otherwise never be told to open. */
+if (ruleOut && (reduced || !('IntersectionObserver' in window))) ruleOut.classList.add('on');
 
 if (ruleBox && !reduced && 'IntersectionObserver' in window) {
   const text = ruleBox.value;
@@ -88,10 +110,18 @@ if (ruleBox && !reduced && 'IntersectionObserver' in window) {
       const step = () => {
         if (i < text.length) {
           ruleBox.value = text.slice(0, ++i);
-          setTimeout(step, 34 + Math.random() * 46);
+          setTimeout(step, 22 + Math.random() * 30);
+        } else {
+          /* The press is 140ms of the button's own pressed state and nothing
+             else. A spinner would be a claim about how long compiling takes,
+             and on the machine this runs on that number is 46 seconds, not a
+             quarter of a second. */
+          setTimeout(() => sendBtn?.classList.add('pressed'), 260);
+          setTimeout(() => sendBtn?.classList.remove('pressed'), 400);
+          setTimeout(() => ruleOut?.classList.add('on'), 520);
         }
       };
-      setTimeout(step, 420);
+      setTimeout(step, 320);
     },
     { threshold: 0.5 }
   );
