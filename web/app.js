@@ -1419,15 +1419,7 @@ function heroComposer() {
       <textarea id="ruleMsg" rows="2" placeholder="Describe it the way you would to a colleague…"></textarea>
       <button type="button" class="btn primary send" id="ruleSend">Write it</button>
     </div>
-    <!-- Two buttons because they are two different asks, and which one you
-         meant is not something to guess from the sentence. "Write it" is one
-         rule, and it is the path every number in docs/MEASUREMENTS.md was
-         measured on. "Write the set" splits a worry into the specific things
-         it means first, which costs an extra model call and is worth it only
-         when you actually said something broad. -->
-    <div class="hero-sugg">
-      <button type="button" class="pill" id="ruleSetBtn">Write the set — I said something broad</button>
-    </div>
+
     ${compilerLine()}
 
     <div class="hero-sugg" id="cats">
@@ -1700,6 +1692,27 @@ async function sendRuleMessage(text) {
 }
 
 /**
+ * One button, and the console works out what you meant.
+ *
+ * There were two: "Write it" for a sentence, and "Write the set" for a worry.
+ * That is a real distinction in `compile.ts` and it is not the administrator's
+ * to make — they typed a sentence, and whether it contains one prohibition or
+ * three is a question about the sentence, not about which button to press.
+ *
+ * So the split pass runs whenever the compiler can do it well, and does not
+ * when it cannot. On the local 1.7B it returned one statement on three of three
+ * inputs and cost thirty seconds to do it, so that model gets the direct path.
+ * On a CLI or a configured endpoint it splits correctly and quickly, so those
+ * get the pass that makes a policy out of one sentence. Either way a specific
+ * sentence still yields exactly one rule; the difference is only whether a
+ * broad one is allowed to yield more.
+ */
+function writeRule(text) {
+  const capable = (state.compiler?.provider ?? 'local') !== 'local';
+  return capable ? sendRuleSet(text) : sendRuleMessage(text);
+}
+
+/**
  * One broad instruction, several rules, ratified one at a time.
  *
  * The compiler splits what you said into the specific prohibitions it means
@@ -1816,11 +1829,9 @@ function bindPolicy() {
   if (cancel) cancel.onclick = discardDraft;
 
   const send = $('ruleSend');
-  if (send) send.onclick = () => sendRuleMessage($('ruleMsg').value);
-  const sendSet = $('ruleSetBtn');
-  if (sendSet) sendSet.onclick = () => sendRuleSet($('ruleMsg').value);
+  if (send) send.onclick = () => writeRule($('ruleMsg').value);
   const msg = $('ruleMsg');
-  if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendRuleMessage(msg.value); };
+  if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) writeRule(msg.value); };
 
   const cats = $('cats');
   if (cats) cats.onclick = (e) => {
