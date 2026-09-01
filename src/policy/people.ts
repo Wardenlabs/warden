@@ -384,34 +384,55 @@ export function clearDemoDirectory(companyName?: string): Directory {
 }
 
 /**
- * Whether what is on disk is a sample nobody asked for.
+ * Did somebody press the button that installs the sample?
  *
- * True only for a directory an old build seeded by itself: marked `demo` and
- * carrying no `sampleInstalledAt` stamp. A directory somebody typed their own
- * company name into is not demo any more; a sample somebody loaded on purpose
- * has the stamp. Both are false here, and both are kept.
+ * The stamp is written only by `loadSampleCompany()`, so this is the one thing
+ * that distinguishes a sample a person asked for — theirs, never touched — from
+ * one an old build wrote by itself on first read.
  */
-export function isUnrequestedSample(seedPath = SEED_PATH): boolean {
+export function sampleWasRequested(): boolean {
+  return loadDirectory().sampleInstalledAt !== undefined;
+}
+
+/**
+ * Remove the people who came out of the shipped sample, keeping everyone else.
+ *
+ * Per person rather than per roster, and that distinction cost a round: the
+ * roster version removed the seven invented people only when the roster was
+ * *identical* to ours, so an administrator who added one real teammate kept all
+ * seven ghosts — one real person protecting seven fictional ones. The same
+ * coupling that had already gone wrong one level up, in the policy.
+ *
+ * A person is removed when their id, name and role all match a person in the
+ * seed. Keys are not compared: they are reissued on install, so no directory
+ * would ever match on them. Anybody who does not match is untouched, which is
+ * the whole point.
+ *
+ * If nothing is left, the file goes with them. If somebody is left, the company
+ * name and the `demo` flag go instead — what remains is theirs, and it should
+ * not still be sitting under a freight company's name they never typed.
+ */
+export function discardSeededPeople(seedPath = SEED_PATH): number {
   const current = loadDirectory();
-  if (current.demo !== true || current.sampleInstalledAt !== undefined) return false;
+  if (current.demo !== true) return 0;
 
-  // And nobody has been added, removed or renamed since. `demo` is cleared by
-  // naming the company and by clearing the sample, and by nothing else — so an
-  // administrator who kept the sample and added one real teammate to it still
-  // has `demo: true` on disk, and without this check the migration would delete
-  // that person. The roster is the evidence: identical to the shipped one means
-  // the file is still entirely ours.
   const seeded = readIfPresent(seedPath);
-  if (!seeded) return false;
-  const roster = (d: Directory): string =>
-    d.employees
-      .map((e) => `${e.id}\u0000${e.name}\u0000${e.role}`)
-      .sort()
-      .join('\u0001');
-  if (roster(current) !== roster(seeded)) return false;
+  if (!seeded) return 0;
 
-  // Renaming a role, or adding one, is the same kind of evidence.
-  return [...current.roles].sort().join(',') === [...seeded.roles].sort().join(',');
+  const key = (e: Employee): string => `${e.id}\u0000${e.name}\u0000${e.role}`;
+  const shipped = new Set(seeded.employees.map(key));
+  const kept = current.employees.filter((e) => !shipped.has(key(e)));
+  const removed = current.employees.length - kept.length;
+  if (removed === 0) return 0;
+
+  if (kept.length === 0) {
+    discardDirectory();
+    return removed;
+  }
+
+  const { demo: _was, ...rest } = current;
+  save({ ...rest, name: '', employees: kept });
+  return removed;
 }
 
 /**

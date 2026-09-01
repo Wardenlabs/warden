@@ -126,6 +126,8 @@ const state = {
   presets: [],
   chain: null,
   mock: false,
+  /** True when a desktop shell is listening that can fetch the models. */
+  canLeaveDemo: false,
   /** Role whose limits are open for editing, or null. One at a time. */
   quotaEdit: null,
   /** Why the last save of that role's limits was refused, if it was. */
@@ -337,6 +339,9 @@ function route() {
 async function boot() {
   const health = await api('/health').catch(() => null);
   state.mock = Boolean(health?.j?.mock);
+  // Whether a desktop shell is listening that could actually fetch the models.
+  // False in a browser against a checkout, where the honest offer is a command.
+  state.canLeaveDemo = Boolean(health?.j?.canLeaveDemo);
   // How long prompt text stays readable. Shown on the screen that shows it,
   // because a retention policy nobody can see is one nobody can rely on.
   state.prompts = health?.j?.prompts ?? null;
@@ -499,6 +504,28 @@ function render() {
     await Promise.all([refreshPolicy(), refreshPeople()]);
     go('policy');
   };
+
+  // Same reason as the button above it: the demo banner is drawn by the shell
+  // on every screen, so binding this inside any one view would make it dead on
+  // the screen the console actually opens on.
+  const models = $('getModels');
+  if (models) models.onclick = async () => {
+    models.disabled = true;
+    models.textContent = 'Starting the download…';
+    const { ok, j } = await api('/api/gateway/leave-demo', { method: 'POST' });
+    if (!ok) {
+      models.disabled = false;
+      models.textContent = 'Download the models';
+      // The one failure worth naming: no shell to do it, so say what to run.
+      models.insertAdjacentHTML('afterend',
+        `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
+      return;
+    }
+    // The shell relaunches the app from under us, so there is nothing after
+    // this to render. Saying so beats a button that looks stuck.
+    models.textContent = 'Downloading. Warden will restart on its own…';
+  };
+
   restoreChat(fields.chat);
 }
 
@@ -1278,8 +1305,17 @@ function bindCompiler() {
  * is not one. `cliTools` is absent on a gateway older than the route that
  * reports it, which reads as "no claim either way" and shows nothing.
  */
+const CLI_TOOL_OF = {
+  'claude-cli': 'claude',
+  'codex-cli': 'codex',
+  'gemini-cli': 'gemini',
+  'opencode-cli': 'opencode',
+  'cursor-cli': 'cursor-agent',
+  'copilot-cli': 'copilot'
+};
+
 function cliFor(providerId) {
-  const tool = providerId === 'claude-cli' ? 'claude' : providerId === 'codex-cli' ? 'codex' : null;
+  const tool = CLI_TOOL_OF[providerId];
   if (!tool) return null;
   return (state.compiler?.cliTools ?? []).find((t) => t.tool === tool) ?? null;
 }
@@ -1290,7 +1326,7 @@ function cliNote(providerId) {
   if (!found) return '';
   return found.found
     ? `<span class="note good">Found on this machine. It will use the session you are already signed in to, with no API key.</span>`
-    : `<span class="note bad">Not found on this machine. Install ${esc(found.label)} and sign in, then reopen this page.</span>`;
+    : `<span class="note bad">Not found on this machine. Install <span class="mono">${esc(found.tool)}</span> and sign in, then reopen this page.</span>`;
 }
 
 function compilerLine() {
@@ -1544,10 +1580,27 @@ function firstRunBanner() {
   </div>`;
 }
 
+/**
+ * Demo mode, and the way out of it.
+ *
+ * The way out used to be a sentence pointing at `Gateway → Download models` in
+ * the menu bar. People did not find it, which is what happens to an action
+ * three levels inside a submenu nobody opens, and the report was "I can't see
+ * where to download the models". The action belongs where the sentence about it
+ * already is.
+ *
+ * In a browser against a checkout there is no shell to do the downloading, so
+ * there is no button there: the command is the honest offer.
+ */
 function mockBanner() {
   return `<div class="banner warn">
     <b>Demo mode: nothing here is real.</b> No model has judged anything on this screen.
-    <div class="note"><b>Gateway → Download models</b> in the menu bar, or <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>
+    ${state.canLeaveDemo
+      ? `<div class="banner-act">
+           <button type="button" class="btn primary" id="getModels">Download the models</button>
+           <span class="note">About 1.8&nbsp;GB, once. Warden restarts when they land.</span>
+         </div>`
+      : '<div class="note">Run <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>'}
   </div>`;
 }
 

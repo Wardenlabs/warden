@@ -67,7 +67,11 @@ function ephemeralPort(): Promise<number> {
   });
 }
 
-export function startServer(config: ServerConfig, onExit: (code: number) => void): RunningServer {
+export function startServer(
+  config: ServerConfig,
+  onExit: (code: number) => void,
+  onMessage?: (msg: unknown) => void
+): RunningServer {
   mkdirSync(config.cwd, { recursive: true });
   mkdirSync(dirname(config.logPath), { recursive: true });
   rotateLog(config.logPath);
@@ -95,6 +99,16 @@ export function startServer(config: ServerConfig, onExit: (code: number) => void
   const log = createWriteStream(config.logPath, { flags: 'a' });
   child.stdout?.pipe(log, { end: false });
   child.stderr?.pipe(log, { end: false });
+
+  // The gateway talks back on the same channel `shutdown` goes out on. It is
+  // how the web console asks for something only the shell can do — fetching the
+  // models — without the console window needing a preload.
+  if (onMessage) {
+    child.on('message', (msg) => {
+      const data = msg && typeof msg === 'object' && 'data' in msg ? (msg as { data: unknown }).data : msg;
+      onMessage(data);
+    });
+  }
 
   let stopping = false;
   child.on('exit', (code) => {

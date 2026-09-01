@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { bindsActor } from './audience.js';
-import { policySpecSchema, type PolicySpec, type Rule, type Quota } from './types.js';
+import { policySpecSchema, quotaSchema, ruleSchema, type PolicySpec, type Rule, type Quota } from './types.js';
 
 const POLICY_PATH = process.env['WARDEN_POLICY_PATH'] ?? 'data/policies.json';
 
@@ -124,6 +124,78 @@ export function isShippedSeed(seedPath: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Remove the rules and quotas that came out of the shipped seed, keeping
+ * everything else.
+ *
+ * The all-or-nothing version of this was wrong in the one case that actually
+ * happened. Somebody on an old build wrote a single rule of their own on top of
+ * the eight that had been seeded without asking; the policy therefore did not
+ * hash identically to the seed; and the migration declined to remove anything —
+ * the eight invented rules, the seven invented people, all of it stayed,
+ * because of one rule that had nothing to do with any of them. "I just
+ * downloaded the latest version and I still see test data" is the correct
+ * report of that.
+ *
+ * So the unit is a rule, not the file. A rule is removed only when it is
+ * byte-identical to one we ship, which is a fact about that rule and not about
+ * its neighbours: edit a seeded rule by one word and it stays, because it is
+ * now yours. Quotas are handled the same way and for the same reason.
+ *
+ * Returns how many of each went, so the boot can say it out loud.
+ */
+export function discardSeededRules(seedPath: string): { rules: number; quotas: number } {
+  const none = { rules: 0, quotas: 0 };
+  if (!existsSync(seedPath)) return none;
+
+  let seed: { rules?: Rule[]; quotas?: Quota[] };
+  try {
+    seed = JSON.parse(readFileSync(seedPath, 'utf8')) as { rules?: Rule[]; quotas?: Quota[] };
+  } catch {
+    return none;
+  }
+
+  // Both sides go through the schema before being compared, and that is the
+  // whole trick. The seed file is hand-written JSON that leaves optional fields
+  // out; what is on disk came back through `policySpecSchema`, which fills the
+  // defaults in and fixes the key order. Comparing the raw file against the
+  // parsed store found nothing in common — eight identical rules, zero matches,
+  // and a migration that reported success while removing none of them. Parsing
+  // the seed the same way is what makes "identical" mean identical.
+  const canon = (r: unknown): string | null => {
+    const parsed = ruleSchema.safeParse(r);
+    return parsed.success ? JSON.stringify({ ...parsed.data, embedding: undefined }) : null;
+  };
+  const canonQuota = (q: unknown): string | null => {
+    const parsed = quotaSchema.safeParse(q);
+    return parsed.success ? JSON.stringify(parsed.data) : null;
+  };
+  const shippedRules = new Set((seed.rules ?? []).map(canon).filter((x): x is string => x !== null));
+  const shippedQuotas = new Set(
+    (seed.quotas ?? []).map(canonQuota).filter((x): x is string => x !== null)
+  );
+
+  const current = loadPolicy();
+  const rules = current.rules.filter((r) => {
+    const key = canon(r);
+    return key === null || !shippedRules.has(key);
+  });
+  const quotas = current.quotas.filter((q) => {
+    const key = canonQuota(q);
+    return key === null || !shippedQuotas.has(key);
+  });
+
+  const removed = {
+    rules: current.rules.length - rules.length,
+    quotas: current.quotas.length - quotas.length
+  };
+  if (removed.rules === 0 && removed.quotas === 0) return none;
+
+  if (rules.length === 0 && quotas.length === 0) discardPolicy();
+  else savePolicy(rules, quotas);
+  return removed;
 }
 
 /** Remove the policy file, leaving the install governing nothing. */
