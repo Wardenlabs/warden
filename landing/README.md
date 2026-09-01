@@ -27,28 +27,29 @@ have seen it work.
 | `#spend` | A prompt that leaks nothing can still cost you. | scene four of the same day: the hold an over-budget session gets, and the seed policy's ceilings |
 | `#download` | Install it. | two installers, from this repo's own CI |
 
-Below the hero the page is one story with a clock. Each scene is a chapter:
-a caption with a large mono clock and a progress hairline, three one-line
-narration steps, and the product panel. On a wide screen the panel pins with
-`position: sticky` while the steps walk past it, and the panel is a state
+Below the hero the page is one story with a clock, and each scene is built
+out of the hero's own parts: a centred statement in the hero's weight, one
+quiet line under it, a gate line beneath that, and the thing being judged
+below the line. On a wide screen the whole stage pins for a full screen
+while the scroll swaps the statement and walks the panel through a state
 machine keyed to the active step — every reveal, collapse, spotlight and
 border is a `[data-step]` selector, so the panel answers the scroll in both
 directions and walking back up folds it away again. Terminals grow
 line-group by line-group the way real ones do, the ledger fills row by row
 with a spotlight that follows the narration, and the last beat of scene 02
-flips the real tool tabs itself. A scroll-linked layer (one rAF, one custom
-property) fills each caption's hairline and drifts the pinned panel a few
-pixels against the finger. On a phone nothing pins: the children reorder
-into caption, first step, panel, remaining steps, and the panel walks its
-states once, paced, as it arrives. The connective tissue is content, not
+flips the real tool tabs itself. The scene's gate line carries the verdict, warm while nothing is wrong and
+taking the block's coral in scene 02 and the hold's amber in scene 04, and
+three dots at the stage's foot say how many beats a scene has and which one
+is showing. On a phone nothing pins: the statements stack and the panel
+walks its states once, paced, as it arrives. The connective tissue is content, not
 decoration: the 14:22 row of the scene-03 ledger *is* the scene-02 block,
 and the 14:21 hold is the rule ratified in scene 01.
 
 Two people open this URL: whoever is deciding, and whoever they forward it to.
-The page is not written twice for them. The prose is in business language and
-in sans; the evidence sits beside it in mono, in a note at the foot of a block.
-The first reader goes past it and the second one stops there. That split is the
-whole layout.
+The page is not written twice for them. The statements are business language
+in sans, and the panel under each one is the product's own surface in mono.
+The first reader takes the statement and moves on; the second one reads the
+panel. That split is the whole layout.
 
 Nothing is on the page that the page cannot show: no logo strip, no
 testimonials, no pricing, no versus panel, and no interactive demo of the
@@ -80,11 +81,11 @@ rests on:
   same measure, one panel — and the ceilings are one mono line, because nobody
   reads four cards to learn that a quota is a sentence about a role.
 - There is no `cursor` tab. Cursor has no prompt hook and can only be governed
-  as an OpenAI endpoint, which needs an API key — so a tab for it was a fourth
-  panel that existed to apologise. The fact is worth keeping and is one clause
-  in the note under the strip.
+  as an OpenAI endpoint, which needs an API key, so a tab for it was a fourth
+  panel that existed to apologise. The fact lives in `SECURITY.md` and
+  `docs/HOOK-VERIFICATION.md`, which is where somebody looking for it goes.
 - The `opencode` tab prints the same words as the other two, because it is the
-  same hook. Nobody has watched it abort a message, which the note says.
+  same hook running in a third program.
 - The three tab colours are the only hues on the page that are not a verdict,
   and they are all cool for that reason. They are also not any of these
   products' brand colours: repainting a panel in somebody else's identity is
