@@ -1690,8 +1690,8 @@ function draftCard() {
   // that says so and points at the download.
   const verdict = state.mock
     ? `<div class="verdict-line"><span class="dot"></span>
-        <b>Not checked — no model is installed.</b>
-        <span>Nothing on this card was judged.</span></div>`
+        <b>Not checked.</b>
+        <span>No model is installed, so nothing on this card was judged.</span></div>`
     : !p
     ? '<div class="verdict-line"><span class="dot"></span><span>Not checked yet.</span></div>'
     : p.falsePositives > 0
@@ -1917,7 +1917,7 @@ async function runPreview(against = []) {
   if (state.mock) {
     // Same reason as the verdict line above: no model ran, so there is nothing
     // to report except that.
-    say('No model is installed, so nothing was actually checked — the rows below came from the demo stand-in. Download the models and the check becomes real.');
+    say('No model is installed, so nothing was actually checked. The rows below came from the demo stand-in. Download the models and the check becomes real.');
     render();
     return;
   }

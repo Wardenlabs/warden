@@ -401,7 +401,7 @@ app.post('/api/settings/compiler/test', asyncRoute(async (req, res) => {
  */
 function draftedBy(remote: string | null): string {
   if (remote) return remote;
-  return isMock() ? 'the demo stand-in — no model ran' : resolvedModel('compiler');
+  return isMock() ? 'the demo stand-in, not a model' : resolvedModel('compiler');
 }
 
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
