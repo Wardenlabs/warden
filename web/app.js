@@ -2023,7 +2023,7 @@ VIEWS.people = {
     <div class="section">
       <div class="label">Add someone</div>
       <div class="chips">
-        <input type="text" id="newName" class="inline wide" placeholder="Federico Tavani, Jeremías Souto, Gastón Foncea" autocomplete="off">
+        <input type="text" id="newName" class="inline wide" placeholder="Federico Tavano, Jeremías Souto, Gastón Foncea" autocomplete="off">
         <select class="inline" id="newRole">${roleOptions()}</select>
         <button type="button" class="btn primary" id="addPerson">Add</button>
       </div>
