@@ -647,11 +647,7 @@ footer::before {
 /* Set apart from the installers, so the buttons read as the thing to press
    and the fine print reads as the floor of the page. */
 .foot .fine { font-size: var(--fs-1); color: var(--faint); text-align: center; margin-top: var(--s-7); }
-/* The honesty line. It used to float mid-page as a grey paragraph in black,
-   which is where a reader least wants a caveat; down here it sits with the
-   licence and the report links, which is what it belongs to. */
-.foot .caveat { max-width: 74ch; margin-top: var(--s-4); line-height: var(--lh-snug); text-wrap: pretty; }
-.foot .caveat strong { color: var(--muted); font-weight: var(--fw-medium); }
+
 
 .foot .links { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4); justify-content: center; align-items: center; }
 .foot .links .brand { color: var(--muted); transition: color .15s ease; }

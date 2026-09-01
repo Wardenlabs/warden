@@ -122,11 +122,15 @@ would drift the moment they were copied into a repo of their own:
   in another repo would drift within a week and nobody would notice until a
   prospect did.
 
-The corpus numbers were on the page and are not any more — they are one run of
-`pnpm run redteam` and the page had no mechanism keeping them in sync, so the
-footer links to `REPORT.md` and `BENCHMARKS.md` instead of quoting them. If
-they come back, they come back with that problem unsolved, which is the thing
-to decide first.
+No measurement lives on this page. The corpus numbers went first, because
+they are one run of `pnpm run redteam` and nothing kept the page in sync with
+them; the verification caveat and the commit hash followed, because a landing
+page is where somebody decides whether to try the thing, and a paragraph
+arguing against the product is not what that reader came for. None of it is
+hidden: `REPORT.md` and `BENCHMARKS.md` are one click away in the footer,
+`SECURITY.md` and `docs/HOOK-VERIFICATION.md` say plainly what has and has not
+been verified end to end, and an evaluator who wants the numbers finds them
+where the numbers actually live. The page sells; the repo keeps the receipts.
 
 ## Design
 
