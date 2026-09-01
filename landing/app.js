@@ -268,16 +268,25 @@ if (reduced || !hasIO) {
 /*
  * The button names the visitor's platform and the quiet link beside it names
  * the other one. Windows is the only case worth branching for; everything
- * else keeps the macOS default. The sizes are carried over from v0.1.3 and are
- * approximate until the v0.1.5 build lands — nothing in this repo reads them
- * off the release, so they are a number a person has to come back and correct.
- * That is the honest cost of a static page with no build step, and it is worth
- * knowing which numbers on it have that property.
+ * else keeps the macOS default.
+ *
+ * Both links go to `releases/latest`, so a new tag reaches the page without
+ * anybody remembering to edit it. This page shipped pointing at v0.1.5 while
+ * v0.1.6 was out, which is the whole argument. Windows can be a direct
+ * download because Squirrel's installer has a fixed name, set in
+ * forge.config.cjs; the dmg still carries its version in the filename, so
+ * macOS lands on the release itself. When a tag ships with the version-free
+ * dmg name that config now asks for, this becomes
+ * `${LATEST}/download/Warden-arm64.dmg` and the last click goes away.
+ *
+ * No size is quoted anywhere. Nothing in this repo reads one off the release,
+ * so every number was a promise to come back and correct it, and the two that
+ * were on the page were both wrong by the time anybody noticed.
  */
 
-const RELEASE = 'https://github.com/Wardenlabs/warden/releases/download/v0.1.5/';
-const MAC = { label: 'Download for macOS', size: '217 MB', file: 'Warden-0.1.5-arm64.dmg', other: 'Also on macOS' };
-const WIN = { label: 'Download for Windows', size: '287 MB', file: 'Warden-Setup.exe', other: 'Also on Windows' };
+const LATEST = 'https://github.com/Wardenlabs/warden/releases/latest';
+const MAC = { label: 'Download for macOS', href: LATEST, other: 'Also on macOS' };
+const WIN = { label: 'Download for Windows', href: `${LATEST}/download/Warden-Setup.exe`, other: 'Also on Windows' };
 
 const primary = document.querySelector('.hero .btn-primary');
 const alt = document.querySelector('.hero .cta .alt');
@@ -286,10 +295,9 @@ const onWindows = /Windows|Win64|Win32/i.test(navigator.userAgent || '');
 if (primary && alt && onWindows) {
   primary.classList.add('on-windows');
   primary.querySelector('.txt').textContent = WIN.label;
-  primary.querySelector('.sz').textContent = WIN.size;
-  primary.setAttribute('href', RELEASE + WIN.file);
+  primary.setAttribute('href', WIN.href);
   alt.textContent = MAC.other;
-  alt.setAttribute('href', RELEASE + MAC.file);
+  alt.setAttribute('href', MAC.href);
 }
 
 /* And in the footer, where both installers are shown: the visitor's platform

@@ -79,7 +79,17 @@ module.exports = {
       name: '@electron-forge/maker-dmg',
       platforms: ['darwin'],
       // The mounted volume carries the brand badge, not the generic disk icon.
-      config: { icon: './desktop/icons/icon.icns' }
+      //
+      // The filename drops the version on purpose. The default is
+      // `Warden-${version}-${arch}.dmg`, which means every release publishes an
+      // asset under a name nothing can predict, and the only way to link to the
+      // installer is to hardcode a tag and remember to bump it. Nobody
+      // remembers: the landing page sat on v0.1.4 while v0.1.6 was out. With
+      // the arch still in the name and the version gone, GitHub's
+      // `releases/latest/download/Warden-arm64.dmg` resolves forever. The
+      // config is a function because the two darwin builds share this maker and
+      // would otherwise collide under one name.
+      config: (arch) => ({ name: `Warden-${arch}`, icon: './desktop/icons/icon.icns' })
     },
     {
       name: '@electron-forge/maker-squirrel',

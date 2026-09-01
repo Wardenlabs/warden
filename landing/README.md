@@ -113,9 +113,21 @@ Two things on this page are read from somewhere else in the tree, and both
 would drift the moment they were copied into a repo of their own:
 
 - **The brand.** Inlined from `brand/`, as above.
-- **The download links.** The installers come from this repo's own CI —
+- **The download links.** The installers come from this repo's own CI:
   `.github/workflows/desktop.yml` publishes them to GitHub Releases on `v*`
-  tags. Same repo means the button and the artifact cannot disagree.
+  tags. Both buttons point at `releases/latest`, never at a tag, because a
+  pinned tag is a promise to come back and edit this page and nobody keeps it
+  — the page sat on v0.1.4, then v0.1.5, while v0.1.6 was the release people
+  were getting. Windows is a direct download, since Squirrel's installer has
+  a fixed name that `forge.config.cjs` sets. macOS lands on the release
+  itself until a tag ships with the version-free dmg name that same file now
+  asks for; after that it can be
+  `releases/latest/download/Warden-arm64.dmg` and the extra click goes.
+
+  No size is quoted on the page any more. Nothing here reads one off the
+  release, so each number was a promise of the same kind, and both were wrong
+  (207 MB and 274 MB against the 217 and 287 the page claimed) before anyone
+  noticed.
 
 - **The product's own surfaces.** Every console fragment is `web/`'s markup,
   every terminal is `integrations/warden-hook.mjs`'s output, and the compiled
