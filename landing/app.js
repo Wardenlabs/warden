@@ -166,13 +166,13 @@ if (steps.length && !reduced && 'IntersectionObserver' in window) {
 /*
  * The button names the visitor's platform and the quiet link beside it names
  * the other one. Windows is the only case worth branching for; everything
- * else keeps the macOS default. Sizes are the v0.1.2 release assets: the
- * arm64 .dmg and the Squirrel .exe. There is no Intel Mac build in v0.1.2.
+ * else keeps the macOS default. Sizes are the v0.1.3 release assets: the
+ * arm64 .dmg and the Squirrel .exe.
  */
 
-const RELEASE = 'https://github.com/Wardenlabs/warden/releases/download/v0.1.2/';
-const MAC = { label: 'Download for macOS', size: '185 MB', file: 'Warden-0.1.0-arm64.dmg', other: 'Also on macOS' };
-const WIN = { label: 'Download for Windows', size: '273 MB', file: 'Warden-Setup.exe', other: 'Also on Windows' };
+const RELEASE = 'https://github.com/Wardenlabs/warden/releases/download/v0.1.3/';
+const MAC = { label: 'Download for macOS', size: '217 MB', file: 'Warden-0.1.3-arm64.dmg', other: 'Also on macOS' };
+const WIN = { label: 'Download for Windows', size: '287 MB', file: 'Warden-Setup.exe', other: 'Also on Windows' };
 
 const primary = document.querySelector('.hero .btn-primary');
 const alt = document.querySelector('.hero .cta .alt');
