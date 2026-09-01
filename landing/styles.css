@@ -143,7 +143,6 @@
   --beam: #2f3644;     /* the edge light that travels a surface's top */
   --gate-fallback: #fff5e6bf;  /* the line when there is no WebGL: the same white, at the alpha the canvas would render it */
   --gate-fallback-block: #ef6b70cc;
-  --gate-fallback-hold: #d29b34cc;  /* the same line when the verdict is a hold */
 
   /* The ground under a scene: --bg raised one step, only ever the far end of
      a gradient. The floor of the palette does not move. */
@@ -893,8 +892,12 @@ footer::before {
 .console .composer { padding: var(--s-7) var(--s-7) var(--s-5); }
 
 
-@media (max-width: 700px) {
-  .chapter .term pre { font-size: var(--fs-1); padding: var(--s-5); }
+@media (max-width: 899px) {
+  .chapter .term pre {
+    font-size: clamp(8px, 2.5vw, 12px);
+    padding: var(--s-5);
+    white-space: pre;
+  }
 }
 @media (max-width: 700px) {
   .console .row .who { flex-basis: 78px; }
@@ -1228,14 +1231,6 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   margin-block: var(--s-3) var(--s-5);
   background: linear-gradient(90deg, transparent, var(--gate-fallback) 30%, var(--gate-fallback) 70%, transparent);
   transition: background .7s ease;
-}
-[data-chapter="hit"][data-step="1"] .sgate,
-[data-chapter="hit"][data-step="2"] .sgate {
-  background: linear-gradient(90deg, transparent, var(--gate-fallback-block) 30%, var(--gate-fallback-block) 70%, transparent);
-}
-[data-chapter="spend"][data-step="1"] .sgate,
-[data-chapter="spend"][data-step="2"] .sgate {
-  background: linear-gradient(90deg, transparent, var(--gate-fallback-hold) 30%, var(--gate-fallback-hold) 70%, transparent);
 }
 
 .chapter .panel { width: min(100%, 1000px); text-align: left; }

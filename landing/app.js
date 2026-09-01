@@ -98,9 +98,12 @@ if (reduced || !hasIO) {
 /*
  * Four scenes below the hero, each built like the hero: a pinned full
  * screen with a centred statement, a gate line, and the panel under it.
- * On a wide screen the scroll drives the scene directly — the pin's travel
- * picks the step, in both directions. On a phone nothing pins and the
- * panel walks its states once, paced, as it arrives.
+ * The scroll drives them directly, both directions, no timers: on a wide
+ * screen the pin's travel picks the step, and on a phone, where nothing
+ * pins, the panel's own climb up the viewport does. A phone used to autoplay
+ * the sequence when the panel arrived, which meant anybody scrolling at
+ * their own speed watched it happen off-screen and arrived at a finished
+ * panel.
  *
  * The engine only ever reveals markup that is already on the page. It
  * types over text that is in the document and flips [data-step]; CSS does
@@ -217,31 +220,10 @@ if (reduced || !hasIO) {
 } else {
   const desktop = window.matchMedia('(min-width: 900px)');
 
-  if (!desktop.matches) {
-    /* No pinning on a phone: the statements stack and the panel walks its
-       states once, paced, when the stage arrives. */
-    chapters.forEach((ch) => {
-      const io = new IntersectionObserver(
-        (entries) => {
-          if (!entries.some((e) => e.isIntersecting)) return;
-          io.disconnect();
-          (async () => {
-            for (let i = 0; i < 3; i++) { setStep(ch, i); await wait(1300); }
-          })();
-        },
-        { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }
-      );
-      io.observe(ch.querySelector('.stage') || ch);
-    });
-  }
-
-  /* Crossing the breakpoint mid-read re-wires nothing; the day simply
-     finishes. Rare enough that correct beats clever. */
-  desktop.addEventListener?.('change', finishAll, { once: true });
-
-  /* On a wide screen the pinned stage is driven straight off the scroll: one
-     rAF computes how far a chapter's pin has travelled and picks the step
-     from thirds of it, both directions, no observers.
+  /* One rAF picks every scene's step off the scroll position. It reads the
+     breakpoint each frame rather than wiring itself once, so a window
+     dragged across 900px, or a phone turned on its side, just starts
+     measuring the other thing.
 
      Only the chapters actually on screen get measured. Reading a rect forces
      the browser to settle layout, and doing that for every chapter on every
@@ -260,19 +242,32 @@ if (reduced || !hasIO) {
   let ticking = false;
   const track = () => {
     ticking = false;
-    if (!desktop.matches) return;
     const vh = window.innerHeight;
+    const wide = desktop.matches;
     for (const ch of live) {
-      const r = ch.getBoundingClientRect();
-      const travel = r.height - (vh - HEADER);
-      if (travel <= 0) { setStep(ch, 0); continue; }
-      const sp = Math.min(1, Math.max(0, (HEADER - r.top) / travel));
-      setStep(ch, sp < 0.34 ? 0 : sp < 0.67 ? 1 : 2);
+      if (wide) {
+        /* The pin's travel is the scrubber: thirds of it are the three steps. */
+        const r = ch.getBoundingClientRect();
+        const travel = r.height - (vh - HEADER);
+        if (travel <= 0) { setStep(ch, 0); continue; }
+        const sp = Math.min(1, Math.max(0, (HEADER - r.top) / travel));
+        setStep(ch, sp < 0.34 ? 0 : sp < 0.67 ? 1 : 2);
+      } else {
+        /* Nothing pins on a phone, so the panel's own climb up the screen is
+           the scrubber instead. It reaches its last state while it is still
+           well inside the viewport, which is the point: the reader has to be
+           looking at the panel for the panel to finish. */
+        const el = ch.querySelector('.pstick') || ch;
+        const r = el.getBoundingClientRect();
+        const p = (vh - r.top) / (vh * 0.62 + r.height * 0.38);
+        setStep(ch, p < 0.42 ? 0 : p < 0.72 ? 1 : 2);
+      }
     }
   };
   window.addEventListener('scroll', () => {
     if (!ticking) { ticking = true; requestAnimationFrame(track); }
   }, { passive: true });
+  window.addEventListener('resize', track, { passive: true });
   track();
 }
 
