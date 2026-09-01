@@ -478,11 +478,23 @@ function render() {
   // today card, which does not render until something has happened — so the
   // person it is written for, somebody who has just installed the app and is
   // wondering why nothing works, was the one person who never saw it.
-  $('pane').innerHTML = (state.mock ? mockBanner() : '') + view.body();
+  $('pane').innerHTML = (state.mock ? mockBanner() : '') + firstRunBanner() + view.body();
 
   restoreFields(fields);
   bindDisclosures();
   if (view.bind) view.bind();
+
+  // The first-run banner is drawn by the shell on every screen, so its one
+  // button is bound here rather than in any view's own bind — it would
+  // otherwise be dead on the screen the console actually opens on.
+  const sample = $('loadSample');
+  if (sample) sample.onclick = async () => {
+    sample.disabled = true;
+    sample.textContent = 'Loading…';
+    await api('/api/company/sample', { method: 'POST' });
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    go('policy');
+  };
   restoreChat(fields.chat);
 }
 
@@ -1334,6 +1346,32 @@ function emptyPolicyBanner() {
  * Both paths, because the console is served to whoever opened it: the desktop
  * app, where the fix is a menu item, and a checkout, where it is one command.
  */
+/**
+ * A genuinely fresh install: nobody in the directory, nothing in the policy.
+ *
+ * The product used to fill both in for you — every install opened as Northwind
+ * Logistics SA with seven people who do not exist and eight rules nobody wrote
+ * — and the way out was a Company block on a tab the console does not open on.
+ * Nothing is seeded now, so this is what the first screen looks like, and it
+ * says the two things that are true about it: nothing is being stopped yet,
+ * and the sample is here if you want to look around first.
+ *
+ * It disappears the moment either half stops being empty, so it cannot become
+ * furniture.
+ */
+function firstRunBanner() {
+  if (state.company.employees.length || state.policy.rules.length) return '';
+  return `<div class="banner">
+    <b>Nothing here yet — and nothing is being stopped.</b>
+    Warden only stops what you tell it to stop, so an empty policy lets everything
+    through. Write your first rule on <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
+    or add your team on <button type="button" class="linkish" data-go="people">Team</button>.
+    <div class="chips">
+      <button type="button" class="btn" id="loadSample">Load the sample company instead</button>
+    </div>
+  </div>`;
+}
+
 function mockBanner() {
   return `<div class="banner warn">
     <b>Demo mode — nothing here was judged by a real model.</b>
