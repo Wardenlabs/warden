@@ -1,8 +1,7 @@
 /*
- * Everything on this page that needs JavaScript, which is five things:
- * the light, the prompt that types itself in the hero, reveal-on-scroll,
- * the count-up on the two headline numbers, and naming the visitor's
- * platform on the download button.
+ * Everything on this page that needs JavaScript: the light in the hero, the
+ * prompt that types itself under it, reveal-on-scroll, the relay through
+ * §how, and naming the visitor's platform on the download button.
  *
  * No build step and no dependencies — see README.md. These are ES modules
  * served from the same origin, which is the same property the console has:
@@ -11,6 +10,11 @@
  */
 
 import { mountLight } from './light.js';
+
+/* Tell the watchdog in <head> that the module got here, so it leaves the
+   reveal-on-scroll hiding in place. If this line is never reached the page
+   un-hides itself rather than staying blank. */
+window.__wardenReady = true;
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -58,6 +62,42 @@ if (judge && !reduced) {
   setTimeout(step, 900);
 }
 
+/* ── the rule being written ────────────────────────────────────────────── */
+/*
+ * Same contract as the hero: the markup holds the finished state, so with no
+ * JavaScript the box simply shows the sentence already written. With it, the
+ * sentence types itself once, when the stage arrives — not on load, because it
+ * is three screens down and would be over before anyone got there.
+ *
+ * It types the rule the way a person would say it out loud, which is the claim
+ * that screen is making: what you write is a sentence, and Warden compiles it.
+ * The formal version is downstairs in the refusal, in the words it came out as.
+ */
+
+const ruleBox = document.getElementById('ruleMsg');
+
+if (ruleBox && !reduced && 'IntersectionObserver' in window) {
+  const text = ruleBox.value;
+  ruleBox.value = '';
+
+  const typeIt = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      typeIt.disconnect();
+      let i = 0;
+      const step = () => {
+        if (i < text.length) {
+          ruleBox.value = text.slice(0, ++i);
+          setTimeout(step, 34 + Math.random() * 46);
+        }
+      };
+      setTimeout(step, 420);
+    },
+    { threshold: 0.5 }
+  );
+  typeIt.observe(ruleBox);
+}
+
 /* ── reveal on scroll ──────────────────────────────────────────────────── */
 
 const revealables = document.querySelectorAll('[data-reveal]');
@@ -75,60 +115,51 @@ if (reduced || !('IntersectionObserver' in window)) {
     },
     { rootMargin: '0px 0px -12% 0px', threshold: 0.05 }
   );
-  revealables.forEach((el) => io.observe(el));
+  // The stages in §how are lit by the relay below, in order — not here.
+  revealables.forEach((el) => { if (!el.closest('#how .stages')) io.observe(el); });
 }
 
-/* ── count-up ──────────────────────────────────────────────────────────── */
+/* ── the relay through §how ────────────────────────────────────────────── */
 /*
- * Only the two numbers in the argument. A page that animates every figure on
- * it is asking to be watched rather than read, and the honest section below
- * would then be competing with its own decoration.
+ * What used to be a line of light drawn down the middle is now order in
+ * time. Each stage lights when it arrives, and stages arriving together are
+ * spaced a beat apart, so a fast scroll still reads as one event passing
+ * through three places rather than three panels appearing at once. When the
+ * refusal lands in 02, the rule written in 01 takes the hit for a moment —
+ * the claim the drawn line was making, told by the content instead.
+ *
+ * Under reduced motion, or with no IntersectionObserver, the generic reveal
+ * path above has already shown everything and none of this runs.
  */
 
-function countUp(el) {
-  const target = Number(el.dataset.count);
-  const suffix = el.dataset.suffix || '';
-  if (!Number.isFinite(target)) return;
+const stages = document.querySelector('#how .stages');
+const steps = stages ? [...stages.querySelectorAll(':scope > .stage')] : [];
 
-  if (reduced || target === 0) {
-    el.textContent = target + suffix;
-    return;
-  }
+if (steps.length && !reduced && 'IntersectionObserver' in window) {
+  const rule = document.getElementById('ruleMsg');
+  const BEAT = 620;
+  let lastLit = 0;
 
-  const DURATION = 1100;
-  let start;
-
-  const step = (now) => {
-    if (start === undefined) start = now;
-    const t = Math.min((now - start) / DURATION, 1);
-    // easeOutExpo — fast off the line, settles rather than stops.
-    const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-    el.textContent = Math.round(target * eased) + suffix;
-    if (t < 1) requestAnimationFrame(step);
-  };
-
-  requestAnimationFrame(step);
-}
-
-const counters = document.querySelectorAll('[data-count]');
-
-if (!('IntersectionObserver' in window)) {
-  counters.forEach(countUp);
-} else {
-  const co = new IntersectionObserver(
+  const io = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
-        countUp(entry.target);
-        co.unobserve(entry.target);
+        io.unobserve(entry.target);
+        const at = Math.max(performance.now(), lastLit + BEAT);
+        lastLit = at;
+        setTimeout(() => {
+          entry.target.classList.add('is-in');
+          entry.target.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-in'));
+          if (entry.target.classList.contains('stops') && rule) {
+            setTimeout(() => rule.classList.add('hit'), 360);
+            setTimeout(() => rule.classList.remove('hit'), 1600);
+          }
+        }, at - performance.now());
       }
     },
-    { threshold: 0.6 }
+    { rootMargin: '0px 0px -10% 0px', threshold: 0.12 }
   );
-  counters.forEach((el) => {
-    el.textContent = '0' + (el.dataset.suffix || '');
-    co.observe(el);
-  });
+  steps.forEach((s) => io.observe(s));
 }
 
 /* ── name the platform on the hero button ──────────────────────────────── */
@@ -145,11 +176,17 @@ const WIN = { label: 'Download for Windows', size: '273 MB', file: 'Warden-Setup
 
 const primary = document.querySelector('.hero .btn-primary');
 const alt = document.querySelector('.hero .cta .alt');
+const onWindows = /Windows|Win64|Win32/i.test(navigator.userAgent || '');
 
-if (primary && alt && /Windows|Win64|Win32/i.test(navigator.userAgent || '')) {
+if (primary && alt && onWindows) {
   primary.querySelector('.txt').textContent = WIN.label;
   primary.querySelector('.sz').textContent = WIN.size;
   primary.setAttribute('href', RELEASE + WIN.file);
   alt.textContent = MAC.other;
   alt.setAttribute('href', RELEASE + MAC.file);
 }
+
+/* And in the footer, where both installers are shown: the visitor's platform
+   goes first. Order, not emphasis — they are the same download either way. */
+const foot = document.querySelector('.foot .dl');
+if (foot && onWindows) foot.prepend(foot.lastElementChild);

@@ -4,21 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden — the local AI gateway</title>
-<meta name="description" content="Your admin writes the rules. Every prompt is judged against them before a model sees it. All inference runs on-device. Free and open source, Apache-2.0.">
+<meta name="description" content="You write the rules. Warden checks what your team sends against them, on their own computer, before it goes anywhere. 136 of 160 attempts stopped. Free and open source, Apache-2.0.">
 
 <meta property="og:title" content="Warden — the local AI gateway">
-<meta property="og:description" content="A system prompt is a request, not a control. Warden judges every prompt against ratified policy before a model sees it — on-device.">
+<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#050507">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2317181c'/%3E%3Cpath d='M50 18 82 30v26c0 22-18 34-32 40C36 90 18 78 18 56V30z' fill='none' stroke='%23fff' stroke-width='7'/%3E%3C/svg%3E">
 <!-- Reveal-on-scroll hides things, so it may only arm itself once something
-     is around to un-hide them. Without this the page is blank below the
-     hero whenever the module fails to run. Inline and parser-blocking on
-     purpose: it has to win the race against first paint, and it is one
-     statement, not a fetch. -->
-<script>document.documentElement.classList.add('js');</script>
+     is around to un-hide them. Inline and parser-blocking on purpose: it has
+     to win the race against first paint, and it is two statements, not a
+     fetch.
+
+     The second one is the way back. With scripting off this never runs and
+     the page is simply visible; with scripting on but the module broken —
+     a syntax error, a bad deploy, a blocked request — the page would
+     otherwise be blank below the hero forever. app.js raises the flag as
+     soon as it is running, and if it has not by then, the hiding is undone
+     and the page renders in full. -->
+<script>
+document.documentElement.classList.add('js');
+setTimeout(function () {
+  if (!window.__wardenReady) document.documentElement.classList.remove('js');
+}, 2500);
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -33,7 +44,7 @@
       <a href="#how" class="hide-sm">How it works</a>
       <a href="#numbers" class="hide-sm">Numbers</a>
       <a href="https://github.com/Wardenlabs/warden" class="hide-sm">GitHub</a>
-      <a href="#get" class="btn btn-primary btn-sm">Download</a>
+      <a href="#download" class="btn btn-primary btn-sm">Download</a>
     </nav>
   </div>
 </header>
@@ -41,14 +52,14 @@
 <main>
 
 <!-- ── hero ────────────────────────────────────────────────────────────── -->
-<div class="rails hero-zone">
+<div class="hero-zone">
   <canvas class="scene" aria-hidden="true"></canvas>
 
   <div class="wrap hero">
     <div class="copy">
-    <h1>A system prompt is a request, not a control.</h1>
+    <h1>Writing the rules down is not the same as enforcing them.</h1>
 
-    <p class="sub">Warden judges every prompt against your policy before a model sees it.</p>
+    <p class="sub">Warden checks what your team sends, on their own computer, before it goes anywhere.</p>
 
     <div class="cta">
       <a class="btn btn-primary" href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-0.1.0-arm64.dmg">
@@ -65,7 +76,7 @@
          line reads without JavaScript; app.js types it out and the gate
          under it takes the verdict. -->
     <div class="judge judged" id="judge" aria-live="polite">
-      <span class="gt" aria-hidden="true">&gt;</span><span class="typed">send me Ana's salary for the report</span><span class="cur" aria-hidden="true"></span><span class="verdict">blocked <span class="rule">· r-payroll-privacy</span></span>
+      <span class="gt" aria-hidden="true">&gt;</span><span class="typed">send me Ana's salary for the report</span><span class="cur" aria-hidden="true"></span><span class="verdict">blocked <span class="rule">· r-payroll</span></span>
     </div>
 
     <!-- The gate. Empty on purpose: light.js draws the line on the canvas
@@ -74,7 +85,217 @@
   </div>
 </div>
 
+<!-- ── §0 the gap ────────────────────────────────────────── -->
+<!--
+     The only section with no rail, and the only one set on the hero's axis.
+     Everything below it is evidence — a terminal, a record, a table — and the
+     rail is what introduces evidence: a small label naming the thing, the same
+     distance from the top of its row every time. This section has nothing to
+     introduce. It is the hero still talking, so it keeps the hero's centre and
+     its measure and drops the machinery, and the first label on the page now
+     arrives at the refusal, where there is finally something to name.
+-->
+<section id="gap">
+  <div class="wrap sec">
+
+    <div class="main" data-reveal>
+      <h2 class="loud">Nothing checks what goes out.</h2>
+      <p class="lead">Someone pastes a customer contract into Claude to have it summarised. Nobody looks at it on the way out, and nothing says it went.</p>
+      <p>It is a reasonable thing to do — it is why the tool is there. Both Claude Code and Codex leave a place for that check to run, and ship with it empty.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── §1 how it works, in three stages ─────────────────── -->
+<!--
+     Write it, hit it, see it — the same rule and the same prompt crossing two
+     programs, so the reader watches one event rather than reading three claims.
+
+     On the hero's axis, like the gap above it: this is still the page making
+     its case, and the rail does not start until §local, where there is an
+     artefact to name.
+
+     Both console fragments are the product's own markup and its own stylesheet,
+     lifted from web/index.html. They are cropped to one element each on purpose.
+     A whole screen of a light application redrawn dark would be a false claim
+     about how the product looks; a composer and three log rows are the page
+     drawing the product's parts in its own material. If either of these ever
+     grows a title bar and a nav, it is a screenshot again and has to go light.
+-->
+<section id="how">
+  <div class="wrap sec">
+
+    <div class="main" data-reveal>
+      <h2 class="loud">Write a rule. It stops the request.<br>You see that it did.</h2>
+    </div>
+
+    <div class="stages">
+      <div class="stage" data-reveal>
+        <div class="cap"><span class="label stepn">01</span><span class="label">You write it</span></div>
+        <div class="beat">
+          <div class="shot" data-reveal>
+            <div class="console">
+<!-- The question, the category chips and the note under them are all real,
+                   and all cut. What this stage has to show is that a rule is a
+                   sentence someone types — the box and the button say that, and
+                   every other element is the application explaining itself to a
+                   user who is already inside it. -->
+              <div class="composer">
+                <div class="hero-box">
+                  <textarea id="ruleMsg" rows="2" readonly tabindex="-1" aria-label="Describe the rule">nobody should be able to ask about someone else's salary</textarea>
+                  <span class="btn primary send">Write it</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage stops" data-reveal>
+        <div class="cap"><span class="label stepn">02</span><span class="label">They hit it</span></div>
+        <div class="beat">
+          <div class="term">
+              <div class="term-bar">claude code</div>
+              <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
+
+<span class="stop">⛔ Blocked by Warden</span>
+
+   <span class="rule">No one may request payroll, salary, bonus, or
+   compensation information about another employee.
+   HR staff are exempt.</span>
+
+   <span class="h">What to do instead</span>
+   Ask HR for anything about a specific person&#39;s pay.
+   Questions about the process, headcount, or review
+   cycles are fine to ask here.
+
+   <span class="h">These would go through</span>
+     · what is the process for asking for a raise?
+     · how many people are on the marketing team?
+
+   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1
+     (paste the same prompt, then Ctrl-D)
+
+   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-reveal>
+        <div class="cap"><span class="label stepn">03</span><span class="label">You see it happened</span></div>
+        <div class="beat">
+          <div class="shot log" data-reveal>
+            <div class="console">
+              <div class="day">Today<span class="n">12</span></div>
+              <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz's salary for the report</span><span class="rule-ref">Payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref">Customer PII</span><span class="meta">13:58</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="how-note" data-reveal>It runs on their computer, before the prompt is sent. That is why it works on the plans people actually buy: a Claude Max or ChatGPT Plus account talks to one fixed address nobody can redirect, so there is nothing to put a filter in front of.</p>
+
+  </div>
+</section>
+
+<!-- ── §4 the numbers ──────────────────────────────────── -->
+<!--
+     All eleven classes, uncurated. Any cut that hides guard-targeted and
+     volume-distraction teaches an evaluator to distrust the nine above them.
+-->
+<section id="numbers">
+  <div class="wrap sec">
+
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Measured, not claimed</span></div>
+      <div class="main"><h2 class="loud">136 of 160 attempts stopped. Without it, <span class="none">none.</span></h2></div>
+    </div>
+
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">Every class, uncut</span></div>
+      <div class="main">
+        <table>
+          <thead>
+            <tr><th scope="col">Attack class</th><th scope="col" class="n">Stopped</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="mono">multi-turn-escalation</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">language-switch</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">paraphrase-evasion</span></td><td class="n">16/16</td></tr>
+            <tr><td><span class="mono">document-borne</span></td><td class="n">8/8</td></tr>
+            <tr><td><span class="mono">direct-override</span></td><td class="n">15/16</td></tr>
+            <tr><td><span class="mono">authority-spoofing</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">roleplay-fiction</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">obfuscation</span></td><td class="n">14/16</td></tr>
+            <tr><td><span class="mono">hypothetical-testing</span></td><td class="n">13/16</td></tr>
+            <tr><td><span class="mono">guard-targeted</span></td><td class="n">8/16</td></tr>
+            <tr><td><span class="mono">volume-distraction</span></td><td class="n">2/8</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="row" data-reveal>
+      <div class="side"><span class="label">What it costs</span></div>
+      <div class="main">
+        <p>It also refused 21 of 36 requests that were perfectly fine. That is the cost of running this, and it is why <span class="mono">--rewrite</span> exists: the employee gets their own prompt back, rephrased to pass, without having to ask anyone for it.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 </main>
+
+<!--
+     No light down here. Mounted a third time the gate stopped reading as the
+     gate and started reading as a divider, so the page closes in type alone.
+-->
+<footer id="download">
+  <div class="wrap foot">
+    <!-- The page opened on "writing the rules down is not the same as
+         enforcing them" and closes by answering it, with the two installers
+         under the answer. -->
+    <p class="close">Writing them down was never the hard part.</p>
+
+    <div class="dl">
+      <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-0.1.0-arm64.dmg">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
+          <span>
+            <span class="t">macOS</span>
+            <span class="m">Apple Silicon · .dmg · 185 MB</span>
+          </span>
+          <span class="go" aria-hidden="true">↓</span>
+        </a>
+      <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.2/Warden-Setup.exe">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3zM11.1 4.5 21 3v8.5h-9.9zM3 12.4h7.2v6.9L3 18.4zM11.1 12.4H21V21l-9.9-1.4z"/></svg>
+          <span>
+            <span class="t">Windows</span>
+            <span class="m">x64 · .exe · 273 MB</span>
+          </span>
+          <span class="go" aria-hidden="true">↓</span>
+        </a>
+    </div>
+    <p class="fine">Free and open source · no server to set up and no account to create · no Intel Mac build yet</p>
+
+    <div class="links">
+      <a class="brand" href="https://github.com/Wardenlabs/warden" aria-label="Warden"><svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="329.92 465.98 411.56 411.56" fill="currentColor" role="img" aria-label="Warden"><path fill-rule="evenodd" d="M 533.097 473.896 C 538.686 473.076 566.931 487.167 574.826 490.581 C 617.361 508.686 661.059 523.926 705.627 536.199 C 705.37 561.895 705.3 587.592 705.416 613.288 C 705.441 640.94 707.47 673.696 699.046 699.72 C 673.21 779.541 608.686 831.238 538.355 869.477 C 530.143 872.817 475.337 833.735 466.973 827.15 C 455.676 818.297 444.906 808.792 434.716 798.684 C 402.538 766.414 373.231 721.428 367.167 675.348 C 365.155 660.064 365.868 636.098 365.873 620.046 L 365.959 536.123 C 421.364 521.555 481.205 498.238 533.097 473.896 z M 535.535 507.27 C 538.793 508.356 543.437 510.556 546.646 512.028 C 588.801 531.364 631.674 546.041 675.87 559.997 L 676.006 626.754 C 676.021 640.715 676.64 658.519 674.641 671.888 C 672.861 683.051 669.725 693.954 665.305 704.357 C 646.004 750.783 608.038 787.959 567.339 816.182 C 559.466 821.641 544.49 831.847 535.621 835.484 C 508.9 821.464 476.937 797.348 455.754 776.151 C 428.933 749.312 401.917 710.121 396.696 671.653 C 394.966 658.902 395.457 638.781 395.451 625.269 L 395.405 559.97 C 442.188 545.38 491.305 528.569 535.535 507.27 z"/><path d="M 423.179 585.437 C 429.592 588.254 445.443 598.306 452.157 602.336 C 464.837 638.182 477.265 674.117 489.441 710.138 C 498.025 695.705 505.705 680.77 514.135 666.334 C 520.943 654.675 523.675 652.502 535.79 649.234 C 536.702 649.488 537.613 649.748 538.522 650.015 C 553.114 654.314 556.271 664.73 563.405 677.114 C 569.749 688.126 575.748 699.466 581.842 710.627 C 583.381 705.347 585.387 699.768 587.219 694.553 C 597.979 663.913 607.968 632.628 619.561 602.309 C 628.036 596.796 639.444 590.718 648.582 585.098 C 649.249 617.809 647.077 617.651 636.039 648.044 C 630.474 663.426 625.082 678.871 619.864 694.374 C 614.372 710.846 607.822 733.916 600.118 749.008 C 598.756 751.677 583.325 765.229 579.864 768.335 C 575.02 761.199 568.375 748.714 563.93 740.911 C 554.618 724.442 545.166 708.053 535.575 691.746 C 520.817 717.124 506.371 742.683 492.242 768.417 C 485.84 762.83 471.216 751.455 468.605 743.886 C 460.695 720.965 453.103 697.9 445.224 674.955 C 438.061 654.099 430.065 633.401 423.672 612.322 C 422.532 608.559 423.09 590.363 423.179 585.437 z"/></svg><svg class="word" xmlns="http://www.w3.org/2000/svg" viewBox="784.13 560.47 949.36 194.01" fill="currentColor" role="img" aria-label="warden"><path fill-rule="evenodd" d="M 1390.23 560.493 C 1399.39 560.408 1408.79 560.578 1417.97 560.644 L 1417.92 751.038 L 1389.95 751.033 L 1389.9 731.81 C 1369.37 757.58 1334.7 759.654 1306.89 744.933 C 1302.1 742.017 1297.7 738.497 1293.8 734.459 C 1252.95 692.205 1282.4 612.706 1344.37 616.846 C 1364.26 618.175 1376.39 624.662 1389.74 639.158 C 1390.14 617.419 1388.36 580.826 1390.23 560.493 z M 1341.28 641.911 C 1365.36 638.77 1387.43 655.776 1390.52 679.869 C 1393.62 703.961 1376.57 725.991 1352.47 729.039 C 1328.44 732.079 1306.48 715.087 1303.39 691.06 C 1300.31 667.034 1317.26 645.044 1341.28 641.911 z"/><path d="M 784.133 620.2 L 814.39 620.032 L 847.112 716.56 C 858.139 684.328 869.38 652.17 880.832 620.087 L 909.067 620.094 C 919.461 651.287 932.195 685.512 943.837 716.348 C 953.679 684.431 965.799 652.02 976.056 620.081 L 1006.12 620.199 L 996.937 645.783 C 983.506 680.031 970.918 716.319 958.398 751.051 L 929.184 751.131 C 917.862 719.625 906.354 688.186 894.66 656.816 L 860.493 751.112 L 831.617 751.091 C 815.474 710.096 799.48 662.181 784.133 620.2 z"/><path fill-rule="evenodd" d="M 1073.69 617.385 C 1099.29 613.567 1134.84 625.769 1138.63 654.944 C 1142.61 685.557 1140.58 719.865 1140.84 751.08 L 1114.04 751.021 L 1113.77 733.958 C 1091.83 760.614 1044.34 762.266 1023.89 733.191 C 1006.43 697.12 1033.78 675.121 1067.72 672.34 C 1082.74 671.109 1097.21 671.914 1111.97 670.464 C 1112.79 670.383 1113.2 668.889 1113.6 668.095 C 1113.61 664.06 1113.05 662.945 1111.92 659.325 C 1105 637.036 1077.76 636.147 1059.55 643.752 C 1052.11 646.856 1048.47 650.055 1042.18 655.879 L 1026.46 638.787 C 1040.43 624.377 1054.11 619.507 1073.69 617.385 z M 1074.18 691.324 C 1082.89 690.327 1103.6 690.926 1113.08 690.983 C 1113.38 713.68 1108.72 723.735 1086.33 731.118 C 1072.35 734.298 1049.76 732.902 1047.01 714.837 C 1046.32 710.246 1047.52 705.573 1050.34 701.882 C 1056.36 694.043 1065.1 692.617 1074.18 691.324 z"/><path fill-rule="evenodd" d="M 1506.51 617.288 C 1534.61 614.056 1561.3 626.328 1573.27 652.621 C 1579.68 666.717 1579.78 678.786 1579.65 693.797 L 1474.93 693.817 C 1481.8 735.032 1526.86 742.727 1553.01 713.629 L 1553.78 712.906 C 1557.51 712.816 1570.07 724.6 1573.72 727.705 C 1561.5 741.856 1551.04 748.83 1531.86 752.644 C 1464.92 765.955 1422.75 698.621 1460.09 643.216 C 1470.35 628.002 1488.07 620.051 1506.51 617.288 z M 1506.75 640.202 C 1532.39 637.588 1547.14 647.929 1552.39 673.183 L 1521.5 673.286 L 1475.07 673.098 C 1479.59 653.606 1487.87 645.666 1506.75 640.202 z"/><path d="M 1673.92 617.301 C 1699.4 613.707 1727.61 628.952 1731 654.684 C 1734.9 684.289 1733.06 721.033 1733 751.098 L 1705.16 751.05 C 1704.61 715.003 1720.57 621.103 1656.77 644.783 C 1641.69 653.173 1637.78 668.414 1637.8 684.711 C 1637.83 706.825 1637.96 728.939 1637.9 751.054 L 1609.44 751.082 L 1609.4 620.123 L 1637.41 620.075 L 1637.35 638.727 C 1648.17 624.841 1656.52 620.214 1673.92 617.301 z"/><path d="M 1243.06 617.311 C 1248.2 616.797 1253.93 617.717 1259.13 618.333 L 1259.06 645.743 C 1244.81 642.562 1230.73 641.76 1219.4 652.849 C 1205.45 666.504 1206.55 686.795 1206.66 704.739 C 1206.75 720.153 1206.74 735.614 1206.76 751.044 L 1179.12 751.091 C 1178.36 748.092 1178.65 718.704 1178.65 714.196 L 1178.81 620.158 L 1206.9 620.116 L 1206.76 640.519 C 1207.78 638.931 1208.85 637.372 1209.96 635.843 C 1218.79 623.794 1228.72 619.415 1243.06 617.311 z"/></svg></a>
+      <span class="sep" aria-hidden="true">·</span>
+      <span>Apache-2.0</span>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="https://github.com/Wardenlabs/warden">GitHub</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="https://github.com/Wardenlabs/warden/blob/main/REPORT.md">REPORT.md</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="https://github.com/Wardenlabs/warden/blob/main/BENCHMARKS.md">BENCHMARKS.md</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <span class="mono">040f4e4</span>
+    </div>
+  </div>
+</footer>
 
 <script type="module" src="app.js"></script>
 
