@@ -35,9 +35,9 @@
 import { discardDirectory, isUnrequestedSample } from './people.js';
 import { discardPolicy, isShippedSeed } from './store.js';
 
-export function dropUnrequestedSample(seedPath: string): boolean {
-  if (!isUnrequestedSample()) return false;
-  if (!isShippedSeed(seedPath)) return false;
+export function dropUnrequestedSample(policySeed: string, companySeed: string): boolean {
+  if (!isUnrequestedSample(companySeed)) return false;
+  if (!isShippedSeed(policySeed)) return false;
 
   discardDirectory();
   discardPolicy();

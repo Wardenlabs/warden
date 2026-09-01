@@ -23,6 +23,17 @@ import { dirname } from 'node:path';
 import { z } from 'zod';
 
 const COMPANY_PATH = process.env['WARDEN_COMPANY_PATH'] ?? 'data/company.json';
+
+/**
+ * Fallback location of the shipped sample, and only a fallback.
+ *
+ * It is relative to the working directory, which is right for a checkout and
+ * wrong for the desktop app: there the working directory is the user's data
+ * folder and the seed is in the bundle, so this resolves to a file that does
+ * not exist and "Load the sample company" answered "no sample company is
+ * bundled with this build" on a build that bundles one. Callers that know where
+ * the bundle is — the server, which has `ASSETS` — pass the path instead.
+ */
 const SEED_PATH = process.env['WARDEN_COMPANY_SEED'] ?? 'data/seed/company.json';
 
 export const employeeSchema = z.object({
@@ -123,8 +134,8 @@ export function loadDirectory(): Directory {
  * are judged. So the seed carries placeholders and this issues the real ones,
  * which also means no two installs share a key.
  */
-export function loadSampleCompany(): Directory {
-  const seeded = readIfPresent(SEED_PATH);
+export function loadSampleCompany(seedPath = SEED_PATH): Directory {
+  const seeded = readIfPresent(seedPath);
   if (!seeded) throw new Error('no sample company is bundled with this build');
 
   const issued: Directory = {
@@ -380,9 +391,27 @@ export function clearDemoDirectory(companyName?: string): Directory {
  * company name into is not demo any more; a sample somebody loaded on purpose
  * has the stamp. Both are false here, and both are kept.
  */
-export function isUnrequestedSample(): boolean {
+export function isUnrequestedSample(seedPath = SEED_PATH): boolean {
   const current = loadDirectory();
-  return current.demo === true && current.sampleInstalledAt === undefined;
+  if (current.demo !== true || current.sampleInstalledAt !== undefined) return false;
+
+  // And nobody has been added, removed or renamed since. `demo` is cleared by
+  // naming the company and by clearing the sample, and by nothing else — so an
+  // administrator who kept the sample and added one real teammate to it still
+  // has `demo: true` on disk, and without this check the migration would delete
+  // that person. The roster is the evidence: identical to the shipped one means
+  // the file is still entirely ours.
+  const seeded = readIfPresent(seedPath);
+  if (!seeded) return false;
+  const roster = (d: Directory): string =>
+    d.employees
+      .map((e) => `${e.id}\u0000${e.name}\u0000${e.role}`)
+      .sort()
+      .join('\u0001');
+  if (roster(current) !== roster(seeded)) return false;
+
+  // Renaming a role, or adding one, is the same kind of evidence.
+  return [...current.roles].sort().join(',') === [...seeded.roles].sort().join(',');
 }
 
 /**

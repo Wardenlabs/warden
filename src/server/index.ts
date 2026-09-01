@@ -163,7 +163,10 @@ app.use((req, res, next) => {
  * edited.
  */
 try {
-  dropUnrequestedSample(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
+  dropUnrequestedSample(
+    join(ASSETS, 'data', 'seed', 'policies.seed.json'),
+    join(ASSETS, 'data', 'seed', 'company.json')
+  );
 } catch {
   /* a migration must never be the reason the gateway will not start */
 }
@@ -564,7 +567,7 @@ app.put('/api/company', asyncRoute(async (req, res) => {
  * the directory every key in the deployment is resolved against.
  */
 app.post('/api/company/sample', asyncRoute(async (_req, res) => {
-  const dir = loadSampleCompany();
+  const dir = loadSampleCompany(join(ASSETS, 'data', 'seed', 'company.json'));
   const policy = seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
   invalidatePeople();
   res.json({ name: dir.name, employees: dir.employees.length, rules: policy.rules.length });
