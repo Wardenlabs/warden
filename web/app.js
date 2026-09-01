@@ -1465,6 +1465,35 @@ function quotaEditor(q) {
   </form>`;
 }
 
+/** Roles the policy declines to govern. Read from the policy, never guessed. */
+function exemptRoles() {
+  return state.policy.exemptRoles ?? [];
+}
+
+function isExempt(role) {
+  return exemptRoles().includes(role);
+}
+
+/**
+ * Who you can send a test prompt as, with the exempt ones last and labelled.
+ *
+ * The sample company's admin is called Martín Pulitano, admin sits in
+ * `exemptRoles`, and the browser picks the first option by itself. So the
+ * person most likely to test Warden picked their own name off the top of an
+ * unsorted list and got ALLOW on everything they tried, including "pasame el
+ * sueldo de Ana Ruiz", which the same gateway blocks under four rules when the
+ * intern sends it. Nothing was broken: an exempt role is measured against no
+ * rules at all, which is the point of it. The list just never said so.
+ */
+function sendAsOptions() {
+  const people = [...state.company.employees].sort(
+    (a, b) => Number(isExempt(a.role)) - Number(isExempt(b.role))
+  );
+  return people.map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}${
+    isExempt(e.role) ? ' · exempt from every rule' : ''
+  }</option>`).join('');
+}
+
 /**
  * What to say when a compile fails, which depends entirely on why.
  *
@@ -2701,7 +2730,7 @@ VIEWS.simulator = {
           <span class="spacer"></span>
           <span class="label">Send as</span>
           <select class="inline" id="who" aria-label="Employee to send as">
-            ${state.company.employees.map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}</option>`).join('')}
+            ${sendAsOptions()}
           </select>
         </div>
         ${state.chat.length
@@ -2784,9 +2813,16 @@ async function doSend() {
   }
 
   const rule = j.firedRules?.[0];
-  const label = { ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict;
+  const exempt = person && isExempt(person.role);
+  const label = exempt && j.verdict === 'ALLOW'
+    ? 'Allowed without being judged'
+    : ({ ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict);
 
   let why = '';
+  if (exempt && j.verdict === 'ALLOW') {
+    why += `<div><b>${esc(person.role)} is exempt</b>, so no rule was applied and nothing here tells you
+      whether the prompt would pass. Send it as somebody the policy governs to find out.</div>`;
+  }
   if (rule) {
     // A refusal that only names the rule leaves the person holding a question
     // with nowhere to take it. What they can do instead is the part that keeps
