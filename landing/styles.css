@@ -246,10 +246,10 @@ section {
    the argument and the demo; soft, it is a detail. And §how used to hand off
    to the section below it across ~500px of black — its own bottom air plus the section
    gap — which read as the page ending twice. Both trimmed. */
-#how { padding-bottom: var(--s-8); }
+#how { padding-bottom: var(--s-7); }
 #spend { padding-block: var(--s-8) var(--s-10); }
 
-.sec { display: grid; gap: var(--s-9); }
+.sec { display: grid; gap: var(--s-7); }
 
 .row {
   display: grid;
@@ -1290,7 +1290,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 
 /* Wide screens: the stage pins a full screen and the scroll drives it. */
 @media (min-width: 900px) {
-  .chapter { min-height: 235vh; min-height: 235svh; }
+  .chapter { min-height: 205vh; min-height: 205svh; }
   .stage {
     position: sticky;
     top: 56px;
