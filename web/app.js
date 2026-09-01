@@ -48,8 +48,8 @@ const adminKey = () => {
 const askForAdminKey = () => {
   const entered = window.prompt(
     'This gateway wants an administrator key.\n\n' +
-      'Paste the API key of a person whose role the policy exempts — People → ' +
-      'that person → API key. It is kept for this browser tab only.'
+      'Paste the API key of somebody whose role the policy exempts. Team, then ' +
+      'that person, then API key. It stays in this browser tab and nowhere else.'
   );
   if (!entered) return false;
   try {
@@ -874,7 +874,7 @@ VIEWS.activity = {
     return `<div class="sheet">
       ${filtered ? '' : todayCard()}
       ${activityToolbar()}
-      ${decisionRows(rows, '<div class="empty"><b>Nothing matches</b><span>No decision in the log fits these filters. Clear one to widen the search.</span></div>')}
+      ${decisionRows(rows, '<div class="empty"><b>Nothing matches</b><span>Nothing in the log matches. Drop a filter.</span></div>')}
     </div>`;
   }
 };
@@ -896,7 +896,7 @@ VIEWS.inbox = {
     if (!state.appeals.length && !state.escalations.length) {
       return `<div class="sheet"><div class="empty">
         <b>Nothing waiting</b>
-        <span>Two things land here: requests Warden held instead of deciding, and blocks an employee said were wrong.</span>
+        <span>Held requests wait here for your call, next to blocks somebody says were wrong.</span>
       </div></div>`;
     }
     return `<div class="sheet">
@@ -1325,8 +1325,8 @@ function cliNote(providerId) {
   const found = cliFor(providerId);
   if (!found) return '';
   return found.found
-    ? `<span class="note good">Found on this machine. It will use the session you are already signed in to, with no API key.</span>`
-    : `<span class="note bad">Not found on this machine. Install <span class="mono">${esc(found.tool)}</span> and sign in, then reopen this page.</span>`;
+    ? `<span class="note good">Found. It uses the session you are already signed in to, so there is no key to paste and no second bill.</span>`
+    : `<span class="note bad">Not on this machine. Install <span class="mono">${esc(found.tool)}</span>, sign in, then come back to this page.</span>`;
 }
 
 function compilerLine() {
@@ -1363,7 +1363,7 @@ function rulesBody() {
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')
-      : '<div class="empty"><b>Warden is enforcing nothing yet</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
+      : '<div class="empty"><b>No rules yet, so nothing gets stopped</b><span>Every prompt your team sends goes straight through until you write one.</span></div>'}
 
     ${state.policy.rules.length ? `<div class="row-actions">
       <button type="button" class="btn quiet" id="clearSample">Take out what came with Warden</button>
@@ -1532,7 +1532,7 @@ function bindSweeps() {
     // broken: the policy is already all theirs.
     if (!j.people && !j.rules && !j.quotas) {
       clear.insertAdjacentHTML('afterend',
-        '<span class="note">Nothing here came with Warden. Every rule and person is yours.</span>');
+        '<span class="note">Nothing here came with Warden. Every rule and every person is yours.</span>');
     }
   };
 
@@ -1658,9 +1658,9 @@ function emptyPolicyBanner() {
 function firstRunBanner() {
   if (state.company.employees.length || state.policy.rules.length) return '';
   return `<div class="banner">
-    <b>Warden is not stopping anything yet.</b> Write a rule on
+    <b>Nothing is being stopped yet.</b> Write a rule on
     <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
-    or add people on <button type="button" class="linkish" data-go="people">Team</button>.
+    or put your team in on <button type="button" class="linkish" data-go="people">Team</button>.
     <div class="chips">
       <button type="button" class="btn" id="loadSample">Load the sample company instead</button>
     </div>
@@ -1681,13 +1681,13 @@ function firstRunBanner() {
  */
 function mockBanner() {
   return `<div class="banner warn">
-    <b>Demo mode: nothing here is real.</b> No model has judged anything on this screen.
+    <b>Demo mode. None of this is real.</b> No model has judged anything you see here.
     ${state.canLeaveDemo
       ? `<div class="banner-act">
            <button type="button" class="btn primary" id="getModels">Download the models</button>
-           <span class="note">About 1.8&nbsp;GB, once. Warden restarts when they land.</span>
+           <span class="note">1.8&nbsp;GB, once. Warden restarts by itself when they land.</span>
          </div>`
-      : '<div class="note">Run <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>'}
+      : '<div class="note">Run <span class="mono">pnpm run setup</span>. 1.8&nbsp;GB, once.</div>'}
   </div>`;
 }
 
@@ -2321,7 +2321,7 @@ VIEWS.people = {
     ${companyBlock()}
     ${state.company.employees.length
       ? state.company.employees.map(personRow).join('')
-      : '<div class="empty"><b>Nobody yet</b><span>Add the first person below to issue them a key.</span></div>'}
+      : '<div class="empty"><b>Nobody yet</b><span>Add somebody below and Warden issues them a key.</span></div>'}
 
     <div class="section">
       <div class="label">Add someone</div>
@@ -2399,7 +2399,7 @@ function bindPeopleList() {
     const people = state.company.employees.length;
     if (!confirm(
       `Remove ${people === 1 ? 'the 1 person' : `all ${people} people`} and issue the administrator a new key?\n\n` +
-      'Their existing keys stop working immediately. Your rules are left alone.'
+      'Their keys stop working right away. Your rules stay.'
     )) return;
     const { ok, j } = await api('/api/company/reset', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -2706,7 +2706,7 @@ VIEWS.simulator = {
         </div>
         ${state.chat.length
           ? state.chat.map(renderMessage).join('')
-          : '<div class="empty"><b>See what Warden would do</b><span>Pick someone and send a prompt as them. Nothing here is privileged; it goes through the gateway on their own key, like any other request.</span></div>'}
+          : '<div class="empty"><b>See what Warden would do</b><span>Send a prompt as somebody on your team. It runs on their key and gets judged like anything else they send.</span></div>'}
       </div>
     </div>
     <div class="composer">
@@ -2922,7 +2922,7 @@ VIEWS.redteam = {
     </div>`;
 
     if (!s) {
-      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite, or load the most recent report, to see how the guard holds up against known attacks.</span></div></div>`;
+      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite to see how the guard does against attacks somebody already wrote down.</span></div></div>`;
     }
     const attacks = (s.warden ?? []).filter((c) => !c.isControl);
     const controls = (s.warden ?? []).filter((c) => c.isControl);

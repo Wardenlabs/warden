@@ -12,7 +12,7 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { bindsActor } from './audience.js';
 import { policySpecSchema, quotaSchema, ruleSchema, type PolicySpec, type Rule, type Quota } from './types.js';
 
@@ -146,6 +146,33 @@ export function isShippedSeed(seedPath: string): boolean {
  *
  * Returns how many of each went, so the boot can say it out loud.
  */
+/**
+ * Every version of a sample rule this repo has shipped.
+ *
+ * `discardSeededRules` recognises a seeded rule by comparing it to the file we
+ * ship, which quietly stops working the moment anybody improves the sample
+ * policy's prose: an install already holding last version's wording becomes
+ * unrecognisable, and the sweep written to remove it removes nothing. That is
+ * not hypothetical. The `text` of all eight was rewritten in one pass and the
+ * `guidance` of two more in another, and the second one is the reason this
+ * stores whole rules rather than just their text: matching on text alone left
+ * `r-instruction-override` and `r-credentials` behind, because a semicolon had
+ * replaced a dash in a field nobody thought of.
+ *
+ * A rule the administrator edited matches no version in here and survives.
+ */
+function retiredRules(seedDir: string): unknown[] {
+  const path = join(seedDir, 'retired-rules.json');
+  if (!existsSync(path)) return [];
+  try {
+    const doc = JSON.parse(readFileSync(path, 'utf8')) as { rules?: unknown[] };
+    return doc.rules ?? [];
+  } catch {
+    // A malformed history means we recognise less, never more.
+    return [];
+  }
+}
+
 export function discardSeededRules(seedPath: string): { rules: number; quotas: number } {
   const none = { rules: 0, quotas: 0 };
   if (!existsSync(seedPath)) return none;
@@ -172,7 +199,12 @@ export function discardSeededRules(seedPath: string): { rules: number; quotas: n
     const parsed = quotaSchema.safeParse(q);
     return parsed.success ? JSON.stringify(parsed.data) : null;
   };
-  const shippedRules = new Set((seed.rules ?? []).map(canon).filter((x): x is string => x !== null));
+  // What we ship now, plus every version of it we have ever shipped.
+  const shippedRules = new Set<string>();
+  for (const raw of [...(seed.rules ?? []), ...retiredRules(dirname(seedPath))]) {
+    const key = canon(raw);
+    if (key !== null) shippedRules.add(key);
+  }
   const shippedQuotas = new Set(
     (seed.quotas ?? []).map(canonQuota).filter((x): x is string => x !== null)
   );
