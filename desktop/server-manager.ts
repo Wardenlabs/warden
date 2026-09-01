@@ -89,9 +89,30 @@ export function startServer(
   };
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];
-  // The shell may itself have been started oddly; never leak this into the
-  // child, where it would change how *its* own spawns behave.
-  delete env['ELECTRON_RUN_AS_NODE'];
+  /*
+   * Set, not deleted, and the reason is the one thing in this file that decides
+   * whether on-device inference runs at all.
+   *
+   * The gateway is an Electron `utilityProcess`, so its `process.execPath` is
+   * the Electron binary, not node. Anything it spawns from that path launches a
+   * whole Electron app unless this variable says otherwise, and a whole Electron
+   * app does not speak the QVAC worker's RPC protocol: it just sits there until
+   * the SDK gives up with "RPC initialization timed out after 30000ms, the
+   * worker process may have failed to start". Which is the error reported from
+   * a packaged install that had finished downloading its models.
+   *
+   * This line used to delete the variable, to stop an oddly-started shell from
+   * leaking it. That is worth nothing here (the gateway's one other spawn, the
+   * red-team runner in `server/index.ts`, sets it explicitly for exactly this
+   * reason) and it costs the SDK's worker.
+   *
+   * NOT VERIFIED. It explains the symptom exactly and it matches what this repo
+   * already does one directory over, but reproducing it needs a packaged build
+   * with the models downloaded, and that has not been done. If a gateway log
+   * still shows the RPC timeout after this, the cause is somewhere else and
+   * this line is not it.
+   */
+  env['ELECTRON_RUN_AS_NODE'] = '1';
 
   const child: Child = utilityProcess.fork(config.entry, [], {
     cwd: config.cwd,
