@@ -51,6 +51,39 @@ export const COMPILER_PROVIDERS = [
     models: [],
     note: 'Same idea, through the codex CLI. Wired from its docs and NOT yet watched working.'
   },
+  // The rest of the agent CLIs people actually have. Each is wired from its own
+  // documented non-interactive flag and none has been watched work here, which
+  // the note says. `detectCliTools()` greys out whatever is not installed, so a
+  // long list costs nothing: you only ever see the ones on your machine as
+  // available.
+  {
+    id: 'gemini-cli',
+    label: 'Gemini CLI on this machine',
+    baseUrl: '',
+    models: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+    note: 'Uses the gemini CLI you are signed in to. Wired from its docs and NOT yet watched working.'
+  },
+  {
+    id: 'opencode-cli',
+    label: 'opencode on this machine',
+    baseUrl: '',
+    models: [],
+    note: 'The one Warden already hooks into. Wired from its docs and NOT yet watched working.'
+  },
+  {
+    id: 'cursor-cli',
+    label: 'Cursor on this machine',
+    baseUrl: '',
+    models: [],
+    note: 'Needs the cursor-agent CLI, not just the editor. Wired from its docs and NOT yet watched working.'
+  },
+  {
+    id: 'copilot-cli',
+    label: 'GitHub Copilot on this machine',
+    baseUrl: '',
+    models: [],
+    note: 'Uses the copilot CLI you are signed in to. Wired from its docs and NOT yet watched working.'
+  },
   {
     id: 'anthropic',
     label: 'Anthropic',

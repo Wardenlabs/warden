@@ -1244,9 +1244,40 @@ app.get('/health', (_req, res) =>
     // it out loud on the screen where the text is shown.
     prompts: promptsEnabled() ? retentionSummary() : null,
     mode: process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden',
-    models: modelState
+    models: modelState,
+    // Whether there is a desktop shell listening that could actually fetch the
+    // models. In a browser against a checkout there is not, and the console has
+    // to offer the command instead of a button that would do nothing.
+    canLeaveDemo: parentPort !== undefined
   })
 );
+
+/**
+ * Leave demo mode: fetch the models and restart into real inference.
+ *
+ * This existed only as `Gateway → Download models & leave demo mode…` in the
+ * desktop menu bar. The banner on every screen told people where that was and
+ * they did not find it, which is a fair outcome for a menu three levels into a
+ * submenu nobody opens — "I can't see where to download the models" is the
+ * report, and the answer is a button where the sentence about it already is.
+ *
+ * The console window deliberately has no preload — it is the same console a
+ * browser gets, and giving it Electron powers would end that. So the request
+ * goes to the gateway, which already holds a message channel to the desktop
+ * shell for shutdown, and the shell does the work. A browser pointed at the
+ * gateway reaches the same route and gets the same thing, which is correct:
+ * it is the machine holding the models that downloads them.
+ *
+ * Administrative like everything not on the employee allowlist. It has exactly
+ * the power the menu item has, and the menu item is on the same machine.
+ */
+app.post('/api/gateway/leave-demo', (_req, res) => {
+  if (!parentPort) {
+    return res.status(409).json({ error: 'No desktop app here. Run `pnpm run setup` instead.' });
+  }
+  parentPort.postMessage('leave-demo');
+  res.status(202).json({ ok: true });
+});
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`\nWarden  (adapter=${adapterName()})`);
@@ -1291,7 +1322,12 @@ process.on('SIGINT', gracefulExit);
 // Electron wraps each message in a MessageEvent while a bare value is accepted
 // too in case that wrapper ever changes.
 const parentPort = (
-  process as unknown as { parentPort?: { on: (ev: 'message', fn: (msg: unknown) => void) => void } }
+  process as unknown as {
+    parentPort?: {
+      on: (ev: 'message', fn: (msg: unknown) => void) => void;
+      postMessage: (msg: unknown) => void;
+    };
+  }
 ).parentPort;
 parentPort?.on('message', (msg) => {
   const data = msg && typeof msg === 'object' && 'data' in msg ? (msg as { data: unknown }).data : msg;

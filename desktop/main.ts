@@ -160,7 +160,13 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       adapter: settings.adapter,
       logPath: logPath()
     },
-    onGatewayExit
+    onGatewayExit,
+    // The console's "Download models" button, arriving the long way round: the
+    // console has no preload, so it POSTs to the gateway and the gateway relays
+    // it here. Same action as the menu item, from where people look for it.
+    (msg) => {
+      if (msg === 'leave-demo' && settings.adapter === 'mock') leaveDemoMode();
+    }
   );
 
   const health = await waitHealthy(port, 30_000);

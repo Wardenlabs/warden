@@ -74,7 +74,7 @@ import {
 /** The one role this file will answer for. Everything else is the guard. */
 const CLI_ROLE: ModelRole = 'compiler';
 
-export type CliTool = 'claude' | 'codex';
+export type CliTool = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor-agent' | 'copilot';
 
 export type CliCompilerConfig = {
   tool: CliTool;
@@ -86,11 +86,25 @@ export type CliCompilerConfig = {
 /**
  * Tools we know how to drive, and exactly how.
  *
- * `claude` is verified — the invocation below was run and its output parsed.
- * `codex` is written from its documented `exec` subcommand and **has not been
- * watched work here**, which the console says beside it rather than leaving
- * somebody to find out. This repo does not get to call something verified
+ * The list is generous on purpose and honest about it, which only works
+ * together. `detectCliTools()` runs `which` over these names, so a tool that is
+ * not installed shows in the console as "not found" rather than as a promise —
+ * nobody is offered something their machine cannot do. And `verified` says
+ * whether the invocation below was actually run here and its output parsed:
+ * only `claude` was. The other five are written from each CLI's documented
+ * non-interactive flag and **have not been watched work here**, which the
+ * console says beside them. This repo does not get to call something verified
  * because it looks right.
+ *
+ * The shape each one needs is the same and it is narrow: take a prompt on
+ * stdin, print one answer to stdout, do not open a session, do not touch the
+ * repository. Where a CLI has a way to say "and no tools", it is said. Where it
+ * does not, `cwd: tmpdir()` is still underneath it — an agent with tools and no
+ * repository can do considerably less than one with both.
+ *
+ * Adding another is this table plus a `COMPILER_PROVIDERS` entry, and nothing
+ * else: the role gate lives in the adapter, not per tool, so a new row here
+ * cannot widen what leaves the machine.
  */
 const TOOLS: Record<CliTool, {
   label: string;
@@ -114,6 +128,33 @@ const TOOLS: Record<CliTool, {
     label: 'Codex',
     verified: false,
     args: (model) => ['exec', ...(model ? ['--model', model] : [])]
+  },
+  gemini: {
+    label: 'Gemini CLI',
+    verified: false,
+    // `-p` is its non-interactive prompt flag; the prompt still arrives on
+    // stdin, which is what keeps it off argv.
+    args: (model) => ['-p', ...(model ? ['--model', model] : [])]
+  },
+  opencode: {
+    label: 'opencode',
+    verified: false,
+    // The one already integrated on the hook side, so somebody governing
+    // opencode with Warden very likely has it. `run` is its one-shot form.
+    args: (model) => ['run', ...(model ? ['--model', model] : [])]
+  },
+  'cursor-agent': {
+    label: 'Cursor',
+    verified: false,
+    // Cursor the editor has no headless mode; `cursor-agent` is the CLI that
+    // does, and it is what this looks for. Somebody who only has the editor
+    // sees "not found", which is the truthful answer rather than a broken one.
+    args: (model) => ['-p', ...(model ? ['--model', model] : [])]
+  },
+  copilot: {
+    label: 'GitHub Copilot CLI',
+    verified: false,
+    args: (model) => ['-p', ...(model ? ['--model', model] : [])]
   }
 };
 
@@ -131,9 +172,31 @@ export function cliToolVerified(tool: CliTool): boolean {
  * Environment first, then the console's saved settings — the same precedence
  * `remote.ts` uses, so there is one rule in the reader's head and not two.
  */
+/**
+ * The provider id the console saves, and the binary it means.
+ *
+ * One table rather than a chain of `if`s, because the chain was the thing that
+ * had to be edited in three places to add a tool and was therefore the thing
+ * that would be edited in two.
+ */
+const PROVIDER_TOOL: Record<string, CliTool> = {
+  'claude-cli': 'claude',
+  'codex-cli': 'codex',
+  'gemini-cli': 'gemini',
+  'opencode-cli': 'opencode',
+  'cursor-cli': 'cursor-agent',
+  'copilot-cli': 'copilot'
+};
+
+function toolFromEnv(): CliTool | null {
+  const raw = process.env['WARDEN_COMPILER_CLI']?.trim();
+  if (!raw) return null;
+  return raw in TOOLS ? (raw as CliTool) : null;
+}
+
 export function cliCompilerConfig(): CliCompilerConfig | null {
-  const fromEnv = process.env['WARDEN_COMPILER_CLI']?.trim();
-  if (fromEnv === 'claude' || fromEnv === 'codex') {
+  const fromEnv = toolFromEnv();
+  if (fromEnv) {
     return {
       tool: fromEnv,
       model: process.env['WARDEN_COMPILER_MODEL']?.trim() ?? '',
@@ -142,16 +205,13 @@ export function cliCompilerConfig(): CliCompilerConfig | null {
   }
 
   const saved = loadCompilerSettings();
-  if (saved.provider === 'claude-cli') return { tool: 'claude', model: saved.model.trim(), timeoutMs: 120_000 };
-  if (saved.provider === 'codex-cli') return { tool: 'codex', model: saved.model.trim(), timeoutMs: 120_000 };
-  return null;
+  const tool = PROVIDER_TOOL[saved.provider];
+  return tool ? { tool, model: saved.model.trim(), timeoutMs: 120_000 } : null;
 }
 
 export function cliCompilerSource(): 'env' | 'settings' | null {
-  const fromEnv = process.env['WARDEN_COMPILER_CLI']?.trim();
-  if (fromEnv === 'claude' || fromEnv === 'codex') return 'env';
-  const saved = loadCompilerSettings().provider;
-  return saved === 'claude-cli' || saved === 'codex-cli' ? 'settings' : null;
+  if (toolFromEnv()) return 'env';
+  return PROVIDER_TOOL[loadCompilerSettings().provider] ? 'settings' : null;
 }
 
 /**
