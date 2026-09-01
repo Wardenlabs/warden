@@ -71,22 +71,20 @@ if (judge && !reduced) {
 
 /* ── the policy being written ──────────────────────────────────────────── */
 /*
- * Three sentences typed into the box, three rules landing on the stack under
- * it. One rule was a demo; three is the thing an administrator actually leaves
- * behind, and watching the second and third arrive is what says the first was
- * not a special case.
+ * One sentence, the way somebody would actually say it, and the specific rules
+ * it turns out to have meant landing under it one at a time.
  *
- * The compiler takes one sentence and returns one rule, so this loops three
- * times rather than showing one sentence producing three — the animation is
- * allowed to be quick, not to be a different product.
+ * This is `compilePolicy` in src/policy/compile.ts and not a liberty the page
+ * is taking: a splitting pass turns a worry into separate concrete
+ * prohibitions, `compileRule` compiles each of them, and the administrator
+ * ratifies them one at a time in the console. The animation is allowed to be
+ * quick; it is not allowed to be a different product, and the earlier version
+ * of this stage typed three sentences precisely because at that point the
+ * compiler could only take one at a time.
  *
- * Fast on purpose. The earlier version typed one sentence at a human pace and
- * spent four seconds saying something the reader had understood by the end of
- * the first line. This is a mechanism being shown, not a person being watched,
- * so it runs at about twice typing speed and is over in four.
- *
- * With no JavaScript the box holds the first sentence and all three rules are
- * already on the stack, which is the same contract the hero has.
+ * Fast on purpose — a mechanism being shown, not a person being watched. With
+ * no JavaScript the box holds the sentence and all three rules are already
+ * there, which is the contract the hero has too.
  */
 
 const ruleBox = document.getElementById('ruleMsg');
@@ -94,46 +92,40 @@ const ruleSet = document.getElementById('ruleSet');
 const sendBtn = document.querySelector('#how .composer .send');
 const rules = ruleSet ? [...ruleSet.children] : [];
 
-const SENTENCES = [
-  "nobody should be able to ask about someone else's salary",
-  'customer data must not leave the company',
-  'payments over USD 5,000 need the CEO to sign off'
-];
-
 /* Reduced motion, or no IntersectionObserver: the finished state, immediately.
    The rules are hidden by CSS as soon as `.js` is on, so something has to say
    otherwise or they never arrive at all. */
 if (reduced || !('IntersectionObserver' in window)) rules.forEach((r) => r.classList.add('on'));
 
 if (ruleBox && rules.length && !reduced && 'IntersectionObserver' in window) {
+  const sentence = ruleBox.value;
   ruleBox.value = '';
 
   const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
-  const type = (text) =>
+  const type = () =>
     new Promise((done) => {
       let i = 0;
       const step = () => {
-        if (i >= text.length) return done();
-        ruleBox.value = text.slice(0, ++i);
-        setTimeout(step, 10 + Math.random() * 16);
+        if (i >= sentence.length) return done();
+        ruleBox.value = sentence.slice(0, ++i);
+        setTimeout(step, 9 + Math.random() * 14);
       };
       step();
     });
 
   const run = async () => {
-    for (let i = 0; i < SENTENCES.length; i++) {
-      await type(SENTENCES[i]);
-      await wait(180);
-      /* The press is 130ms of the button's own pressed state and nothing else.
-         A spinner would be a claim about how long compiling takes, and on the
-         machine this runs on that number is 46 seconds. */
-      sendBtn?.classList.add('pressed');
-      await wait(130);
-      sendBtn?.classList.remove('pressed');
-      rules[i]?.classList.add('on');
-      await wait(560);
-      if (i < SENTENCES.length - 1) ruleBox.value = '';
+    await type();
+    await wait(200);
+    /* 130ms of the button's own pressed state and nothing else. A spinner
+       would be a claim about how long compiling takes, and on the machine this
+       runs on that number is 46 seconds. */
+    sendBtn?.classList.add('pressed');
+    await wait(130);
+    sendBtn?.classList.remove('pressed');
+    for (const rule of rules) {
+      await wait(380);
+      rule.classList.add('on');
     }
   };
 
@@ -229,6 +221,7 @@ const alt = document.querySelector('.hero .cta .alt');
 const onWindows = /Windows|Win64|Win32/i.test(navigator.userAgent || '');
 
 if (primary && alt && onWindows) {
+  primary.classList.add('on-windows');
   primary.querySelector('.txt').textContent = WIN.label;
   primary.querySelector('.sz').textContent = WIN.size;
   primary.setAttribute('href', RELEASE + WIN.file);

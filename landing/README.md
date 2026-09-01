@@ -23,8 +23,8 @@ have seen it work.
 | | | Earns its scroll with |
 |---|---|---|
 | Hero | Writing the rules down is not the same as enforcing them. | the gate line, and the prompt being judged on it |
-| `#how` | Write a rule, it stops the request, you see that it did. | three rules compiling onto the page, and the hook's literal output in three tools |
-| `#spend` | A prompt that leaks nothing can still cost you. | the console's own quota cards, and the hold an over-budget session gets |
+| `#how` | Write a rule, it stops the request, you see that it did. | one broad instruction becoming three specific rules, and the hook's literal output in three tools |
+| `#spend` | A prompt that leaks nothing can still cost you. | the hold an over-budget session gets, and the seed policy's ceilings |
 | `#download` | Install it. | two installers, from this repo's own CI |
 
 Two people open this URL: whoever is deciding, and whoever they forward it to.
@@ -52,9 +52,16 @@ rests on:
   ceilings an administrator ratified and, on an opened decision, that person's
   count for the day. It does not draw a live gauge per role, so neither does
   this.
-- Step 01 types three sentences and gets three rules, not one sentence
-  producing three. The compiler takes one sentence and returns one rule; the
-  loop is allowed to be quick, not to be a different product.
+- Step 01 shows one broad instruction becoming three specific rules, which is
+  `compilePolicy` in `src/policy/compile.ts` — a splitting pass, then the
+  measured `compileRule` once per statement, then ratification one rule at a
+  time. It was three separate sentences until that function existed, because
+  until then the compiler took one sentence and returned one rule and the page
+  was not allowed to imply otherwise.
+- `#spend` was two panels side by side, one of them a grid of quota cards. It
+  read as a second product bolted on; it is now built like a stage in `#how` —
+  same measure, one panel — and the ceilings are one mono line, because nobody
+  reads four cards to learn that a quota is a sentence about a role.
 - There is no `cursor` tab. Cursor has no prompt hook and can only be governed
   as an OpenAI endpoint, which needs an API key — so a tab for it was a fourth
   panel that existed to apologise. The fact is worth keeping and is one clause

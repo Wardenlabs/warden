@@ -387,6 +387,44 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   });
 }));
 
+/**
+ * The same compiler, given the sentence an administrator actually says.
+ *
+ * A separate route rather than a flag on `/api/policy/draft`, because that one
+ * is the measured path and every prompt this repo ships has a note saying what
+ * moving it cost. This adds a splitting pass in front of the compiler; a
+ * specific sentence still yields exactly one rule, but paying for that extra
+ * model call on every single-rule compile is a change nobody asked for. So the
+ * console offers it as its own button and the old route is untouched.
+ *
+ * Administrative by default, like every route that is not in the employee
+ * allowlist in `admin-auth.ts` — which is the direction that list is written
+ * to make automatic.
+ */
+app.post('/api/policy/draft-set', asyncRoute(async (req, res) => {
+  const text = String(req.body?.text ?? '').trim();
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  const mod = await optional<{
+    compilePolicy: (a: unknown, t: string, p: unknown, o?: unknown) => Promise<{ statements: string[]; rules: unknown[] }>;
+  }>('../policy/compile.js');
+  const compilePolicy = mod?.compilePolicy;
+  if (!compilePolicy) return res.status(503).json({ error: 'compiler not available' });
+  const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
+  const { statements, rules } = await compilePolicy(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {});
+  const remote = remoteCompiler();
+  res.json({
+    statements,
+    // Stamped per rule and not once for the set, because the administrator
+    // ratifies them one at a time and the card in front of them has to be able
+    // to say where that rule came from on its own.
+    rules: rules.map((rule) => ({
+      ...(rule as object),
+      draftedBy: remote ?? resolvedModel('compiler'),
+      draftedRemotely: remote !== null
+    }))
+  });
+}));
+
 app.post('/api/policy/preview', asyncRoute(async (req, res) => {
   const mod = await optional<{
     previewRule: (a: unknown, r: unknown, p: unknown, x?: unknown) => Promise<unknown>;

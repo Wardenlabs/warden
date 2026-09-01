@@ -157,6 +157,34 @@ export const ruleDraftSchema = ruleSchema.omit({ id: true, embedding: true });
 export type RuleDraft = z.infer<typeof ruleDraftSchema>;
 
 /** JSON Schema handed to the decoder as a grammar when compiling a rule. */
+/**
+ * What a broad instruction splits into before any of it is compiled.
+ *
+ * An administrator does not say "no one may export customer contact details".
+ * They say "I want people to stop leaking customer data", which names a worry
+ * rather than a prohibition. A single rule carrying all of that worry is so
+ * wide that the adjudicator refuses honest work under it — the failure
+ * `docs/MEASUREMENTS.md` keeps recording — so the worry is split into the
+ * specific things it actually means, and each of those is compiled on its own.
+ *
+ * Sentences and nothing else. This pass is asked for the one thing a small
+ * model is reliably good at here; every structured field it might also have
+ * been asked for is a field `compileRule` already knows how to get right.
+ */
+export const policySplitSchema = z.object({
+  statements: z.array(z.string().min(1)).min(1).max(5)
+});
+export type PolicySplit = z.infer<typeof policySplitSchema>;
+
+export const POLICY_SPLIT_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    statements: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 5 }
+  },
+  required: ['statements'],
+  additionalProperties: false
+} as const satisfies Record<string, unknown>;
+
 export const RULE_DRAFT_JSON_SCHEMA = {
   type: 'object',
   properties: {

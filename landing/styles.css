@@ -350,6 +350,11 @@ h3 {
 .btn svg { width: 15px; height: 15px; }
 
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
+/* One mark at a time. Both are in the markup so the button is never briefly
+   wrong while app.js is still on the wire. */
+.btn .os.win { display: none; }
+.btn.on-windows .os.mac { display: none; }
+.btn.on-windows .os.win { display: inline; }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary .sz { font-family: var(--mono); font-size: var(--fs-1); opacity: .55; }
 
@@ -518,13 +523,13 @@ header nav .btn { color: var(--accent-ink); }
    for the two panels, which is the one place on the page where two things are
    deliberately shown at the same size: neither of the two controls is the
    footnote of the other. */
-#spend .sec { justify-items: center; }
-#spend .row { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); justify-items: center; width: 100%; text-align: center; }
-#spend .side { padding-top: 0; justify-items: center; }
-#spend .main { width: 100%; justify-items: center; }
+/* §spend is built like a stage in §1 — same centre, same measure, one panel.
+   Two full-width panels side by side made it read as a second product bolted
+   on; at the width the refusal is shown at, it reads as the same gate doing
+   the other half of its job. */
+#spend .sec { gap: 0; justify-items: center; text-align: center; }
+#spend .main { justify-items: center; width: 100%; margin-bottom: var(--s-8); }
 #spend h2.loud { max-width: 22ch; margin-inline: auto; }
-#spend .main p { margin-inline: auto; }
-#spend .main p.lead { max-width: 34ch; }
 
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
@@ -962,7 +967,7 @@ footer::before {
 }
 /* A fixed column, so the three severities line up under each other — the
    whole point of a stack is that it reads down. */
-.ru .rid { flex: 0 0 148px; font-size: var(--fs-2); color: var(--ink-2); }
+.ru .rid { flex: 0 0 178px; font-size: var(--fs-2); color: var(--ink-2); }
 /* The badge is the console's, and the console's rule is scoped to `.console` —
    which the stack is now deliberately outside of. Same tokens, carried here. */
 .ru .badge {
@@ -1062,82 +1067,13 @@ footer::before {
 
 
 /* ═══ §2, what it costs ══════════════════════════════════════════════════ */
-/*
- * Two panels at the same size, because the two controls are the same size in
- * an administrator's head: what must not leave, and what must not be spent.
- * Making one of them a footnote under the other would have said the opposite
- * of what the section is for.
- */
-.two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s-8);
-  width: 100%;
-  align-items: start;
-}
-.half { display: grid; gap: var(--s-5); align-content: start; min-width: 0; }
-.half .cap-label { text-align: center; }
-.half-note {
-  margin: 0;
-  font-size: var(--fs-2);
-  line-height: var(--lh-snug);
-  color: var(--faint);
-  text-wrap: pretty;
-}
-.half-note .mono { color: var(--muted); }
-.half-note em { font-style: normal; color: var(--ink-2); }
-/* Stretching both panels to the taller one's height left the shorter card
-   with a field of empty sunken grey under its last row, which read as a
-   missing screenshot. Each is its own height; the caption above them is what
-   makes them a pair. */
-
-
 /* The hold. The third verdict finally has somewhere on this page to be the
    main event rather than a dot in a legend, and it takes the colour the
    product gives it. */
 .term .hold { color: var(--escalate); font-weight: var(--fw-semi); }
 
-/* ── the counters, as the console really draws them ───────────────────── */
-/*
- * Lifted from `web/index.html`, rule for rule. It was briefly a row of live
- * meters filling toward a ceiling, which looked better and was a lie: the
- * console shows the ceilings an administrator ratified and, on an opened
- * decision, that person's count for the day. It does not render a live gauge
- * per role, so neither does this. A landing page that draws a screen the
- * product does not have is a demo the first call has to walk back.
- */
-.quotas { padding: var(--s-4) var(--s-5) var(--s-6); }
-.quotas .day.two-up { margin-top: var(--s-7); }
-.quota-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); padding: var(--s-3) var(--s-3) 0; }
-.quota {
-  display: flex; flex-direction: column; gap: var(--s-1);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: var(--s-4);
-  font-size: var(--fs-2);
-  color: var(--muted);
-}
-.quota-role { font-weight: var(--fw-semi); color: var(--ink); }
-.quota-row { display: flex; align-items: baseline; gap: var(--s-3); }
-.quota-row b { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: var(--fw-normal); color: var(--ink-2); }
-/* Nobody is counting is a different statement from a bar at zero. */
-.quota-row.unmetered b { color: var(--muted); }
-
-.quotas .kv { display: grid; gap: var(--s-3); padding: var(--s-4) var(--s-3) 0; }
-.quotas .kv .r { display: flex; align-items: baseline; gap: var(--s-5); font-size: var(--fs-3); }
-.quotas .kv .k { flex: 0 0 88px; color: var(--faint); font-size: var(--fs-2); }
-.quotas .kv .v { flex: 1; min-width: 0; color: var(--ink-2); }
-
 .shot.log .rule-ref { color: var(--faint); }
 
-@media (max-width: 900px) {
-  .two { grid-template-columns: minmax(0, 1fr); gap: var(--s-9); }
-}
-@media (max-width: 700px) {
-  .quotas { padding: var(--s-3) var(--s-3) var(--s-5); }
-  .quota-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 0; }
-  .quotas .kv { padding-inline: 0; }
-}
 
 /* ═══ the press, and the pointer that is not there ═══════════════════════ */
 /*
@@ -1187,4 +1123,49 @@ footer::before {
   .ru { flex-wrap: wrap; row-gap: var(--s-2); padding-inline: 0; }
   .ru .rid { flex: 0 0 auto; }
   .ru .rtx { flex: 1 0 100%; }
+}
+
+
+/* ═══ what §2 and step 03 grew ═══════════════════════════════════════════ */
+
+/* The lead inside a beat. Left-aligned with the panel under it rather than
+   centred with the heading above it, because it is the panel's caption and
+   not the section's second headline. */
+.beat-lead {
+  margin: 0 0 var(--s-6);
+  font-size: var(--fs-3);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* The ceilings, as one line. It was four cards, and nobody reads four cards
+   to learn that a quota is a sentence about a role. */
+.ceilings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-5) 0 0;
+  font-size: var(--fs-2);
+  color: var(--faint);
+}
+.ceilings .mono { color: var(--muted); }
+
+/* The day's shape on the day line. A bare "12" is a number with nothing to
+   compare it to; the three verdicts broken out are the only place the page
+   says out loud that a verdict has three values and not two. */
+.shot.log .tally { display: flex; align-items: center; gap: var(--s-4); margin-left: auto; }
+.shot.log .tally .t {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  letter-spacing: 0; text-transform: none; font-family: var(--mono);
+}
+.shot.log .tally .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.shot.log .tally .dot.BLOCK { background: var(--block); }
+.shot.log .tally .dot.ESCALATE { background: var(--escalate); }
+.shot.log .tally .dot.ALLOW { background: var(--allow); }
+
+@media (max-width: 700px) {
+  .shot.log .tally { gap: var(--s-3); }
+  .shot.log .tally .t { font-size: var(--fs-0); }
 }

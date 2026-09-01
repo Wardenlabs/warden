@@ -175,6 +175,17 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 - Six attachment-bearing corpus prompts are skipped in every run, because the
   OCR model resolves only over the P2P registry. `document-borne` has never been
   measured.
+- **The policy splitter has no measurement behind it.** `compilePolicy` turns
+  one broad instruction into several statements and compiles each with the
+  measured `compileRule`. Nothing has been run to say whether the split is any
+  good — whether it stays inside what the admin asked, whether five is the
+  right ceiling, whether a specific sentence reliably comes back as one
+  statement. So it ships the way every unmeasured lever here ships: off the
+  measured path. `/api/policy/draft` is untouched, the splitter lives behind
+  `/api/policy/draft-set` and its own button, and no single-rule compile pays
+  for it. The bench measures one message against one rule and cannot judge a
+  split; measuring this needs a corpus of broad instructions with the rules
+  they ought to become, and that corpus does not exist yet.
 - Quota counters live in memory and reset with the process.
 - API keys are stored in plaintext in the directory file, and so is the compiler
   provider key in `data/settings.json` (written `0600`, gitignored).

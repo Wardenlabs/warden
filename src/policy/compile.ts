@@ -17,10 +17,13 @@ import { EVERYONE, employeeIdOf, employeeToken, sanitiseAudience } from './audie
 import { loadDirectory } from './people.js';
 import { loadPolicy, savePolicy } from './store.js';
 import {
+  POLICY_SPLIT_JSON_SCHEMA,
   RULE_DRAFT_JSON_SCHEMA,
+  policySplitSchema,
   ruleDraftSchema,
   ruleSchema,
   type PolicySpec,
+  type PolicySplit,
   type Rule,
   type RuleDraft
 } from './types.js';
@@ -129,6 +132,120 @@ export async function compileRule(
       options.lockTo ??
       sanitiseAudience(draft.appliesTo, roles, people.map((p) => p.id))
   });
+}
+
+/**
+ * Ceiling on how many rules one instruction may become.
+ *
+ * Not a tuning knob. It is here because "stop people leaking data" is an
+ * invitation to enumerate, and a model that answers it with fifteen rules has
+ * handed the administrator a ratification queue nobody works through — at
+ * which point they activate the list without reading it, and a model has
+ * written policy after all. Five is the most a person will actually read.
+ */
+const MAX_STATEMENTS = 5;
+
+/**
+ * Split one broad instruction into the specific prohibitions it means.
+ *
+ * Fails soft, and the direction matters: a split that errors, times out, or
+ * comes back unparseable returns the administrator's own sentence unchanged,
+ * so the broad path degrades into the narrow one that already worked rather
+ * than into an error page. It cannot fail open in the security sense — nothing
+ * here decides anything, and every sentence it returns still has to survive
+ * `compileRule` and then be ratified by a person.
+ */
+async function splitStatement(qvac: QvacAdapter, text: string): Promise<string[]> {
+  const iso = isolate(text);
+
+  const system = [
+    'A company administrator has said what they want stopped, in their own words.',
+    'Split it into separate, specific prohibitions — one sentence each.',
+    '',
+    `- At most ${MAX_STATEMENTS} statements, and fewer is better.`,
+    '- Each one stands alone and names one concrete thing that is prohibited.',
+    '- Never restate another one in different words.',
+    // The one instruction that is a security instruction rather than a quality
+    // one. An administrator who asks about customer data and gets back a rule
+    // about overtime has been handed policy nobody asked for, and the fact
+    // that they still have to ratify it is not a reason to put it in front of
+    // them: a queue of plausible rules is exactly how ratification stops being
+    // read.
+    '- Stay strictly inside what was asked. Never add a prohibition the administrator did not ask for.',
+    '- If what they said is already one specific prohibition, return it as the only statement.',
+    '- Write them in the language the administrator used.',
+    isolationPreamble(iso.nonce),
+    thinkingMarker('compiler')
+  ].join('\n');
+
+  try {
+    const res = await qvac.completeJSON<PolicySplit>(
+      {
+        role: 'compiler',
+        system,
+        user: `${iso.envelope}\n\nSplit the instruction above.`,
+        maxTokens: 320,
+        timeoutMs: 60_000
+      },
+      policySplitSchema,
+      POLICY_SPLIT_JSON_SCHEMA
+    );
+
+    const seen = new Set<string>();
+    const statements: string[] = [];
+    for (const raw of res.value.statements) {
+      const statement = raw.trim();
+      const key = statement.toLowerCase();
+      if (!statement || seen.has(key)) continue;
+      seen.add(key);
+      statements.push(statement);
+    }
+    return statements.length > 0 ? statements.slice(0, MAX_STATEMENTS) : [text];
+  } catch {
+    return [text];
+  }
+}
+
+/**
+ * Compile one broad instruction into a set of specific rules.
+ *
+ * This is the sentence an administrator actually says out loud — "I want them
+ * to stop leaking customer data" — and it is not a rule. `compileRule` would
+ * take it and produce something technically valid and practically useless: one
+ * prohibition wide enough to cover the whole worry, which is one prohibition
+ * wide enough to refuse the day's honest work.
+ *
+ * Two passes and not one, deliberately. Asking a single call for N complete
+ * rules would multiply a 640-token cap by N and give every field of every rule
+ * another chance to be filled in without being decided — which is the failure
+ * `docs/MEASUREMENTS.md` records for every extra field this compiler has ever
+ * been asked to produce. So the split pass is asked for sentences only, and
+ * the second pass is `compileRule`, unchanged and already measured, once each.
+ *
+ * Sequentially, not in parallel. The adapter batches concurrent work and the
+ * measurement note in CLAUDE.md is explicit that batch composition moves the
+ * numerics; a rule whose examples depend on what else happened to be in flight
+ * is a rule that cannot be reproduced. On the machine this was written for it
+ * is also simply faster.
+ *
+ * **The boundary is unchanged.** The model drafts, the administrator ratifies,
+ * one rule at a time, and a draft nobody ratified has never judged anybody.
+ * Nothing in this function writes to the policy.
+ */
+export async function compilePolicy(
+  qvac: QvacAdapter,
+  text: string,
+  policy: PolicySpec,
+  options: CompileOptions = {}
+): Promise<{ statements: string[]; rules: Rule[] }> {
+  const statements = await splitStatement(qvac, text);
+
+  const rules: Rule[] = [];
+  for (const statement of statements) {
+    rules.push(await compileRule(qvac, statement, policy, options));
+  }
+
+  return { statements, rules };
 }
 
 export type PreviewRow = {

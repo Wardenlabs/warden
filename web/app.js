@@ -160,6 +160,16 @@ const state = {
    *  activate the wrong one. `draftFor` locks the audience when it was started
    *  from a person's page. */
   draft: null,
+  /**
+   * Rules compiled from one broad instruction that are still waiting their
+   * turn. `draft` is always the one on screen; this is the rest of the set.
+   *
+   * A queue and not a list you tick through, because ratification is the
+   * security boundary and it only holds if each rule is looked at. Showing
+   * three cards with three Activate buttons is how you get three clicks and
+   * one reading.
+   */
+  drafts: [],
   draftFor: null,
   preview: null,
   ruleChat: [],
@@ -1314,6 +1324,15 @@ function heroComposer() {
       <textarea id="ruleMsg" rows="2" placeholder="Describe it the way you would to a colleague…"></textarea>
       <button type="button" class="btn primary send" id="ruleSend">Write it</button>
     </div>
+    <!-- Two buttons because they are two different asks, and which one you
+         meant is not something to guess from the sentence. "Write it" is one
+         rule, and it is the path every number in docs/MEASUREMENTS.md was
+         measured on. "Write the set" splits a worry into the specific things
+         it means first, which costs an extra model call and is worth it only
+         when you actually said something broad. -->
+    <div class="hero-sugg">
+      <button type="button" class="pill" id="ruleSetBtn">Write the set — I said something broad</button>
+    </div>
     ${compilerLine()}
 
     <div class="hero-sugg" id="cats">
@@ -1499,6 +1518,9 @@ function draftCard() {
           : ''
       }
       <span class="when">not active yet</span>
+      ${state.drafts.length
+        ? `<span class="when">${plural(state.drafts.length, 'more')} from that instruction</span>`
+        : ''}
     </div>
 
     <p class="summary">${esc(d.text)}</p>
@@ -1583,6 +1605,54 @@ async function sendRuleMessage(text) {
 }
 
 /**
+ * One broad instruction, several rules, ratified one at a time.
+ *
+ * The compiler splits what you said into the specific prohibitions it means
+ * and compiles each of those; what comes back is a queue, not a policy. The
+ * first is put on screen and checked exactly like a single draft, and the rest
+ * wait — activating one brings up the next. Nothing is written until you press
+ * Activate, once per rule, which is the same boundary as everywhere else and
+ * the reason this is a queue rather than a list with a "take all" button.
+ */
+async function sendRuleSet(text) {
+  const clean = String(text ?? '').trim();
+  if (!clean || state.ruleBusy) return;
+
+  state.ruleBusy = true;
+  const box = $('ruleMsg');
+  if (box) box.value = '';
+  state.ruleChat.push({ from: 'you', text: clean });
+  say('Working out what that means, then compiling each part…', true);
+  if (composing()) render(); else go('policy', 'new');
+
+  const body = { text: clean };
+  if (state.draftFor) body.lockTo = [`@${state.draftFor}`];
+
+  const { ok, j } = await api('/api/policy/draft-set', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+  });
+
+  dropPending();
+  if (!ok || !Array.isArray(j.rules) || j.rules.length === 0) {
+    state.ruleBusy = false;
+    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    render();
+    return;
+  }
+
+  const [first, ...rest] = j.rules;
+  state.draft = first;
+  state.drafts = rest;
+  state.preview = null;
+  say(rest.length
+    ? `That means ${plural(j.rules.length, 'separate rule')} to me. Here is the first — the others are behind it, and you activate them one at a time.`
+    : 'That was already one specific thing, so it is one rule.');
+  render();
+
+  await runPreview();
+}
+
+/**
  * The step that keeps a badly-worded rule from reaching anyone.
  *
  * False positives are called out loudly rather than folded into a score,
@@ -1652,6 +1722,8 @@ function bindPolicy() {
 
   const send = $('ruleSend');
   if (send) send.onclick = () => sendRuleMessage($('ruleMsg').value);
+  const sendSet = $('ruleSetBtn');
+  if (sendSet) sendSet.onclick = () => sendRuleSet($('ruleMsg').value);
   const msg = $('ruleMsg');
   if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendRuleMessage(msg.value); };
 
@@ -1703,6 +1775,20 @@ function bindPolicy() {
       body: JSON.stringify({ rule: state.draft })
     });
     const id = state.draft.id;
+    // The rest of a set is not discarded by activating one of it. The next
+    // rule takes the card, gets its own check, and needs its own Activate —
+    // which is the whole reason a set is a queue.
+    const next = state.drafts.shift();
+    if (next) {
+      state.draft = next;
+      state.preview = null;
+      state.ruleBusy = false;
+      await refreshPolicy();
+      say(`Activated. Next in the set — ${plural(state.drafts.length + 1, 'rule')} left.`);
+      render();
+      void runPreview();
+      return;
+    }
     resetDraft();
     await Promise.all([refreshPolicy(), refreshPeople()]);
     if (person) go('people', person); else go('policy', id);
@@ -1712,6 +1798,7 @@ function bindPolicy() {
 
 function resetDraft() {
   state.draft = null;
+  state.drafts = [];
   state.draftFor = null;
   state.preview = null;
   state.ruleChat = [];

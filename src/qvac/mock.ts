@@ -210,6 +210,21 @@ function mockValue(
     if (k === 'appliesto') return ['*'];
     if (k === 'violating') return [`mock: ${ctx.subject.slice(0, 80)}`];
     if (k === 'compliant') return ['mock: a nearby request that must still be allowed'];
+    // The policy splitter. Without this it fell through to `[]`, failed the
+    // `min(1)`, and `compilePolicy` caught the failure and quietly compiled the
+    // administrator's own sentence as a single rule — which is the correct way
+    // for that function to degrade and the wrong thing for a test double to do:
+    // the one flow somebody in mock mode is trying to work on would have been
+    // the one flow they could never reach. Three statements, so the queue in
+    // the console has something to be a queue about.
+    if (k === 'statements') {
+      const said = ctx.subject.slice(0, 60);
+      return [
+        `mock: the first specific thing meant by "${said}"`,
+        `mock: the second specific thing meant by "${said}"`,
+        `mock: the third specific thing meant by "${said}"`
+      ];
+    }
     return [];
   }
 
