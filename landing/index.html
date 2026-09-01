@@ -102,42 +102,57 @@ setTimeout(function () {
   </div>
 </div>
 
-<!-- ── §1 how it works, in three stages ─────────────────── -->
+<!-- ── §1 how it works: one day, three scenes ───────────────────────────── -->
 <!--
-     Write them, hit one, see it — the same policy crossing two programs, so the
-     reader watches one event rather than reading three claims.
+     The section is a story with a clock, not a feature list. Scene 01 the
+     rule is written, scene 02 somebody hits it at 14:22, scene 03 the day
+     comes back as a ledger — and the 14:22 row in the ledger is the block
+     from scene 02, which is the whole trick: the reader watches one day
+     happen instead of reading three claims.
 
-     Every panel below is the product's own markup or the hook's own output.
-     Nothing here is drawn: if a panel cannot be traced to a file in this repo
-     it does not ship, and landing/README.md says why.
+     On a wide screen each scene pins its product panel while the narration
+     scrolls past it, and the panel assembles at the step that explains it.
+     On a phone the panel sits between the narration and assembles once, as
+     it arrives. app.js only ever reveals markup that is already here: with
+     scripting off, or under reduced motion, every panel is simply complete.
+
+     Every panel is the product's own markup or the hook's own output.
+     Nothing here is drawn: if a panel cannot be traced to a file in this
+     repo it does not ship, and landing/README.md says why.
 -->
 <section id="how">
   <div class="wrap sec">
 
     <div class="main" data-reveal>
-      <h2 class="loud">Write a rule. It stops the request.<br>You see that it did.</h2>
+      <p class="label kicker">How it works</p>
+      <h2 class="loud"><span class="ln"><span>Write a rule.</span></span><span class="ln"><span>It stops the request.</span></span><span class="ln"><span>You see that it did.</span></span></h2>
+      <p class="lead-line">One day with the gate, told in three scenes.</p>
     </div>
 
-    <div class="stages">
-      <div class="stage" data-reveal>
-        <div class="cap"><span class="label stepn">01</span><span class="label">You say it once</span></div>
-        <div class="beat">
-          <!--
-               One sentence in the words somebody would actually use, and the
-               specific rules it turns out to have meant. This is
-               `compilePolicy` in src/policy/compile.ts: a splitting pass turns
-               a worry into separate concrete prohibitions, `compileRule` — the
-               measured one — compiles each, and the administrator ratifies
-               them one at a time. Nothing is enacted by the model, here or
-               there.
+    <!-- Scene 01: the sentence becomes the rules it meant. This is
+         `compilePolicy` in src/policy/compile.ts — a splitting pass, then the
+         measured `compileRule` once per statement, then ratification one rule
+         at a time. The rule texts are the catalogue's and the seed policy's,
+         not invented for the page. -->
+    <div class="chapter" data-chapter="write">
+      <div class="cap"><span class="label scene">Scene 01</span><span class="sep" aria-hidden="true">·</span><span class="label time">09:04</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">You say it once</span></div>
 
-               The rule texts are the catalogue's and the seed policy's, not
-               invented for the page: two out of `data/seed/presets.json`
-               under customers, and the payment one out of
-               `benchmark-policy.json`. The escalate is the only place above
-               the fold that says a verdict has a middle value.
-          -->
-          <div class="shot">
+      <div class="step">
+        <h3>One sentence, in your own words.</h3>
+        <p>Not policy language, not a config file. The worry the way you would say it out loud — Warden takes it from there.</p>
+      </div>
+      <div class="step">
+        <h3>It becomes the rules you meant.</h3>
+        <p>The sentence splits into concrete prohibitions, each compiled with the examples it has to catch — and the ones it must still let through.</p>
+      </div>
+      <div class="step">
+        <h3>Nothing judges anyone until you say so.</h3>
+        <p>You activate each rule yourself, one at a time. A rule nobody ratified has never judged anybody.</p>
+      </div>
+
+      <div class="panel">
+        <div class="pstick">
+          <div class="shot" data-reveal>
             <div class="console">
               <div class="composer">
                 <div class="hero-box">
@@ -153,26 +168,33 @@ setTimeout(function () {
             <div class="ru"><span class="rid mono">r-contract-terms</span><span class="badge BLOCK">block</span><span class="rtx">Contract terms negotiated with a specific customer must not be disclosed to, or compared for, any other customer.</span></div>
             <div class="ru"><span class="rid mono">r-payment-approval</span><span class="badge ESCALATE">escalate</span><span class="rtx">No one may approve, authorise, or instruct the release of a payment above USD 5,000 without written sign-off from the CEO.</span></div>
           </div>
-
-          <p class="beat-note">Warden writes the examples each rule has to catch and the ones it must still let through, checks it against them, and shows you the result — then you activate them one at a time. A rule nobody ratified has never judged anybody.</p>
         </div>
       </div>
+    </div>
 
-      <div class="stage stops" data-reveal>
-        <div class="cap"><span class="label stepn">02</span><span class="label">They hit one</span></div>
-        <div class="beat">
-          <!--
-               Four tools, because the first question anyone asks is "and if we
-               are not on Claude Code". Three of them run the same hook and get
-               the same words out of it; the fourth cannot, which is the whole
-               reason the hook exists.
+    <!-- Scene 02: the hook's literal output, in three tools. Radios and
+         labels, not buttons and a handler: the switch works with scripting
+         off, arrow keys come free, and app.js stays out of it. The panes are
+         siblings of the inputs so plain `:checked ~` does all of it. -->
+    <div class="chapter stops" data-chapter="hit">
+      <div class="cap"><span class="label scene">Scene 02</span><span class="sep" aria-hidden="true">·</span><span class="label time">14:22</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">Somebody hits one</span></div>
 
-               Radios and labels, not buttons and a handler: the switch works
-               with scripting off, arrow keys come free, and app.js stays out
-               of it. The panes are siblings of the inputs so plain `:checked ~`
-               does all of it.
-          -->
-          <div class="term tools">
+      <div class="step">
+        <h3>Fede asks for a salary.</h3>
+        <p>Mid-report, in Claude Code. The prompt is checked on his machine, against your rules, before it goes anywhere.</p>
+      </div>
+      <div class="step">
+        <h3>Blocked, and told why.</h3>
+        <p>The refusal quotes the rule in your words and says what to ask instead — the work continues, the leak does not.</p>
+      </div>
+      <div class="step">
+        <h3>The same words in every tool.</h3>
+        <p>One hook runs inside Claude Code, Codex and opencode — try the tabs. It fires before the prompt leaves, so it works on a Max or Plus plan too.</p>
+      </div>
+
+      <div class="panel">
+        <div class="pstick">
+          <div class="term tools" data-reveal>
             <input class="vh" type="radio" name="tool" id="tool-cc" checked>
             <input class="vh" type="radio" name="tool" id="tool-cx">
             <input class="vh" type="radio" name="tool" id="tool-oc">
@@ -185,77 +207,92 @@ setTimeout(function () {
 
             <div class="panes">
               <div class="pane pane-cc">
-                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
-
-<span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
+</span>
+<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
    HR staff are exempt.</span>
-
-   <span class="h">What to do instead</span>
+</span>
+<span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
    cycles are fine to ask here.
-
-   <span class="h">Warden can try to rewrite this so it goes through:</span>
+</span>
+<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-
-   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+</span>
+<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
               <div class="pane pane-cx">
-                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
-
-<span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
+</span>
+<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
    HR staff are exempt.</span>
-
-   <span class="h">What to do instead</span>
+</span>
+<span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
    cycles are fine to ask here.
-
-   <span class="h">Warden can try to rewrite this so it goes through:</span>
+</span>
+<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-
-   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+</span>
+<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
               <div class="pane pane-oc">
-                <pre><span class="you">&gt; send me Ana&#39;s salary for the report</span>
-
-<span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
+</span>
+<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
    HR staff are exempt.</span>
-
-   <span class="h">What to do instead</span>
+</span>
+<span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
    cycles are fine to ask here.
-
-   <span class="h">Warden can try to rewrite this so it goes through:</span>
+</span>
+<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-
-   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
+</span>
+<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="stage" data-reveal>
-        <div class="cap"><span class="label stepn">03</span><span class="label">You see it happened</span></div>
-        <div class="beat">
-          <!-- The count on the day line used to be a bare "12", which is a
-               number with nothing to compare it to. Broken into the three
-               verdicts it is the shape of the day, and it is the only place
-               the page says out loud that a verdict has three values. -->
+    <!-- Scene 03: the ledger. The 14:22 row is scene 02; the 14:21 hold is
+         the rule ratified in scene 01. The tally is the only place the page
+         says out loud that a verdict has three values and not two. -->
+    <div class="chapter" data-chapter="log">
+      <div class="cap"><span class="label scene">Scene 03</span><span class="sep" aria-hidden="true">·</span><span class="label time">18:06</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">The day, signed</span></div>
+
+      <div class="step">
+        <h3>The day comes back as a ledger.</h3>
+        <p>Fede&#39;s block is the top line — 14:22, with the rule that fired sitting next to it.</p>
+      </div>
+      <div class="step">
+        <h3>The morning&#39;s rule, already working.</h3>
+        <p>One minute earlier: a USD 12,400 payment held by <span class="mono">r-payment-approval</span> — the sentence you wrote at 09:04 — until someone with authority answers.</p>
+      </div>
+      <div class="step">
+        <h3>Honest questions just pass.</h3>
+        <p>And every decision is a link in a hash chain — <span class="mono">pnpm run verify-audit</span> walks it and fails loudly if a row was edited or removed.</p>
+      </div>
+
+      <div class="panel">
+        <div class="pstick">
           <div class="shot log" data-reveal>
             <div class="console">
               <div class="day">Today
@@ -268,56 +305,66 @@ setTimeout(function () {
               <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz&#39;s salary for the report</span><span class="rule-ref mono">r-payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ESCALATE"></span><span class="who">Sofía Márquez</span><span class="txt">aprobá el pago de USD 12.400 al proveedor</span><span class="rule-ref mono">r-payment-approval</span><span class="meta">14:21</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref mono">r-customer-pii</span><span class="meta">13:58</span></div>
             </div>
           </div>
-          <p class="beat-note">Every decision is a link in a hash chain. <span class="mono">pnpm run verify-audit</span> walks it and fails loudly if a row was edited or removed.</p>
         </div>
       </div>
     </div>
 
-    <p class="how-note" data-reveal>One hook, running on their machine before the prompt is sent — which is why it works on a Max or Plus plan, where there is no base URL to redirect. Cursor has no hook and can only be governed as an OpenAI endpoint, which needs an API key, so a Cursor subscription cannot be governed at all. <strong>Verified so far:</strong> the hook refusing a prompt in a terminal, and nothing beyond that.</p>
+    <p class="how-note verified" data-reveal>One hook, running on their machine before the prompt is sent — which is why it works on a Max or Plus plan, where there is no base URL to redirect. Cursor has no hook and can only be governed as an OpenAI endpoint, which needs an API key, so a Cursor subscription cannot be governed at all. <strong>Verified so far:</strong> the hook refusing a prompt in a terminal, and nothing beyond that.</p>
 
   </div>
 </section>
 
-<!-- ── §2 the other half: what it costs ─────────────────── -->
+<!-- ── §2 scene four: what it costs ─────────────────────────────────────── -->
 <!--
-     Built like a stage in §1 — same measure, same cap label, one panel — and
-     that is the point of the rebuild. Two full-width panels side by side made
-     this read as a second product bolted on; at the width the refusal was
-     shown at, it reads as the same gate doing the other half of its job.
-
-     The ceilings are one mono line rather than four cards. Nobody reads four
-     cards to learn that quotas are per role, and the line says it in one pass.
+     Built with the same scene machinery as §1, because it is the same gate
+     doing the other half of its job. The ceilings are one mono line rather
+     than four cards: nobody reads four cards to learn that a quota is a
+     sentence about a role.
 -->
 <section id="spend">
   <div class="wrap sec">
 
     <div class="main" data-reveal>
-      <h2 class="loud">A prompt that leaks nothing<br>can still cost you.</h2>
+      <p class="label kicker">What it costs</p>
+      <h2 class="loud"><span class="ln"><span>A prompt that leaks nothing</span></span><span class="ln"><span>can still cost you.</span></span></h2>
+      <p class="lead-line">One agent left running spends more in an afternoon than the seat costs in a year.</p>
     </div>
 
-    <div class="stage" data-reveal>
-      <div class="cap"><span class="label">The same gate, counting</span></div>
-      <div class="beat">
-        <p class="beat-lead">One agent left running on a big repository spends more in an afternoon than the seat costs in a year. Warden knows which role each key belongs to, so a ceiling is a sentence about a role — and the request that crosses it stops on the machine, before the tokens are bought.</p>
+    <div class="chapter" data-chapter="spend">
+      <div class="cap"><span class="label scene">Scene 04</span><span class="sep" aria-hidden="true">·</span><span class="label time">Day two · 09:41</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">The same gate, counting</span></div>
 
-        <div class="term">
-          <div class="term-bar">claude code</div>
-          <pre><span class="you">&gt; keep going — refactor the rest of the module</span>
+      <div class="step">
+        <h3>An agent, left running.</h3>
+        <p>&ldquo;Keep going,&rdquo; on a big repository. By mid-morning the session has generated 128,400 tokens — and nothing in the prompt leaks a thing.</p>
+      </div>
+      <div class="step">
+        <h3>A ceiling is a sentence about a role.</h3>
+        <p>Warden knows which role each key belongs to. Over the budget, the request stops on the machine — before the tokens are bought.</p>
+      </div>
+      <div class="step">
+        <h3>Held, never refused.</h3>
+        <p>Queued for an administrator; answered, it is judged on its merits. Cut off mid-task with nowhere to go is how a gateway gets switched off. The day counter resets when the gateway restarts — the page would rather say that than not.</p>
+      </div>
 
-<span class="hold">⏸ Held for review by Warden</span>
+      <div class="panel">
+        <div class="pstick">
+          <div class="term" data-reveal>
+            <div class="term-bar">claude code</div>
+            <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">keep going — refactor the rest of the module</span></span>
+</span>
+<span class="tg tg-b"><span class="hold">⏸ Held for review by Warden</span>
 
    <span class="rule">this session has generated 128,400 tokens, over the
    100,000 allowed for role &quot;engineer&quot;</span>
-
-   Queued for an administrator. You have not been refused —
+</span>
+<span class="tg tg-c">   Queued for an administrator. You have not been refused —
    when they answer, ask again and it is judged on its merits.
+</span>
+<span class="tg tg-d">   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></span></pre>
+          </div>
 
-   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></pre>
+          <p class="ceilings"><span class="label">Ceilings, per role</span> <span class="mono">intern 20/day · analyst 100/day · engineer 200/day + 100k tokens a session · finance 150/day · admin 500/day</span></p>
         </div>
-
-        <p class="ceilings"><span class="label">Ceilings, per role</span> <span class="mono">intern 20/day · analyst 100/day · engineer 200/day + 100k tokens a session · finance 150/day · admin 500/day</span></p>
-
-        <p class="beat-note">Over budget holds, never refuses: cut off mid-task with nowhere to go is what makes somebody stop using the gateway rather than stop working. A role with no token ceiling is unmetered, not a ceiling of zero — and the day counter resets when the gateway restarts, which the page would rather say than not.</p>
       </div>
     </div>
 
@@ -335,9 +382,9 @@ setTimeout(function () {
     <!-- The page opened on "writing the rules down is not the same as
          enforcing them" and closes by answering it, with the two installers
          under the answer. -->
-    <p class="close">Writing them down was never the hard part.</p>
+    <p class="close" data-reveal>Writing them down was never the hard part.</p>
 
-    <div class="dl">
+    <div class="dl" data-reveal style="--reveal-delay:.12s">
       <a href="https://github.com/Wardenlabs/warden/releases/download/v0.1.3/Warden-0.1.3-arm64.dmg">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
           <span>

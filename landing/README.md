@@ -7,8 +7,8 @@ its place doing.
 | File | What it is |
 |---|---|
 | `index.html` | Structure and copy. The mark and wordmark are inlined from `brand/`, path for path. |
-| `styles.css` | The whole design system. `:root` first, then everything that reads from it. |
-| `app.js` | The prompt that types itself in the hero, the three rules that write and compile themselves in `#how`, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
+| `styles.css` | The whole design system. `:root` first, then everything that reads from it; the scene grid the story runs on is the last block. |
+| `app.js` | The prompt that types itself in the hero, the scene engine that walks the four chapters below it, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
 | `light.js` | The light: the gate line under the hero, on a canvas. Nothing else imports from it and it touches nothing outside `.hero-zone`. |
 
 ## What is on the page
@@ -23,9 +23,21 @@ have seen it work.
 | | | Earns its scroll with |
 |---|---|---|
 | Hero | Writing the rules down is not the same as enforcing them. | the gate line, and the prompt being judged on it |
-| `#how` | Write a rule, it stops the request, you see that it did. | one broad instruction becoming three specific rules, and the hook's literal output in three tools |
-| `#spend` | A prompt that leaks nothing can still cost you. | the hold an over-budget session gets, and the seed policy's ceilings |
+| `#how` | Write a rule, it stops the request, you see that it did. | one day told as three scenes — the sentence compiling at 09:04, the hook's literal refusal at 14:22, and the ledger where both show up again |
+| `#spend` | A prompt that leaks nothing can still cost you. | scene four of the same day: the hold an over-budget session gets, and the seed policy's ceilings |
 | `#download` | Install it. | two installers, from this repo's own CI |
+
+Below the hero the page is one story with a clock. Each scene is a chapter:
+a caption row, three narration steps, and the product panel. On a wide screen
+the panel pins with `position: sticky` while the steps walk past it, and the
+panel assembles at the step that explains it — the classic pinned-narrative
+pattern, done with one IntersectionObserver per chapter and no library. On a
+phone nothing pins: the children reorder into caption, first step, panel,
+remaining steps, and the panel assembles once, as it arrives. Assembly is
+monotonic — scrolling back up disassembles nothing, which is the audit log's
+own claim made physical. The connective tissue is content, not decoration:
+the 14:22 row of the scene-03 ledger *is* the scene-02 block, and the 14:21
+hold is the rule ratified in scene 01.
 
 Two people open this URL: whoever is deciding, and whoever they forward it to.
 The page is not written twice for them. The prose is in business language and
@@ -190,15 +202,19 @@ Three parts, and they are the seam:
 
 ### Motion
 
-Three things move: the prompt that types itself, reveal on scroll, and the
-beam. Every one of them is off under `prefers-reduced-motion` — the hero then
-shows the finished state, prompt typed and verdict on.
+Three kinds of thing move: the prompt that types itself, reveal on scroll, and
+the scene engine assembling a panel. Every one of them is off under
+`prefers-reduced-motion` — the hero then shows the finished state, prompt
+typed and verdict on, and every scene panel is simply complete.
 
-Below the hero, motion is only ever a thing arriving: a panel revealing, a rule
-typing itself, the compiled card opening a beat after the button presses. Every
-one of them is keyed on `.is-in` or on one short chain of timers in `app.js`,
-none of them loops, and all of them are off under `prefers-reduced-motion` —
-which shows the finished state, card open and prompt typed.
+Below the hero, motion is only ever a thing arriving: a headline rising out of
+its mask, a line group landing in a terminal, a ledger row taking its place.
+The engine in `app.js` never invents content — it types over text that ships
+in the markup and turns `on` classes on elements that are merely translucent,
+so the finished page and the never-animated page are the same page. Terminal
+line groups occupy their space from the start: a panel fills, it never grows,
+and the layout under it never shifts. None of it loops, and a fast scroll
+lands on the finished state rather than a queue of catch-up animation.
 
 The tool switch in `#how` has no animation and no JavaScript at all. It is four
 radios and `:checked ~`, so it works with scripting off, takes arrow keys for

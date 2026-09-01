@@ -1,7 +1,8 @@
 /*
  * Everything on this page that needs JavaScript: the light in the hero, the
- * prompt that types itself under it, reveal-on-scroll, the relay through
- * §how, and naming the visitor's platform on the download button.
+ * prompt that types itself under it, reveal-on-scroll, the scene engine that
+ * walks the four chapters, and naming the visitor's platform on the download
+ * button.
  *
  * No build step and no dependencies — see README.md. These are ES modules
  * served from the same origin, which is the same property the console has:
@@ -17,6 +18,11 @@ import { mountLight } from './light.js';
 window.__wardenReady = true;
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const hasIO = 'IntersectionObserver' in window;
+
+const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+const on = (el) => el && el.classList.add('on');
 
 /* ── the light ─────────────────────────────────────────────────────────── */
 
@@ -49,10 +55,10 @@ const judge = document.getElementById('judge');
 if (judge && !reduced) {
   const typed = judge.querySelector('.typed');
   const text = typed.textContent;
-  const verdict = (on) => {
-    judge.classList.toggle('judged', on);
-    zone?.classList.toggle('judged', on);
-    light?.set(on);
+  const verdict = (isOn) => {
+    judge.classList.toggle('judged', isOn);
+    zone?.classList.toggle('judged', isOn);
+    light?.set(isOn);
   };
 
   verdict(false);
@@ -69,82 +75,11 @@ if (judge && !reduced) {
   setTimeout(step, 320);
 }
 
-/* ── the policy being written ──────────────────────────────────────────── */
-/*
- * One sentence, the way somebody would actually say it, and the specific rules
- * it turns out to have meant landing under it one at a time.
- *
- * This is `compilePolicy` in src/policy/compile.ts and not a liberty the page
- * is taking: a splitting pass turns a worry into separate concrete
- * prohibitions, `compileRule` compiles each of them, and the administrator
- * ratifies them one at a time in the console. The animation is allowed to be
- * quick; it is not allowed to be a different product, and the earlier version
- * of this stage typed three sentences precisely because at that point the
- * compiler could only take one at a time.
- *
- * Fast on purpose — a mechanism being shown, not a person being watched. With
- * no JavaScript the box holds the sentence and all three rules are already
- * there, which is the contract the hero has too.
- */
-
-const ruleBox = document.getElementById('ruleMsg');
-const ruleSet = document.getElementById('ruleSet');
-const sendBtn = document.querySelector('#how .composer .send');
-const rules = ruleSet ? [...ruleSet.children] : [];
-
-/* Reduced motion, or no IntersectionObserver: the finished state, immediately.
-   The rules are hidden by CSS as soon as `.js` is on, so something has to say
-   otherwise or they never arrive at all. */
-if (reduced || !('IntersectionObserver' in window)) rules.forEach((r) => r.classList.add('on'));
-
-if (ruleBox && rules.length && !reduced && 'IntersectionObserver' in window) {
-  const sentence = ruleBox.value;
-  ruleBox.value = '';
-
-  const wait = (ms) => new Promise((done) => setTimeout(done, ms));
-
-  const type = () =>
-    new Promise((done) => {
-      let i = 0;
-      const step = () => {
-        if (i >= sentence.length) return done();
-        ruleBox.value = sentence.slice(0, ++i);
-        setTimeout(step, 9 + Math.random() * 14);
-      };
-      step();
-    });
-
-  const run = async () => {
-    await type();
-    await wait(200);
-    /* 130ms of the button's own pressed state and nothing else. A spinner
-       would be a claim about how long compiling takes, and on the machine this
-       runs on that number is 46 seconds. */
-    sendBtn?.classList.add('pressed');
-    await wait(130);
-    sendBtn?.classList.remove('pressed');
-    for (const rule of rules) {
-      await wait(380);
-      rule.classList.add('on');
-    }
-  };
-
-  const io = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((e) => e.isIntersecting)) return;
-      io.disconnect();
-      setTimeout(run, 240);
-    },
-    { threshold: 0.4 }
-  );
-  io.observe(ruleBox);
-}
-
 /* ── reveal on scroll ──────────────────────────────────────────────────── */
 
-const revealables = document.querySelectorAll('[data-reveal]');
+const revealables = $$('[data-reveal]');
 
-if (reduced || !('IntersectionObserver' in window)) {
+if (reduced || !hasIO) {
   revealables.forEach((el) => el.classList.add('is-in'));
 } else {
   const io = new IntersectionObserver(
@@ -157,51 +92,205 @@ if (reduced || !('IntersectionObserver' in window)) {
     },
     { rootMargin: '0px 0px -12% 0px', threshold: 0.05 }
   );
-  // The stages in §how are lit by the relay below, in order — not here.
-  revealables.forEach((el) => { if (!el.closest('#how .stages')) io.observe(el); });
+  revealables.forEach((el) => io.observe(el));
 }
 
-/* ── the relay through §how ────────────────────────────────────────────── */
+/* ── the scene engine ──────────────────────────────────────────────────── */
 /*
- * What used to be a line of light drawn down the middle is now order in
- * time. Each stage lights when it arrives, and stages arriving together are
- * spaced a beat apart, so a fast scroll still reads as one event passing
- * through three places rather than three panels appearing at once. When the
- * refusal lands in 02, the rule written in 01 takes the hit for a moment —
- * the claim the drawn line was making, told by the content instead.
+ * Four chapters below the hero, one scroll-driven day. On a wide screen each
+ * chapter pins its product panel with position:sticky while the narration
+ * walks past it, and the panel assembles at the step that explains it — one
+ * IntersectionObserver per chapter, watching the steps. On a phone there is
+ * no pinning: the panel sits between the narration and assembles once, when
+ * it scrolls into view.
  *
- * Under reduced motion, or with no IntersectionObserver, the generic reveal
- * path above has already shown everything and none of this runs.
+ * The engine only ever reveals markup that is already on the page. It types
+ * over text that is in the document, adds `on` to rows and line groups that
+ * are merely translucent, and decides nothing — which is why reduced motion
+ * and a missing IntersectionObserver get the same treatment: everything on,
+ * immediately, and the page is simply complete.
+ *
+ * Actions are monotonic. Scrolling back up does not disassemble a panel:
+ * what the day produced stays produced, the same claim the audit log makes.
  */
 
-const stages = document.querySelector('#how .stages');
-const steps = stages ? [...stages.querySelectorAll(':scope > .stage')] : [];
-
-if (steps.length && !reduced && 'IntersectionObserver' in window) {
-  const rule = document.getElementById('ruleMsg');
-  const BEAT = 620;
-  let lastLit = 0;
-
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        io.unobserve(entry.target);
-        const at = Math.max(performance.now(), lastLit + BEAT);
-        lastLit = at;
-        setTimeout(() => {
-          entry.target.classList.add('is-in');
-          entry.target.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-in'));
-          if (entry.target.classList.contains('stops') && rule) {
-            setTimeout(() => rule.classList.add('hit'), 360);
-            setTimeout(() => rule.classList.remove('hit'), 1600);
-          }
-        }, at - performance.now());
+/* A typer over text that ships in the markup. It never invents a string:
+   it clears what is there and puts the same thing back, so with the engine
+   off the words are simply present. `finish` is the escape hatch for
+   reduced motion and layout changes mid-scroll. */
+const typer = (els, min = 9, spread = 14) => {
+  const targets = els.filter(Boolean);
+  if (!targets.length) return null;
+  const isBox = targets[0].value !== undefined;
+  const full = isBox ? targets[0].value : targets[0].textContent;
+  const set = (v) => targets.forEach((el) => { if (isBox) el.value = v; else el.textContent = v; });
+  let started = false;
+  let done = false;
+  return {
+    async run() {
+      if (started) return;
+      started = true;
+      set('');
+      for (let i = 1; i <= full.length; i++) {
+        if (done) return;
+        set(full.slice(0, i));
+        await wait(min + Math.random() * spread);
       }
+      done = true;
     },
-    { rootMargin: '0px 0px -10% 0px', threshold: 0.12 }
-  );
-  steps.forEach((s) => io.observe(s));
+    finish() { done = true; set(full); },
+  };
+};
+
+const chapters = $$('.chapter');
+const byName = {};
+chapters.forEach((ch) => { byName[ch.dataset.chapter] = ch; });
+
+const ruleBox = document.getElementById('ruleMsg');
+const ruleTyper = ruleBox && typer([ruleBox]);
+const rules = $$('#ruleSet .ru');
+const sendBtn = document.querySelector('[data-chapter="write"] .send');
+
+const hitCh = byName.hit;
+const hitTyper = hitCh && typer($$('.pt', hitCh), 14, 20);
+
+const logCh = byName.log;
+const logRows = logCh ? $$('.console .row', logCh) : [];
+
+const spendCh = byName.spend;
+const spendTyper = spendCh && typer($$('.pt', spendCh), 14, 20);
+
+/* One list of actions per chapter, indexed by narration step. `runTo` fires
+   them once each, in order, even when a fast scroll lands on step three
+   directly. */
+const acts = {
+  write: [
+    async () => { await wait(180); await ruleTyper?.run(); },
+    async () => {
+      /* 130ms of the button's own pressed state and nothing else. A spinner
+         would be a claim about how long compiling takes, and on the machine
+         this runs on that number is 46 seconds. */
+      sendBtn?.classList.add('pressed');
+      await wait(130);
+      sendBtn?.classList.remove('pressed');
+      for (const r of rules) { await wait(340); on(r); }
+    },
+    async () => {},
+  ],
+  hit: [
+    async () => { $$('.tg-a', hitCh).forEach(on); await wait(140); await hitTyper?.run(); },
+    async () => {
+      $$('.tg-b', hitCh).forEach(on);
+      /* The handoff: when the refusal lands, the sentence written in scene 01
+         takes the hit for a beat. The connective tissue is the event itself,
+         not a line drawn beside it. */
+      ruleBox?.classList.add('hit');
+      setTimeout(() => ruleBox?.classList.remove('hit'), 1400);
+      await wait(320);
+      $$('.tg-c', hitCh).forEach(on);
+    },
+    async () => { $$('.tg-d', hitCh).forEach(on); await wait(220); $$('.tg-e', hitCh).forEach(on); },
+  ],
+  log: [
+    async () => { on(logCh?.querySelector('.day')); await wait(220); on(logRows[0]); },
+    async () => { on(logRows[1]); },
+    async () => {
+      on(logRows[2]);
+      await wait(240);
+      on(logRows[3]);
+      await wait(420);
+      on(logCh?.querySelector('.tally'));
+    },
+  ],
+  spend: [
+    async () => { $$('.tg-a', spendCh).forEach(on); await wait(140); await spendTyper?.run(); },
+    async () => { $$('.tg-b', spendCh).forEach(on); },
+    async () => {
+      $$('.tg-c', spendCh).forEach(on);
+      await wait(220);
+      $$('.tg-d', spendCh).forEach(on);
+      await wait(320);
+      on(spendCh?.querySelector('.ceilings'));
+    },
+  ],
+};
+
+const ran = {}; /* chapter name -> highest step already fired */
+
+const runTo = (name, i) => {
+  const from = ran[name] ?? -1;
+  if (i <= from) return;
+  ran[name] = i;
+  (async () => {
+    for (let k = from + 1; k <= i; k++) {
+      acts[name]?.[k]?.();
+      await wait(150);
+    }
+  })();
+};
+
+const finishChapter = (ch) => {
+  const name = ch.dataset.chapter;
+  ran[name] = 99;
+  if (name === 'write') ruleTyper?.finish();
+  if (name === 'hit') hitTyper?.finish();
+  if (name === 'spend') spendTyper?.finish();
+  $$('.tg, .ru, .console .row, .day, .tally, .ceilings', ch).forEach(on);
+  $$(':scope > .step', ch).forEach((s) => s.classList.add('on'));
+};
+
+const finishAll = () => chapters.forEach(finishChapter);
+
+if (reduced || !hasIO) {
+  finishAll();
+} else {
+  const desktop = window.matchMedia('(min-width: 900px)');
+
+  chapters.forEach((ch) => {
+    const name = ch.dataset.chapter;
+    const steps = $$(':scope > .step', ch);
+
+    if (desktop.matches) {
+      /* The active step is whichever one crosses the band around the middle
+         of the screen. `on` moves with it; the panel only ever moves forward. */
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const i = steps.indexOf(entry.target);
+            steps.forEach((s, k) => s.classList.toggle('on', k === i));
+            runTo(name, i);
+          }
+        },
+        { rootMargin: '-32% 0px -46% 0px', threshold: 0 }
+      );
+      steps.forEach((s) => io.observe(s));
+    } else {
+      /* No pinning on a phone: the whole sequence plays once, paced, when
+         the panel arrives. The narration around it is plain text. */
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting)) return;
+          io.disconnect();
+          steps.forEach((s) => s.classList.add('on'));
+          (async () => {
+            const list = acts[name] || [];
+            ran[name] = list.length;
+            /* Tighter beats than the pinned version: on a phone the reserved
+               space under the last revealed line is visible until the next
+               group lands, so the pauses are for rhythm, not suspense. */
+            for (const act of list) { await act(); await wait(180); }
+          })();
+        },
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }
+      );
+      io.observe(ch.querySelector('.pstick') || ch);
+    }
+  });
+
+  /* Crossing the breakpoint mid-read re-wires nothing; the day simply
+     finishes. Rare enough that correct beats clever. */
+  desktop.addEventListener?.('change', finishAll, { once: true });
 }
 
 /* ── name the platform on the hero button ──────────────────────────────── */

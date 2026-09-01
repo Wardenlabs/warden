@@ -108,6 +108,12 @@
   --s-11: 128px;  --s-12: 168px;
   --r-xl: 16px;
 
+  /* Where a pinned scene panel rests. Proportional, so on a tall screen the
+     panel sits near the middle where the narration's eye line is, and on a
+     short laptop it pulls up under the 56px header so the tallest terminal
+     still fits. */
+  --stick: clamp(84px, 16svh, 176px);
+
   --wide: 1140px;
   --guide-w: 1px;
 
@@ -519,17 +525,10 @@ header nav .btn { color: var(--accent-ink); }
   .judge .verdict { flex: 1 1 100%; margin-left: 0; }
 }
 
-/* §spend opens on the hero's centre and then breaks out of it
-   for the two panels, which is the one place on the page where two things are
-   deliberately shown at the same size: neither of the two controls is the
-   footnote of the other. */
-/* §spend is built like a stage in §1 — same centre, same measure, one panel.
-   Two full-width panels side by side made it read as a second product bolted
-   on; at the width the refusal is shown at, it reads as the same gate doing
-   the other half of its job. */
-#spend .sec { gap: 0; justify-items: center; text-align: center; }
-#spend .main { justify-items: center; width: 100%; margin-bottom: var(--s-8); }
-#spend h2.loud { max-width: 22ch; margin-inline: auto; }
+/* §spend is scene four of the same day and uses the same scene machinery as
+   §1 — the chapter grid at the end of this file. Its centred one-column
+   layout went with the rebuild: the story reads down a left rail now, and
+   the hero keeps the centre as its signature. */
 
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
@@ -853,34 +852,16 @@ footer::before {
 }
 .console .day { position: static; }
 
-/* ── §1, the three stages ──────────────────────────────────────────────── */
+/* ── §1, the day in scenes ─────────────────────────────────────────────── */
 /*
- * One centred column — the axis every other section already sits on. What
- * made three panels a sequence used to be a line of light drawn down the
- * middle; now it is order in time. app.js lights the stages one after
- * another as they arrive, and when the refusal lands in 02 the rule written
- * in 01 takes the hit for a beat: the connective tissue is the event
- * itself, not something drawn beside it. The hero's gate is the only light
- * on the page now, which is the one place light means something.
+ * The three centred stages became four chapters on a left rail — the scene
+ * grid at the end of this file. What made the panels a sequence used to be
+ * order in time alone; now it is the scroll itself: the narration walks and
+ * the pinned panel assembles at the step that explains it. The handoff
+ * stayed — when the refusal lands in scene 02 the sentence written in 01
+ * takes the hit for a beat — and the hero's gate is still the only light
+ * on the page, which is the one place light means something.
  */
-#how .sec { gap: 0; justify-items: center; text-align: center; }
-#how .main { justify-items: center; width: 100%; margin-bottom: var(--s-9); }
-#how h2 { max-width: 24ch; }
-
-.stages { position: relative; width: 100%; }
-
-.stage {
-  display: grid;
-  justify-items: center;
-  gap: var(--s-5);
-  padding-block: var(--s-7);
-}
-/* Number and name on one line, an overline over the panel. */
-.stage .cap { display: flex; justify-content: center; gap: var(--s-3); }
-.stage .cap .stepn { color: var(--ink-2); }
-/* Near the width the refusal was written at, so its author's own line
-   breaks survive instead of the column adding a second set. */
-.stage .beat { width: 100%; max-width: 640px; min-width: 0; text-align: left; }
 
 /* The relay's handoff: when the refusal lands in 02, the rule that caused
    it re-lights for a beat. app.js adds and removes the class. */
@@ -889,7 +870,7 @@ footer::before {
 
 /* The card the verdict lands in carries a trace of its colour on the frame —
    well under the text's saturation, so it marks the card without shouting. */
-#how .stage.stops .term { border-color: color-mix(in srgb, var(--block) 30%, transparent); }
+#how .chapter.stops .term { border-color: color-mix(in srgb, var(--block) 30%, transparent); }
 
 
 /* The panels. No border and no shadow: at this value against --bg there is
@@ -903,14 +884,16 @@ footer::before {
   background: var(--sunken);
 }
 .shot.log { padding: var(--s-5) var(--s-6); }
-.stage .term { width: 100%; text-align: left; }
-.stage .term pre { font-size: var(--fs-2); padding: var(--s-6); }
+.chapter .term { width: 100%; text-align: left; }
+.chapter .term pre { font-size: var(--fs-2); padding: var(--s-6); }
 .console .composer { padding: var(--s-7) var(--s-7) var(--s-5); }
 
+/* The caveat closes the section on the same left rail the story reads down,
+   at the narration's own size — a page that buries its own caveat in --faint
+   has technically said it and practically hidden it. */
 #how .how-note {
-  max-width: 58ch;
-  margin-top: var(--s-8);
-  text-align: center;
+  max-width: 62ch;
+  margin-top: var(--s-7);
   font-size: var(--fs-3);
   line-height: var(--lh-body);
   color: var(--muted);
@@ -918,7 +901,7 @@ footer::before {
 }
 
 @media (max-width: 700px) {
-  .stage .term pre { font-size: var(--fs-1); padding: var(--s-5); }
+  .chapter .term pre { font-size: var(--fs-1); padding: var(--s-5); }
 }
 @media (max-width: 700px) {
   .console .row .who { flex-basis: 78px; }
@@ -993,14 +976,8 @@ footer::before {
   transition: opacity .42s var(--ease-out), transform .42s var(--ease-out), filter .42s var(--ease-out);
 }
 
-.beat-note {
-  margin: var(--s-5) 0 0;
-  font-size: var(--fs-2);
-  line-height: var(--lh-snug);
-  color: var(--faint);
-  text-wrap: pretty;
-}
-.beat-note .mono { color: var(--muted); }
+/* What was `.beat-note` under each panel is narration now: the notes moved
+   into the scene steps, where a reader actually meets them. */
 
 /* ── 02, the same refusal in three tools ────────────────────────────────── */
 /*
@@ -1128,16 +1105,8 @@ footer::before {
 
 /* ═══ what §2 and step 03 grew ═══════════════════════════════════════════ */
 
-/* The lead inside a beat. Left-aligned with the panel under it rather than
-   centred with the heading above it, because it is the panel's caption and
-   not the section's second headline. */
-.beat-lead {
-  margin: 0 0 var(--s-6);
-  font-size: var(--fs-3);
-  line-height: var(--lh-body);
-  color: var(--muted);
-  text-wrap: pretty;
-}
+/* `.beat-lead` went the same way as `.beat-note`: the caption became scene
+   narration. The ceilings line below is the one machine line that stayed. */
 
 /* The ceilings, as one line. It was four cards, and nobody reads four cards
    to learn that a quota is a sentence about a role. */
@@ -1168,4 +1137,176 @@ footer::before {
 @media (max-width: 700px) {
   .shot.log .tally { gap: var(--s-3); }
   .shot.log .tally .t { font-size: var(--fs-0); }
+}
+
+
+/* ═══ the scene grid: one day, four chapters ═════════════════════════════ */
+/*
+ * The story below the hero. Each chapter is one grid: a caption row across
+ * the top, three narration steps down the left rail, and the product panel
+ * on the right, pinned with position:sticky while the steps walk past it.
+ * app.js watches the steps and assembles the panel at the step that explains
+ * it; scrolling back up disassembles nothing.
+ *
+ * On a phone there is no pinning. The same children reorder into caption,
+ * first step, panel, remaining steps — the scene is set, the thing happens,
+ * the narration finishes — and the panel assembles once, on arrival.
+ *
+ * Everything here hides only under `.js`, so with scripting off (or the
+ * module broken, or reduced motion) every panel is simply complete. That is
+ * the same contract the hero has, extended down the page.
+ */
+
+/* The header is sticky, so anchored sections start under it, not behind it. */
+#how, #spend { scroll-margin-top: 64px; }
+
+/* Section heads on the left rail. The hero keeps the centre as its
+   signature; down here everything hangs off one edge, and the repetition of
+   that edge is what makes four scenes read as one page. */
+#how .main, #spend .main { display: block; max-width: var(--read); }
+.kicker { margin: 0 0 var(--s-4); color: var(--faint); }
+#how h2.loud, #spend h2.loud { margin: 0 0 var(--s-7); line-height: var(--lh-hero); }
+.lead-line {
+  margin: 0;
+  font-size: var(--fs-sub);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  max-width: var(--prose);
+}
+
+/* The loud headline arrives line by line, each one rising out of a mask.
+   Gated on `.js` and keyed on the head's own reveal, so without scripting
+   the sentence is simply there. */
+h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
+.js .main[data-reveal] h2.loud .ln > span {
+  display: block;
+  transform: translateY(118%);
+  transition: transform .8s var(--ease-out);
+}
+.js .main[data-reveal] h2.loud .ln:nth-child(2) > span { transition-delay: .09s; }
+.js .main[data-reveal] h2.loud .ln:nth-child(3) > span { transition-delay: .18s; }
+.js .main[data-reveal].is-in h2.loud .ln > span { transform: none; }
+
+/* ── the chapter grid ──────────────────────────────────────────────────── */
+
+.chapter {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  column-gap: clamp(var(--s-7), 5vw, var(--s-10));
+  border-top: 1px solid var(--line-soft);
+  margin-top: var(--s-9);
+  padding-top: var(--s-6);
+}
+#how .main + .chapter, #spend .main + .chapter { margin-top: var(--s-9); }
+
+.chapter > .cap {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+.cap .sep { color: var(--line-firm); }
+.cap .ttl { color: var(--ink-2); }
+
+.chapter > .step {
+  grid-column: 1;
+  display: grid;
+  align-content: center;
+  gap: var(--s-3);
+  min-height: 52vh;
+  min-height: 52svh;
+  padding-block: var(--s-6);
+}
+.step h3 { font-size: var(--fs-sub); color: var(--ink); }
+.step p {
+  margin: 0;
+  font-size: var(--fs-4);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  max-width: 44ch;
+  text-wrap: pretty;
+}
+.step .mono { color: var(--ink-2); }
+
+.chapter > .panel { grid-column: 2; grid-row: 2 / span 3; min-width: 0; }
+.pstick {
+  position: sticky;
+  top: var(--stick);
+  display: grid;
+  gap: var(--s-5);
+  align-content: start;
+}
+.pstick .ruleset { margin-top: 0; }
+
+/* The narration dims where it is not being read. Dimming is a filter, not
+   the opacity property, so it composes with the entrance fade the steps get
+   from [data-reveal] instead of fighting it. Desktop only: on a phone every
+   step is simply on. */
+@media (min-width: 900px) {
+  .js .chapter > .step { transition: opacity .6s var(--ease-out), transform .6s var(--ease-out), filter .45s var(--ease-out); }
+  .js .chapter > .step:not(.on) { filter: opacity(.35); }
+}
+
+/* ── the pieces a panel assembles from ─────────────────────────────────── */
+
+/* Terminal output arrives in groups of lines. They occupy their space from
+   the start — the panel never changes height, only fills — and visibility
+   rides along so what is not on screen yet is not read out either. */
+.js .tg {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .55s var(--ease-out), visibility 0s linear .55s;
+}
+.js .tg.on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .55s var(--ease-out);
+}
+
+/* The ledger fills row by row, and the tally — nested inside the day line —
+   waits for the day to be over. */
+.js [data-chapter="log"] .day,
+.js [data-chapter="log"] .console .row {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
+}
+.js [data-chapter="log"] .day.on,
+.js [data-chapter="log"] .console .row.on { opacity: 1; transform: none; }
+.js [data-chapter="log"] .tally { opacity: 0; transition: opacity .6s var(--ease-out); }
+.js [data-chapter="log"] .tally.on { opacity: 1; }
+
+/* The ceilings line lands after the hold explains it. */
+.js .ceilings { opacity: 0; transform: translateY(6px); transition: opacity .5s var(--ease-out), transform .5s var(--ease-out); }
+.js .ceilings.on { opacity: 1; transform: none; }
+
+/* ── the phone ─────────────────────────────────────────────────────────── */
+/*
+ * One column, reordered: caption, the step that sets the scene, the panel,
+ * then the narration that reads what just happened. No pinning, no dimming,
+ * shorter steps — the assembly itself is the show, and it plays once.
+ */
+@media (max-width: 899px) {
+  .chapter { grid-template-columns: minmax(0, 1fr); margin-top: var(--s-8); }
+  .chapter > .cap { order: 0; }
+  .chapter > .step:nth-child(2) { order: 1; }
+  .chapter > .panel { order: 2; grid-column: 1; grid-row: auto; margin-block: var(--s-4); }
+  .chapter > .step:nth-child(3) { order: 3; }
+  .chapter > .step:nth-child(4) { order: 4; }
+  .chapter > .step { min-height: 0; padding-block: var(--s-5); }
+  .pstick { position: static; }
+}
+
+/* ── reduced motion: the day, already over ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .js .tg { opacity: 1; visibility: visible; }
+  .js [data-chapter="log"] .day,
+  .js [data-chapter="log"] .console .row,
+  .js [data-chapter="log"] .tally,
+  .js .ceilings { opacity: 1; transform: none; }
+  .js .chapter > .step { filter: none; }
+  .js .main[data-reveal] h2.loud .ln > span { transform: none; transition: none; }
 }
