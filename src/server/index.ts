@@ -304,7 +304,10 @@ app.put('/api/settings/compiler', asyncRoute(async (req, res) => {
   // Held to the same bar as the environment variables: https unless loopback,
   // and both halves present. Rejecting here means an unusable configuration
   // never reaches disk, so the compiler cannot be left silently broken.
-  if (next.data.provider !== 'local') {
+  // The CLI providers are neither local nor an endpoint: there is nothing to
+  // validate because there is nothing to type. Holding them to the https-and-a-
+  // key bar would reject the one configuration that needs no credential.
+  if (next.data.provider !== 'local' && !next.data.provider.endsWith('-cli')) {
     try {
       validateCompilerEndpoint({ ...next.data, timeoutMs: 60_000 });
     } catch (err) {

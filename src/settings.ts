@@ -38,6 +38,20 @@ const SETTINGS_PATH = process.env['WARDEN_SETTINGS_PATH'] ?? join('data', 'setti
 export const COMPILER_PROVIDERS = [
   { id: 'local', label: 'This machine', baseUrl: '', models: [], note: 'Nothing leaves the machine. The default.' },
   {
+    id: 'claude-cli',
+    label: 'Claude Code on this machine',
+    baseUrl: '',
+    models: ['opus', 'sonnet', 'haiku'],
+    note: 'Uses the session you are already signed in to. No API key, no extra bill.'
+  },
+  {
+    id: 'codex-cli',
+    label: 'Codex on this machine',
+    baseUrl: '',
+    models: [],
+    note: 'Same idea, through the codex CLI. Wired from its docs and NOT yet watched working.'
+  },
+  {
     id: 'anthropic',
     label: 'Anthropic',
     baseUrl: 'https://api.anthropic.com/v1',

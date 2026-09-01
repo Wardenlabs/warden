@@ -7,6 +7,7 @@ import { LlamaCppAdapter } from './llamacpp.js';
 import { RealQvacAdapter } from './real.js';
 import { RemoteCompilerAdapter, remoteCompilerConfig } from './remote.js';
 import type { QvacAdapter } from './types.js';
+import { CliCompilerAdapter, cliCompilerConfig } from './cli-compiler.js';
 
 let instance: QvacAdapter | null = null;
 
@@ -32,8 +33,18 @@ export function adapter(): QvacAdapter {
     // runs on `local`, and only the rule compiler is routed off-machine. When
     // the feature is unconfigured this returns the local adapter untouched, so
     // a default install has no network path from any model call.
-    const remote = remoteCompilerConfig();
-    instance = remote ? new RemoteCompilerAdapter(local, remote) : local;
+    // Two ways to move compilation off the local weights, and they are
+    // mutually exclusive by construction: a CLI already signed in on this
+    // machine, or an endpoint someone configured. The CLI wins when both are
+    // set, because it is the one that needed no credential typed in and is
+    // therefore the one somebody chose on purpose.
+    const cli = cliCompilerConfig();
+    if (cli) {
+      instance = new CliCompilerAdapter(local, cli);
+    } else {
+      const remote = remoteCompilerConfig();
+      instance = remote ? new RemoteCompilerAdapter(local, remote) : local;
+    }
   }
   return instance;
 }
@@ -47,6 +58,7 @@ export function adapter(): QvacAdapter {
  */
 export function remoteCompiler(): string | null {
   const a = adapter();
+  if (a instanceof CliCompilerAdapter) return a.describe();
   return a instanceof RemoteCompilerAdapter ? a.describe() : null;
 }
 
