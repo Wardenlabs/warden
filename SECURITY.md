@@ -53,6 +53,18 @@ text.
 with a witness file holding the count so truncation is visible as well as
 alteration. `pnpm run verify-audit` walks it.
 
+**Sending prompts to a model you do not run.** Judging is local under every
+configuration this repo can produce. Rule *compilation* is the one thing that
+can be moved — to an endpoint you configure (`WARDEN_COMPILER_API`) or to the
+`claude`/`codex` CLI already signed in on the machine (`WARDEN_COMPILER_CLI`,
+or the provider picker in the console) — because compilation turns a sentence
+*you* typed into a draft *you* then ratify, and a model that cannot enact
+policy cannot be talked into enacting it. What goes with it: your sentence,
+your role names, and your employee roster (`WARDEN_COMPILER_REDACT_NAMES=1`
+reduces the roster to tokens). What never does: employee prompts, audit
+entries, the policy, and any API key. Both wrappers gate on the `compiler`
+role and repeat the check inside the call.
+
 **Keeping a transcript of your team.** The audit log holds `sha256(prompt)` and
 never the prompt: `recordDecision` strips the text before writing, so the
 governance record cannot become the thing it is meant to make accountable.

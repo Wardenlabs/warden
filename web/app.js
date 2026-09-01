@@ -1061,7 +1061,12 @@ function compilerPage() {
   const d = compilerDraft();
   const providers = c.providers ?? [];
   const chosen = providers.find((p) => p.id === d.provider) ?? providers[0];
-  const remote = d.provider !== 'local';
+  // Three kinds of provider and they need different forms. `local` asks for
+  // nothing. A `-cli` provider asks for nothing either — that is the point of
+  // it — beyond which model to pass through. Only a real endpoint needs a URL
+  // and a key, so only that one gets those fields.
+  const cli = d.provider.endsWith('-cli');
+  const remote = d.provider !== 'local' && !cli;
   const t = state.compilerTest;
   const host = (() => {
     try { return new URL(d.baseUrl || chosen?.baseUrl || '').host; } catch { return ''; }
@@ -1090,6 +1095,25 @@ function compilerPage() {
           ${providers.map((p) => `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}</button>`).join('')}
         </div>
       </div>
+
+      ${cli ? `
+      <div class="field">
+        <label for="cModel">Model</label>
+        <input id="cModel" type="text" spellcheck="false" list="cModelList" value="${esc(d.model)}"
+               placeholder="${esc(chosen?.models?.[0] ?? 'leave blank for its default')}">
+        ${chosen?.models?.length ? `<datalist id="cModelList">${chosen.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>` : ''}
+        <span class="note">${esc(chosen?.note ?? '')}</span>
+      </div>
+
+      <div class="field">
+        <label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}>
+          <span>Send <code>@ana</code> instead of employee names</span></label>
+        <span class="note">Rules are compiled by the session that CLI is signed in to, so the
+          same three things go to it as to any other provider: your sentence, your role names,
+          your staff list. Never sent: employee prompts, the audit log, your policy.
+          Judging always stays on this machine.</span>
+      </div>
+      ` : ''}
 
       ${remote ? `
       <div class="grid2">
@@ -1257,7 +1281,7 @@ function rulesBody() {
   return `<div class="sheet">
     ${rulesTabs(`
       <button type="button" class="btn" data-go="simulator">Try a prompt</button>
-      <button type="button" class="btn" data-go="redteam">Red team</button>`)}
+      <button type="button" class="btn" data-go="redteam">Try to break it</button>`)}
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')

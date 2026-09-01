@@ -120,6 +120,18 @@ pnpm run verify-audit             # walk the audit chain
 The mock adapter is a test double, never a fallback. If the real adapter fails,
 Warden escalates — it does not downgrade to keyword matching and keep answering.
 
+**Compilation may leave the machine; judging may not.** Two adapters wrap the
+local one and both are gated on the `compiler` role and nothing else:
+[`qvac/remote.ts`](src/qvac/remote.ts) for an OpenAI-shaped endpoint, and
+[`qvac/cli-compiler.ts`](src/qvac/cli-compiler.ts) for the `claude` or `codex`
+CLI already signed in on the machine — no API key, no endpoint, and a model
+that makes rules the 1.7B cannot. What goes to either is the administrator's
+own sentence, the role names and the employee roster, and nothing else; there
+is no flag anywhere that routes a prompt under judgement off-machine, and the
+role check is repeated inside the call as the line that would have to be wrong
+for that to happen. If you add a third of these, gate it the same way and say
+in its header exactly what leaves.
+
 `src/qvac/` is the only place `@qvac/sdk` is imported, and the adapter interface
 is six methods. That is what makes "is the runtime the problem" answerable
 rather than arguable: `llamacpp.ts` runs the same weights under a different
@@ -204,15 +216,26 @@ Warden was built fast and the repo says so rather than pretending otherwise.
   The boundary held: nothing was enacted, and an administrator ratifying that
   draft would have rejected it. The paraphrase failure is now structurally
   impossible — a split of one returns the administrator's own sentence, never
-  the model's rewrite of it — and both sentences compile correctly after that
-  change. What is left is that the pass earns nothing on this model, and it is
-  still off the measured path for exactly that reason: `/api/policy/draft` is
-  untouched, `/api/policy/draft-set` is its own route behind its own button,
-  and no single-rule compile pays for it. **Do not put it on the landing page
-  or in release notes as a feature.** Before it can be one, it needs either a
-  bigger compiler — `WARDEN_MODEL_COMPILER`, or the remote compiler in
-  `qvac/remote.ts` — or a corpus of broad instructions paired with the rules
-  they ought to become, which does not exist.
+  the model's rewrite of it.
+
+  **It works on a capable compiler, which was the stated precondition.** Same
+  day, same sentences, through `qvac/cli-compiler.ts` on the `claude` CLI
+  (sonnet): *"no quiero que se filtren datos de clientes ni que aprueben pagos
+  grandes sin mi"* split into two statements and compiled into a `block` rule
+  about customer data and an `escalate` rule about payment approval, in 25
+  seconds; *"quiero que dejen de filtrar datos de clientes"* — the false friend
+  the 1.7B inverted — came back as `block`, "Employees must not share or leak
+  customer data outside authorized channels", with Spanish examples on both
+  sides, in 9. So the pass is not wrong; the local 1.7B is too small for it.
+
+  It still ships off the measured path on the default configuration, because
+  the default configuration is that 1.7B: `/api/policy/draft` is untouched,
+  `/api/policy/draft-set` is its own route behind its own button, and no
+  single-rule compile pays for it. What has changed is that there is now a way
+  to turn it on that costs nothing — the coding agent already signed in on the
+  machine. What is still missing is a corpus of broad instructions paired with
+  the rules they ought to become, so "works" here means three sentences and a
+  human reading the output, not a measurement.
 - Quota counters live in memory and reset with the process.
 - API keys are stored in plaintext in the directory file, and so is the compiler
   provider key in `data/settings.json` (written `0600`, gitignored).
