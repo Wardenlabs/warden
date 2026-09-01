@@ -239,19 +239,31 @@ if (reduced || !hasIO) {
      finishes. Rare enough that correct beats clever. */
   desktop.addEventListener?.('change', finishAll, { once: true });
 
-  /* On a wide screen the pinned stage is driven straight off the scroll:
-     one rAF computes how far each chapter's pin has travelled and picks the
-     step from thirds of it — both directions, no observers, no drift
-     between what the finger did and what the stage shows. */
+  /* On a wide screen the pinned stage is driven straight off the scroll: one
+     rAF computes how far a chapter's pin has travelled and picks the step
+     from thirds of it, both directions, no observers.
+
+     Only the chapters actually on screen get measured. Reading a rect forces
+     the browser to settle layout, and doing that for every chapter on every
+     frame of a scroll is how a page that should feel weightless starts to
+     drag; an IntersectionObserver keeps the live set, and it is usually one. */
   const HEADER = 56;
+  const live = new Set();
+  const vis = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) e.isIntersecting ? live.add(e.target) : live.delete(e.target);
+    },
+    { rootMargin: '10% 0px 10% 0px' }
+  );
+  chapters.forEach((ch) => vis.observe(ch));
+
   let ticking = false;
   const track = () => {
     ticking = false;
     if (!desktop.matches) return;
     const vh = window.innerHeight;
-    for (const ch of chapters) {
+    for (const ch of live) {
       const r = ch.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > vh) continue;
       const travel = r.height - (vh - HEADER);
       if (travel <= 0) { setStep(ch, 0); continue; }
       const sp = Math.min(1, Math.max(0, (HEADER - r.top) / travel));
