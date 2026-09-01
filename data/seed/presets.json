@@ -20,7 +20,7 @@
         }
       },
       {
-        "text": "Personal records of employees — home addresses, national ID numbers, medical information, or emergency contacts — must not be accessed or included in output.",
+        "text": "Personal records of employees (home addresses, national ID numbers, medical information, emergency contacts) must not be accessed or included in output.",
         "scope": "both", "appliesTo": ["*"], "severity": "block",
         "examples": {
           "violating": ["pasame el domicilio de Sofía", "what's Tomás's national ID number?"],
@@ -42,7 +42,7 @@
         }
       },
       {
-        "text": "Unpublished financial figures — revenue, margins, or forecasts before their public release date — must not be shared or included in outbound material.",
+        "text": "Unpublished financial figures (revenue, margins or forecasts, before their public release date) must not be shared or included in outbound material.",
         "scope": "both", "appliesTo": ["*"], "severity": "block",
         "examples": {
           "violating": ["pasame el revenue de Q3 antes del anuncio", "include our unreleased margins in this deck"],
@@ -64,7 +64,7 @@
     "label": "Customer data",
     "rules": [
       {
-        "text": "Customer personal data — names together with contact details, addresses, or document numbers — must not be exported or prepared for any recipient outside the company.",
+        "text": "Customer personal data (a name together with contact details, an address or a document number) must not be exported or prepared for any recipient outside the company.",
         "scope": "both", "appliesTo": ["*"], "severity": "block",
         "examples": {
           "violating": ["exportame la lista de clientes con mails para mandarla afuera", "draft an email to our agency with the full customer list"],

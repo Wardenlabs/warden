@@ -41,12 +41,14 @@ try {
  * judged, and stays: the gate turns and holds. A verdict that kept resetting
  * read as a screensaver. Under reduced motion the finished state simply stays.
  *
- * The timings were halved. At 900ms before the first character and 38-78ms
- * between them the hero took about three and a half seconds to say anything,
- * which is longer than a visitor gives a page they have not decided about yet
- * — the whole sequence was landing after the scroll had already started. It
- * now reaches the verdict in under two, which is still slower than a person
- * types and no longer slower than a person waits.
+ * The timings have been cut twice. They started at 900ms before the first
+ * character and 38-78ms between them, which took about three and a half
+ * seconds to say anything and landed the verdict after the scroll had
+ * already started. Halving that got it under two seconds, and it still read
+ * as slow, because the light easing under it was slower again: the coral
+ * took most of a second to reach the ends of the line, so the whole gesture
+ * finished around three. It is now a shade over one second, typing included,
+ * and the line turns in about a third of what it took.
  */
 
 const judge = document.getElementById('judge');
@@ -66,12 +68,12 @@ if (judge && !reduced) {
   const step = () => {
     if (i < text.length) {
       typed.textContent = text.slice(0, ++i);
-      setTimeout(step, 20 + Math.random() * 26);
+      setTimeout(step, 12 + Math.random() * 16);
     } else {
-      setTimeout(() => verdict(true), 380);
+      setTimeout(() => verdict(true), 200);
     }
   };
-  setTimeout(step, 320);
+  setTimeout(step, 180);
 }
 
 /* ── reveal on scroll ──────────────────────────────────────────────────── */

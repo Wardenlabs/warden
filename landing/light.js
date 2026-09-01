@@ -209,9 +209,9 @@ export function mountLight(host, opts = {}) {
     if (state.hover < .01) state.hx = state.hxWant; else state.hx += (state.hxWant - state.hx) * .18;
     state.hover += (state.hoverWant - state.hover) * (state.hoverWant > state.hover ? .12 : .06);
     // in quickly, out slowly
-    state.glow += (state.want - state.glow) * (state.want > state.glow ? .06 : .02);
+    state.glow += (state.want - state.glow) * (state.want > state.glow ? .14 : .05);
     // the front runs out once the verdict lands, and only resets after the colour has faded
-    if (state.want) state.front += (1.3 - state.front) * .05;
+    if (state.want) state.front += (1.3 - state.front) * .12;
     else if (state.glow < .02) state.front = 0;
     gl.viewport(0, 0, state.W, state.H);
     gl.uniform2f(u.R, state.W, state.H);

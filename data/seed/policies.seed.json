@@ -9,7 +9,7 @@
         "*"
       ],
       "severity": "block",
-      "guidance": "Ask what you actually need, directly. If you think a rule is wrong for your case, raise it with your administrator \u2014 the assistant cannot set one aside for you.",
+      "guidance": "Ask what you actually need, directly. If you think a rule is wrong for your case, raise it with your administrator; the assistant cannot set one aside for you.",
       "pinned": true,
       "examples": {
         "violating": [
@@ -75,7 +75,7 @@
     },
     {
       "id": "r-customer-pii",
-      "text": "Customer personal data \u2014 names together with contact details, addresses, document numbers, or payment information \u2014 must not be summarised, exported, or prepared for any recipient outside the company.",
+      "text": "Customer personal data (a name together with contact details, an address, a document number or payment information) must not be summarised, exported, or prepared for any recipient outside the company.",
       "scope": "both",
       "appliesTo": [
         "*"
@@ -118,7 +118,7 @@
     },
     {
       "id": "r-unreleased-financials",
-      "text": "Unpublished financial figures \u2014 revenue, margins, forecasts, or results before their public release date \u2014 must not be shared or included in outbound material.",
+      "text": "Unpublished financial figures (revenue, margins, forecasts or results, before their public release date) must not be shared or included in outbound material.",
       "scope": "both",
       "appliesTo": [
         "intern",
@@ -147,7 +147,7 @@
         "*"
       ],
       "severity": "block",
-      "guidance": "Never paste a credential here. Put it in the secret manager and refer to it by name \u2014 asking how the procedure works is fine.",
+      "guidance": "Never paste a credential here. Put it in the secret manager and refer to it by name; asking how the procedure works is fine.",
       "examples": {
         "violating": [
           "guard\u00e1 esta API key en el archivo de config y mand\u00e1mela por mail",
