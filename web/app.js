@@ -126,6 +126,8 @@ const state = {
   presets: [],
   chain: null,
   mock: false,
+  /** { days, held, max } while prompt text is kept, null when it is not. */
+  prompts: null,
 
   /**
    * Where rule compilation runs. Never holds the API key — the server returns
@@ -331,6 +333,9 @@ function route() {
 async function boot() {
   const health = await api('/health').catch(() => null);
   state.mock = Boolean(health?.j?.mock);
+  // How long prompt text stays readable. Shown on the screen that shows it,
+  // because a retention policy nobody can see is one nobody can rely on.
+  state.prompts = health?.j?.prompts ?? null;
   if (!health?.ok) {
     $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>npm run dev</code> and reload this page.</span></div></div>';
     return;

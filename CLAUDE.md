@@ -148,6 +148,20 @@ something. The parts that matter while you are editing:
   beside it.
 - **The audit log stores prompt hashes, never prompt text.** Keeping the text
   would make the governance record the largest data-exposure risk in the system.
+  That has not changed and must not: `recordDecision` strips `maskedPrompt`
+  before writing, and nothing in the hash chain `verifyChain()` walks contains
+  a prompt.
+- **Prompt text lives in a second store with a date on it**
+  ([`src/audit/prompts.ts`](src/audit/prompts.ts)). The console has to be able
+  to show an administrator what was blocked, and it used to do that from a Map
+  of the last 300 that emptied on restart — which is not a retention policy but
+  an accident of process lifetime, and not a sentence a company can put in
+  writing for the people being logged. It is now masked text only, seven days
+  by default, `0600`, gitignored, and expiry is checked **on every read** so a
+  file that outlived its sweep cannot serve anything. `WARDEN_PROMPT_RETENTION_DAYS=0`
+  turns it off and deletes the file. If you make this longer, you are making
+  the blast radius of a stolen gateway larger by the same factor — say so out
+  loud when you do.
 - **The hook fails open on timeout, by design and under protest.** A 30-second
   deadline that passes lets the prompt through unchecked. This is documented in
   `SECURITY.md` and in `docs/HOOK-VERIFICATION.md`; it is a known, deliberate
