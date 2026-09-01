@@ -863,6 +863,11 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 /* A card is now a button, so it has to stop looking like one: no browser
    chrome, the same box as before, and the affordance carried by the hover
    rather than by a border that would put six outlines on the page. */
+/* Offered, and honest about not being there. Still clickable: somebody who is
+   about to install Claude Code can set it up first and have it work when they
+   do, and refusing the click would only make that a puzzle. */
+.pill.faded { color: var(--muted); border-style: dashed; }
+
 button.quota { text-align: left; background: var(--bg); font: inherit; font-size: var(--fs-2); cursor: pointer; }
 button.quota:hover { border-color: var(--ink-3); }
 button.quota .quota-row b { margin-left: auto; }

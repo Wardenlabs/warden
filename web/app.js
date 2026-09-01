@@ -1108,8 +1108,17 @@ function compilerPage() {
       <div class="field">
         <label>Provider</label>
         <div class="hero-sugg tight">
-          ${providers.map((p) => `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}</button>`).join('')}
+          ${providers.map((p) => {
+            // A CLI option that is not installed is still offered, greyed and
+            // labelled, rather than hidden. Hiding it answers "why can I not
+            // use my Claude Code session" with silence; saying "not found on
+            // this machine" answers it with the reason.
+            const cliState = cliFor(p.id);
+            const missing = cliState !== null && !cliState.found;
+            return `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}${missing ? ' faded' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}${missing ? ' · not found' : ''}</button>`;
+          }).join('')}
         </div>
+        ${cliNote(d.provider)}
       </div>
 
       ${cli ? `
@@ -1264,6 +1273,26 @@ function bindCompiler() {
 }
 
 /** One line in the composer saying who is about to write the rule. */
+/**
+ * What the gateway found when it looked for this CLI, or null if this provider
+ * is not one. `cliTools` is absent on a gateway older than the route that
+ * reports it, which reads as "no claim either way" and shows nothing.
+ */
+function cliFor(providerId) {
+  const tool = providerId === 'claude-cli' ? 'claude' : providerId === 'codex-cli' ? 'codex' : null;
+  if (!tool) return null;
+  return (state.compiler?.cliTools ?? []).find((t) => t.tool === tool) ?? null;
+}
+
+/** The one line under the picker that says whether the chosen CLI is there. */
+function cliNote(providerId) {
+  const found = cliFor(providerId);
+  if (!found) return '';
+  return found.found
+    ? `<span class="note good">Found on this machine. It will use the session you are already signed in to, with no API key.</span>`
+    : `<span class="note bad">Not found on this machine. Install ${esc(found.label)} and sign in, then reopen this page.</span>`;
+}
+
 function compilerLine() {
   const c = state.compiler;
   if (!c) return '';

@@ -58,7 +58,8 @@
  * schema-checked twice before anything is built from it.
  */
 import { execFile } from 'node:child_process';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ZodType } from 'zod';
 import { loadCompilerSettings } from '../settings.js';
 import {
@@ -154,6 +155,46 @@ export function cliCompilerSource(): 'env' | 'settings' | null {
 }
 
 /**
+ * The PATH to look for these CLIs on, which is not the one this process has.
+ *
+ * A GUI application on macOS is launched by `launchd`, not by a shell, so it
+ * inherits `/usr/bin:/bin:/usr/sbin:/sbin` and nothing else — none of the
+ * places a coding agent actually installs to. The whole feature therefore
+ * worked under `pnpm run dev`, where the terminal's PATH is inherited, and
+ * silently did not exist in the packaged app, which is the only place a user
+ * meets it. "Claude Code is not installed" on a machine running Claude Code is
+ * the worst answer this could give.
+ *
+ * So the usual install locations are appended rather than substituted: the
+ * inherited PATH still wins, and this only adds places to look. Appending is
+ * also what keeps it safe — nothing here can shadow a binary the environment
+ * already resolves, so a directory on this list cannot take over a name.
+ */
+function searchPath(): string {
+  const home = homedir();
+  const extra =
+    process.platform === 'win32'
+      ? [join(home, 'AppData', 'Local', 'Programs'), join(home, '.local', 'bin')]
+      : [
+          join(home, '.local', 'bin'),
+          join(home, '.claude', 'local'),
+          join(home, '.codex', 'bin'),
+          join(home, 'bin'),
+          '/opt/homebrew/bin',
+          '/usr/local/bin'
+        ];
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const current = process.env['PATH'] ?? '';
+  const seen = new Set(current.split(sep).filter(Boolean));
+  return [current, ...extra.filter((d) => !seen.has(d))].filter(Boolean).join(sep);
+}
+
+/** `process.env` with that PATH, for anything that has to find one of these. */
+function cliEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, PATH: searchPath() };
+}
+
+/**
  * Which of these are actually on this machine.
  *
  * The console offers what is installed rather than a menu of things that will
@@ -166,7 +207,7 @@ export async function detectCliTools(): Promise<{ tool: CliTool; label: string; 
     (Object.keys(TOOLS) as CliTool[]).map(
       (tool) =>
         new Promise<{ tool: CliTool; label: string; verified: boolean; found: boolean }>((resolve) => {
-          execFile(probe, [tool], { timeout: 5_000 }, (err) =>
+          execFile(probe, [tool], { timeout: 5_000, env: cliEnv() }, (err) =>
             resolve({ tool, label: TOOLS[tool].label, verified: TOOLS[tool].verified, found: !err })
           );
         })
@@ -308,7 +349,7 @@ export class CliCompilerAdapter implements QvacAdapter {
           cwd: tmpdir(),
           timeout: this.config.timeoutMs,
           maxBuffer: 4 * 1024 * 1024,
-          env: process.env
+          env: cliEnv()
         },
         (err, stdout, stderr) => {
           if (err) {

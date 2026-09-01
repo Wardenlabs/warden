@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
 import { resolvedModel } from '../qvac/client.js';
+import { detectCliTools } from '../qvac/cli-compiler.js';
 import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
 import {
   COMPILER_PROVIDERS,
@@ -282,9 +283,16 @@ app.get('/api/policy/presets', (_req, res) => {
  * saved" from "the field is empty" without putting the secret back on the wire
  * on every page load.
  */
-app.get('/api/settings/compiler', (_req, res) => {
+app.get('/api/settings/compiler', asyncRoute(async (_req, res) => {
   const source = remoteCompilerSource();
+  // Which CLIs are actually on this machine, so the console can say so beside
+  // the option instead of letting somebody pick one that will fail on the first
+  // compile. `detectCliTools` existed and nothing called it, which is the same
+  // as it not existing: an administrator picked "Claude Code on this machine"
+  // and found out whether that was true a minute later, from a compile error.
+  const cliTools = await detectCliTools().catch(() => []);
   res.json({
+    cliTools,
     ...redactedCompilerSettings(loadCompilerSettings()),
     providers: COMPILER_PROVIDERS,
     // Which source is actually in force. An administrator whose saved settings
@@ -294,7 +302,7 @@ app.get('/api/settings/compiler', (_req, res) => {
     overriddenByEnv: source === 'env',
     localModel: resolvedModel('adjudicator')
   });
-});
+}));
 
 app.put('/api/settings/compiler', asyncRoute(async (req, res) => {
   const body = req.body ?? {};
