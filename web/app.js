@@ -589,6 +589,19 @@ document.addEventListener('keydown', (e) => {
  *  with — a badge that never goes down stops being read. */
 const pendingEscalations = () => state.escalations.filter((e) => !e.review);
 
+/**
+ * The three verdicts, in words rather than in the enum.
+ *
+ * `ESCALATE` is what the code calls it and it is the right name there — it is
+ * a position in a lattice. On a screen it is jargon: nobody outside this repo
+ * knows whether an escalated request was refused, and the whole point of that
+ * verdict is that it was not. What happened is that it is waiting for a
+ * person, so that is what it says.
+ */
+function verdictWord(v) {
+  return { all: 'All', BLOCK: 'Blocked', ESCALATE: 'Held', ALLOW: 'Allowed' }[v] ?? v;
+}
+
 function visibleAudit() {
   return state.audit.filter((a) => {
     const d = a.decision ?? {};
@@ -729,8 +742,7 @@ function decisionDetail(entry, head = '') {
         <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
         <span class="ms">${p.ms ?? 0}ms</span>
       </div>`).join('')}
-    <div class="note">${plural((d.passes ?? []).length, 'pass', 'passes')}, ${((d.totalMs ?? 0) / 1000).toFixed(1)}s end to end,
-      ${state.mock ? 'on the mock adapter.' : 'and none of it left this machine.'}</div>`;
+    <div class="note">${((d.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`;
 
   const chain = `<div class="chain">
       <div class="link"><span>previous</span><b>${esc(shortHash(entry.prevHash))}</b></div>
@@ -738,7 +750,7 @@ function decisionDetail(entry, head = '') {
       <div class="link"><span class="dot ${state.chain?.ok ? 'ALLOW' : 'BLOCK'}"></span><b>${esc(shortHash(entry.entryHash))}</b><span>this one</span></div>
     </div>
     <div class="note">${state.chain?.ok
-      ? `All ${state.chain.entries} records still recompute to the hash written with them. Change any one of them and this check fails.`
+      ? `All ${state.chain.entries} records still match their hashes.`
       : 'This log no longer verifies — a record was altered or removed after it was written.'}</div>`;
 
   const record = `<div class="kv">
@@ -798,7 +810,7 @@ function activityToolbar() {
   return `<div class="toolbar">
     <span class="seg" id="verdictSeg">
       ${['all', 'BLOCK', 'ESCALATE', 'ALLOW'].map((v) => `
-        <button type="button" data-v="${v}" class="${state.filter === v ? 'on' : ''}">${v === 'all' ? 'All' : v[0] + v.slice(1).toLowerCase()}</button>`).join('')}
+        <button type="button" data-v="${v}" class="${state.filter === v ? 'on' : ''}">${verdictWord(v)}</button>`).join('')}
     </span>
     <select class="inline" id="actorFilter" aria-label="Filter by person">
       <option value="">Everyone</option>${opts}
@@ -917,7 +929,7 @@ function escalationDetail(e) {
         <button type="button" class="btn primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
         <button type="button" class="btn danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
       </div>
-      <div class="note">Approving does not release the original prompt — their tool moved on seconds after they pressed Enter. It answers them, and the next ask is judged on its own merits.</div>
+      <div class="note">This answers them. Their next ask is judged on its own.</div>
       <div class="note bad" id="reviewNote_err"></div>
     </div>`}`;
 
@@ -1108,10 +1120,8 @@ function compilerPage() {
       <div class="field">
         <label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}>
           <span>Send <code>@ana</code> instead of employee names</span></label>
-        <span class="note">Rules are compiled by the session that CLI is signed in to, so the
-          same three things go to it as to any other provider: your sentence, your role names,
-          your staff list. Never sent: employee prompts, the audit log, your policy.
-          Judging always stays on this machine.</span>
+        <span class="note">Sent: your sentence, your role names, your staff list.
+          Never: prompts, the log, your policy. Judging stays here.</span>
       </div>
       ` : ''}
 
@@ -1280,8 +1290,7 @@ function rulesTabs(right = '') {
 function rulesBody() {
   return `<div class="sheet">
     ${rulesTabs(`
-      <button type="button" class="btn" data-go="simulator">Try a prompt</button>
-      <button type="button" class="btn" data-go="redteam">Try to break it</button>`)}
+      <button type="button" class="btn" data-go="simulator">Try a prompt</button>`)}
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')
@@ -1291,10 +1300,8 @@ function rulesBody() {
       <div class="label">Limits by role</div>
       ${state.policy.quotas.length
         ? `<div class="quota-grid">${state.policy.quotas.map(quotaCard).join('')}</div>`
-        : '<div class="note">No limits set — every role is unmetered.</div>'}
-      <div class="note">Token ceilings are per session and are read from the tool's
-        own transcript on the employee's machine — reported, not measured. Warden
-        never sees the provider on the hook path.</div>
+        : '<div class="note">No limits set.</div>'}
+      <div class="note">Token counts are reported by the tool, not measured here.</div>
     </div>
   </div>`;
 }
@@ -1322,7 +1329,7 @@ function quotaCard(q) {
     rows.push(`<div class="quota-row"><span>context</span><b>${tokens(q.maxContextTokens)}</b></div>`);
   }
   if (!q.maxSessionOutputTokens && !q.maxContextTokens) {
-    rows.push('<div class="quota-row unmetered"><span>tokens</span><b>unmetered</b></div>');
+    rows.push('<div class="quota-row unmetered"><span>tokens</span><b>no limit</b></div>');
   }
   return `<div class="quota"><span class="quota-role">${esc(q.role)}</span>${rows.join('')}</div>`;
 }
@@ -1386,10 +1393,9 @@ function emptyPolicyBanner() {
 function firstRunBanner() {
   if (state.company.employees.length || state.policy.rules.length) return '';
   return `<div class="banner">
-    <b>Nothing here yet — and nothing is being stopped.</b>
-    Warden only stops what you tell it to stop, so an empty policy lets everything
-    through. Write your first rule on <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
-    or add your team on <button type="button" class="linkish" data-go="people">Team</button>.
+    <b>Nothing is being stopped yet.</b> Write a rule on
+    <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
+    or add people on <button type="button" class="linkish" data-go="people">Team</button>.
     <div class="chips">
       <button type="button" class="btn" id="loadSample">Load the sample company instead</button>
     </div>
@@ -1398,11 +1404,8 @@ function firstRunBanner() {
 
 function mockBanner() {
   return `<div class="banner warn">
-    <b>Demo mode — nothing here was judged by a real model.</b>
-    Every verdict on this screen came from a keyword-matching test double, so it
-    is not evidence about anything. The models are about 1.8&nbsp;GB and download once.
-    <div class="note">In the desktop app: <b>Gateway → Download models &amp; leave demo mode…</b> in the menu bar.
-    From a checkout: <span class="mono">pnpm run setup</span>, then restart the gateway.</div>
+    <b>Demo mode — nothing here is real.</b> No model has judged anything on this screen.
+    <div class="note"><b>Gateway → Download models</b> in the menu bar, or <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>
   </div>`;
 }
 
@@ -1435,7 +1438,7 @@ function heroComposer() {
     ${cat ? `<div class="hero-sugg" id="presetList">
       ${(cat.rules ?? []).map((r, k) => `
         <button type="button" class="pill wrap" data-preset="${state.presetCat}" data-r="${k}">${esc(clip(r.text, 90))}</button>`).join('')}
-    </div>` : '<p class="hero-foot">Warden compiles it, writes the examples it should catch, and checks it against them before anyone is judged by it.</p>'}
+    </div>` : ''}
   </div>`;
 }
 
@@ -1964,9 +1967,7 @@ function companyBlock() {
   return `<div class="section company">
     <div class="label">Company</div>
     ${demo ? `<div class="banner warn">
-      <b>This is the sample company that ships with Warden.</b>
-      ${esc(state.company.name)} and everyone below are made up, and their keys are
-      demo keys. Put your own name in and the sample goes away.
+      <b>Sample data.</b> ${esc(state.company.name)} and everyone below are made up.
     </div>` : ''}
     <div class="chips">
       <input type="text" id="orgInput" class="inline" value="${demo ? '' : esc(state.company.name ?? '')}"
@@ -2015,7 +2016,7 @@ VIEWS.people = {
         <select class="inline" id="newRole">${roleOptions()}</select>
         <button type="button" class="btn primary" id="addPerson">Add</button>
       </div>
-      <div class="note">One name, or several separated by commas — Enter adds them. Each gets their own key.</div>
+      <div class="note">Commas for several. Enter adds them.</div>
       <div class="note" id="addNote"></div>
     </div>
 
@@ -2241,7 +2242,7 @@ async function renderPerson(id) {
         <pre class="code oneline">export WARDEN_API_KEY=${esc(p.apiKey)}</pre>
         <button type="button" class="btn sm copy" data-copy="${attr('export WARDEN_API_KEY=' + p.apiKey)}">Copy</button>
       </div>
-      <div class="note">This key is their whole identity. Issuing a new one revokes the old.</div>
+      <div class="note">This key is their identity. A new one revokes the old.</div>
     </div>
 
     <div class="chips">
@@ -2427,8 +2428,7 @@ function renderMessage(m, i) {
         <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
         <span class="ms">${p.ms ?? 0}ms</span>
       </div>`).join('')}</div>
-    <div class="note">${plural(m.passes.length, 'pass', 'passes')}, ${((m.totalMs ?? 0) / 1000).toFixed(1)}s end to end,
-      ${state.mock ? 'on the mock adapter.' : 'and none of it left this machine.'}</div>`)}</div>` : '';
+    <div class="note">${((m.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`)}</div>` : '';
 
   return `<div class="msg">
     <div class="who">Warden</div>
@@ -2584,6 +2584,18 @@ function bindFollowUps() {
 
 // ═══ RED TEAM ════════════════════════════════════════════════════════════════
 
+/**
+ * The corpus run. Off the console's main path on purpose.
+ *
+ * It is a developer's screen wearing an administrator's clothes: it replays 160
+ * canned attacks written against the *sample* policy, takes minutes of local
+ * inference to do it, and tells you about this repo's corpus rather than about
+ * the rules you wrote. An administrator pressing "Try to break it" expects
+ * their own policy tested and does not get that.
+ *
+ * Still here, still reachable, still what `pnpm run redteam` renders — it just
+ * no longer sits in the toolbar next to things that are about your policy.
+ */
 VIEWS.redteam = {
   railParent: 'policy',
   body: () => {
@@ -2608,7 +2620,7 @@ VIEWS.redteam = {
     return `<div class="sheet">
       ${toolbar}
       <div class="group">
-        ${s.adapter === 'mock' ? '<div class="banner warn">These numbers come from the mock adapter, not a real model. They measure the harness, not the guard.</div>' : ''}
+        ${s.adapter === 'mock' ? '<div class="banner warn">Demo mode: these numbers measure nothing.</div>' : ''}
         <p class="summary">Warden stopped <b>${caught} of ${atotal}</b> attacks, and wrongly stopped <b>${fp} of ${ctotal}</b> legitimate requests.</p>
         <div class="stats">
           <div class="stat"><div class="n good">${pc(caught, atotal)}%</div><div class="k">attacks stopped</div></div>
