@@ -323,6 +323,9 @@ select {
 }
 select.inline, input.inline { width: auto; font-size: var(--fs-2); padding: var(--s-1) var(--s-6) var(--s-1) var(--s-3); }
 input.inline { padding-right: var(--s-3); }
+/* The name field takes a list now, so it gets room for one. Everything else
+   inline stays sized to its own content. */
+input.inline.wide { min-width: 320px; flex: 1 1 320px; }
 
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--bg); }
 .seg button {

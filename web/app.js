@@ -1955,6 +1955,28 @@ function companyBlock() {
   </div>`;
 }
 
+/**
+ * Roles for the add-someone dropdown, with `admin` never first.
+ *
+ * `admin` sits in `exemptRoles`, which means an admin is measured against no
+ * rules at all. It is also alphabetically first, so it was the selected option
+ * on a fresh install — and the very first person anybody added, before they
+ * had read anything about exemptions, was silently unjudgeable. A default that
+ * hands out a bypass is the wrong default however defensible the sort order.
+ *
+ * It stays in the list, because somebody does have to be one. It is last, it
+ * says what it costs, and it is never what you get by not choosing.
+ */
+function roleOptions() {
+  const exempt = new Set(state.policy.exemptRoles ?? ['admin']);
+  const ordinary = state.company.roles.filter((r) => !exempt.has(r));
+  const privileged = state.company.roles.filter((r) => exempt.has(r));
+  return [
+    ...ordinary.map((r) => `<option value="${attr(r)}">${esc(r)}</option>`),
+    ...privileged.map((r) => `<option value="${attr(r)}">${esc(r)} — exempt from every rule</option>`)
+  ].join('');
+}
+
 VIEWS.people = {
   body: () => `<div class="sheet">
     ${companyBlock()}
@@ -1965,10 +1987,11 @@ VIEWS.people = {
     <div class="section">
       <div class="label">Add someone</div>
       <div class="chips">
-        <input type="text" id="newName" class="inline" placeholder="Full name">
-        <select class="inline" id="newRole">${state.company.roles.map((r) => `<option>${esc(r)}</option>`).join('')}</select>
+        <input type="text" id="newName" class="inline wide" placeholder="Ana Ruiz, Fede Tavano, Jere Souto" autocomplete="off">
+        <select class="inline" id="newRole">${roleOptions()}</select>
         <button type="button" class="btn primary" id="addPerson">Add</button>
       </div>
+      <div class="note">One name, or several separated by commas — Enter adds them. Each gets their own key.</div>
       <div class="note" id="addNote"></div>
     </div>
 
@@ -2048,18 +2071,65 @@ function bindPeopleList() {
     render();
   };
 
-  const add = $('addPerson');
-  if (add) add.onclick = async () => {
-    const name = $('newName').value.trim();
-    if (!name) return;
-    const { ok, j } = await api('/api/people', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, role: $('newRole').value })
-    });
-    if (!ok) { $('addNote').textContent = j.error ?? 'failed'; return; }
+  /**
+   * Adding people, without a round trip per person.
+   *
+   * This used to take one name and then navigate into that person's page,
+   * which is the right screen to end on when you are adding one person and
+   * exactly the wrong one when you are setting up a team: eight people meant
+   * eight trips back to this form. It now takes a comma-separated list, adds
+   * them in order, and stays here with the field cleared and focused — so the
+   * whole team is one paste, and one person is still one name and Enter.
+   *
+   * Sequential rather than concurrent because ids are derived from names and
+   * two people called Ana must not race for the same one.
+   */
+  const addPeople = async () => {
+    const field = $('newName');
+    const names = field.value.split(',').map((n) => n.trim()).filter(Boolean);
+    if (!names.length) return;
+
+    const role = $('newRole').value;
+    const added = [];
+    const failed = [];
+    for (const name of names) {
+      const { ok, j } = await api('/api/people', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, role })
+      });
+      if (ok) added.push(j); else failed.push(`${name}: ${j.error ?? 'failed'}`);
+    }
+
     await refreshPeople();
-    go('people', j.id);
+    if (added.length === 1 && !failed.length) {
+      // One person is still the case where their page — and their key — is
+      // what you wanted next.
+      go('people', added[0].id);
+      return;
+    }
+    render();
+    const note = $('addNote');
+    if (note) {
+      note.textContent = [
+        added.length ? `Added ${added.length} — each has a key on their row.` : '',
+        ...failed
+      ].filter(Boolean).join(' · ');
+    }
+    const next = $('newName');
+    if (next) { next.value = ''; next.focus(); }
   };
+
+  const add = $('addPerson');
+  if (add) add.onclick = addPeople;
+  const newName = $('newName');
+  // Reaching for the mouse after typing a name is the friction you feel every
+  // single time; Enter is the whole fix.
+  if (newName) newName.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); void addPeople(); } };
+
+  for (const id of ['newRoleName', 'newRoleQuota']) {
+    const el = $(id);
+    if (el) el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('addRole')?.click(); } };
+  }
 
   const addRole = $('addRole');
   if (addRole) addRole.onclick = async () => {
