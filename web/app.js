@@ -693,7 +693,7 @@ function plainSummary(entry) {
   const rule = d.firedRules?.[0];
 
   if (d.verdict === 'ALLOW') {
-    return `<b>${who}</b> asked ${asked}, and Warden let it through — nothing in the policy applies to it.`;
+    return `<b>${who}</b> asked ${asked}, and Warden let it through, because nothing in the policy applies to it.`;
   }
   if (!rule) {
     // No rule fired, so the only account of the refusal is the explanation the
@@ -707,7 +707,7 @@ function plainSummary(entry) {
     if (d.verdict === 'ESCALATE') {
       return `<b>${who}</b> asked ${asked}. No rule matched it, but Warden noticed ${
         signal ? `<b>${esc(signal)}</b>` : 'something structural in the text'
-      } and queued it for a person. They have not been refused — they are waiting.`;
+      } and queued it for a person. They have not been refused; they are waiting.`;
     }
     return `<b>${who}</b> asked ${asked}, and Warden stopped it${
       signal ? ` after noticing <b>${esc(signal)}</b>` : ''
@@ -751,7 +751,7 @@ function decisionDetail(entry, head = '') {
     </div>
     <div class="note">${state.chain?.ok
       ? `All ${state.chain.entries} records still match their hashes.`
-      : 'This log no longer verifies — a record was altered or removed after it was written.'}</div>`;
+      : 'This log no longer verifies: a record was altered or removed after it was written.'}</div>`;
 
   const record = `<div class="kv">
       <div class="r"><span class="k">Audit id</span><span class="v mono">${esc(entry.auditId)}</span></div>
@@ -912,7 +912,7 @@ function escalationDetail(e) {
   const entry = state.audit.find((x) => x.auditId === e.auditId);
   const who = esc(e.employeeName ?? e.employeeId);
 
-  const head = `<p class="summary">${who} sent something the <b>${esc(ruleName(e.ruleId ?? ''))}</b> rule says needs a person to sign off. They were not refused — they were told to wait, and they are still waiting.</p>
+  const head = `<p class="summary">${who} sent something the <b>${esc(ruleName(e.ruleId ?? ''))}</b> rule says needs a person to sign off. They were not refused, only told to wait, and they are still waiting.</p>
     ${e.employeeNote ? `<div class="group">
       <div class="label">They added</div>
       <div class="banner">“${esc(e.employeeNote)}”</div>
@@ -984,7 +984,7 @@ function appealDetail(a) {
       <div class="label">${esc(a.employeeName)} reported this</div>
       ${a.note
         ? `<div class="banner">“${esc(a.note)}”</div>`
-        : '<div class="note">No note — just that it was wrong.</div>'}
+        : '<div class="note">No note, just that it was wrong.</div>'}
     </div>
     ${a.ruleId ? `<div class="group">
       <div class="label">The rule that stopped them</div>
@@ -1361,7 +1361,7 @@ function emptyPolicyBanner() {
   if (state.policy.rules.length) return '';
   return `<div class="banner warn">
     <b>Your policy is empty, so right now Warden lets everything through.</b>
-    It only stops what you tell it to stop — write the first rule below, or take one from the catalogue.
+    It only stops what you tell it to stop, so write the first rule below or take one from the catalogue.
   </div>`;
 }
 
@@ -1393,7 +1393,7 @@ function emptyPolicyBanner() {
 function firstRunBanner() {
   if (state.company.employees.length || state.policy.rules.length) return '';
   return `<div class="banner">
-    <b>Nothing is being stopped yet.</b> Write a rule on
+    <b>Warden is not stopping anything yet.</b> Write a rule on
     <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
     or add people on <button type="button" class="linkish" data-go="people">Team</button>.
     <div class="chips">
@@ -1404,7 +1404,7 @@ function firstRunBanner() {
 
 function mockBanner() {
   return `<div class="banner warn">
-    <b>Demo mode — nothing here is real.</b> No model has judged anything on this screen.
+    <b>Demo mode: nothing here is real.</b> No model has judged anything on this screen.
     <div class="note"><b>Gateway → Download models</b> in the menu bar, or <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>
   </div>`;
 }
@@ -1740,7 +1740,7 @@ async function sendRuleSet(text) {
   state.drafts = rest;
   state.preview = null;
   say(rest.length
-    ? `That means ${plural(j.rules.length, 'separate rule')} to me. Here is the first — the others are behind it, and you activate them one at a time.`
+    ? `That means ${plural(j.rules.length, 'separate rule')} to me. Here is the first, and the others are behind it, and you activate them one at a time.`
     : 'That was already one specific thing, so it is one rule.');
   render();
 
@@ -2261,7 +2261,7 @@ async function renderPerson(id) {
       ${disclosure('p:onboarding', 'Setup instructions to send them', '<div id="onboarding"><div class="note">loading…</div></div>')}
     </div>
 
-    ${section('Written for them', group('personal'), 'No personal rules — only the company and role ones below.')}
+    ${section('Written for them', group('personal'), 'No personal rules, only the company and role ones below.')}
     ${section(`Because they are ${esc(p.role)}`, group('role'), 'No rules target this role.')}
     ${section('Everyone', group('company'), 'No company-wide rules.')}`;
 
@@ -2392,7 +2392,7 @@ VIEWS.simulator = {
         </div>
         ${state.chat.length
           ? state.chat.map(renderMessage).join('')
-          : '<div class="empty"><b>See what Warden would do</b><span>Pick someone and send a prompt as them. Nothing here is privileged — it goes through the gateway on their own key, like any other request.</span></div>'}
+          : '<div class="empty"><b>See what Warden would do</b><span>Pick someone and send a prompt as them. Nothing here is privileged; it goes through the gateway on their own key, like any other request.</span></div>'}
       </div>
     </div>
     <div class="composer">
@@ -2506,12 +2506,12 @@ async function doSend() {
 
 const REWRITE_REFUSAL = {
   'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
-  'no-honest-rewrite': 'There is no honest rewrite of this one — the phrasing reached for the assistant’s own instructions, and no version of that is inside the rules.',
+  'no-honest-rewrite': 'There is no honest rewrite of this one, because the phrasing reached for the assistant’s own instructions, and no version of that is inside the rules.',
   'too-long': 'Too long to restate. A rewrite has to be a request someone could have typed.',
-  'model-unavailable': 'The model did not answer, so nothing was suggested. Nothing was spent — you can ask again.',
+  'model-unavailable': 'The model did not answer, so nothing was suggested. Nothing was spent, so you can ask again.',
   'nothing-left': 'Once the prohibited part is taken out there is no request left to make.',
   'still-blocked': 'The rewrite did not survive its own re-check, so it was not offered.',
-  'already-rewritten': 'One rewrite per block, and this one is used.'
+  'already-rewritten': 'One rewrite per block, and you have used this one.'
 };
 
 /** Renders under a refusal in the simulator, on the message that owns it. */

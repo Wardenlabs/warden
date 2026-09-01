@@ -278,12 +278,12 @@ function render(res) {
 
   if (res.verdict === 'ESCALATE') {
     lines.push('');
-    lines.push('   Queued for an administrator. You have not been refused —');
+    lines.push('   Queued for an administrator. You have not been refused,');
     lines.push('   when they answer, ask again and it is judged on its merits.');
   }
   if (res.maskedSpans?.length) {
     lines.push('');
-    lines.push(`   Note: ${res.maskedSpans.length} secret(s) were masked before checking.`);
+    lines.push(`   Note: Warden masked ${res.maskedSpans.length} secret(s) before checking.`);
   }
 
   lines.push('');
@@ -354,12 +354,12 @@ function validateDecision(value) {
  */
 const REWRITE_REFUSALS = {
   'no-honest-rewrite':
-    "There is no honest rewrite of this one — the phrasing reached for the assistant's own instructions.",
+    "There is no honest rewrite of this one, because the phrasing reached for the assistant's own instructions.",
   'no-rule': 'No specific rule fired, so there is nothing to rewrite against.',
   'too-long': 'Too long to restate. Ask for the part you actually need.',
   'model-unavailable': 'The local model could not answer. Nothing is suggested rather than guessed.',
   'nothing-left': 'Nothing legitimate was left once the part the rule prohibits was taken out.',
-  'still-blocked': 'What it came up with did not pass the same check, so it is not being shown.',
+  'still-blocked': 'What it came up with did not pass the same check, so Warden is not showing it.',
   quota: 'Daily limit reached, so the suggestion could not be re-checked.',
   'already-rewritten': 'This block has already been rewritten once.'
 };
@@ -411,7 +411,7 @@ async function rewriteMode(auditId, decisionTimeoutMs) {
         '',
         ...wrap(res.suggestion),
         '',
-        `   Checked against the same policy before being shown — it came back ALLOW${res.auditId ? ` (audit ${res.auditId})` : ''}.`,
+        `   Checked against the same policy before being shown, and it came back ALLOW${res.auditId ? ` (audit ${res.auditId})` : ''}.`,
         ''
       ].join('\n') + '\n'
     );
@@ -618,7 +618,7 @@ function fixClaudeCode() {
     }
   }
   if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
-    return 'settings.json is not an object — left alone';
+    return 'settings.json is not an object, left alone';
   }
 
   const hooks = (settings.hooks ??= {});
@@ -702,7 +702,7 @@ async function fixMode(agents) {
     process.stdout.write(
       problem
         ? `  ✗ ${agent.name.padEnd(12)} ${problem}\n`
-        : `  ✓ ${agent.name.padEnd(12)} wired — restart it to pick this up\n`
+        : `  ✓ ${agent.name.padEnd(12)} wired, restart it to pick this up\n`
     );
   }
 
@@ -742,18 +742,18 @@ function detectMode() {
       : agent.wired
         ? 'governed by Warden'
         : agent.governable
-          ? `installed, NOT governed — ${agent.how}`
+          ? `installed, NOT governed: ${agent.how}`
           : `installed, and cannot be governed on a subscription — ${agent.how}`;
     lines.push(`  ${mark} ${agent.name.padEnd(12)} ${state}`);
     if (agent.installed && agent.at) lines.push(`    ${' '.repeat(12)} ${agent.at}`);
   }
 
   lines.push('');
-  lines.push(`  hook       ${hookAt ?? 'not found — this file is not installed where the tools look for it'}`);
+  lines.push(`  hook       ${hookAt ?? 'not found, so this file is not installed where the tools look for it'}`);
   lines.push(`  gateway    ${WARDEN_URL}`);
   // Whether a key is set, never the key. Printing it would put a credential in
   // whatever the employee pastes this output into.
-  lines.push(`  key        ${API_KEY ? 'set' : 'NOT set — every prompt will be refused by the gateway'}`);
+  lines.push(`  key        ${API_KEY ? 'set' : 'NOT set, so every prompt will be refused by the gateway'}`);
   lines.push('');
   lines.push('  ✓ governed   ○ installed but not wired   — cannot be governed here   · not found');
   lines.push('');
@@ -886,7 +886,7 @@ async function main() {
   if (res.verdict === 'ALLOW') {
     const warnings = Array.isArray(res.warnings) ? res.warnings : [];
     if (warnings.length > 0) {
-      const lines = ['', `⚠ Warden — allowed, with a note`, ''];
+      const lines = ['', `⚠ Warden: allowed, with a note`, ''];
       for (const w of warnings.slice(0, 2)) {
         lines.push(...wrap(`Rule: "${w.ruleText ?? w.ruleId ?? 'unnamed rule'}"`));
         if (w.guidance) lines.push(...wrap(`If that applies here: ${w.guidance}`));
