@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureModels, sendState } from './first-run.js';
+import { ensureModels, modelsPresent, sendState } from './first-run.js';
 import {
   fetchHealth,
   pickPort,
@@ -132,6 +132,14 @@ async function main(): Promise<void> {
       settings = { ...settings, adapter: 'mock' };
       writeSettings(userData, settings);
     }
+  } else if (await modelsPresent(APP_ROOT, modelsDir())) {
+    // Demo mode was a decision about a machine with no models on it. This
+    // machine has them now, so the decision has expired — and leaving it in
+    // place would mean an installation that is fully able to run the guard
+    // quietly answering with a keyword-matching test double instead. Silent
+    // in the other direction too: nothing to click, it just works next time.
+    settings = { ...settings, adapter: 'real' };
+    writeSettings(userData, settings);
   }
 
   await launchGateway();
