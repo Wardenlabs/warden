@@ -91,8 +91,16 @@
   /* And above its ceiling. Fluid, because a 78px headline on a phone is
      not a headline. */
   --fs-9:  clamp(40px, 5vw, 72px);     /* hero */
-  --fs-h2: clamp(30px, 4.4vw, 52px);   /* section heads */
   --fs-sub: 16px;                      /* the hero's one sentence under the headline */
+
+  /* Two tiers of section head. At one tier of 52px the page had six heros and
+     therefore none: every section opened at near-hero size and fell to 15px
+     grey, the same cliff six times, and nothing below the hero could read as
+     quiet because nothing was loud. The quiet tier is the default and carries
+     four of the six. `.loud` is spent where the headline is itself the
+     event — the gap, the count, and the closing line. */
+  --fs-h2:      clamp(23px, 2.3vw, 30px);
+  --fs-h2-loud: clamp(32px, 4.4vw, 52px);
 
   --ls-hero: -.02em;
   --lh-hero: 1.05;
@@ -164,7 +172,9 @@ body::after {
 h1, h2, h3, p, figure, pre, table { margin: 0; }
 a { color: inherit; }
 svg { display: block; }
-::selection { background: var(--selected); }
+/* The page's light, under the reader's own cursor: selected text takes the
+   gate's warm white instead of the system blue. */
+::selection { background: var(--gate); color: var(--bg); }
 
 :focus-visible {
   outline: 2px solid var(--ink);
@@ -198,6 +208,17 @@ section {
   padding-block: clamp(var(--s-10), 13vh, var(--s-12));
   border-top: var(--guide-w) solid var(--line);
 }
+/* No rule under the hero and none under §how. The hero already ends on a light,
+   and drawing a second line a screen below it makes the first one look like
+   trim; §how ends on one too, running down its own middle. Where a divider is
+   the only thing separating two sections it stays. */
+#gap, #numbers { border-top: 0; }
+/* The one drawn rule left on the page. At --line it read as a wall between
+   the argument and the demo; soft, it is a detail. And §how used to hand off
+   to §numbers across ~500px of black — its own bottom air plus the section
+   gap — which read as the page ending twice. Both trimmed. */
+#how { border-top-color: var(--line-soft); padding-bottom: var(--s-9); }
+#numbers { padding-block: var(--s-10); }
 
 .sec { display: grid; gap: var(--s-9); }
 
@@ -220,15 +241,17 @@ section {
 .main { display: grid; gap: var(--s-6); }
 .main p { font-size: var(--fs-4); line-height: var(--lh-body); color: var(--muted); max-width: var(--prose); }
 
-/* The rule in the words its author used. The only prose on the page set at
-   display weight, because it is the one sentence the reader is meant to
-   picture someone having written. */
-.main p.say {
+/* One paragraph per page — the gap's — set above body size and in full ink.
+   It was the rule quote in the section below, where it duplicated a sentence
+   the terminal already renders with provenance. It is better spent on the one
+   paragraph the reader has to actually stop on. */
+.main p.lead {
   font-size: var(--fs-5);
   line-height: var(--lh-snug);
   letter-spacing: var(--ls-tight);
   color: var(--ink);
-  max-width: 34ch;
+  max-width: 41ch;
+  text-wrap: pretty;
 }
 
 /* ═══ type ═══════════════════════════════════════════════════════════════ */
@@ -251,12 +274,26 @@ section {
   text-wrap: balance;
 }
 
+/* A quiet head with no measure runs the full 1140 and becomes the widest line
+   on a page whose every other column stops at the prose measure. The loud tier
+   below keeps none: at 52px `balance` already breaks it, and a measure would
+   break it a second time in the wrong place. */
 h2 {
   font-size: var(--fs-h2);
   font-weight: var(--fw-semi);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-tight);
+  max-width: 44ch;
+  text-wrap: balance;
+}
+
+/* Display tracking and a 1.25 leading are corrections for large type; at 30px
+   they only make a heading look cramped. So they arrive with the size rather
+   than sitting on the base rule and being wrong four times out of six. */
+h2.loud {
+  font-size: var(--fs-h2-loud);
   line-height: var(--lh-tight);
   letter-spacing: var(--ls-display);
-  text-wrap: balance;
 }
 
 h3 {
@@ -326,12 +363,20 @@ header nav .btn { color: var(--accent-ink); }
 
 .hero-zone canvas.scene {
   position: absolute;
-  inset: 0;
+  /* Past the hero's bottom edge by --fall, so the glow under the line dies in
+     the dark instead of on the section boundary. See the note on .hero-zone.
+     The height is written out because a canvas is a replaced element: sized
+     with top and bottom alone it falls back to its intrinsic height, and the
+     overrun silently becomes a cut just under the line. */
+  inset: 0 0 auto;
   width: 100%;
-  height: 100%;
+  height: calc(100% + var(--fall));
   display: block;
   z-index: 0;
   pointer-events: none;
+  /* Fade before the canvas's own edge, so the overrun never becomes a new cut. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), transparent 100%);
 }
 
 .gate {
@@ -366,7 +411,16 @@ header nav .btn { color: var(--accent-ink); }
  * through it — the light is the only line here.
  */
 
-.hero-zone { min-height: calc(clamp(640px, 100vh, 920px) - 56px); display: grid; grid-template-columns: minmax(0, 1fr); }
+.hero-zone {
+  /* svh, not vh: on phones and in short or zoomed windows 100vh is taller than
+     what is actually visible, and the gate — the point of the first screen —
+     slid under the fold. The 560px floor is the least height at which the
+     copy and the prompt still breathe. */
+  min-height: calc(clamp(560px, 100vh, 920px) - 56px);
+  min-height: calc(clamp(560px, 100svh, 920px) - 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
 .hero-zone > .hero.wrap { border-inline: 0; }
 .hero {
   position: relative; z-index: 1;
@@ -374,7 +428,9 @@ header nav .btn { color: var(--accent-ink); }
   /* one column, the container's width — an implicit column would size itself
      to the prompt's max-content and push the whole stack off a phone */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 3fr auto 3fr auto 2fr;
+  /* The bottom band grew from 2fr: at 2 the line sat at 87% of the screen,
+     and any zoom or short window pushed it out of the first view. */
+  grid-template-rows: 3fr auto 3fr auto 2.6fr;
   grid-template-areas: "." "copy" "." "gate" ".";
   justify-items: center;
   text-align: center;
@@ -435,6 +491,41 @@ header nav .btn { color: var(--accent-ink); }
   .judge .verdict { flex: 1 1 100%; margin-left: 0; }
 }
 
+/* ── §0, the gap: the hero still talking ───────────────────────────────── */
+/*
+ * Centred, and the only section that is. The rail below is not decoration that
+ * could be applied evenly — it is the thing that says "here is an artefact, and
+ * this is its name", so a section with no artefact should not have one. What is
+ * left is the hero's axis and the hero's measure (20ch on the head, the same
+ * number `.hero h1` uses), which is the point: the page has not started showing
+ * anything yet, it is still making the claim.
+ *
+ * Every override here is an id plus one class or more, so it outranks the .main
+ * rules it is narrowing without needing !important or source order to hold.
+ */
+#gap .sec  { gap: var(--s-10); justify-items: center; text-align: center; }
+#gap .main { justify-items: center; width: 100%; }
+#gap .main h2      { max-width: 20ch; }
+#gap .main p       { max-width: 54ch; }
+#gap .main p.lead  { max-width: 40ch; }
+
+/* §numbers sat on a left rail — label column, content column — but the rail's
+   mechanism was repetition, and the sections that repeated it were cut. The
+   one survivor read as a different page. So it sits on the centre axis like
+   everything above it, each label an overline on its own block. */
+#numbers .sec { justify-items: center; text-align: center; }
+#numbers .row { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); justify-items: center; width: 100%; }
+#numbers .side { padding-top: 0; justify-items: center; }
+#numbers .main { width: 100%; }
+#numbers h2.loud { max-width: 24ch; margin-inline: auto; }
+#numbers .main > p { max-width: var(--prose); margin-inline: auto; }
+/* The table keeps its own alignment under the centred axis — a centred column
+   of class names is noise — it just narrows to the width the numbers need. */
+#numbers table { width: 100%; max-width: 620px; margin-inline: auto; text-align: left; }
+/* The one coral word outside a panel. The verdict's colour lands exactly
+   where the page says what happens without the gate. */
+#numbers h2 .none { color: var(--block); }
+
 /* ═══ sections ═══════════════════════════════════════════════════════════ */
 
 /* ── the refusal, rendered as the employee sees it ─────────────────────── */
@@ -475,34 +566,10 @@ header nav .btn { color: var(--accent-ink); }
 .term .dim  { color: var(--faint); }
 .term .h    { color: var(--ink-2); }
 
-/*
- * The one light outside the hero. It runs the top edge once, when the section
- * arrives, and then it is over — the reader learned upstairs that light here
- * means the gate just decided, and a light that repeated would go back to
- * being decoration. Driven by .is-in, which the reveal observer already sets,
- * so this costs no JavaScript.
- */
-.term::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--beam) 20%, var(--ink-2) 50%, var(--beam) 80%, transparent 100%);
-  background-size: 200% 100%;
-  background-position: 150% 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.js [data-reveal].term.is-in::before {
-  animation: edge-light 1.5s cubic-bezier(.3,0,.2,1) .35s 1 both;
-}
-@keyframes edge-light {
-  from { background-position: 150% 0;  opacity: 0; }
-  20%  { opacity: .85; }
-  80%  { opacity: .85; }
-  to   { background-position: -150% 0; opacity: 0; }
-}
+/* The panels carry no light of their own. They used to take a beam across the
+   top edge as they arrived; with a lit line running past all three it was a
+   second thing moving for no second reason, and the eye went to the wrong one.
+   The section has one light now, and it is the line. */
 
 /* ── numbers ───────────────────────────────────────────────────────────── */
 /* Rules between the rows and nothing around them. A box here would be the
@@ -522,27 +589,88 @@ td b { font-weight: var(--fw-medium); color: var(--ink); }
 th.n, td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.n { color: var(--ink-2); }
 
-/* ── download ──────────────────────────────────────────────────────────── */
-.dl { display: grid; gap: var(--s-4); }
-@media (min-width: 700px) { .dl { grid-template-columns: 1fr 1fr; } }
-.dl a {
-  display: flex; align-items: center; gap: var(--s-5);
-  padding: var(--s-6) var(--s-7);
-  border: 1px solid var(--line); border-radius: var(--r-lg);
-  text-decoration: none; background: var(--bg);
-  transition: border-color .18s ease, background .18s ease;
-}
-.dl a:hover { border-color: var(--line-firm); background: var(--sunken); }
-.dl svg { width: 26px; height: 26px; color: var(--ink); flex: none; }
-.dl .t { display: block; font-size: var(--fs-4); font-weight: var(--fw-medium); }
-.dl .m { display: block; font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); margin-top: 2px; }
-
 /* ── footer ────────────────────────────────────────────────────────────── */
-footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size: var(--fs-2); color: var(--muted); }
-.foot { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); justify-content: center; align-items: center; }
+/*
+ * Short, and the end of the page rather than another section of it. The two
+ * installers are here because they are the only thing left to do, and putting
+ * them anywhere else meant a screen-high section asking the reader to press a
+ * button the header has been offering the whole way down.
+ *
+ * The gate is not mounted down here — a third line read as a divider, not a
+ * gate. What the footer gets instead is a halo: the verdict's coral, low and
+ * soft behind the closing sentence, echoing the "none." a screen above. No
+ * line — just the colour settling where the page rests its case. Kept faint
+ * on purpose: coral is the block's colour, and at full presence it would
+ * read as an alarm over the one thing left to press.
+ *
+ * And real air underneath — flush with the bottom edge the installers read
+ * as the end of the page, not as something to press.
+ */
+footer {
+  position: relative;
+  padding-block: var(--s-11) var(--s-12);
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+footer::before {
+  content: "";
+  position: absolute;
+  top: var(--s-5);
+  left: 50%;
+  width: min(700px, 92vw);
+  height: 420px;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 50% at 50% 38%, rgba(239, 107, 112, .095), transparent 70%);
+  pointer-events: none;
+}
+
+.foot { position: relative; display: grid; justify-items: center; gap: var(--s-6); }
+
+/* The last sentence on the page, and the only one down here. It answers the
+   hero, so it is set at the size of a statement rather than of a footer. */
+.foot .close {
+  max-width: 18ch;
+  margin-bottom: var(--s-4);
+  font-size: var(--fs-h2-loud);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  color: var(--ink);
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* The two installers, as the buttons they are. Side by side, and the primary
+   one is whichever platform the visitor is on — app.js swaps them. */
+.foot .dl { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-4); }
+.foot .dl a {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  height: 44px; padding-inline: var(--s-6);
+  border: 1px solid var(--line-firm); border-radius: var(--r-md);
+  background: var(--bg); color: var(--ink);
+  text-decoration: none; white-space: nowrap;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.foot .dl a:hover { border-color: var(--ink-2); background: var(--sunken); transform: translateY(-1px); }
+.foot .dl a:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+.foot .dl svg { width: 17px; height: 17px; flex: none; }
+.foot .dl a > span { display: inline-flex; align-items: baseline; gap: var(--s-3); }
+.foot .dl .t { font-size: var(--fs-3); font-weight: var(--fw-medium); }
+.foot .dl .m { font-family: var(--mono); font-size: var(--fs-1); color: var(--faint); }
+.foot .dl .go { display: none; }
+
+/* Set apart from the installers, so the buttons read as the thing to press
+   and the fine print reads as the floor of the page. */
+.foot .fine { font-size: var(--fs-1); color: var(--faint); text-align: center; margin-top: var(--s-7); }
+
+.foot .links { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4); justify-content: center; align-items: center; }
+.foot .links .brand { color: var(--muted); transition: color .15s ease; }
+.foot .links .brand:hover { color: var(--ink); }
+.foot .links .brand .mark { width: 15px; height: 15px; }
+.foot .links .brand .word { height: 10px; }
 .foot .sep { color: var(--line-firm); }
 .foot a { color: var(--muted); text-decoration: none; }
-.foot a:hover { color: var(--ink); }
+.foot .links a:hover { color: var(--ink); }
 
 /* ═══ motion ═════════════════════════════════════════════════════════════ */
 
@@ -559,109 +687,254 @@ footer { border-top: 1px solid var(--line); padding-block: var(--s-8); font-size
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
-  .judge .cur,
-  .term::before { animation: none; }
+  .judge .cur { animation: none; }
+  /* The spine needs no override: --lit defaults to 1, so the line is simply on
+     and app.js never touches it. Blanking the mask here would take the halo's
+     falloff with it and leave a solid 341px bar. */
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
 
 /* ═══ pieces the sections above call for ═════════════════════════════════ */
 
-.hero-zone { position: relative; overflow: hidden; }
-/* ── the receipt ───────────────────────────────────────────────────────── */
-/*
- * Where the evidence lives. The person deciding reads the prose above it and
- * goes past; the person they forward the page to stops here. It is the whole
- * reason the page does not have to be written twice.
- */
-.receipt {
-  font-family: var(--mono);
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--faint);
-  max-width: var(--read);
-  overflow-wrap: anywhere;
-}
-
-/*
- * The pipeline. Each step is a row of the section's own grid, so its numeral
- * lands in the rail beside the labels rather than in a box of its own. No
- * borders: four short lines with a mono numeral against them read as a list
- * without needing to be drawn as one.
- */
-.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-7); }
-.steps li {
-  display: grid;
-  grid-template-columns: var(--s-12) minmax(0, 1fr);
-  gap: var(--s-7);
-  align-items: start;
-}
-.steps .stepn {
-  font-family: var(--mono); font-size: var(--fs-1);
-  letter-spacing: var(--ls-label); color: var(--faint);
-  padding-top: .35em;
-}
-.steps .t { display: block; font-size: var(--fs-4); line-height: var(--lh-body); color: var(--ink-2); max-width: var(--prose); }
-.steps .m {
-  display: block; margin-top: var(--s-3);
-  font-family: var(--mono); font-size: var(--fs-1); color: var(--faint);
-}
-/* The three verdicts, in their own colours — the only saturation below the
-   hero besides the refusal itself, and the only place the page says out loud
-   that a verdict has three values rather than two. */
-.steps .m .v-allow    { color: var(--allow); }
-.steps .m .v-block    { color: var(--block); }
-.steps .m .v-escalate { color: var(--escalate); }
-@media (max-width: 940px) {
-  .steps li { grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
-  .steps .stepn { padding-top: 0; }
-}
-
-/* ── the receipt ───────────────────────────────────────────────────────── */
-/*
- * Where the evidence lives. The person deciding reads the prose above it and
- * goes past; the person they forward the page to stops here. It is the whole
- * reason the page does not have to be written twice.
- */
-.receipt {
-  font-family: var(--mono);
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--faint);
-  max-width: var(--read);
-  overflow-wrap: anywhere;
-}
-
-/* the pipeline */
-.steps { list-style: none; margin: 0; padding: 0; display: grid; }
-.steps li {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--s-4);
-  padding: var(--s-4) var(--s-6);
-  border-bottom: 1px solid var(--line-soft);
-  font-size: var(--fs-2);
-  color: var(--ink-2);
-}
-.steps .stepn {
-  width: 20px; height: 20px;
-  display: grid; place-items: center;
-  border: 1px solid var(--line); border-radius: var(--r-sm);
-  font-family: var(--mono); font-size: var(--fs-0); color: var(--muted);
-  flex: none;
-}
-.steps .m { font-family: var(--mono); font-size: var(--fs-0); color: var(--faint); white-space: nowrap; }
-/* The three verdicts, in their own colours — the only saturation below the
-   hero besides the refusal itself, and the only place the page says out loud
-   that a verdict has three values rather than two. */
-.steps .m .v-allow    { color: var(--allow); }
-.steps .m .v-block    { color: var(--block); }
-.steps .m .v-escalate { color: var(--escalate); }
-
+/* The gate's light does not stop at the hero's edge. Clipped there it ended on
+   a straight horizontal cut against §gap — the one thing the line is not
+   allowed to do — so the canvas runs --fall past the section and fades out
+   inside the overrun. §gap is transparent and its first text sits lower than
+   the light ever reaches, so the spill costs nothing. */
+.hero-zone { position: relative; --fall: 180px; }
 .note { font-size: var(--fs-2); line-height: var(--lh-body); color: var(--faint); max-width: var(--prose); }
 
 /* ── responsive trims ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .term pre { padding: var(--s-5); font-size: var(--fs-1); }
   .term-bar { padding-inline: var(--s-5); }
+}
+
+/* ═══ the product, on the page ════════════════════════════════════════════ */
+/*
+ * The console's own CSS, lifted out of web/index.html with every selector
+ * prefixed `.console `, minus its twenty-one colour values. Losing those is the
+ * whole mechanism: the console declares no literal colour anywhere else, so
+ * with its palette gone the subtree falls through to this file's :root, which
+ * carries the same twenty-one names in the dark. The prefix is what keeps
+ * `.btn`, `.row`, `.note` and `.hero` — names both stylesheets use — from
+ * reaching each other; `.hero` is renamed `.composer` on both sides, which was
+ * cheaper than arbitrating it in the cascade.
+ */
+
+/* Two tokens the console has and this page did not need until now. */
+.console { --hero: 640px; --accent-line: var(--line-firm); }
+
+.console .topnav { flex: none; display: flex; align-items: center; gap: var(--s-5); height: 56px; padding: 0 var(--s-6); border-bottom: 1px solid var(--line); }
+.console .brand { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.console .mark { width: 22px; height: 22px; color: var(--accent); display: block; flex: none; }
+.console .mark svg { width: 100%; height: 100%; display: block; }
+.console .brand .who { font-size: var(--fs-3); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console .brand .who span { font-weight: var(--fw-normal); color: var(--muted); }
+.console .nav-item { display: inline-flex; align-items: center; gap: var(--s-2); border: none; border-radius: var(--r-sm); background: none; color: var(--muted); font: inherit; font-size: var(--fs-3); padding: var(--s-2) var(--s-4); cursor: pointer; white-space: nowrap; }
+.console .nav-item:hover { background: var(--hover); color: var(--ink); }
+.console .nav-item.on { background: var(--selected); color: var(--ink); font-weight: var(--fw-medium); }
+.console .nav-sep { width: 1px; height: 18px; background: var(--line); margin: 0 var(--s-3); flex: none; }
+.console .pane { flex: 1; min-height: 0; overflow-y: auto; }
+.console .pane.flush { overflow: hidden; display: flex; flex-direction: column; }
+.console .pane.flush > * { flex: 1; min-height: 0; }
+.console .sheet { max-width: var(--read); margin: 0 auto; padding: var(--s-6) var(--s-6) var(--s-9); }
+.console .toolbar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-2) var(--s-3) var(--s-5); }
+.console .toolbar .spacer { flex: 1; }
+.console .toolbar .label { margin-right: var(--s-2); }
+.console .blank { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.console .blank > .sheet { flex: none; width: 100%; padding-bottom: 0; }
+.console .blank-fill { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.console .blank-fill .composer { margin: auto 0; width: 100%; padding-bottom: calc(var(--s-9) * 2); }
+.console .composer { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--s-5); padding: var(--s-8) var(--s-6); text-align: center; }
+.console .hero-q { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); letter-spacing: -.024em; line-height: var(--lh-tight); color: var(--ink); text-wrap: balance; }
+.console .hero-box { position: relative; width: 100%; max-width: var(--hero); border: 1px solid var(--line-firm); border-radius: var(--r-lg); background: var(--bg); padding: var(--s-5) var(--s-5) var(--s-8); text-align: left; }
+.console .hero-box:focus-within { border-color: var(--accent-line); }
+.console .hero-box textarea { width: 100%; border: none; padding: 0; background: none; resize: none; font-size: var(--fs-4); line-height: var(--lh-snug); color: var(--ink); }
+.console .hero-box textarea:focus { outline: none; }
+.console .hero-box .send { position: absolute; right: var(--s-4); bottom: var(--s-4); }
+.console .hero-sugg { display: flex; flex-wrap: wrap; gap: var(--s-2); justify-content: center; max-width: var(--hero); }
+.console .pill { border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--bg); color: var(--muted); font: inherit; font-size: var(--fs-2); padding: var(--s-2) var(--s-4); cursor: pointer; white-space: nowrap; }
+.console .pill:hover { background: var(--hover); color: var(--ink); }
+.console .pill.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.console .pill.wrap { white-space: normal; text-align: left; max-width: 100%; }
+.console .hero-foot { font-size: var(--fs-2); color: var(--faint); max-width: 52ch; line-height: var(--lh-snug); }
+.console .btn { display: inline-flex; align-items: center; gap: var(--s-2); border: 1px solid var(--line-firm); border-radius: var(--r-sm); background: var(--bg); color: var(--ink-2); padding: var(--s-2) var(--s-4); font-size: var(--fs-2); font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap; }
+.console .btn:hover { background: var(--hover); color: var(--ink); }
+.console .btn:disabled { opacity: .45; cursor: default; background: var(--bg); }
+.console .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.console .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.console .btn.primary:disabled { background: var(--accent); border-color: var(--accent); }
+.console .btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.console .btn.quiet:hover { background: var(--hover); color: var(--ink); }
+.console .btn.danger { color: var(--block); }
+.console .btn.danger:hover { background: var(--block-bg); border-color: var(--block); color: var(--block); }
+.console .btn.sm { padding: var(--s-1) var(--s-3); font-size: var(--fs-1); }
+.console select.inline, .console input.inline { width: auto; font-size: var(--fs-2); padding: var(--s-1) var(--s-6) var(--s-1) var(--s-3); }
+.console input.inline { padding-right: var(--s-3); }
+.console .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--bg); }
+.console .seg button { border: none; background: none; padding: var(--s-1) var(--s-4); font-size: var(--fs-2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+.console .seg button + button { border-left: 1px solid var(--line); }
+.console .seg button:hover { background: var(--hover); color: var(--ink); }
+.console .seg button.on { background: var(--selected); color: var(--ink); font-weight: var(--fw-medium); }
+.console .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--faint); }
+.console .dot.ALLOW { background: var(--allow); }
+.console .dot.BLOCK { background: var(--block); }
+.console .dot.ESCALATE { background: var(--escalate); }
+.console .dot.block { background: var(--block); }
+.console .dot.escalate { background: var(--escalate); }
+.console .dot.allow { background: var(--allow); }
+.console .badge { display: inline-flex; align-items: center; border-radius: var(--r-sm); padding: 1px var(--s-2); font-size: var(--fs-1); font-weight: var(--fw-medium); font-family: var(--mono); background: var(--sunken); color: var(--muted); }
+.console .badge.ALLOW { background: var(--allow-bg); color: var(--allow); }
+.console .badge.BLOCK { background: var(--block-bg); color: var(--block); }
+.console .badge.ESCALATE { background: var(--escalate-bg); color: var(--escalate); }
+.console .badge.block { background: var(--block-bg); color: var(--block); }
+.console .badge.escalate { background: var(--escalate-bg); color: var(--escalate); }
+.console .note { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); }
+.console .note.warn { color: var(--escalate); }
+.console .note.bad { color: var(--block); }
+.console .note.good { color: var(--allow); }
+.console .group > .btn { justify-self: start; }
+.console .day { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-3) var(--s-2); background: var(--bg); font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--faint); }
+.console .day .n { margin-left: auto; font-family: var(--mono); letter-spacing: 0; }
+.console .row { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-2) var(--s-3); border: none; border-bottom: 1px solid var(--line-soft); background: none; text-align: left; cursor: pointer; min-width: 0; font-size: var(--fs-3); color: var(--ink-2); }
+.console .row:hover { background: var(--hover); }
+.console .row.on { background: var(--selected); border-bottom-color: transparent; }
+.console .row .who { flex: 0 0 100px; color: var(--ink); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console .row .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.console .row .meta { flex: none; font-family: var(--mono); font-size: var(--fs-1); font-variant-numeric: tabular-nums; color: var(--faint); }
+.console .row .rule-ref { flex: none; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2); color: var(--faint); }
+.console .row.roomy { align-items: flex-start; padding: var(--s-5) var(--s-3); gap: var(--s-4); }
+.console .row.roomy .dot, .console .row.roomy .avatar { margin-top: 3px; }
+.console .row.roomy .col { min-width: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+.console .row.roomy .t { color: var(--ink); font-weight: var(--fw-medium); line-height: var(--lh-snug); }
+.console .row.roomy .m2 { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.console .row.roomy .m { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; font-size: var(--fs-2); color: var(--faint); }
+.console .pass .n { flex: 1; min-width: 0; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console .ruleref .dot { margin-top: 6px; }
+.console .ruleref .col { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-1); }
+.console .ruleref .t { color: var(--ink); font-weight: var(--fw-medium); }
+.console .ruleref .m { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); }
+.console .today { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); padding: var(--s-6) var(--s-3) var(--s-7); }
+.console .today .line { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-medium); letter-spacing: -.02em; line-height: var(--lh-snug); color: var(--ink); max-width: var(--prose); }
+.console .today .line b { font-weight: var(--fw-semi); }
+.console .today .cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.console .chat .sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); align-content: start; }
+.console .msg .who { font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--faint); }
+.console .msg .say .btn { margin-top: var(--s-3); }
+.console .composer .sheet { padding: var(--s-5) var(--s-6) var(--s-6); }
+.console .composer .hero-box { max-width: none; padding: var(--s-4) var(--s-4) var(--s-8); }
+.console .composer .hero-box textarea { font-size: var(--fs-3); }
+.console .verdict-line .dot { width: 7px; height: 7px; }
+.console .kv .v .btn { margin-left: var(--s-3); vertical-align: baseline; }
+.console .preview-row .badge { flex: none; }
+.console .stat .n { font-size: var(--fs-6); font-weight: var(--fw-semi); letter-spacing: -.02em; line-height: var(--lh-tight); font-variant-numeric: tabular-nums; }
+.console .stat .n.good { color: var(--allow); }
+.console .stat .n.warn { color: var(--escalate); }
+.console td.n, .console th.n { text-align: right; font-variant-numeric: tabular-nums; }
+
+
+/* ── the landing's corrections to the lifted rules ─────────────────────── */
+/*
+ * After the lifted block, not before it: these share specificity with the rules
+ * they narrow, so source order is the only thing deciding them.
+ */
+.console {
+  text-align: left;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-3);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-tight);
+}
+/* Nothing in these fragments is operable, so the affordances the application
+   needs are taken back off: no pointer, no focus ring, no hover. */
+.console .row, .console .pill, .console .btn { cursor: default; }
+.console .row:hover, .console .pill:hover, .console .btn:hover { background: none; }
+.console .btn.primary:hover { background: var(--accent); }
+/* The box already carries 40px under its own last line for the button, so an
+   equal outer padding lands the panel bottom-heavy. Less below than above. */
+.console .composer { display: grid; justify-items: center; padding: var(--s-9) var(--s-9) var(--s-8); }
+.console .hero-box { max-width: none; background: var(--sunken); }
+/* Form controls do not inherit type. The console says so once in a bare
+   `textarea` rule, which is an element selector and so was never lifted —
+   without it the sentence a person is supposed to have written by hand comes
+   out in the monospace this page reserves for machine output. */
+.console .hero-box textarea {
+  color: var(--ink);
+  font-family: var(--sans);
+  letter-spacing: var(--ls-tight);
+}
+.console .day { position: static; }
+
+/* ── §1, the three stages ──────────────────────────────────────────────── */
+/*
+ * One centred column — the axis every other section already sits on. What
+ * made three panels a sequence used to be a line of light drawn down the
+ * middle; now it is order in time. app.js lights the stages one after
+ * another as they arrive, and when the refusal lands in 02 the rule written
+ * in 01 takes the hit for a beat: the connective tissue is the event
+ * itself, not something drawn beside it. The hero's gate is the only light
+ * on the page now, which is the one place light means something.
+ */
+#how .sec { gap: 0; justify-items: center; text-align: center; }
+#how .main { justify-items: center; width: 100%; margin-bottom: var(--s-9); }
+#how h2 { max-width: 24ch; }
+
+.stages { position: relative; width: 100%; }
+
+.stage {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-5);
+  padding-block: var(--s-8);
+}
+/* Number and name on one line, an overline over the panel. */
+.stage .cap { display: flex; justify-content: center; gap: var(--s-3); }
+.stage .cap .stepn { color: var(--ink-2); }
+/* Near the width the refusal was written at, so its author's own line
+   breaks survive instead of the column adding a second set. */
+.stage .beat { width: 100%; max-width: 640px; min-width: 0; text-align: left; }
+
+/* The relay's handoff: when the refusal lands in 02, the rule that caused
+   it re-lights for a beat. app.js adds and removes the class. */
+#ruleMsg { transition: color .3s ease, text-shadow .3s ease; }
+#ruleMsg.hit { color: var(--ink); text-shadow: 0 0 14px rgba(239, 107, 112, .45); }
+
+/* The card the verdict lands in carries a trace of its colour on the frame —
+   well under the text's saturation, so it marks the card without shouting. */
+#how .stage.stops .term { border-color: color-mix(in srgb, var(--block) 30%, transparent); }
+
+
+/* The panels. No border and no shadow: at this value against --bg there is
+   nothing for one to separate. The radius is the terminal's, so both programs
+   are held the same way. */
+.shot {
+  position: relative;
+  width: 100%;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  background: var(--sunken);
+}
+.shot.log { padding: var(--s-5) var(--s-6); }
+.stage .term { width: 100%; text-align: left; }
+.stage .term pre { font-size: var(--fs-2); padding: var(--s-6); }
+.console .composer { padding: var(--s-8) var(--s-7); }
+
+#how .how-note {
+  max-width: 62ch;
+  margin-top: var(--s-10);
+  text-align: center;
+  font-size: var(--fs-3);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+@media (max-width: 700px) {
+  .stage .term pre { font-size: var(--fs-1); padding: var(--s-5); }
+}
+@media (max-width: 700px) {
+  .console .row .who { flex-basis: 78px; }
+  .console .row .rule-ref { display: none; }
 }
