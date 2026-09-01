@@ -108,12 +108,6 @@
   --s-11: 128px;  --s-12: 168px;
   --r-xl: 16px;
 
-  /* Where a pinned scene panel rests. Proportional, so on a tall screen the
-     panel sits near the middle where the narration's eye line is, and on a
-     short laptop it pulls up under the 56px header so the tallest terminal
-     still fits. */
-  --stick: clamp(84px, 16svh, 176px);
-
   --wide: 1140px;
   --guide-w: 1px;
 
@@ -148,6 +142,7 @@
   --beam: #2f3644;     /* the edge light that travels a surface's top */
   --gate-fallback: #fff5e6bf;  /* the line when there is no WebGL: the same white, at the alpha the canvas would render it */
   --gate-fallback-block: #ef6b70cc;
+  --gate-fallback-hold: #d29b34cc;  /* the same line when the verdict is a hold */
 }
 
 /* ═══ base ═══════════════════════════════════════════════════════════════ */
@@ -1138,36 +1133,32 @@ footer::before {
 }
 
 
-/* ═══ the scene grid: one day, four chapters ═════════════════════════════ */
+/* ═══ the scenes: four hero screens, one day ═════════════════════════════ */
 /*
- * The story below the hero. Each chapter is one grid: a caption row across
- * the top, three narration steps down the left rail, and the product panel
- * on the right, pinned with position:sticky while the steps walk past it.
- * app.js watches the steps and assembles the panel at the step that explains
- * it; scrolling back up disassembles nothing.
- *
- * On a phone there is no pinning. The same children reorder into caption,
- * first step, panel, remaining steps — the scene is set, the thing happens,
- * the narration finishes — and the panel assembles once, on arrival.
- *
- * Everything here hides only under `.js`, so with scripting off (or the
- * module broken, or reduced motion) every panel is simply complete. That is
- * the same contract the hero has, extended down the page.
+ * The hero is the page's best screen, so the scenes below it are built out
+ * of its parts: a centred statement in the hero's own weight, a gate line
+ * under it, and the thing being judged beneath the line. Each chapter pins
+ * a full screen; scrolling through it swaps the statement and walks the
+ * panel through its [data-step] states, in both directions. The canvas
+ * light stays the hero's alone — a scene's line is the CSS gate, a static
+ * gradient hairline that takes the scene's verdict: warm while nothing is
+ * wrong, the block's coral in scene 02, the hold's amber in scene 04.
  */
 
-/* The header is sticky, so anchored sections start under it, not behind it. */
 #how, #spend { scroll-margin-top: 64px; }
 
-/* Section heads on the left rail. The hero keeps the centre as its
-   signature; down here everything hangs off one edge, and the repetition of
-   that edge is what makes four scenes read as one page. */
-#how .main, #spend .main { display: block; max-width: var(--read); }
+/* Section heads sit on the hero's centre line now, in the hero's weight. */
+#how .main, #spend .main { display: block; max-width: none; text-align: center; }
 .kicker { margin: 0 0 var(--s-4); color: var(--faint); }
-#how h2.loud, #spend h2.loud { margin: 0; line-height: var(--lh-hero); }
+#how h2.loud, #spend h2.loud {
+  margin: 0 auto;
+  max-width: 22ch;
+  font-weight: var(--fw-normal);
+  line-height: var(--lh-hero);
+}
+#how .how-note { margin-inline: auto; text-align: center; }
 
-/* The loud headline arrives line by line, each one rising out of a mask.
-   Gated on `.js` and keyed on the head's own reveal, so without scripting
-   the sentence is simply there. */
+/* The loud headline still arrives line by line, out of a mask. */
 h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 .js .main[data-reveal] h2.loud .ln > span {
   display: block;
@@ -1178,102 +1169,99 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 .js .main[data-reveal] h2.loud .ln:nth-child(3) > span { transition-delay: .18s; }
 .js .main[data-reveal].is-in h2.loud .ln > span { transform: none; }
 
-/* ── the chapter grid ──────────────────────────────────────────────────── */
+/* ── the stage ─────────────────────────────────────────────────────────── */
 
-.chapter {
-  position: relative;
+.chapter { position: relative; }
+.stage {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  column-gap: clamp(var(--s-7), 5vw, var(--s-10));
-  border-top: 1px solid var(--line-soft);
-  margin-top: var(--s-9);
-  padding-top: var(--s-6);
-}
-#how .main + .chapter, #spend .main + .chapter { margin-top: var(--s-9); }
-
-/* The caption: the scene's name, small, and a hairline that fills with --p
-   as the reader crosses the chapter — the page's continuous, finger-linked
-   line. The clock lives in the narration now, where an hour means something. */
-.chapter > .cap {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-5);
-  margin-bottom: var(--s-5);
+  justify-items: center;
+  align-content: start;
+  text-align: center;
+  gap: var(--s-6);
+  padding-top: clamp(16px, 5svh, 56px);
 }
 .cap .scene { color: var(--faint); }
-.js .cap::after {
-  content: "";
-  flex: 1 1 40px;
-  align-self: center;
-  height: 1px;
-  background: linear-gradient(90deg,
-    var(--muted) calc(var(--p, 0) * 100%),
-    var(--line-soft) calc(var(--p, 0) * 100%));
-}
 
-/* Narration: one statement per step, and one quiet line under it that says
-   what to watch for in the panel. The panels carry the rest. */
-.chapter > .step {
-  grid-column: 1;
-  display: grid;
-  align-content: center;
-  min-height: 52vh;
-  min-height: 52svh;
-  padding-block: var(--s-6);
-}
-.step h3 {
-  font-size: var(--fs-5);
-  font-weight: var(--fw-semi);
-  line-height: var(--lh-snug);
-  letter-spacing: var(--ls-tight);
+/* The statements share one cell and trade places as the step changes —
+   the same spot on screen, the way the hero holds one headline. */
+.says { display: grid; justify-items: center; align-items: end; min-height: clamp(110px, 19svh, 180px); }
+.say { max-width: 30ch; }
+.say h3 {
+  font-size: var(--fs-h2-loud);
+  font-weight: var(--fw-normal);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--ls-hero);
   color: var(--ink);
-  max-width: 20ch;
   text-wrap: balance;
 }
-.step p {
-  margin: var(--s-3) 0 0;
-  font-size: var(--fs-4);
+.say p {
+  margin: var(--s-4) auto 0;
+  font-size: var(--fs-sub);
   line-height: var(--lh-body);
   color: var(--muted);
-  max-width: 38ch;
-  text-wrap: pretty;
+  max-width: 52ch;
+  text-wrap: balance;
 }
-.step .mono { color: var(--ink-2); }
+.say .mono { color: var(--ink-2); }
 
-.chapter > .panel { grid-column: 2; grid-row: 2 / span 3; min-width: 0; }
-.pstick {
-  position: sticky;
-  top: var(--stick);
-  display: grid;
-  gap: var(--s-5);
-  align-content: start;
+/* The scene's gate: the hero's line, carried down as a hairline. It takes
+   the scene's verdict the moment the verdict lands. */
+.sgate {
+  width: min(560px, 74vw);
+  height: 1px;
+  margin-block: var(--s-2) var(--s-3);
+  background: linear-gradient(90deg, transparent, var(--gate-fallback) 30%, var(--gate-fallback) 70%, transparent);
+  transition: background .7s ease;
 }
+[data-chapter="hit"][data-step="1"] .sgate,
+[data-chapter="hit"][data-step="2"] .sgate {
+  background: linear-gradient(90deg, transparent, var(--gate-fallback-block) 30%, var(--gate-fallback-block) 70%, transparent);
+}
+[data-chapter="spend"][data-step="1"] .sgate,
+[data-chapter="spend"][data-step="2"] .sgate {
+  background: linear-gradient(90deg, transparent, var(--gate-fallback-hold) 30%, var(--gate-fallback-hold) 70%, transparent);
+}
+
+.chapter .panel { width: min(100%, 720px); text-align: left; }
+.pstick { display: grid; gap: var(--s-5); }
 .pstick .ruleset { margin-top: 0; }
 
-/* ── the scroll-linked drift ───────────────────────────────────────────── */
-/* The pinned panel answers the finger: as --p crosses the chapter the panel
-   drifts a couple of dozen pixels against the scroll. Enough to feel alive,
-   not enough to detach it from its pin. */
+/* Wide screens: the stage pins a full screen and the scroll drives it. */
 @media (min-width: 900px) {
-  .js .pstick { transform: translateY(calc(var(--p, 0) * -26px + 13px)); }
+  .chapter { min-height: 280vh; min-height: 280svh; }
+  .stage {
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    height: calc(100svh - 56px);
+    overflow: clip;
+  }
+  .js .say {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
+  }
+  .js .chapter:not([data-step]) .say:nth-child(1),
+  .js [data-step="0"] .say:nth-child(1),
+  .js [data-step="1"] .say:nth-child(2),
+  .js [data-step="2"] .say:nth-child(3) { opacity: 1; transform: none; }
 }
 
-/* narration dim: a filter, not the opacity property, so it composes with the
-   entrance fade the steps get from [data-reveal] instead of fighting it */
-@media (min-width: 900px) {
-  .js .chapter > .step { transition: filter .45s var(--ease-out); }
-  .js .chapter > .step:not(.on) { filter: opacity(.32); }
+/* Short screens: the tallest terminal still has to fit under the statement. */
+@media (min-width: 900px) and (max-height: 780px) {
+  .say h3 { font-size: clamp(28px, 3.6vw, 40px); }
+  .says { min-height: clamp(90px, 15svh, 140px); }
+  .chapter .term pre { font-size: var(--fs-1); }
 }
 
 /* ── the panel states ──────────────────────────────────────────────────── */
 /*
- * Everything below keys off [data-step] on the chapter. Hidden things are
+ * Everything keys off [data-step] on the chapter. Hidden things are
  * collapsed, not spaced-for: a terminal grows line-group by line-group the
  * way a real one does, the ledger grows row by row, and walking back up
- * the page folds them away again. The caps are generous maxima for the
- * transitions, not measurements; --tg-max and --row-max widen on a phone
- * where the same lines wrap taller.
+ * folds them away again. The caps are generous maxima for the transitions;
+ * --tg-max and --row-max widen on a phone where the same lines wrap taller.
  */
 
 .chapter { --tg-max: 300px; --row-max: 140px; }
@@ -1335,8 +1323,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   filter: blur(4px);
   transition: max-height .55s var(--ease-in-out), opacity .4s var(--ease-out),
               transform .45s var(--ease-out), filter .45s var(--ease-out),
-              padding .55s var(--ease-in-out), border-color .4s ease,
-              background-color .5s var(--ease-out);
+              padding .55s var(--ease-in-out), border-color .4s ease;
 }
 .js .ru:nth-child(2) { transition-delay: .1s; }
 .js .ru:nth-child(3) { transition-delay: .2s; }
@@ -1427,23 +1414,23 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 
 /* ── the phone ─────────────────────────────────────────────────────────── */
 /*
- * One column, reordered: caption, the step that sets the scene, the panel,
- * then the rest of the narration. No pinning and no dimming — the panel
- * walks its states once, paced by app.js, as it arrives.
+ * No pinning: the statements stack, centred like the hero, the scene's gate
+ * under them, and the panel walks its states once, paced, as it arrives.
  */
 @media (max-width: 899px) {
-  .chapter { --tg-max: 520px; --row-max: 240px; grid-template-columns: minmax(0, 1fr); margin-top: var(--s-8); }
-  .chapter > .cap { order: 0; }
-  .chapter > .step:nth-child(2) { order: 1; }
-  .chapter > .panel { order: 2; grid-column: 1; grid-row: auto; margin-block: var(--s-4); }
-  .chapter > .step:nth-child(3) { order: 3; }
-  .chapter > .step:nth-child(4) { order: 4; }
-  .chapter > .step { min-height: 0; padding-block: var(--s-5); }
-  .pstick { position: static; }
+  .chapter { --tg-max: 520px; --row-max: 240px; margin-top: var(--s-8); }
+  .says { min-height: 0; gap: var(--s-7); align-items: start; }
+  .say h3 { font-size: clamp(26px, 7.4vw, 34px); }
+  .say p { font-size: var(--fs-4); }
+  .chapter .panel { margin-top: var(--s-4); }
 }
 
 /* ── reduced motion: the day, already over ─────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  .chapter { min-height: 0; }
+  .stage { position: static; height: auto; overflow: visible; }
+  .js .say { position: static; grid-area: auto; opacity: 1; transform: none; transition: none; }
+  .says { min-height: 0; gap: var(--s-7); align-items: start; }
   .term pre .tg, .js .ru, .js [data-chapter="log"] .console .row {
     max-height: none; opacity: 1; transform: none; filter: none; transition: none;
   }
@@ -1452,8 +1439,6 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   .term pre .tg { margin-top: .72em; }
   .term pre .tg-a { margin-top: 0; }
   .js [data-chapter="log"] .day, .js [data-chapter="log"] .tally, .js .ceilings { opacity: 1; transform: none; }
-  .js .chapter > .step { filter: none; }
   .js .ru .ract { opacity: 1; transform: none; transition: none; }
   .js .main[data-reveal] h2.loud .ln > span { transform: none; transition: none; }
-  .js .pstick { transform: none; }
 }

@@ -96,21 +96,17 @@ if (reduced || !hasIO) {
 
 /* ── the scene engine ──────────────────────────────────────────────────── */
 /*
- * Four chapters below the hero, one scroll-driven day. On a wide screen each
- * chapter pins its product panel with position:sticky while the narration
- * walks past it, and the panel assembles at the step that explains it — one
- * IntersectionObserver per chapter, watching the steps. On a phone there is
- * no pinning: the panel sits between the narration and assembles once, when
- * it scrolls into view.
+ * Four scenes below the hero, each built like the hero: a pinned full
+ * screen with a centred statement, a gate line, and the panel under it.
+ * On a wide screen the scroll drives the scene directly — the pin's travel
+ * picks the step, in both directions. On a phone nothing pins and the
+ * panel walks its states once, paced, as it arrives.
  *
- * The engine only ever reveals markup that is already on the page. It types
- * over text that is in the document, adds `on` to rows and line groups that
- * are merely translucent, and decides nothing — which is why reduced motion
- * and a missing IntersectionObserver get the same treatment: everything on,
- * immediately, and the page is simply complete.
- *
- * Actions are monotonic. Scrolling back up does not disassemble a panel:
- * what the day produced stays produced, the same claim the audit log makes.
+ * The engine only ever reveals markup that is already on the page. It
+ * types over text that is in the document and flips [data-step]; CSS does
+ * the rest — which is why reduced motion and a missing IntersectionObserver
+ * get the same treatment: final state, immediately, statements stacked,
+ * and the page is simply complete.
  */
 
 /* A typer over text that ships in the markup. It never invents a string:
@@ -212,7 +208,6 @@ const finishChapter = (ch) => {
   typed[name] = true;
   typers[name]?.finish();
   setStep(ch, 2);
-  $$(':scope > .step', ch).forEach((s) => s.classList.add('on'));
 };
 
 const finishAll = () => chapters.forEach(finishChapter);
@@ -222,59 +217,45 @@ if (reduced || !hasIO) {
 } else {
   const desktop = window.matchMedia('(min-width: 900px)');
 
-  chapters.forEach((ch) => {
-    const steps = $$(':scope > .step', ch);
-
-    if (desktop.matches) {
-      /* The active step is whichever one crosses the band around the middle
-         of the screen — in either direction. The panel follows it. */
-      const io = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
-            const i = steps.indexOf(entry.target);
-            steps.forEach((s, k) => s.classList.toggle('on', k === i));
-            setStep(ch, i);
-          }
-        },
-        { rootMargin: '-32% 0px -46% 0px', threshold: 0 }
-      );
-      steps.forEach((s) => io.observe(s));
-    } else {
-      /* No pinning on a phone: the panel walks its states once, paced, when
-         it arrives. */
+  if (!desktop.matches) {
+    /* No pinning on a phone: the statements stack and the panel walks its
+       states once, paced, when the stage arrives. */
+    chapters.forEach((ch) => {
       const io = new IntersectionObserver(
         (entries) => {
           if (!entries.some((e) => e.isIntersecting)) return;
           io.disconnect();
-          steps.forEach((s) => s.classList.add('on'));
           (async () => {
-            for (let i = 0; i < steps.length; i++) { setStep(ch, i); await wait(1300); }
+            for (let i = 0; i < 3; i++) { setStep(ch, i); await wait(1300); }
           })();
         },
         { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }
       );
-      io.observe(ch.querySelector('.pstick') || ch);
-    }
-  });
+      io.observe(ch.querySelector('.stage') || ch);
+    });
+  }
 
   /* Crossing the breakpoint mid-read re-wires nothing; the day simply
      finishes. Rare enough that correct beats clever. */
   desktop.addEventListener?.('change', finishAll, { once: true });
 
-  /* The scroll-linked layer: one rAF, one custom property per chapter.
-     --p runs 0→1 across a chapter and drives the caption's progress line
-     and the pinned panel's slow drift — the part of the page that answers
-     the finger directly rather than in steps. */
+  /* On a wide screen the pinned stage is driven straight off the scroll:
+     one rAF computes how far each chapter's pin has travelled and picks the
+     step from thirds of it — both directions, no observers, no drift
+     between what the finger did and what the stage shows. */
+  const HEADER = 56;
   let ticking = false;
   const track = () => {
     ticking = false;
+    if (!desktop.matches) return;
     const vh = window.innerHeight;
     for (const ch of chapters) {
       const r = ch.getBoundingClientRect();
-      if (r.bottom < -120 || r.top > vh + 120) continue;
-      const p = Math.min(1, Math.max(0, (vh * 0.72 - r.top) / (r.height + vh * 0.2)));
-      ch.style.setProperty('--p', p.toFixed(4));
+      if (r.bottom < 0 || r.top > vh) continue;
+      const travel = r.height - (vh - HEADER);
+      if (travel <= 0) { setStep(ch, 0); continue; }
+      const sp = Math.min(1, Math.max(0, (HEADER - r.top) / travel));
+      setStep(ch, sp < 0.34 ? 0 : sp < 0.67 ? 1 : 2);
     }
   };
   window.addEventListener('scroll', () => {
