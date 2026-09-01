@@ -126,7 +126,6 @@ setTimeout(function () {
     <div class="main" data-reveal>
       <p class="label kicker">How it works</p>
       <h2 class="loud"><span class="ln"><span>Write a rule.</span></span><span class="ln"><span>It stops the request.</span></span><span class="ln"><span>You see that it did.</span></span></h2>
-      <p class="lead-line">One day with the gate, told in three scenes.</p>
     </div>
 
     <!-- Scene 01: the sentence becomes the rules it meant. This is
@@ -135,19 +134,16 @@ setTimeout(function () {
          at a time. The rule texts are the catalogue's and the seed policy's,
          not invented for the page. -->
     <div class="chapter" data-chapter="write">
-      <div class="cap"><span class="label scene">Scene 01</span><span class="sep" aria-hidden="true">·</span><span class="label time">09:04</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">You say it once</span></div>
+      <div class="cap"><span class="tclock" aria-hidden="true">09:04</span><span class="label scene">Scene 01 · You say it once</span></div>
 
       <div class="step">
-        <h3>One sentence, in your own words.</h3>
-        <p>Not policy language, not a config file. The worry the way you would say it out loud — Warden takes it from there.</p>
+        <h3>You write one sentence.</h3>
       </div>
       <div class="step">
-        <h3>It becomes the rules you meant.</h3>
-        <p>The sentence splits into concrete prohibitions, each compiled with the examples it has to catch — and the ones it must still let through.</p>
+        <h3>Warden turns it into rules.</h3>
       </div>
       <div class="step">
-        <h3>Nothing judges anyone until you say so.</h3>
-        <p>You activate each rule yourself, one at a time. A rule nobody ratified has never judged anybody.</p>
+        <h3>You activate them, one by one.</h3>
       </div>
 
       <div class="panel">
@@ -177,19 +173,16 @@ setTimeout(function () {
          off, arrow keys come free, and app.js stays out of it. The panes are
          siblings of the inputs so plain `:checked ~` does all of it. -->
     <div class="chapter stops" data-chapter="hit">
-      <div class="cap"><span class="label scene">Scene 02</span><span class="sep" aria-hidden="true">·</span><span class="label time">14:22</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">Somebody hits one</span></div>
+      <div class="cap"><span class="tclock" aria-hidden="true">14:22</span><span class="label scene">Scene 02 · Somebody hits one</span></div>
 
       <div class="step">
         <h3>Fede asks for a salary.</h3>
-        <p>Mid-report, in Claude Code. The prompt is checked on his machine, against your rules, before it goes anywhere.</p>
       </div>
       <div class="step">
-        <h3>Blocked, and told why.</h3>
-        <p>The refusal quotes the rule in your words and says what to ask instead — the work continues, the leak does not.</p>
+        <h3>Blocked — and told why.</h3>
       </div>
       <div class="step">
-        <h3>The same words in every tool.</h3>
-        <p>One hook runs inside Claude Code, Codex and opencode — try the tabs. It fires before the prompt leaves, so it works on a Max or Plus plan too.</p>
+        <h3>Same hook in Codex and opencode.</h3>
       </div>
 
       <div class="panel">
@@ -207,63 +200,39 @@ setTimeout(function () {
 
             <div class="panes">
               <div class="pane pane-cc">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
-</span>
-<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
-   HR staff are exempt.</span>
-</span>
-<span class="tg tg-c">   <span class="h">What to do instead</span>
+   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
-   cycles are fine to ask here.
-</span>
-<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1
-</span>
-<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
               <div class="pane pane-cx">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
-</span>
-<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
-   HR staff are exempt.</span>
-</span>
-<span class="tg tg-c">   <span class="h">What to do instead</span>
+   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
-   cycles are fine to ask here.
-</span>
-<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1
-</span>
-<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
               <div class="pane pane-oc">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span>
-</span>
-<span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
 
    <span class="rule">No one may request payroll, salary, bonus, or
    compensation information about another employee.
-   HR staff are exempt.</span>
-</span>
-<span class="tg tg-c">   <span class="h">What to do instead</span>
+   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
    Ask HR for anything about a specific person&#39;s pay.
    Questions about the process, headcount, or review
-   cycles are fine to ask here.
-</span>
-<span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1
-</span>
-<span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
+     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
               </div>
 
             </div>
@@ -276,19 +245,16 @@ setTimeout(function () {
          the rule ratified in scene 01. The tally is the only place the page
          says out loud that a verdict has three values and not two. -->
     <div class="chapter" data-chapter="log">
-      <div class="cap"><span class="label scene">Scene 03</span><span class="sep" aria-hidden="true">·</span><span class="label time">18:06</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">The day, signed</span></div>
+      <div class="cap"><span class="tclock" aria-hidden="true">18:06</span><span class="label scene">Scene 03 · The day, signed</span></div>
 
       <div class="step">
         <h3>The day comes back as a ledger.</h3>
-        <p>Fede&#39;s block is the top line — 14:22, with the rule that fired sitting next to it.</p>
       </div>
       <div class="step">
-        <h3>The morning&#39;s rule, already working.</h3>
-        <p>One minute earlier: a USD 12,400 payment held by <span class="mono">r-payment-approval</span> — the sentence you wrote at 09:04 — until someone with authority answers.</p>
+        <h3>The morning&#39;s rule already held a payment.</h3>
       </div>
       <div class="step">
-        <h3>Honest questions just pass.</h3>
-        <p>And every decision is a link in a hash chain — <span class="mono">pnpm run verify-audit</span> walks it and fails loudly if a row was edited or removed.</p>
+        <h3>Honest questions pass. The chain signs it all.</h3>
       </div>
 
       <div class="panel">
@@ -327,43 +293,33 @@ setTimeout(function () {
     <div class="main" data-reveal>
       <p class="label kicker">What it costs</p>
       <h2 class="loud"><span class="ln"><span>A prompt that leaks nothing</span></span><span class="ln"><span>can still cost you.</span></span></h2>
-      <p class="lead-line">One agent left running spends more in an afternoon than the seat costs in a year.</p>
     </div>
 
     <div class="chapter" data-chapter="spend">
-      <div class="cap"><span class="label scene">Scene 04</span><span class="sep" aria-hidden="true">·</span><span class="label time">Day two · 09:41</span><span class="sep" aria-hidden="true">·</span><span class="label ttl">The same gate, counting</span></div>
+      <div class="cap"><span class="tclock" aria-hidden="true">09:41</span><span class="label scene">Scene 04 · Day two · The same gate, counting</span></div>
 
       <div class="step">
         <h3>An agent, left running.</h3>
-        <p>&ldquo;Keep going,&rdquo; on a big repository. By mid-morning the session has generated 128,400 tokens — and nothing in the prompt leaks a thing.</p>
       </div>
       <div class="step">
-        <h3>A ceiling is a sentence about a role.</h3>
-        <p>Warden knows which role each key belongs to. Over the budget, the request stops on the machine — before the tokens are bought.</p>
+        <h3>Over the ceiling — held on the machine.</h3>
       </div>
       <div class="step">
         <h3>Held, never refused.</h3>
-        <p>Queued for an administrator; answered, it is judged on its merits. Cut off mid-task with nowhere to go is how a gateway gets switched off. The day counter resets when the gateway restarts — the page would rather say that than not.</p>
       </div>
 
       <div class="panel">
         <div class="pstick">
           <div class="term" data-reveal>
             <div class="term-bar">claude code</div>
-            <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">keep going — refactor the rest of the module</span></span>
-</span>
-<span class="tg tg-b"><span class="hold">⏸ Held for review by Warden</span>
+            <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">keep going — refactor the rest of the module</span></span></span><span class="tg tg-b"><span class="hold">⏸ Held for review by Warden</span>
 
    <span class="rule">this session has generated 128,400 tokens, over the
-   100,000 allowed for role &quot;engineer&quot;</span>
-</span>
-<span class="tg tg-c">   Queued for an administrator. You have not been refused —
-   when they answer, ask again and it is judged on its merits.
-</span>
-<span class="tg tg-d">   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></span></pre>
+   100,000 allowed for role &quot;engineer&quot;</span></span><span class="tg tg-c">   Queued for an administrator. You have not been refused —
+   when they answer, ask again and it is judged on its merits.</span><span class="tg tg-d">   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></span></pre>
           </div>
 
-          <p class="ceilings"><span class="label">Ceilings, per role</span> <span class="mono">intern 20/day · analyst 100/day · engineer 200/day + 100k tokens a session · finance 150/day · admin 500/day</span></p>
+          <p class="ceilings"><span class="label">Ceilings, per role</span> <span class="mono">intern 20/day · analyst 100/day · <b class="ceil-eng">engineer 200/day + 100k tokens a session</b> · finance 150/day · admin 500/day</span></p>
         </div>
       </div>
     </div>

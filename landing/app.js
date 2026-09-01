@@ -22,7 +22,6 @@ const hasIO = 'IntersectionObserver' in window;
 
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
-const on = (el) => el && el.classList.add('on');
 
 /* ── the light ─────────────────────────────────────────────────────────── */
 
@@ -148,94 +147,71 @@ chapters.forEach((ch) => { byName[ch.dataset.chapter] = ch; });
 
 const ruleBox = document.getElementById('ruleMsg');
 const ruleTyper = ruleBox && typer([ruleBox]);
-const rules = $$('#ruleSet .ru');
 const sendBtn = document.querySelector('[data-chapter="write"] .send');
+const hitTyper = byName.hit && typer($$('.pt', byName.hit), 14, 20);
+const spendTyper = byName.spend && typer($$('.pt', byName.spend), 14, 20);
 
-const hitCh = byName.hit;
-const hitTyper = hitCh && typer($$('.pt', hitCh), 14, 20);
+/* The panel is a state machine keyed to the narration step. CSS owns the
+   states — every reveal, collapse, spotlight and border is a [data-step]
+   selector, so walking backwards undoes what walking forward did and the
+   panel answers the scroll in both directions. This file only does the
+   things CSS cannot: type, press the button once, and flip the tool tabs. */
 
-const logCh = byName.log;
-const logRows = logCh ? $$('.console .row', logCh) : [];
+const typed = {};
+const typers = { write: ruleTyper, hit: hitTyper, spend: spendTyper };
+const typeOnce = (name) => { if (!typed[name]) { typed[name] = true; typers[name]?.run(); } };
 
-const spendCh = byName.spend;
-const spendTyper = spendCh && typer($$('.pt', spendCh), 14, 20);
+/* Scene 02, last beat: the same refusal shown in each tool by actually
+   switching the real tabs — the radios a person can also grab themselves. */
+let cycling = false;
+const cycleTools = async () => {
+  if (cycling) return;
+  cycling = true;
+  const pick = (id) => { const r = document.getElementById(id); if (r) r.checked = true; };
+  await wait(420); pick('tool-cx');
+  await wait(780); pick('tool-oc');
+  await wait(780); pick('tool-cc');
+  cycling = false;
+};
 
-/* One list of actions per chapter, indexed by narration step. `runTo` fires
-   them once each, in order, even when a fast scroll lands on step three
-   directly. */
-const acts = {
-  write: [
-    async () => { await wait(180); await ruleTyper?.run(); },
-    async () => {
+const fx = {
+  write: (i) => {
+    typeOnce('write');
+    if (i >= 1 && sendBtn && !sendBtn.dataset.done) {
       /* 130ms of the button's own pressed state and nothing else. A spinner
          would be a claim about how long compiling takes, and on the machine
          this runs on that number is 46 seconds. */
-      sendBtn?.classList.add('pressed');
-      await wait(130);
-      sendBtn?.classList.remove('pressed');
-      for (const r of rules) { await wait(340); on(r); }
-    },
-    async () => {},
-  ],
-  hit: [
-    async () => { $$('.tg-a', hitCh).forEach(on); await wait(140); await hitTyper?.run(); },
-    async () => {
-      $$('.tg-b', hitCh).forEach(on);
+      sendBtn.dataset.done = '1';
+      sendBtn.classList.add('pressed');
+      setTimeout(() => sendBtn.classList.remove('pressed'), 140);
+    }
+  },
+  hit: (i) => {
+    typeOnce('hit');
+    if (i === 1) {
       /* The handoff: when the refusal lands, the sentence written in scene 01
          takes the hit for a beat. The connective tissue is the event itself,
          not a line drawn beside it. */
       ruleBox?.classList.add('hit');
       setTimeout(() => ruleBox?.classList.remove('hit'), 1400);
-      await wait(320);
-      $$('.tg-c', hitCh).forEach(on);
-    },
-    async () => { $$('.tg-d', hitCh).forEach(on); await wait(220); $$('.tg-e', hitCh).forEach(on); },
-  ],
-  log: [
-    async () => { on(logCh?.querySelector('.day')); await wait(220); on(logRows[0]); },
-    async () => { on(logRows[1]); },
-    async () => {
-      on(logRows[2]);
-      await wait(240);
-      on(logRows[3]);
-      await wait(420);
-      on(logCh?.querySelector('.tally'));
-    },
-  ],
-  spend: [
-    async () => { $$('.tg-a', spendCh).forEach(on); await wait(140); await spendTyper?.run(); },
-    async () => { $$('.tg-b', spendCh).forEach(on); },
-    async () => {
-      $$('.tg-c', spendCh).forEach(on);
-      await wait(220);
-      $$('.tg-d', spendCh).forEach(on);
-      await wait(320);
-      on(spendCh?.querySelector('.ceilings'));
-    },
-  ],
+    }
+    if (i === 2) cycleTools();
+  },
+  log: () => {},
+  spend: () => { typeOnce('spend'); },
 };
 
-const ran = {}; /* chapter name -> highest step already fired */
-
-const runTo = (name, i) => {
-  const from = ran[name] ?? -1;
-  if (i <= from) return;
-  ran[name] = i;
-  (async () => {
-    for (let k = from + 1; k <= i; k++) {
-      acts[name]?.[k]?.();
-      await wait(150);
-    }
-  })();
+const setStep = (ch, i) => {
+  if (ch.dataset.step === String(i)) return;
+  ch.dataset.step = String(i);
+  fx[ch.dataset.chapter]?.(i);
 };
 
 const finishChapter = (ch) => {
   const name = ch.dataset.chapter;
-  ran[name] = 99;
-  if (name === 'write') ruleTyper?.finish();
-  if (name === 'hit') hitTyper?.finish();
-  if (name === 'spend') spendTyper?.finish();
-  $$('.tg, .ru, .console .row, .day, .tally, .ceilings', ch).forEach(on);
+  typed[name] = true;
+  typers[name]?.finish();
+  setStep(ch, 2);
   $$(':scope > .step', ch).forEach((s) => s.classList.add('on'));
 };
 
@@ -247,39 +223,33 @@ if (reduced || !hasIO) {
   const desktop = window.matchMedia('(min-width: 900px)');
 
   chapters.forEach((ch) => {
-    const name = ch.dataset.chapter;
     const steps = $$(':scope > .step', ch);
 
     if (desktop.matches) {
       /* The active step is whichever one crosses the band around the middle
-         of the screen. `on` moves with it; the panel only ever moves forward. */
+         of the screen — in either direction. The panel follows it. */
       const io = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (!entry.isIntersecting) continue;
             const i = steps.indexOf(entry.target);
             steps.forEach((s, k) => s.classList.toggle('on', k === i));
-            runTo(name, i);
+            setStep(ch, i);
           }
         },
         { rootMargin: '-32% 0px -46% 0px', threshold: 0 }
       );
       steps.forEach((s) => io.observe(s));
     } else {
-      /* No pinning on a phone: the whole sequence plays once, paced, when
-         the panel arrives. The narration around it is plain text. */
+      /* No pinning on a phone: the panel walks its states once, paced, when
+         it arrives. */
       const io = new IntersectionObserver(
         (entries) => {
           if (!entries.some((e) => e.isIntersecting)) return;
           io.disconnect();
           steps.forEach((s) => s.classList.add('on'));
           (async () => {
-            const list = acts[name] || [];
-            ran[name] = list.length;
-            /* Tighter beats than the pinned version: on a phone the reserved
-               space under the last revealed line is visible until the next
-               group lands, so the pauses are for rhythm, not suspense. */
-            for (const act of list) { await act(); await wait(180); }
+            for (let i = 0; i < steps.length; i++) { setStep(ch, i); await wait(1300); }
           })();
         },
         { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }
@@ -291,6 +261,26 @@ if (reduced || !hasIO) {
   /* Crossing the breakpoint mid-read re-wires nothing; the day simply
      finishes. Rare enough that correct beats clever. */
   desktop.addEventListener?.('change', finishAll, { once: true });
+
+  /* The scroll-linked layer: one rAF, one custom property per chapter.
+     --p runs 0→1 across a chapter and drives the caption's progress line
+     and the pinned panel's slow drift — the part of the page that answers
+     the finger directly rather than in steps. */
+  let ticking = false;
+  const track = () => {
+    ticking = false;
+    const vh = window.innerHeight;
+    for (const ch of chapters) {
+      const r = ch.getBoundingClientRect();
+      if (r.bottom < -120 || r.top > vh + 120) continue;
+      const p = Math.min(1, Math.max(0, (vh * 0.72 - r.top) / (r.height + vh * 0.2)));
+      ch.style.setProperty('--p', p.toFixed(4));
+    }
+  };
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(track); }
+  }, { passive: true });
+  track();
 }
 
 /* ── name the platform on the hero button ──────────────────────────────── */

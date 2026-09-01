@@ -28,16 +28,21 @@ have seen it work.
 | `#download` | Install it. | two installers, from this repo's own CI |
 
 Below the hero the page is one story with a clock. Each scene is a chapter:
-a caption row, three narration steps, and the product panel. On a wide screen
-the panel pins with `position: sticky` while the steps walk past it, and the
-panel assembles at the step that explains it — the classic pinned-narrative
-pattern, done with one IntersectionObserver per chapter and no library. On a
-phone nothing pins: the children reorder into caption, first step, panel,
-remaining steps, and the panel assembles once, as it arrives. Assembly is
-monotonic — scrolling back up disassembles nothing, which is the audit log's
-own claim made physical. The connective tissue is content, not decoration:
-the 14:22 row of the scene-03 ledger *is* the scene-02 block, and the 14:21
-hold is the rule ratified in scene 01.
+a caption with a large mono clock and a progress hairline, three one-line
+narration steps, and the product panel. On a wide screen the panel pins with
+`position: sticky` while the steps walk past it, and the panel is a state
+machine keyed to the active step — every reveal, collapse, spotlight and
+border is a `[data-step]` selector, so the panel answers the scroll in both
+directions and walking back up folds it away again. Terminals grow
+line-group by line-group the way real ones do, the ledger fills row by row
+with a spotlight that follows the narration, and the last beat of scene 02
+flips the real tool tabs itself. A scroll-linked layer (one rAF, one custom
+property) fills each caption's hairline and drifts the pinned panel a few
+pixels against the finger. On a phone nothing pins: the children reorder
+into caption, first step, panel, remaining steps, and the panel walks its
+states once, paced, as it arrives. The connective tissue is content, not
+decoration: the 14:22 row of the scene-03 ledger *is* the scene-02 block,
+and the 14:21 hold is the rule ratified in scene 01.
 
 Two people open this URL: whoever is deciding, and whoever they forward it to.
 The page is not written twice for them. The prose is in business language and
@@ -207,14 +212,16 @@ the scene engine assembling a panel. Every one of them is off under
 `prefers-reduced-motion` — the hero then shows the finished state, prompt
 typed and verdict on, and every scene panel is simply complete.
 
-Below the hero, motion is only ever a thing arriving: a headline rising out of
-its mask, a line group landing in a terminal, a ledger row taking its place.
-The engine in `app.js` never invents content — it types over text that ships
-in the markup and turns `on` classes on elements that are merely translucent,
-so the finished page and the never-animated page are the same page. Terminal
-line groups occupy their space from the start: a panel fills, it never grows,
-and the layout under it never shifts. None of it loops, and a fast scroll
-lands on the finished state rather than a queue of catch-up animation.
+Below the hero, motion is the panel answering the scroll: a headline rising
+out of its mask, a terminal growing a group of lines, a ledger row unfolding,
+a spotlight moving one row down — and all of it in reverse on the way back
+up, because the states live in CSS `[data-step]` selectors rather than in
+one-way classes. The engine in `app.js` never invents content — it types
+over text that ships in the markup, presses one button, and flips the real
+tool tabs; everything else is a selector. None of it loops, and a fast
+scroll lands on the current step's state rather than a queue of catch-up
+animation. The growth happens inside the pinned column, so nothing under a
+chapter ever shifts while it plays.
 
 The tool switch in `#how` has no animation and no JavaScript at all. It is four
 radios and `:checked ~`, so it works with scripting off, takes arrow keys for
