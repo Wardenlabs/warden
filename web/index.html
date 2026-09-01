@@ -302,6 +302,10 @@ button, input, select, textarea { font: inherit; font-size: var(--fs-3); color: 
 .btn.quiet { border-color: transparent; background: none; color: var(--muted); }
 .btn.quiet:hover { background: var(--hover); color: var(--ink); }
 
+/* Destructive actions sit under the thing they destroy, not in the toolbar
+   over it: they are the last resort on the page, not one of its options. */
+.row-actions { display: flex; gap: var(--s-2); margin-top: var(--s-4); flex-wrap: wrap; align-items: center; }
+
 .btn.danger { color: var(--block); }
 .btn.danger:hover { background: var(--block-bg); border-color: var(--block); color: var(--block); }
 

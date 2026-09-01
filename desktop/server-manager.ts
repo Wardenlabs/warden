@@ -81,7 +81,11 @@ export function startServer(
     WARDEN_HOST: config.host,
     WARDEN_PORT: String(config.port),
     WARDEN_ASSETS_DIR: config.assetsDir,
-    WARDEN_MODELS_DIR: config.modelsDir
+    WARDEN_MODELS_DIR: config.modelsDir,
+    // So the console can show the tail of this file when a model will not load.
+    // The log is where the reason is, and "Gateway -> View gateway log" is two
+    // menus away from the screen that just failed.
+    WARDEN_LOG_PATH: config.logPath
   };
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];

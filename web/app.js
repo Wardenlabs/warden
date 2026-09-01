@@ -1365,6 +1365,11 @@ function rulesBody() {
       ? state.policy.rules.map(ruleRow).join('')
       : '<div class="empty"><b>Warden is enforcing nothing yet</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
 
+    ${state.policy.rules.length ? `<div class="row-actions">
+      <button type="button" class="btn quiet" id="clearSample">Take out what came with Warden</button>
+      <button type="button" class="btn quiet danger" id="wipeRules">Delete every rule</button>
+    </div>` : ''}
+
     <div class="section">
       <div class="label">Limits by role</div>
       ${limitsGrid()}
@@ -1458,6 +1463,88 @@ function quotaEditor(q) {
       <button type="button" class="btn" id="qCancel">Cancel</button>
     </div>
   </form>`;
+}
+
+/**
+ * What to say when a compile fails, which depends entirely on why.
+ *
+ * There used to be one line for both cases and it ended "Try saying it more
+ * plainly." That is fine advice for a sentence the 1.7B could not turn into a
+ * rule, and it is useless when the gateway reports that its RPC never came up
+ * after 30 seconds: the sentence was never the problem, and somebody rewriting
+ * "no filtrar datos de clientes" for the fourth time is being sent in a circle
+ * by their own tool. The server tags which kind it is.
+ *
+ * The infra case gets the two things that actually move it: where the log is,
+ * and the fact that a signed-in Claude Code or Codex compiles rules without the
+ * local model running at all.
+ */
+function compileFailure(j) {
+  const why = esc(j?.error ?? 'the model did not answer');
+  if (j?.kind !== 'model-down') {
+    return `I could not compile that: ${why}. Try saying it more plainly.`;
+  }
+  return `<b>The local model is not running.</b> ${why}.
+    <div>Rewording will not help. <button type="button" class="linkish" id="showLog">Show me the gateway log</button>, which is where the reason is.</div>
+    <div>If you have Claude Code or Codex signed in, <button type="button" class="linkish" data-go="compiler">point the compiler at it</button> and rules compile without the local model.</div>`;
+}
+
+/**
+ * The two ways to get rid of rules you did not write.
+ *
+ * They answer different questions and that is why there are two of them. "Take
+ * out what came with Warden" removes only rows that match the files we ship, so
+ * a policy somebody has been building keeps everything they built; it is the
+ * boot migration, run on request, for the installs the migration itself will
+ * not touch because naming your company cleared the flag it reads. "Delete
+ * every rule" is the blunt one, and it asks first.
+ */
+/**
+ * Pull the log into the page rather than sending somebody to a menu.
+ *
+ * 200 lines, in a scroll box, selectable, because the next thing that happens
+ * is that they paste it to whoever is going to read it.
+ */
+function bindLogPeek() {
+  const btn = $('showLog');
+  if (!btn) return;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const { ok, j } = await api('/api/gateway/log');
+    btn.replaceWith(Object.assign(document.createElement('div'), {
+      className: 'code',
+      textContent: ok ? (j.lines ?? []).join('\n') : (j.error ?? 'could not read the log')
+    }));
+  };
+}
+
+function bindSweeps() {
+  bindLogPeek();
+  const clear = $('clearSample');
+  if (clear) clear.onclick = async () => {
+    clear.disabled = true;
+    const { ok, j } = await api('/api/company/sample/clear', { method: 'POST' });
+    clear.disabled = false;
+    if (!ok) return;
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+    // Nothing matched, so say that rather than leaving a button that looks
+    // broken: the policy is already all theirs.
+    if (!j.people && !j.rules && !j.quotas) {
+      clear.insertAdjacentHTML('afterend',
+        '<span class="note">Nothing here came with Warden. Every rule and person is yours.</span>');
+    }
+  };
+
+  const wipe = $('wipeRules');
+  if (wipe) wipe.onclick = async () => {
+    const n = state.policy.rules.length;
+    if (!confirm(`Delete all ${n} rules? Warden will stop nothing until you write another. Limits by role are kept.`)) return;
+    wipe.disabled = true;
+    await api('/api/policy/rules', { method: 'DELETE' });
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+  };
 }
 
 /**
@@ -1882,7 +1969,7 @@ async function sendRuleMessage(text) {
   dropPending();
   if (!ok) {
     state.ruleBusy = false;
-    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    say(compileFailure(j));
     render();
     return;
   }
@@ -1948,7 +2035,7 @@ async function sendRuleSet(text) {
   dropPending();
   if (!ok || !Array.isArray(j.rules) || j.rules.length === 0) {
     state.ruleBusy = false;
-    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    say(compileFailure(j));
     render();
     return;
   }
@@ -2039,6 +2126,7 @@ function bindPolicy() {
   };
 
   bindLimits();
+  bindSweeps();
 
   const cancel = $('cancelDraft');
   if (cancel) cancel.onclick = discardDraft;

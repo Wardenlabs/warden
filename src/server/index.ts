@@ -33,6 +33,7 @@ import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
   clearDemoDirectory,
+  discardSeededPeople,
   invalidate as invalidatePeople,
   loadDirectory,
   loadSampleCompany,
@@ -47,7 +48,7 @@ import {
   findEmployee,
   actorForCredential
 } from '../policy/people.js';
-import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
+import { discardSeededRules, loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
 import { quotaSchema } from '../policy/types.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
@@ -571,6 +572,45 @@ app.post('/api/company/sample', asyncRoute(async (_req, res) => {
   const policy = seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
   invalidatePeople();
   res.json({ name: dir.name, employees: dir.employees.length, rules: policy.rules.length });
+}));
+
+/**
+ * Take out everything that came with Warden, on request, wherever it is.
+ *
+ * The boot migration does this by itself for installs that never asked for the
+ * sample, and it is deliberately careful: if it cannot prove a row is ours it
+ * leaves the row alone. That carefulness has a cost, and the cost showed up on
+ * a real machine. Name your company and the `demo` flag clears, which is
+ * correct and also removes the evidence the migration reads, so the seven
+ * invented people and the eight seeded rules sit there with nothing willing to
+ * remove them. There was no button for it either: "Clear the sample team" only
+ * ever appeared while the flag was set, and it only ever touched people.
+ *
+ * This is that button, and it does not need evidence because the person
+ * pressing it is the evidence. It still only removes rows that match the files
+ * we ship, so a rule you wrote or edited survives it.
+ */
+app.post('/api/company/sample/clear', asyncRoute(async (_req, res) => {
+  const people = discardSeededPeople(join(ASSETS, 'data', 'seed', 'company.json'), true);
+  const { rules, quotas } = discardSeededRules(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
+  invalidatePeople();
+  res.json({ people, rules, quotas });
+}));
+
+/**
+ * Delete every rule, because sometimes you want the slate and not the audit.
+ *
+ * Quotas stay: they are about spending, not about what anyone may ask, and
+ * wiping somebody's daily limits because they wanted to rewrite their policy
+ * would be a second thing they did not ask for. There is a confirm in front of
+ * this in the console, and it goes through `savePolicy`, so the empty policy is
+ * a ratified version like any other and the audit trail keeps the before.
+ */
+app.delete('/api/policy/rules', asyncRoute(async (_req, res) => {
+  const policy = loadPolicy();
+  const removed = policy.rules.length;
+  const saved = savePolicy([], policy.quotas);
+  res.json({ removed, version: saved.version });
 }));
 
 app.post('/api/company/reset', asyncRoute(async (req, res) => {
@@ -1271,6 +1311,29 @@ app.get('/health', (_req, res) =>
  * Administrative like everything not on the employee allowlist. It has exactly
  * the power the menu item has, and the menu item is on the same machine.
  */
+/**
+ * The last lines the gateway wrote, for the screen that just failed.
+ *
+ * When a model will not load, the reason is in this file and nowhere else, and
+ * the file is behind `Gateway -> View gateway log` in the menu bar, which is
+ * the same place the download button was hiding and just as hard to find. The
+ * console shows the tail instead.
+ *
+ * Administrative, and it is worth saying why that is enough: the log holds the
+ * gateway's own stdout, which carries decisions as verdict plus rule id plus
+ * timing, never prompt text. Same promise the audit chain makes.
+ */
+app.get('/api/gateway/log', (_req, res) => {
+  const path = process.env['WARDEN_LOG_PATH'];
+  if (!path) return res.status(404).json({ error: 'this gateway does not write to a log file' });
+  try {
+    const lines = readFileSync(path, 'utf8').split('\n');
+    res.json({ path, lines: lines.slice(-200) });
+  } catch (err) {
+    res.status(404).json({ error: err instanceof Error ? err.message : 'log unreadable' });
+  }
+});
+
 app.post('/api/gateway/leave-demo', (_req, res) => {
   if (!parentPort) {
     return res.status(409).json({ error: 'No desktop app here. Run `pnpm run setup` instead.' });
@@ -1572,6 +1635,33 @@ function readSeedJson<T>(path: string, fallback: T): T {
 }
 
 /** Wrap an async route so a rejected promise becomes a 500 instead of a hang. */
+/**
+ * Is this failure the model not running, rather than the model not answering?
+ *
+ * They read identically in a stack trace and they need opposite advice from the
+ * person in front of the console. A prompt the model could not turn into a rule
+ * is worth rephrasing; a worker process that never started is not, and telling
+ * somebody to "try saying it more plainly" when the SDK's RPC timed out after
+ * 30 seconds sends them to rewrite a sentence that was never the problem.
+ *
+ * Matched on the SDK's own wording plus our load timeout and cooldown, because
+ * neither carries a code. It is a heuristic and it errs toward the infra
+ * reading: a false positive costs one line of unnecessary advice about the
+ * gateway log, a false negative sends somebody in a circle.
+ */
+function looksLikeModelDown(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('rpc initialization') ||
+    m.includes('worker process') ||
+    m.includes('failed to load') ||
+    m.includes('not being retried') ||
+    m.includes('plugin not found') ||
+    m.includes('loading the') ||
+    m.includes('model not found')
+  );
+}
+
 function asyncRoute(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response) => {
     fn(req, res).catch((err: unknown) => {
@@ -1580,7 +1670,13 @@ function asyncRoute(fn: (req: Request, res: Response) => Promise<unknown>) {
       // into the console, and "Error: audience names nobody…" reads as a crash
       // where "audience names nobody…" reads as the instruction it is.
       if (!res.headersSent) {
-        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        res.status(500).json({
+          error: message,
+          // The console renders different advice for each, so the classification
+          // happens here where the error is, not by matching strings in the UI.
+          kind: looksLikeModelDown(message) ? 'model-down' : 'other'
+        });
       }
     });
   };
