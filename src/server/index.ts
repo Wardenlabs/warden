@@ -992,6 +992,23 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
  * captive portal, or in a demo with egress blocked, that step is where the
  * setup dies. The gateway already has the file.
  */
+/**
+ * The OpenCode plugin, served like the hook is.
+ *
+ * `warden-hook --fix` fetches this rather than carrying a copy of it: two
+ * sources of the same file disagree within a release, which is the reason the
+ * install script curls the hook instead of vendoring it too.
+ */
+app.get('/integrations/opencode/warden.js', (_req, res) => {
+  try {
+    res.type('application/javascript').send(
+      readFileSync(join(ASSETS, 'integrations', 'opencode', 'warden.js'), 'utf8')
+    );
+  } catch {
+    res.status(404).type('text/plain').send('// not bundled in this build\n');
+  }
+});
+
 app.get('/warden-hook.mjs', (_req, res) => {
   try {
     res.type('application/javascript').send(readFileSync(join(ASSETS, 'integrations', 'warden-hook.mjs'), 'utf8'));
@@ -1064,14 +1081,17 @@ echo ""
 echo "Done. Hook at $HOOK, environment in $PROFILE."
 echo "Open a new terminal (or: source $PROFILE)."
 
-# What is actually on this machine, rather than a sentence telling them to go
-# and find out. Read-only and it cannot fail the install: the hook exits 0
-# whatever it finds, and \`|| true\` covers the case where node is missing —
-# which would be a strange machine to be installing a node hook on, but not a
-# reason for the install to end on a red line.
-node "$HOOK" --detect || true
+# What is on this machine, and then wiring it. --fix adds the hook to the tools
+# it finds, backs up every file it touches to <file>.warden-bak first, leaves
+# anything already wired alone, and prints each thing it did — so the install
+# ends on an inventory that says "governed" instead of on a sentence telling
+# them to go and configure three programs by hand.
+#
+# \`|| true\` covers a machine with no node, which would be a strange place to
+# be installing a node hook but is not a reason for the install to end red.
+node "$HOOK" --fix || true
 
-echo "Wiring per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
+echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
 `);
 });
 

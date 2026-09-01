@@ -189,17 +189,30 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 - Six attachment-bearing corpus prompts are skipped in every run, because the
   OCR model resolves only over the P2P registry. `document-borne` has never been
   measured.
-- **The policy splitter has no measurement behind it.** `compilePolicy` turns
-  one broad instruction into several statements and compiles each with the
-  measured `compileRule`. Nothing has been run to say whether the split is any
-  good — whether it stays inside what the admin asked, whether five is the
-  right ceiling, whether a specific sentence reliably comes back as one
-  statement. So it ships the way every unmeasured lever here ships: off the
-  measured path. `/api/policy/draft` is untouched, the splitter lives behind
-  `/api/policy/draft-set` and its own button, and no single-rule compile pays
-  for it. The bench measures one message against one rule and cannot judge a
-  split; measuring this needs a corpus of broad instructions with the rules
-  they ought to become, and that corpus does not exist yet.
+- **The policy splitter does not split.** `compilePolicy` was built to turn one
+  broad instruction into several specific rules. Run against the real
+  `Qwen3-1.7B-Q4_0` on 2026-09-01, it returned **one statement on three of
+  three inputs** — English and Spanish — so what it currently is, is
+  `compileRule` plus a thirty-second model call. Two of those three runs were
+  also actively worse than not splitting: *"nadie puede mandar datos de
+  clientes afuera de la empresa"* came back as *"nadar datos de clientes"*, and
+  *"dejen de filtrar datos de clientes"* compiled into a `warn` rule against
+  **filtering** customer data — the false friend — whose compliant example was
+  *"send customer data to a third-party for analysis"*. A draft that permits
+  the leak it was asked to stop.
+
+  The boundary held: nothing was enacted, and an administrator ratifying that
+  draft would have rejected it. The paraphrase failure is now structurally
+  impossible — a split of one returns the administrator's own sentence, never
+  the model's rewrite of it — and both sentences compile correctly after that
+  change. What is left is that the pass earns nothing on this model, and it is
+  still off the measured path for exactly that reason: `/api/policy/draft` is
+  untouched, `/api/policy/draft-set` is its own route behind its own button,
+  and no single-rule compile pays for it. **Do not put it on the landing page
+  or in release notes as a feature.** Before it can be one, it needs either a
+  bigger compiler — `WARDEN_MODEL_COMPILER`, or the remote compiler in
+  `qvac/remote.ts` — or a corpus of broad instructions paired with the rules
+  they ought to become, which does not exist.
 - Quota counters live in memory and reset with the process.
 - API keys are stored in plaintext in the directory file, and so is the compiler
   provider key in `data/settings.json` (written `0600`, gitignored).

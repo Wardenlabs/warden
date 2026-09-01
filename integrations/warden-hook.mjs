@@ -26,9 +26,9 @@
  * refused outright, which is also how revoking one works.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const API_KEY = process.env.WARDEN_API_KEY ?? '';
@@ -566,6 +566,153 @@ function detectAgents() {
   });
 }
 
+/**
+ * `warden-hook --detect --fix` — wire this hook into whatever is installed.
+ *
+ * The detector answers "which of my tools is governed"; without this the
+ * answer to "none of them" was a paragraph of instructions per tool, which is
+ * three files an employee edits by hand on the day they are least equipped to
+ * edit them. This does it, for the tools that can be done.
+ *
+ * Rules it does not break:
+ *
+ * - **It adds, never replaces.** Claude Code's settings are merged as JSON and
+ *   every other hook in the file survives; Codex's TOML is appended to. A
+ *   config that already mentions `warden-hook` is left completely alone, so
+ *   running this twice is the same as running it once.
+ * - **It backs up first.** `<file>.warden-bak` next to the original, before a
+ *   byte is written. Somebody letting a tool edit their editor config should
+ *   get the old one back with a `mv`.
+ * - **It never claims to have done what it did not.** Every path prints what
+ *   changed or why it could not, and a failure on one tool does not stop the
+ *   others.
+ *
+ * Cursor is absent on purpose and always will be: there is no local wiring
+ * that governs it. That is not a step this could take and forgot to.
+ */
+
+/** Copy a file to `<path>.warden-bak` before touching it. */
+function backup(path) {
+  try {
+    if (existsSync(path)) copyFileSync(path, `${path}.warden-bak`);
+    return true;
+  } catch (err) {
+    process.stderr.write(`   could not back up ${path}: ${err?.message ?? err}\n`);
+    return false;
+  }
+}
+
+/** This file, as it was actually invoked — the path the tools should call. */
+function hookPath() {
+  return process.argv[1] ?? join(homedir(), '.warden-hook.mjs');
+}
+
+function fixClaudeCode() {
+  const file = join(homedir(), '.claude', 'settings.json');
+  let settings = {};
+  if (existsSync(file)) {
+    try {
+      settings = JSON.parse(readFileSync(file, 'utf8'));
+    } catch (err) {
+      return `settings.json is not valid JSON (${err?.message ?? err}) — fix it, then run this again`;
+    }
+  }
+  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    return 'settings.json is not an object — left alone';
+  }
+
+  const hooks = (settings.hooks ??= {});
+  const list = Array.isArray(hooks.UserPromptSubmit) ? hooks.UserPromptSubmit : (hooks.UserPromptSubmit = []);
+  if (JSON.stringify(list).includes('warden-hook')) return null;
+
+  if (!backup(file)) return 'backup failed, so nothing was written';
+  list.push({ hooks: [{ type: 'command', command: `node ${hookPath()}` }] });
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
+  return null;
+}
+
+function fixCodex() {
+  const file = join(homedir(), '.codex', 'config.toml');
+  const body = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  if (body.includes('warden-hook')) return null;
+
+  if (!backup(file)) return 'backup failed, so nothing was written';
+  const block = [
+    '',
+    '# Added by warden-hook --fix. Remove this block to stop routing prompts',
+    '# through Warden; the file next to this one ending .warden-bak is what it',
+    '# looked like before.',
+    '[[hooks.UserPromptSubmit]]',
+    '',
+    '[[hooks.UserPromptSubmit.hooks]]',
+    'type = "command"',
+    `command = "node ${hookPath()}"`,
+    ''
+  ].join('\n');
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, body.endsWith('\n') || body === '' ? body + block : body + '\n' + block);
+  return null;
+}
+
+/**
+ * OpenCode needs a plugin file, and the plugin is fetched rather than embedded.
+ *
+ * A copy of it pasted in here would be a second source of that file, and the
+ * two would disagree within a release — the same reason the hook itself is
+ * served by the gateway instead of vendored into the install script.
+ */
+async function fixOpenCode() {
+  const file = join(homedir(), '.config', 'opencode', 'plugin', 'warden.js');
+  if (existsSync(file) ) return null;
+
+  let source;
+  try {
+    const res = await fetch(`${WARDEN_URL}/integrations/opencode/warden.js`, {
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!res.ok) throw new Error(`gateway answered ${res.status}`);
+    source = await res.text();
+  } catch (err) {
+    return `could not fetch the plugin from ${WARDEN_URL} (${err?.message ?? err})`;
+  }
+
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, source);
+  return null;
+}
+
+async function fixMode(agents) {
+  process.stdout.write('\nWiring what can be wired\n\n');
+  const fixers = { 'claude-code': fixClaudeCode, codex: fixCodex, opencode: fixOpenCode };
+
+  for (const agent of agents) {
+    const fix = fixers[agent.id];
+    if (!agent.installed || !agent.governable || !fix) continue;
+    if (agent.wired) {
+      process.stdout.write(`  · ${agent.name.padEnd(12)} already wired, left alone\n`);
+      continue;
+    }
+    let problem;
+    try {
+      problem = await fix();
+    } catch (err) {
+      problem = err?.message ?? String(err);
+    }
+    process.stdout.write(
+      problem
+        ? `  ✗ ${agent.name.padEnd(12)} ${problem}\n`
+        : `  ✓ ${agent.name.padEnd(12)} wired — restart it to pick this up\n`
+    );
+  }
+
+  const cursor = agents.find((a) => a.id === 'cursor');
+  if (cursor?.installed) {
+    process.stdout.write(`  — ${cursor.name.padEnd(12)} nothing to wire: ${cursor.how}\n`);
+  }
+  process.stdout.write('\n');
+}
+
 function detectMode() {
   const agents = detectAgents();
   const hookAt = [join(homedir(), '.warden-hook.mjs'), join(homedir(), '.config', 'warden', 'hook.mjs')]
@@ -620,8 +767,18 @@ async function main() {
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
-  // Takes no audit id and talks to nothing: it reads this machine and prints.
-  if (process.argv.includes('--detect')) return detectMode();
+  // Takes no audit id and judges nothing: it reads this machine and prints.
+  // `--fix` writes, and only to the three tools that have local wiring.
+  if (process.argv.includes('--detect') || process.argv.includes('--fix')) {
+    detectMode();
+    if (process.argv.includes('--fix')) {
+      await fixMode(detectAgents());
+      // Re-read from disk so the closing inventory is what is actually there
+      // now, not what this process believes it wrote.
+      detectMode();
+    }
+    return;
+  }
 
   for (const [flag, run] of [['--rewrite', rewriteMode], ['--note', noteMode]]) {
     const at = process.argv.indexOf(flag);

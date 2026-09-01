@@ -60,9 +60,34 @@ Agents on this machine
   key        set
 ```
 
-The installer runs this as its last step, so the employee ends on an inventory
-rather than on a sentence telling them to go and find out. `--detect --json`
-prints the same thing for a script.
+And wire up whatever it found:
+
+```bash
+node ~/.warden-hook.mjs --fix
+```
+
+```
+Wiring what can be wired
+
+  ✓ Claude Code  wired — restart it to pick this up
+  ✓ Codex        wired — restart it to pick this up
+  · OpenCode     already wired, left alone
+  — Cursor       nothing to wire: no prompt hook
+```
+
+It adds and never replaces: Claude Code's settings are merged as JSON and every
+other hook in the file survives, Codex's TOML is appended to, and a config that
+already mentions `warden-hook` is left completely alone — so running it twice is
+the same as running it once. Every file it touches is copied to
+`<file>.warden-bak` first, before a byte is written. The OpenCode plugin is
+fetched from the gateway rather than carried inside the hook, for the same
+reason the install script curls the hook instead of vendoring it: two copies of
+one file disagree within a release.
+
+The installer runs `--fix` as its last step, so an install ends on an inventory
+that says *governed* rather than on a sentence telling somebody to go and
+configure three programs by hand. `--detect --json` prints the inventory for a
+script.
 
 It has to live here rather than in the console because the console is on
 another computer. The gateway learns a tool exists when a prompt turns up from

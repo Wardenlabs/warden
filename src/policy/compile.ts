@@ -205,6 +205,20 @@ async function splitStatement(qvac: QvacAdapter, text: string): Promise<string[]
       seen.add(key);
       statements.push(statement);
     }
+    // A split of one is not a split. The pass was asked to break a worry into
+    // parts and came back with the administrator's own sentence — so use the
+    // administrator's own sentence, not the model's paraphrase of it.
+    //
+    // This is not tidiness. Measured on 2026-09-01 against Qwen3-1.7B-Q4_0,
+    // the paraphrase is where the damage was: "nadie puede mandar datos de
+    // clientes afuera de la empresa" came back as "nadar datos de clientes",
+    // and "dejen de filtrar datos de clientes" came back as a rule against
+    // *filtering* customer data — the false friend — whose compliant example
+    // was "send customer data to a third-party for analysis". A pass that
+    // returns one statement can now only return the one it was given, so the
+    // worst failure this pass had is structurally gone rather than prompted
+    // against.
+    if (statements.length === 1) return [text];
     return statements.length > 0 ? statements.slice(0, MAX_STATEMENTS) : [text];
   } catch {
     return [text];
