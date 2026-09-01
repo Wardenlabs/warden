@@ -126,6 +126,8 @@ const state = {
   presets: [],
   chain: null,
   mock: false,
+  /** { days, held, max } while prompt text is kept, null when it is not. */
+  prompts: null,
 
   /**
    * Where rule compilation runs. Never holds the API key — the server returns
@@ -331,6 +333,9 @@ function route() {
 async function boot() {
   const health = await api('/health').catch(() => null);
   state.mock = Boolean(health?.j?.mock);
+  // How long prompt text stays readable. Shown on the screen that shows it,
+  // because a retention policy nobody can see is one nobody can rely on.
+  state.prompts = health?.j?.prompts ?? null;
   if (!health?.ok) {
     $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>npm run dev</code> and reload this page.</span></div></div>';
     return;
@@ -469,7 +474,11 @@ function render() {
 
   renderNav();
   $('pane').className = `pane${val(view.flush) ? ' flush' : ''}`;
-  $('pane').innerHTML = view.body();
+  // Demo mode goes above every screen, not inside one. It used to live in the
+  // today card, which does not render until something has happened — so the
+  // person it is written for, somebody who has just installed the app and is
+  // wondering why nothing works, was the one person who never saw it.
+  $('pane').innerHTML = (state.mock ? mockBanner() : '') + view.body();
 
   restoreFields(fields);
   bindDisclosures();
@@ -605,7 +614,6 @@ function todayCard() {
     ${waiting ? `<div class="cta">
       <button type="button" class="btn primary" data-go="inbox">${plural(waiting, 'request')} waiting on you</button>
     </div>` : ''}
-    ${state.mock ? '<div class="banner warn">Warden is running on the mock adapter. These decisions did not come from a real model.</div>' : ''}
   </div>`;
 }
 
@@ -1311,6 +1319,28 @@ function emptyPolicyBanner() {
   return `<div class="banner warn">
     <b>Your policy is empty, so right now Warden lets everything through.</b>
     It only stops what you tell it to stop — write the first rule below, or take one from the catalogue.
+  </div>`;
+}
+
+/**
+ * Demo mode, and the way out of it.
+ *
+ * It used to say only what was true — "these decisions did not come from a
+ * real model" — and stop there, which names the problem and leaves you in it.
+ * Somebody who installs the app, lands in demo mode and reads that banner has
+ * been told the product is not working and given nothing to do about it; the
+ * exit existed and was a tray menu item, which is not where anyone looks.
+ *
+ * Both paths, because the console is served to whoever opened it: the desktop
+ * app, where the fix is a menu item, and a checkout, where it is one command.
+ */
+function mockBanner() {
+  return `<div class="banner warn">
+    <b>Demo mode — nothing here was judged by a real model.</b>
+    Every verdict on this screen came from a keyword-matching test double, so it
+    is not evidence about anything. The models are about 1.8&nbsp;GB and download once.
+    <div class="note">In the desktop app: <b>Gateway → Download models &amp; leave demo mode…</b> in the menu bar.
+    From a checkout: <span class="mono">pnpm run setup</span>, then restart the gateway.</div>
   </div>`;
 }
 

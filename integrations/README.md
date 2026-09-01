@@ -39,6 +39,66 @@ Check it:
 echo '{"user_input":"hello"}' | node ~/.warden-hook.mjs   # exit 0, silent
 ```
 
+And ask it what is on this machine:
+
+```bash
+node ~/.warden-hook.mjs --detect
+```
+
+```
+Agents on this machine
+
+  ✓ Claude Code  governed by Warden
+                 /Users/fede/.claude
+  ○ Codex        installed, NOT governed — add [[hooks.UserPromptSubmit]] to ~/.codex/config.toml
+                 /Users/fede/.codex
+  · OpenCode     not found
+  — Cursor       installed, and cannot be governed on a subscription
+
+  hook       /Users/fede/.warden-hook.mjs
+  gateway    http://192.168.1.42:8080
+  key        set
+```
+
+And wire up whatever it found:
+
+```bash
+node ~/.warden-hook.mjs --fix
+```
+
+```
+Wiring what can be wired
+
+  ✓ Claude Code  wired — restart it to pick this up
+  ✓ Codex        wired — restart it to pick this up
+  · OpenCode     already wired, left alone
+  — Cursor       nothing to wire: no prompt hook
+```
+
+It adds and never replaces: Claude Code's settings are merged as JSON and every
+other hook in the file survives, Codex's TOML is appended to, and a config that
+already mentions `warden-hook` is left completely alone — so running it twice is
+the same as running it once. Every file it touches is copied to
+`<file>.warden-bak` first, before a byte is written. The OpenCode plugin is
+fetched from the gateway rather than carried inside the hook, for the same
+reason the install script curls the hook instead of vendoring it: two copies of
+one file disagree within a release.
+
+The installer runs `--fix` as its last step, so an install ends on an inventory
+that says *governed* rather than on a sentence telling somebody to go and
+configure three programs by hand. `--detect --json` prints the inventory for a
+script.
+
+It has to live here rather than in the console because the console is on
+another computer. The gateway learns a tool exists when a prompt turns up from
+one — that is `activity.ts`, and it is a liveness view, which means it stays
+empty for exactly the tool nobody wired up. That is the case worth catching,
+and an inventory built from traffic can never see it.
+
+It reads config files, prints, and exits 0 whatever it finds. It sends nothing:
+a list of installed programs is not an identity, and identity here is the API
+key and only the API key.
+
 Employees never clone the repo or download a model — only the machine running
 the gateway does. From inside the repo, `npm link` gives you the same thing as
 `warden-hook` on your PATH.

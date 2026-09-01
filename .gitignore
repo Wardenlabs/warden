@@ -97,3 +97,4 @@ data/audit-eval.witness.json
 
 # Operational settings set from the console. Holds a provider API key.
 data/settings.json
+data/prompts.jsonl

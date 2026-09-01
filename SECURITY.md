@@ -53,6 +53,25 @@ text.
 with a witness file holding the count so truncation is visible as well as
 alteration. `pnpm run verify-audit` walks it.
 
+**Keeping a transcript of your team.** The audit log holds `sha256(prompt)` and
+never the prompt: `recordDecision` strips the text before writing, so the
+governance record cannot become the thing it is meant to make accountable.
+
+Prompt text does exist in one other place, deliberately and with a limit. The
+console has to be able to show an administrator what was actually blocked, so
+`src/audit/prompts.ts` keeps the **masked** text — secrets already removed —
+for **seven days by default**, in `data/prompts.jsonl`, mode `0600` and
+gitignored. Expiry is enforced on every read and not only by a sweep, so a copy
+of that file taken to another machine, or restored from a backup, still cannot
+be read past its date. `WARDEN_PROMPT_RETENTION_DAYS=0` disables it entirely
+and deletes the file.
+
+What this means for the people being logged is a sentence you can put in
+writing: *an administrator can read what you sent for seven days, with secrets
+already masked, and after that nobody can — including them.* Lengthening the
+window lengthens what an attacker who reaches the gateway walks away with, in
+direct proportion.
+
 **Reaching the administrative surface.** Policy writes, key issuance, the
 onboarding script and the audit record require an administrator: a request from
 the machine the gateway runs on, or an API key belonging to a role the ratified

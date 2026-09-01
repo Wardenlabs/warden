@@ -46,6 +46,38 @@ function nextChoice(): Promise<'download' | 'mock' | 'retry'> {
   });
 }
 
+/**
+ * Are the required models already on disk?
+ *
+ * Asked on every boot, including the boots that start in demo mode. Choosing
+ * demo used to be permanent and silent: the choice was written to settings,
+ * and `ensureModels` only runs when settings say `real`, so an installation
+ * that later acquired the models — a retried download, a `pnpm run setup`, a
+ * copy from a colleague's machine — kept booting into mock forever with no
+ * indication that it no longer had to. The way out existed and was a tray menu
+ * item, which is not where somebody looks when the product appears not to work.
+ *
+ * Separate from `ensureModels` because this one asks and never prompts: it
+ * touches the splash, the network and the user's attention not at all.
+ */
+export async function modelsPresent(appRoot: string, modelsDir: string): Promise<boolean> {
+  try {
+    const lib = (await import(
+      pathToFileURL(join(appRoot, 'dist', 'setup', 'download.js')).href
+    )) as DownloadLib;
+    const { MODEL_CATALOG } = (await import(
+      pathToFileURL(join(appRoot, 'dist', 'setup', 'catalog.js')).href
+    )) as CatalogLib;
+    const required = MODEL_CATALOG.filter((spec) => spec.required && spec.url);
+    return lib.missingModels(modelsDir, required).length === 0;
+  } catch {
+    // A build without the setup modules, or an unreadable models directory.
+    // Answering "no" leaves the installation exactly where it was, which is
+    // the safe direction for a check nobody asked for.
+    return false;
+  }
+}
+
 export async function ensureModels(opts: {
   splash: BrowserWindow;
   appRoot: string;

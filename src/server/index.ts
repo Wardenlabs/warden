@@ -50,6 +50,13 @@ import { findDecision } from '../audit/log.js';
 import { checkQuota } from '../guard/quota.js';
 import type { RewriteRefusal, RewriteResult } from '../guard/rewrite.js';
 import { onboardingFor, supportedTools } from '../onboarding/index.js';
+import {
+  forgetAll as forgetPrompts,
+  promptsEnabled,
+  remember as rememberPromptText,
+  retentionSummary,
+  textFor as promptTextFor
+} from '../audit/prompts.js';
 
 const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
 
@@ -186,46 +193,39 @@ app.get('/api/events', (_req, res) => {
 
 /** Broadcast a decision to every connected trace viewer. */
 /**
- * Prompts the console may still show, for as long as this process lives.
+ * Prompt text for the console, held in `audit/prompts.ts` with an expiry.
  *
  * The audit log deliberately does not keep prompt text — `recordDecision`
  * strips it, because a log that kept it would be a transcript of everything
- * employees typed, and the log's own header promises it is not one. That is the
- * right call for the record and the wrong one for the screen: an operations
- * lead watching a block happen has no way to see what was blocked, and a row
- * that reads "—" looks like a bug rather than a promise being kept.
+ * employees typed, and the log's own header promises it is not one. That is
+ * still true and does not move.
  *
- * So the text lives here instead: in memory, capped, gone on restart, never
- * written anywhere. The console can show you what just happened; the record
- * still cannot tell you what anyone typed last week. Anything that starts
- * persisting this map has turned the console's convenience into the transcript
- * the audit log refuses to be.
+ * It is the wrong answer for the screen, though: an operations lead watching a
+ * block happen has no way to see what was blocked, and a row that reads "—"
+ * looks like a bug rather than a promise being kept. This used to be answered
+ * by a Map of the last 300, in this file, emptied by every restart — which is
+ * not a retention policy but an accident of process lifetime, and one nobody
+ * could put in writing for the people being logged.
+ *
+ * It is now a store with a date on it: masked text only, seven days by
+ * default, expiry checked on every read so a file that outlived its sweep
+ * cannot serve anything, and `WARDEN_PROMPT_RETENTION_DAYS=0` for a deployment
+ * that wants nothing on disk at all.
  */
-const RECENT_PROMPTS_MAX = 300;
-const recentPrompts = new Map<string, string>();
-
 function rememberPrompt(decision: unknown): void {
   if (!decision || typeof decision !== 'object') return;
   const d = decision as { auditId?: unknown; maskedPrompt?: unknown };
   if (typeof d.auditId !== 'string' || typeof d.maskedPrompt !== 'string') return;
-  if (!d.maskedPrompt) return;
-
-  // Insertion-ordered, so deleting the first key evicts the oldest.
-  recentPrompts.set(d.auditId, d.maskedPrompt);
-  while (recentPrompts.size > RECENT_PROMPTS_MAX) {
-    const oldest = recentPrompts.keys().next().value;
-    if (oldest === undefined) break;
-    recentPrompts.delete(oldest);
-  }
+  rememberPromptText(d.auditId, d.maskedPrompt);
 }
 
-/** Put the remembered text back on entries that still have it in memory. */
+/** Put the text back on entries the store still holds and has not expired. */
 function withRememberedPrompts(entries: unknown): unknown {
   if (!Array.isArray(entries)) return entries;
   return entries.map((e) => {
     const entry = e as { auditId?: unknown; decision?: Record<string, unknown> };
     if (typeof entry.auditId !== 'string' || !entry.decision) return e;
-    const text = recentPrompts.get(entry.auditId);
+    const text = promptTextFor(entry.auditId);
     if (text === undefined) return e;
     return { ...entry, decision: { ...entry.decision, maskedPrompt: text } };
   });
@@ -508,6 +508,9 @@ app.put('/api/company', asyncRoute(async (req, res) => {
 app.post('/api/company/reset', asyncRoute(async (req, res) => {
   const name = typeof req.body?.name === 'string' ? req.body.name : undefined;
   const dir = clearDemoDirectory(name);
+  // Resetting the company and leaving last week's prompts readable would be a
+  // reset that kept the one thing worth clearing.
+  forgetPrompts();
   res.json({ name: dir.name, employees: dir.employees.length });
 }));
 
@@ -989,6 +992,23 @@ app.post('/api/redteam/run', asyncRoute(async (_req, res) => {
  * captive portal, or in a demo with egress blocked, that step is where the
  * setup dies. The gateway already has the file.
  */
+/**
+ * The OpenCode plugin, served like the hook is.
+ *
+ * `warden-hook --fix` fetches this rather than carrying a copy of it: two
+ * sources of the same file disagree within a release, which is the reason the
+ * install script curls the hook instead of vendoring it too.
+ */
+app.get('/integrations/opencode/warden.js', (_req, res) => {
+  try {
+    res.type('application/javascript').send(
+      readFileSync(join(ASSETS, 'integrations', 'opencode', 'warden.js'), 'utf8')
+    );
+  } catch {
+    res.status(404).type('text/plain').send('// not bundled in this build\n');
+  }
+});
+
 app.get('/warden-hook.mjs', (_req, res) => {
   try {
     res.type('application/javascript').send(readFileSync(join(ASSETS, 'integrations', 'warden-hook.mjs'), 'utf8'));
@@ -1059,8 +1079,19 @@ WARDEN_BLOCK
 
 echo ""
 echo "Done. Hook at $HOOK, environment in $PROFILE."
-echo "Open a new terminal (or: source $PROFILE), then wire up your tool."
-echo "Setup per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
+echo "Open a new terminal (or: source $PROFILE)."
+
+# What is on this machine, and then wiring it. --fix adds the hook to the tools
+# it finds, backs up every file it touches to <file>.warden-bak first, leaves
+# anything already wired alone, and prints each thing it did — so the install
+# ends on an inventory that says "governed" instead of on a sentence telling
+# them to go and configure three programs by hand.
+#
+# \`|| true\` covers a machine with no node, which would be a strange place to
+# be installing a node hook but is not a reason for the install to end red.
+node "$HOOK" --fix || true
+
+echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
 `);
 });
 
@@ -1081,6 +1112,10 @@ app.get('/health', (_req, res) =>
   res.json({
     ok: true,
     mock: isMock(),
+    // How long an administrator can read a prompt for. On /health because it
+    // is a property of this deployment, and the console has to be able to say
+    // it out loud on the screen where the text is shown.
+    prompts: promptsEnabled() ? retentionSummary() : null,
     mode: process.env['WARDEN_MODE'] === 'baseline' ? 'baseline' : 'warden',
     models: modelState
   })
