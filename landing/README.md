@@ -13,15 +13,17 @@ its place doing.
 
 ## What is on the page
 
-Five screens, in this order. The hero is centred and nothing else is; the
-sections below it hang off the same axis, and the footer closes the bracket the
-hero opened.
+Four screens, and the count is the constraint rather than an outcome: every
+section that was only restating a claim the next one demonstrates has been
+cut. `#gap` — a whole screen on "nothing checks what goes out" — went because
+the hero opens on that already, and a strip naming the models went because
+nobody deciding whether to install this needs a bill of materials before they
+have seen it work.
 
 | | | Earns its scroll with |
 |---|---|---|
 | Hero | Writing the rules down is not the same as enforcing them. | the gate line, and the prompt being judged on it |
-| `#gap` | Nothing checks what goes out. | the empty hook both Claude Code and Codex ship with |
-| `#how` | Write a rule, it stops the request, you see that it did. | three rules compiling onto a stack, the hook's literal output in four tools, and the four models by name |
+| `#how` | Write a rule, it stops the request, you see that it did. | three rules compiling onto the page, and the hook's literal output in three tools |
 | `#spend` | A prompt that leaks nothing can still cost you. | the console's own quota cards, and the hold an over-budget session gets |
 | `#download` | Install it. | two installers, from this repo's own CI |
 
@@ -53,11 +55,16 @@ rests on:
 - Step 01 types three sentences and gets three rules, not one sentence
   producing three. The compiler takes one sentence and returns one rule; the
   loop is allowed to be quick, not to be a different product.
-- The `cursor` tab shows the gateway's 403 body and not a picture of Cursor,
-  because what that editor does with a 403 is not ours to draw.
+- There is no `cursor` tab. Cursor has no prompt hook and can only be governed
+  as an OpenAI endpoint, which needs an API key — so a tab for it was a fourth
+  panel that existed to apologise. The fact is worth keeping and is one clause
+  in the note under the strip.
 - The `opencode` tab prints the same words as the other two, because it is the
-  same hook — and says, on the page, that nobody has watched it abort a
-  message.
+  same hook. Nobody has watched it abort a message, which the note says.
+- The three tab colours are the only hues on the page that are not a verdict,
+  and they are all cool for that reason. They are also not any of these
+  products' brand colours: repainting a panel in somebody else's identity is
+  borrowing a brand this repo does not have.
 
 If a panel here cannot be traced to a file in this repo, it does not ship.
 

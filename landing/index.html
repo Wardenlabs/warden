@@ -96,28 +96,6 @@ setTimeout(function () {
   </div>
 </div>
 
-<!-- ── §0 the gap ────────────────────────────────────────── -->
-<!--
-     The only section with no rail, and the only one set on the hero's axis.
-     Everything below it is evidence — a terminal, a record, a table — and the
-     rail is what introduces evidence: a small label naming the thing, the same
-     distance from the top of its row every time. This section has nothing to
-     introduce. It is the hero still talking, so it keeps the hero's centre and
-     its measure and drops the machinery, and the first label on the page now
-     arrives at the refusal, where there is finally something to name.
--->
-<section id="gap">
-  <div class="wrap sec">
-
-    <div class="main" data-reveal>
-      <h2 class="loud">Nothing checks what goes out.</h2>
-      <p class="lead">Someone pastes a customer contract into Claude to have it summarised. Nobody looks at it on the way out, and nothing says it went.</p>
-      <p>Both Claude Code and Codex leave a place for that check to run, and ship with it empty.</p>
-    </div>
-
-  </div>
-</section>
-
 <!-- ── §1 how it works, in three stages ─────────────────── -->
 <!--
      Write them, hit one, see it — the same policy crossing two programs, so the
@@ -159,12 +137,18 @@ setTimeout(function () {
                   <span class="btn primary send">Write it</span>
                 </div>
               </div>
-              <div class="ruleset" id="ruleSet">
-                <div class="ru"><span class="rid mono">r-payroll</span><span class="badge BLOCK">block</span><span class="rtx">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</span></div>
-                <div class="ru"><span class="rid mono">r-customer-pii</span><span class="badge BLOCK">block</span><span class="rtx">Customer personal data must not be summarised, exported, or prepared for any recipient outside the company.</span></div>
-                <div class="ru"><span class="rid mono">r-payment-approval</span><span class="badge ESCALATE">escalate</span><span class="rtx">No one may instruct the release of a payment above USD 5,000 without written sign-off from the CEO.</span></div>
-              </div>
             </div>
+          </div>
+
+          <!-- Outside the panel, on the page's own ground. Inside it they were
+               a list in an application; out here they are what the application
+               produced and left behind, which is the only reason the stage
+               exists. Nothing is drawn around them — the hairline between rows
+               is the whole container. -->
+          <div class="ruleset" id="ruleSet">
+            <div class="ru"><span class="rid mono">r-payroll</span><span class="badge BLOCK">block</span><span class="rtx">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</span></div>
+            <div class="ru"><span class="rid mono">r-customer-pii</span><span class="badge BLOCK">block</span><span class="rtx">Customer personal data must not be summarised, exported, or prepared for any recipient outside the company.</span></div>
+            <div class="ru"><span class="rid mono">r-payment-approval</span><span class="badge ESCALATE">escalate</span><span class="rtx">No one may instruct the release of a payment above USD 5,000 without written sign-off from the CEO.</span></div>
           </div>
         </div>
       </div>
@@ -187,13 +171,11 @@ setTimeout(function () {
             <input class="vh" type="radio" name="tool" id="tool-cc" checked>
             <input class="vh" type="radio" name="tool" id="tool-cx">
             <input class="vh" type="radio" name="tool" id="tool-oc">
-            <input class="vh" type="radio" name="tool" id="tool-cu">
 
             <div class="term-bar picker" role="radiogroup" aria-label="Show the refusal as it arrives in">
               <label for="tool-cc">claude code</label>
               <label for="tool-cx">codex</label>
               <label for="tool-oc">opencode</label>
-              <label for="tool-cu">cursor</label>
             </div>
 
             <div class="panes">
@@ -215,7 +197,6 @@ setTimeout(function () {
      warden-hook --rewrite a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note"><span class="mono">UserPromptSubmit</span> hook, exit 2. Works on a Max subscription — it runs before the prompt is sent.</p>
               </div>
 
               <div class="pane pane-cx">
@@ -236,7 +217,6 @@ setTimeout(function () {
      warden-hook --rewrite a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note">Word for word the tab before it — one hook, one refusal, whichever tool they opened. Works on a Plus subscription.</p>
               </div>
 
               <div class="pane pane-oc">
@@ -257,26 +237,8 @@ setTimeout(function () {
      warden-hook --rewrite a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note">A <span class="mono">chat.message</span> plugin, same hook. <strong>Nobody has watched it abort a message</strong> — if it quietly does nothing, that is the bug to report.</p>
               </div>
 
-              <div class="pane pane-cu">
-                <pre><span class="you">POST /v1/chat/completions  →  the gateway</span>
-
-<span class="stop">HTTP/1.1 403 Forbidden</span>
-
-<span class="rule">{
-  "error": {
-    "code": "policy_block",
-    "message": "No one may request payroll, salary,
-                bonus, or compensation information
-                about another employee."
-  }
-}</span>
-
-   <span class="dim">Nothing was forwarded.</span></pre>
-                <p class="tool-note">No prompt hook, so it is governed as an OpenAI endpoint — which needs an API key. <strong>A Cursor subscription cannot be governed at all.</strong> This is the response body; what the editor draws is not ours to draw.</p>
-              </div>
             </div>
           </div>
         </div>
@@ -296,17 +258,7 @@ setTimeout(function () {
       </div>
     </div>
 
-    <div class="models" data-reveal>
-      <span class="label">What ran, and where</span>
-      <ul>
-        <li><span class="m mono">Qwen3-1.7B-Q4_0</span><span class="j">writes the rule, judges the prompt</span></li>
-        <li><span class="m mono">embeddinggemma-300M-Q8_0</span><span class="j">picks which rules to judge against</span></li>
-        <li><span class="m mono">latin_g2</span><span class="j">reads attachments — never measured</span></li>
-        <li><span class="m mono">Qwen3-0.6B-Q4_0</span><span class="j">second injection pass — ships off, unmeasured</span></li>
-      </ul>
-    </div>
-
-    <p class="how-note" data-reveal>All of it on their machine, before the prompt is sent — which is why it works on a Max or Plus plan, where there is no base URL to redirect. <strong>Verified so far:</strong> the hook refusing a prompt in a terminal, and nothing beyond that.</p>
+    <p class="how-note" data-reveal>One hook, running on their machine before the prompt is sent — which is why it works on a Max or Plus plan, where there is no base URL to redirect. Cursor has no hook and can only be governed as an OpenAI endpoint, which needs an API key, so a Cursor subscription cannot be governed at all. <strong>Verified so far:</strong> the hook refusing a prompt in a terminal, and nothing beyond that.</p>
 
   </div>
 </section>

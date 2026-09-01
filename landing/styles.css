@@ -124,6 +124,17 @@
      thing that moves while already on screen uses --ease-in-out. Nothing uses
      ease-in: it withholds movement in the first frames, which are the frames
      the reader is actually looking at. */
+  /* Tool identity on the tab strip in §1. The only hues on this page that do
+     not mean a verdict, which is why they are all cool: coral, amber and green
+     are spoken for, and a reader must never be able to confuse "which tool"
+     with "what happened". They are also deliberately not any of these
+     products' own brand colours — a page repainting itself in somebody else's
+     identity per tab would be borrowing three brands it does not have. They
+     touch one label and one 2px rule, and nothing else. */
+  --tool-cc: #8a93b8;
+  --tool-cx: #9f8fbe;
+  --tool-oc: #74a4b8;
+
   --ease-out: cubic-bezier(.23, 1, .32, 1);
   --ease-in-out: cubic-bezier(.77, 0, .175, 1);
 
@@ -222,12 +233,14 @@ section {
    and drawing a second line a screen below it makes the first one look like
    trim; §how ends on one too, running down its own middle. Where a divider is
    the only thing separating two sections it stays. */
-#gap, #spend { border-top: 0; }
+/* The hero ends on a light; drawing a rule a screen under it makes the
+   light look like trim. Neither section below takes one. */
+#how, #spend { border-top: 0; }
 /* The one drawn rule left on the page. At --line it read as a wall between
    the argument and the demo; soft, it is a detail. And §how used to hand off
    to the section below it across ~500px of black — its own bottom air plus the section
    gap — which read as the page ending twice. Both trimmed. */
-#how { border-top-color: var(--line-soft); padding-bottom: var(--s-9); }
+#how { padding-bottom: var(--s-9); }
 #spend { padding-block: var(--s-10); }
 
 .sec { display: grid; gap: var(--s-9); }
@@ -501,25 +514,7 @@ header nav .btn { color: var(--accent-ink); }
   .judge .verdict { flex: 1 1 100%; margin-left: 0; }
 }
 
-/* ── §0, the gap: the hero still talking ───────────────────────────────── */
-/*
- * Centred, and the only section that is. The rail below is not decoration that
- * could be applied evenly — it is the thing that says "here is an artefact, and
- * this is its name", so a section with no artefact should not have one. What is
- * left is the hero's axis and the hero's measure (20ch on the head, the same
- * number `.hero h1` uses), which is the point: the page has not started showing
- * anything yet, it is still making the claim.
- *
- * Every override here is an id plus one class or more, so it outranks the .main
- * rules it is narrowing without needing !important or source order to hold.
- */
-#gap .sec  { gap: var(--s-10); justify-items: center; text-align: center; }
-#gap .main { justify-items: center; width: 100%; }
-#gap .main h2      { max-width: 20ch; }
-#gap .main p       { max-width: 54ch; }
-#gap .main p.lead  { max-width: 40ch; }
-
-/* §spend keeps §gap's centre for its opening block and then breaks out of it
+/* §spend opens on the hero's centre and then breaks out of it
    for the two panels, which is the one place on the page where two things are
    deliberately shown at the same size: neither of the two controls is the
    footnote of the other. */
@@ -944,41 +939,53 @@ footer::before {
   white-space: nowrap;
 }
 
-/* ── 01, the rules landing on the stack ───────────────────────────────── */
+/* ── 01, the rules landing on the page ────────────────────────────────── */
 /*
- * It was one card with every field of a compiled rule on it — scope, roles,
- * guidance, four examples — and it was a screen and a half of specification
- * where the stage only had to make one point: a sentence becomes a rule with
- * a name and a severity, and then another, and then another. The fields are
- * in the product; the landing shows the shape.
+ * They used to sit inside the composer's panel, which made them a list in an
+ * application. Out here on the page's own ground they are what the application
+ * produced and left behind — which is the thing the stage exists to say. There
+ * is no container: the hairline between rows is the whole of it.
  *
- * Each row arrives when app.js drops it, and everything here is behind `.js`:
- * with no script, or once the watchdog fires, all three are simply already on
- * the stack.
+ * The entrance is blur, lift and fade together. Fade alone read as three rows
+ * that had always been there having their opacity turned up; blurring the row
+ * on the way in gives it somewhere to have come from, which is what makes it
+ * read as arriving rather than appearing. Under 6px — heavy blur is expensive,
+ * and in Safari especially.
  */
-.ruleset { display: grid; gap: 0; padding: 0 var(--s-7) var(--s-7); }
+.ruleset { display: grid; gap: 0; width: 100%; margin-top: var(--s-6); }
 .ru {
   display: flex;
   align-items: baseline;
   gap: var(--s-4);
-  padding: var(--s-4) 0;
+  padding: var(--s-5) var(--s-2);
   border-top: 1px solid var(--line-soft);
 }
 /* A fixed column, so the three severities line up under each other — the
    whole point of a stack is that it reads down. */
 .ru .rid { flex: 0 0 148px; font-size: var(--fs-2); color: var(--ink-2); }
-.ru .badge { flex: none; }
+/* The badge is the console's, and the console's rule is scoped to `.console` —
+   which the stack is now deliberately outside of. Same tokens, carried here. */
+.ru .badge {
+  flex: none;
+  display: inline-flex; align-items: center;
+  border-radius: var(--r-sm);
+  padding: 1px var(--s-2);
+  font-family: var(--mono); font-size: var(--fs-1); font-weight: var(--fw-medium);
+  background: var(--sunken); color: var(--muted);
+}
+.ru .badge.BLOCK { background: var(--block-bg); color: var(--block); }
+.ru .badge.ESCALATE { background: var(--escalate-bg); color: var(--escalate); }
 .ru .rtx {
-  flex: 1 1 100%;
+  flex: 1;
   min-width: 0;
   font-size: var(--fs-2);
   line-height: var(--lh-snug);
   color: var(--muted);
 }
-.js .ru { opacity: 0; transform: translateY(6px); }
+.js .ru { opacity: 0; transform: translateY(10px); filter: blur(5px); }
 .js .ru.on {
-  opacity: 1; transform: none;
-  transition: opacity .32s var(--ease-out), transform .32s var(--ease-out);
+  opacity: 1; transform: none; filter: none;
+  transition: opacity .42s var(--ease-out), transform .42s var(--ease-out), filter .42s var(--ease-out);
 }
 
 .beat-note {
@@ -990,7 +997,7 @@ footer::before {
 }
 .beat-note .mono { color: var(--muted); }
 
-/* ── 02, the same refusal in four tools ────────────────────────────────── */
+/* ── 02, the same refusal in three tools ────────────────────────────────── */
 /*
  * The switch is `:checked ~` and nothing else — no script, no :has(), and the
  * radios sit directly under `.term` so the plain sibling combinator can reach
@@ -1007,17 +1014,17 @@ footer::before {
 }
 .tools .picker label:hover { color: var(--ink-2); }
 
-#tool-cc:checked ~ .picker label[for="tool-cc"],
-#tool-cx:checked ~ .picker label[for="tool-cx"],
-#tool-oc:checked ~ .picker label[for="tool-oc"],
-#tool-cu:checked ~ .picker label[for="tool-cu"] {
-  color: var(--ink);
-  border-bottom-color: var(--ink-2);
-}
+/* The selected tab takes its tool's colour, and so does the rule under it.
+   Three identical dark rectangles switching between each other read as
+   nothing happening; the whole point of the strip is that the reader believes
+   they are looking at a different program. */
+#tool-cc:checked ~ .picker label[for="tool-cc"] { color: var(--tool-cc); border-bottom-color: var(--tool-cc); font-weight: var(--fw-medium); }
+#tool-cx:checked ~ .picker label[for="tool-cx"] { color: var(--tool-cx); border-bottom-color: var(--tool-cx); font-weight: var(--fw-medium); }
+#tool-oc:checked ~ .picker label[for="tool-oc"] { color: var(--tool-oc); border-bottom-color: var(--tool-oc); font-weight: var(--fw-medium); }
+
 #tool-cc:focus-visible ~ .picker label[for="tool-cc"],
 #tool-cx:focus-visible ~ .picker label[for="tool-cx"],
-#tool-oc:focus-visible ~ .picker label[for="tool-oc"],
-#tool-cu:focus-visible ~ .picker label[for="tool-cu"] {
+#tool-oc:focus-visible ~ .picker label[for="tool-oc"] {
   outline: 2px solid var(--ink);
   outline-offset: -2px;
   border-radius: var(--r-sm);
@@ -1026,22 +1033,16 @@ footer::before {
 .tools .pane { display: none; }
 #tool-cc:checked ~ .panes .pane-cc,
 #tool-cx:checked ~ .panes .pane-cx,
-#tool-oc:checked ~ .panes .pane-oc,
-#tool-cu:checked ~ .panes .pane-cu { display: block; }
+#tool-oc:checked ~ .panes .pane-oc { display: block; }
 
-/* The line under each output, saying how that tool is reached and what it
-   costs. It is the reason the tabs are worth having: the four panes differ
-   less than the four mechanisms do. */
-.tools .tool-note {
-  margin: 0 var(--s-6);
-  padding: var(--s-5) 0 var(--s-6);
-  border-top: 1px solid var(--line-soft);
-  font-size: var(--fs-2);
-  line-height: var(--lh-snug);
-  color: var(--faint);
-  max-width: 64ch;
-}
-.tools .tool-note .mono { color: var(--muted); }
+/* And the ground under it moves one step on the surface ramp, so the switch
+   is felt as well as read. One step: any more and one of the three stops
+   looking like this page. */
+.tools .panes { transition: background-color .2s var(--ease-out); }
+#tool-cc:checked ~ .panes { background: var(--sunken); }
+#tool-cx:checked ~ .panes { background: var(--bg); }
+#tool-oc:checked ~ .panes { background: var(--hover); }
+
 
 @media (prefers-reduced-motion: reduce) {
   .js .ru { opacity: 1; transform: none; transition: none; }
@@ -1050,7 +1051,6 @@ footer::before {
 @media (max-width: 700px) {
   .tools .picker { padding: 0 var(--s-2); }
   .tools .picker label { padding: var(--s-3); }
-  .tools .tool-note { margin-inline: var(--s-5); }
 }
 
 /* The press. The console's own hover states are taken off these fragments
@@ -1128,43 +1128,6 @@ footer::before {
 .quotas .kv .k { flex: 0 0 88px; color: var(--faint); font-size: var(--fs-2); }
 .quotas .kv .v { flex: 1; min-width: 0; color: var(--ink-2); }
 
-/* ── §1's fourth element: what actually ran ────────────────────────────── */
-.models {
-  width: 100%;
-  max-width: 660px;
-  margin: var(--s-9) auto 0;
-  display: grid;
-  gap: var(--s-5);
-  justify-items: center;
-  text-align: center;
-}
-.models ul {
-  list-style: none;
-  margin: 0; padding: 0;
-  width: 100%;
-  display: grid;
-  gap: 0;
-  text-align: left;
-}
-.models li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-5);
-  padding: var(--s-3) 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-.models li:last-child { border-bottom: 0; }
-.models .m { flex: 0 0 auto; color: var(--ink-2); font-size: var(--fs-2); }
-.models .j { flex: 1; min-width: 0; font-size: var(--fs-2); line-height: var(--lh-snug); color: var(--faint); text-align: right; }
-.models-note {
-  margin: 0;
-  max-width: 58ch;
-  font-size: var(--fs-2);
-  line-height: var(--lh-snug);
-  color: var(--faint);
-  text-wrap: pretty;
-}
-
 .shot.log .rule-ref { color: var(--faint); }
 
 @media (max-width: 900px) {
@@ -1174,8 +1137,6 @@ footer::before {
   .quotas { padding: var(--s-3) var(--s-3) var(--s-5); }
   .quota-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 0; }
   .quotas .kv { padding-inline: 0; }
-  .models li { display: grid; gap: var(--s-1); }
-  .models .j { text-align: left; }
 }
 
 /* ═══ the press, and the pointer that is not there ═══════════════════════ */
@@ -1207,7 +1168,6 @@ footer::before {
    hidden it. */
 #how .how-note.verified { margin-top: var(--s-9); color: var(--faint); }
 #how .how-note.verified strong { color: var(--ink-2); font-weight: var(--fw-medium); }
-.tool-note strong { color: var(--ink-2); font-weight: var(--fw-medium); }
 
 /* The log rows are a dense list built for a desktop console, and on a phone
    the ellipsis was eating the half of each row that carries the meaning:
@@ -1224,8 +1184,7 @@ footer::before {
 /* The compiled rules read as a phone list rather than a table on a narrow
    screen: the id and the badge on one line, the sentence under them. */
 @media (max-width: 700px) {
-  .ruleset { padding-inline: var(--s-5); padding-bottom: var(--s-5); }
-  .ru { flex-wrap: wrap; row-gap: var(--s-2); }
+  .ru { flex-wrap: wrap; row-gap: var(--s-2); padding-inline: 0; }
   .ru .rid { flex: 0 0 auto; }
   .ru .rtx { flex: 1 0 100%; }
 }
