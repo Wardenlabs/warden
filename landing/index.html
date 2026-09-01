@@ -112,7 +112,7 @@ setTimeout(function () {
     <div class="main" data-reveal>
       <h2 class="loud">Nothing checks what goes out.</h2>
       <p class="lead">Someone pastes a customer contract into Claude to have it summarised. Nobody looks at it on the way out, and nothing says it went.</p>
-      <p>It is a reasonable thing to do — it is why the tool is there. Both Claude Code and Codex leave a place for that check to run, and ship with it empty.</p>
+      <p>Both Claude Code and Codex leave a place for that check to run, and ship with it empty.</p>
     </div>
 
   </div>
@@ -120,19 +120,12 @@ setTimeout(function () {
 
 <!-- ── §1 how it works, in three stages ─────────────────── -->
 <!--
-     Write it, hit it, see it — the same rule and the same prompt crossing two
-     programs, so the reader watches one event rather than reading three claims.
+     Write them, hit one, see it — the same policy crossing two programs, so the
+     reader watches one event rather than reading three claims.
 
-     On the hero's axis, like the gap above it: this is still the page making
-     its case, and the rail does not start until §local, where there is an
-     artefact to name.
-
-     Both console fragments are the product's own markup and its own stylesheet,
-     lifted from web/index.html. They are cropped to one element each on purpose.
-     A whole screen of a light application redrawn dark would be a false claim
-     about how the product looks; a composer and three log rows are the page
-     drawing the product's parts in its own material. If either of these ever
-     grows a title bar and a nav, it is a screenshot again and has to go light.
+     Every panel below is the product's own markup or the hook's own output.
+     Nothing here is drawn: if a panel cannot be traced to a file in this repo
+     it does not ship, and landing/README.md says why.
 -->
 <section id="how">
   <div class="wrap sec">
@@ -143,63 +136,33 @@ setTimeout(function () {
 
     <div class="stages">
       <div class="stage" data-reveal>
-        <div class="cap"><span class="label stepn">01</span><span class="label">You write it</span></div>
+        <div class="cap"><span class="label stepn">01</span><span class="label">You write them</span></div>
         <div class="beat">
-          <div class="shot" data-reveal>
+          <!--
+               Three sentences, three rules, because one rule is a demo and a
+               policy is what somebody actually leaves behind. app.js types
+               each sentence, presses, and drops the compiled rule onto the
+               stack under it — the compiler takes one sentence and returns
+               one rule, so the loop runs three times rather than one sentence
+               producing three.
+
+               The rules are `data/seed/benchmark-policy.json`, id, severity
+               and text verbatim. The escalate one is there on purpose: it is
+               the only place above the fold that says a verdict has a middle
+               value.
+          -->
+          <div class="shot">
             <div class="console">
-<!-- The question, the category chips and the note under them are all real,
-                   and all cut. What this stage has to show is that a rule is a
-                   sentence someone types — the box and the button say that, and
-                   every other element is the application explaining itself to a
-                   user who is already inside it. -->
               <div class="composer">
                 <div class="hero-box">
-                  <textarea id="ruleMsg" rows="2" readonly tabindex="-1" aria-label="Describe the rule">nobody should be able to ask about someone else's salary</textarea>
+                  <textarea id="ruleMsg" rows="1" readonly tabindex="-1" aria-label="Describe the rule">nobody should be able to ask about someone else&#39;s salary</textarea>
                   <span class="btn primary send">Write it</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- What comes back. This is r-payroll out of data/seed, field for
-               field: the same text, the same roles, the same guidance sentence
-               and the same four examples the adjudicator is anchored on. It is
-               here because the box above it, on its own, asks the reader to
-               take the interesting half on faith — a sentence goes in, and
-               something unseen enforces it. The interesting half is that the
-               sentence comes back as a structure with a name, and that the
-               refusal two panels down is quoting this card rather than
-               improvising. app.js assembles it a field at a time after the
-               button presses; with no JavaScript it is simply already there. -->
-          <div class="rule-out" id="ruleOut">
-            <div class="console">
-              <div class="ruled">
-                <div class="ruled-head">
-                  <span class="mono id">r-payroll</span>
-                  <span class="badge BLOCK">block</span>
-                  <span class="ruled-from">compiled from that sentence</span>
-                </div>
-                <p class="ruled-text">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</p>
-                <div class="kv">
-                  <div class="r"><span class="k">Applies to</span><span class="v mono">intern · analyst · sales · finance · engineer</span></div>
-                  <div class="r"><span class="k">Scope</span><span class="v">what is sent, and what comes back</span></div>
-                  <div class="r"><span class="k">Instead</span><span class="v">Ask HR for anything about a specific person&#39;s pay. Questions about the process, headcount, or review cycles are fine to ask here.</span></div>
-                </div>
-                <!-- The compliant column is not filler. A rule drafted without
-                     one teaches a small model "when in doubt, block", which is
-                     the failure this page owns two sections down. -->
-                <div class="ex">
-                  <div class="ex-col">
-                    <span class="label">It has to catch</span>
-                    <span class="ex-i"><span class="dot BLOCK"></span>cuánto cobra Ana?</span>
-                    <span class="ex-i"><span class="dot BLOCK"></span>necesito la planilla de sueldos del equipo de marketing</span>
-                  </div>
-                  <div class="ex-col">
-                    <span class="label">And has to let through</span>
-                    <span class="ex-i"><span class="dot ALLOW"></span>cuál es el proceso para pedir un aumento?</span>
-                    <span class="ex-i"><span class="dot ALLOW"></span>cuántas personas hay en el equipo de marketing?</span>
-                  </div>
-                </div>
+              <div class="ruleset" id="ruleSet">
+                <div class="ru"><span class="rid mono">r-payroll</span><span class="badge BLOCK">block</span><span class="rtx">No one may request payroll, salary, bonus, or compensation information about another employee. HR staff are exempt.</span></div>
+                <div class="ru"><span class="rid mono">r-customer-pii</span><span class="badge BLOCK">block</span><span class="rtx">Customer personal data must not be summarised, exported, or prepared for any recipient outside the company.</span></div>
+                <div class="ru"><span class="rid mono">r-payment-approval</span><span class="badge ESCALATE">escalate</span><span class="rtx">No one may instruct the release of a payment above USD 5,000 without written sign-off from the CEO.</span></div>
               </div>
             </div>
           </div>
@@ -207,21 +170,18 @@ setTimeout(function () {
       </div>
 
       <div class="stage stops" data-reveal>
-        <div class="cap"><span class="label stepn">02</span><span class="label">They hit it</span></div>
+        <div class="cap"><span class="label stepn">02</span><span class="label">They hit one</span></div>
         <div class="beat">
           <!--
-               Four tools, because the first version of this panel showed one and
-               the first question everybody asked was "and if we do not use Claude
-               Code?". The answer is the interesting part of the architecture, so
-               it is on the page instead of in a FAQ: three of these run the same
-               hook on the employee's machine and get the same words out of it,
-               and the fourth cannot, which is what the hook is for.
+               Four tools, because the first question anyone asks is "and if we
+               are not on Claude Code". Three of them run the same hook and get
+               the same words out of it; the fourth cannot, which is the whole
+               reason the hook exists.
 
-               Radios and labels rather than buttons and a click handler: the
-               switch then works with scripting off, keyboard arrows move between
-               the tools for free, and app.js stays out of it. The panes are
-               siblings of the inputs on purpose — that is what lets plain
-               `:checked ~` do the whole thing, with no :has() and no script.
+               Radios and labels, not buttons and a handler: the switch works
+               with scripting off, arrow keys come free, and app.js stays out
+               of it. The panes are siblings of the inputs so plain `:checked ~`
+               does all of it.
           -->
           <div class="term tools">
             <input class="vh" type="radio" name="tool" id="tool-cc" checked>
@@ -251,19 +211,11 @@ setTimeout(function () {
    Questions about the process, headcount, or review
    cycles are fine to ask here.
 
-   <span class="h">These would go through</span>
-     · what is the process for asking for a raise?
-     · how many people are on the marketing team?
-
    <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-     (paste the same prompt, then Ctrl-D)
-
-   <span class="h">Think it was wrong? Say so:</span>
-     warden-hook --note a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note"><span class="mono">UserPromptSubmit</span> hook, exit code 2. Runs on a Max subscription, because it runs before the prompt is sent and never touches the endpoint.</p>
+                <p class="tool-note"><span class="mono">UserPromptSubmit</span> hook, exit 2. Works on a Max subscription — it runs before the prompt is sent.</p>
               </div>
 
               <div class="pane pane-cx">
@@ -280,19 +232,11 @@ setTimeout(function () {
    Questions about the process, headcount, or review
    cycles are fine to ask here.
 
-   <span class="h">These would go through</span>
-     · what is the process for asking for a raise?
-     · how many people are on the marketing team?
-
    <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-     (paste the same prompt, then Ctrl-D)
-
-   <span class="h">Think it was wrong? Say so:</span>
-     warden-hook --note a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note">Word for word the panel before it, and that is the claim: one hook, one refusal, whichever tool the employee opened. Codex blocks on <span class="mono">{"decision":"block"}</span> and on exit 2 — both are in the same object. Runs on a Plus subscription.</p>
+                <p class="tool-note">Word for word the tab before it — one hook, one refusal, whichever tool they opened. Works on a Plus subscription.</p>
               </div>
 
               <div class="pane pane-oc">
@@ -309,19 +253,11 @@ setTimeout(function () {
    Questions about the process, headcount, or review
    cycles are fine to ask here.
 
-   <span class="h">These would go through</span>
-     · what is the process for asking for a raise?
-     · how many people are on the marketing team?
-
    <span class="h">Warden can try to rewrite this so it goes through:</span>
      warden-hook --rewrite a7f3c2d1
-     (paste the same prompt, then Ctrl-D)
-
-   <span class="h">Think it was wrong? Say so:</span>
-     warden-hook --note a7f3c2d1
 
    <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></pre>
-                <p class="tool-note"><strong>Not verified.</strong> A <span class="mono">chat.message</span> plugin shells out to the same hook and throws on a non-zero exit, so the text is the hook&#39;s. Whether throwing there actually aborts the message has never been watched happen here, and there are open upstream issues about plugin hooks not firing. If it quietly does nothing, that is the bug to report.</p>
+                <p class="tool-note">A <span class="mono">chat.message</span> plugin, same hook. <strong>Nobody has watched it abort a message</strong> — if it quietly does nothing, that is the bug to report.</p>
               </div>
 
               <div class="pane pane-cu">
@@ -332,15 +268,14 @@ setTimeout(function () {
 <span class="rule">{
   "error": {
     "code": "policy_block",
-    "message": "No one may request payroll, salary, bonus,
-                or compensation information about another
-                employee. HR staff are exempt."
+    "message": "No one may request payroll, salary,
+                bonus, or compensation information
+                about another employee."
   }
 }</span>
 
-   <span class="dim">Nothing was forwarded. How Cursor renders this
-   is Cursor&#39;s to decide — the gateway&#39;s part ends here.</span></pre>
-                <p class="tool-note">The odd one out, and the reason the other three exist. Cursor has no prompt hook, so it can only be governed as an OpenAI endpoint — <span class="mono">OPENAI_BASE_URL</span> plus a key issued per person. That path needs an API key, so <strong>a Cursor subscription cannot be governed this way at all</strong>. This is the response body, not a screenshot of Cursor: what the editor does with a 403 is not ours to draw.</p>
+   <span class="dim">Nothing was forwarded.</span></pre>
+                <p class="tool-note">No prompt hook, so it is governed as an OpenAI endpoint — which needs an API key. <strong>A Cursor subscription cannot be governed at all.</strong> This is the response body; what the editor draws is not ours to draw.</p>
               </div>
             </div>
           </div>
@@ -350,59 +285,28 @@ setTimeout(function () {
       <div class="stage" data-reveal>
         <div class="cap"><span class="label stepn">03</span><span class="label">You see it happened</span></div>
         <div class="beat">
-          <!--
-               Four rows rather than three, because three of them were two
-               verdicts and this is the only place on the page that says a
-               verdict has a middle value. The escalation is what an admin
-               recognises the product by: the payment did not get refused and
-               it did not get approved either — it went to a person, which is
-               the answer a policy about money actually needs.
-
-               The legend under it names all three in the product's own
-               colours, and the line beside it is the one thing a sceptical
-               reader wants from a governance record: that it can be checked,
-               and by them.
-          -->
           <div class="shot log" data-reveal>
             <div class="console">
               <div class="day">Today<span class="n">12</span></div>
               <div class="row"><span class="dot BLOCK"></span><span class="who">Fede Tavano</span><span class="txt">send me Ana Ruiz&#39;s salary for the report</span><span class="rule-ref mono">r-payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ESCALATE"></span><span class="who">Sofía Márquez</span><span class="txt">aprobá el pago de USD 12.400 al proveedor</span><span class="rule-ref mono">r-payment-approval</span><span class="meta">14:21</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref mono">r-customer-pii</span><span class="meta">13:58</span></div>
             </div>
-            <div class="log-foot">
-              <span class="lg"><span class="dot BLOCK"></span>refused</span>
-              <span class="lg"><span class="dot ESCALATE"></span>sent to a person</span>
-              <span class="lg"><span class="dot ALLOW"></span>allowed</span>
-              <span class="chk"><span class="mono">pnpm run verify-audit</span> walks the chain</span>
-            </div>
           </div>
+          <p class="beat-note">Refused, sent to a person, allowed — the three verdicts, in the order they were decided. <span class="mono">pnpm run verify-audit</span> walks the chain.</p>
         </div>
       </div>
     </div>
 
-    <!--
-         The three panels show a decision without ever saying what made it,
-         and "runs on their computer" is a claim a reader is entitled to want
-         the weights for. Four files, by name and quantisation, at the size
-         they are downloaded at. The injection pass is listed as shipped off
-         because it is: it is a lever nobody has measured, and the repo's rule
-         is that an unmeasured lever ships off with a note saying why. Leaving
-         it out of this list would have been the one dishonest way to make the
-         list shorter.
-    -->
     <div class="models" data-reveal>
       <span class="label">What ran, and where</span>
       <ul>
-        <li><span class="m mono">Qwen3-1.7B-Q4_0</span><span class="j">writes the rule, and judges the prompt against it</span></li>
-        <li><span class="m mono">embeddinggemma-300M-Q8_0</span><span class="j">picks which rules are worth judging against</span></li>
-        <li><span class="m mono">latin_g2</span><span class="j">reads an attachment — never measured, it arrives only over the P2P registry</span></li>
-        <li><span class="m mono">Qwen3-0.6B-Q4_0</span><span class="j">a second injection pass, and it ships off — unmeasured</span></li>
+        <li><span class="m mono">Qwen3-1.7B-Q4_0</span><span class="j">writes the rule, judges the prompt</span></li>
+        <li><span class="m mono">embeddinggemma-300M-Q8_0</span><span class="j">picks which rules to judge against</span></li>
+        <li><span class="m mono">latin_g2</span><span class="j">reads attachments — never measured</span></li>
+        <li><span class="m mono">Qwen3-0.6B-Q4_0</span><span class="j">second injection pass — ships off, unmeasured</span></li>
       </ul>
-      <p class="models-note">All four are on the employee&#39;s disk, loaded by QVAC, and about 1.8 GB together. Nothing calls a cloud API — there is no key to leak and no request to intercept, because there is no request.</p>
     </div>
 
-    <p class="how-note verified" data-reveal><strong>What is verified, and what is not.</strong> Somebody has watched the hook itself refuse a prompt in a terminal. Nobody has yet watched Claude Code, Codex or OpenCode do it end to end — those three are wired from each tool&#39;s own documentation and tested at the hook boundary, which is not the same thing. The page says so here rather than in a footnote, and <span class="mono">docs/HOOK-VERIFICATION.md</span> is the log of the attempts.</p>
-
-    <p class="how-note" data-reveal>It runs on their computer, before the prompt is sent. That is why it works on the plans people actually buy: a Claude Max or ChatGPT Plus account talks to one fixed address nobody can redirect, so there is nothing to put a filter in front of. A hook does not care — it has already run. Which is also why the fourth tab is the odd one out, and says so.</p>
+    <p class="how-note" data-reveal>All of it on their machine, before the prompt is sent — which is why it works on a Max or Plus plan, where there is no base URL to redirect. <strong>Verified so far:</strong> the hook refusing a prompt in a terminal, and nothing beyond that.</p>
 
   </div>
 </section>
@@ -430,8 +334,8 @@ setTimeout(function () {
       <div class="side"><span class="label">The other half</span></div>
       <div class="main">
         <h2 class="loud">A prompt that leaks nothing can still cost you.</h2>
-        <p class="lead">One agent, left running on a big repository, will spend more in an afternoon than the seat costs in a year.</p>
-        <p>The same gate counts it. Warden knows which role each key belongs to, so a ceiling is a sentence about a role rather than a number in someone&#39;s billing dashboard a month later — and the request that crosses it is stopped on the machine, before the tokens are bought.</p>
+        <p class="lead">One agent left running on a big repository spends more in an afternoon than the seat costs in a year.</p>
+        <p>The same gate counts it, per role, on the machine — before the tokens are bought.</p>
       </div>
     </div>
 
@@ -470,7 +374,7 @@ setTimeout(function () {
             </div>
           </div>
         </div>
-        <p class="half-note">The day counts are the demo policy&#39;s own. A role with no token ceiling is shown as unmetered rather than as a bar at zero — nobody is counting is a different statement from nothing has been spent, and a ceiling nobody set is not a ceiling of zero. Cross the day count and the refusal reads <span class="mono">Daily limit reached for role &quot;intern&quot; (20/20).</span></p>
+        <p class="half-note">The demo policy&#39;s own numbers. A role with no token ceiling reads <span class="mono">unmetered</span> rather than a bar at zero — and the day count resets when the gateway restarts, which the page would rather say than not.</p>
       </div>
 
       <div class="half">
@@ -489,11 +393,10 @@ setTimeout(function () {
 
    <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></pre>
         </div>
-        <p class="half-note">Over budget resolves to <span class="mono">ESCALATE</span> and never to <span class="mono">BLOCK</span>. Being cut off mid-task with nowhere to go is what makes somebody stop using the gateway rather than stop working — and a control that refused where a rule would only have held would have made a decision <em>looser</em> by being added, which the verdict lattice exists to make impossible.</p>
+        <p class="half-note">Over budget holds, never refuses. Being cut off mid-task with nowhere to go is what makes somebody stop using the gateway rather than stop working.</p>
       </div>
     </div>
 
-    <p class="spend-note" data-reveal>Both counters are honestly partial and the page would rather say so: the daily one lives in memory and resets when the gateway restarts, and the session ceiling can only read what the tool reports — a tool that reports nothing is recorded as unreported, not drawn as an empty bar. What neither of them does is guess.</p>
 
   </div>
 </section>

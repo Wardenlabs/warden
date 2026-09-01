@@ -69,63 +69,83 @@ if (judge && !reduced) {
   setTimeout(step, 320);
 }
 
-/* ── the rule being written, and the rule that comes back ─────────────── */
+/* ── the policy being written ──────────────────────────────────────────── */
 /*
- * Same contract as the hero: the markup holds the finished state, so with no
- * JavaScript the box shows the sentence already written and the compiled rule
- * under it is already open. With it, the stage plays once when it arrives —
- * not on load, because it is three screens down and would be over before
- * anyone got there.
+ * Three sentences typed into the box, three rules landing on the stack under
+ * it. One rule was a demo; three is the thing an administrator actually leaves
+ * behind, and watching the second and third arrive is what says the first was
+ * not a special case.
  *
- * It types the rule the way a person would say it out loud, presses the
- * button, and a beat later the card opens. That beat is the only claim this
- * stage makes and it is worth spending a timer on: a card that were simply
- * present would read as a second screenshot placed under the first, and what
- * the reader has to see is that one produced the other.
+ * The compiler takes one sentence and returns one rule, so this loops three
+ * times rather than showing one sentence producing three — the animation is
+ * allowed to be quick, not to be a different product.
  *
- * The card is `r-payroll` out of data/seed, field for field. Nothing here is
- * generated in the browser — the page has no model in it, and a fake compiler
- * on a page arguing that inference happens on the employee's machine would be
- * the wrong kind of demo.
+ * Fast on purpose. The earlier version typed one sentence at a human pace and
+ * spent four seconds saying something the reader had understood by the end of
+ * the first line. This is a mechanism being shown, not a person being watched,
+ * so it runs at about twice typing speed and is over in four.
+ *
+ * With no JavaScript the box holds the first sentence and all three rules are
+ * already on the stack, which is the same contract the hero has.
  */
 
 const ruleBox = document.getElementById('ruleMsg');
-const ruleOut = document.getElementById('ruleOut');
+const ruleSet = document.getElementById('ruleSet');
 const sendBtn = document.querySelector('#how .composer .send');
+const rules = ruleSet ? [...ruleSet.children] : [];
 
-/* Reduced motion, or a browser with no IntersectionObserver, gets the finished
-   state immediately — including the card, which is hidden by CSS the moment
-   `.js` is on and would otherwise never be told to open. */
-if (ruleOut && (reduced || !('IntersectionObserver' in window))) ruleOut.classList.add('on');
+const SENTENCES = [
+  "nobody should be able to ask about someone else's salary",
+  'customer data must not leave the company',
+  'payments over USD 5,000 need the CEO to sign off'
+];
 
-if (ruleBox && !reduced && 'IntersectionObserver' in window) {
-  const text = ruleBox.value;
+/* Reduced motion, or no IntersectionObserver: the finished state, immediately.
+   The rules are hidden by CSS as soon as `.js` is on, so something has to say
+   otherwise or they never arrive at all. */
+if (reduced || !('IntersectionObserver' in window)) rules.forEach((r) => r.classList.add('on'));
+
+if (ruleBox && rules.length && !reduced && 'IntersectionObserver' in window) {
   ruleBox.value = '';
 
-  const typeIt = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((e) => e.isIntersecting)) return;
-      typeIt.disconnect();
+  const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+  const type = (text) =>
+    new Promise((done) => {
       let i = 0;
       const step = () => {
-        if (i < text.length) {
-          ruleBox.value = text.slice(0, ++i);
-          setTimeout(step, 22 + Math.random() * 30);
-        } else {
-          /* The press is 140ms of the button's own pressed state and nothing
-             else. A spinner would be a claim about how long compiling takes,
-             and on the machine this runs on that number is 46 seconds, not a
-             quarter of a second. */
-          setTimeout(() => sendBtn?.classList.add('pressed'), 260);
-          setTimeout(() => sendBtn?.classList.remove('pressed'), 400);
-          setTimeout(() => ruleOut?.classList.add('on'), 520);
-        }
+        if (i >= text.length) return done();
+        ruleBox.value = text.slice(0, ++i);
+        setTimeout(step, 10 + Math.random() * 16);
       };
-      setTimeout(step, 320);
+      step();
+    });
+
+  const run = async () => {
+    for (let i = 0; i < SENTENCES.length; i++) {
+      await type(SENTENCES[i]);
+      await wait(180);
+      /* The press is 130ms of the button's own pressed state and nothing else.
+         A spinner would be a claim about how long compiling takes, and on the
+         machine this runs on that number is 46 seconds. */
+      sendBtn?.classList.add('pressed');
+      await wait(130);
+      sendBtn?.classList.remove('pressed');
+      rules[i]?.classList.add('on');
+      await wait(560);
+      if (i < SENTENCES.length - 1) ruleBox.value = '';
+    }
+  };
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      setTimeout(run, 240);
     },
-    { threshold: 0.5 }
+    { threshold: 0.4 }
   );
-  typeIt.observe(ruleBox);
+  io.observe(ruleBox);
 }
 
 /* ── reveal on scroll ──────────────────────────────────────────────────── */

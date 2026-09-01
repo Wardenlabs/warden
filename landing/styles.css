@@ -873,7 +873,7 @@ footer::before {
   display: grid;
   justify-items: center;
   gap: var(--s-5);
-  padding-block: var(--s-8);
+  padding-block: var(--s-7);
 }
 /* Number and name on one line, an overline over the panel. */
 .stage .cap { display: flex; justify-content: center; gap: var(--s-3); }
@@ -905,11 +905,11 @@ footer::before {
 .shot.log { padding: var(--s-5) var(--s-6); }
 .stage .term { width: 100%; text-align: left; }
 .stage .term pre { font-size: var(--fs-2); padding: var(--s-6); }
-.console .composer { padding: var(--s-8) var(--s-7); }
+.console .composer { padding: var(--s-7) var(--s-7) var(--s-5); }
 
 #how .how-note {
-  max-width: 62ch;
-  margin-top: var(--s-10);
+  max-width: 58ch;
+  margin-top: var(--s-8);
   text-align: center;
   font-size: var(--fs-3);
   line-height: var(--lh-body);
@@ -944,87 +944,51 @@ footer::before {
   white-space: nowrap;
 }
 
-/* ── 01, the rule that comes back ──────────────────────────────────────── */
+/* ── 01, the rules landing on the stack ───────────────────────────────── */
 /*
- * A second panel under the composer, and a hairline between them doing the one
- * job an arrow would have done worse: saying the lower thing came out of the
- * upper one. No border and no shadow, same as `.shot` — at this value against
- * --bg there is nothing for either to separate.
+ * It was one card with every field of a compiled rule on it — scope, roles,
+ * guidance, four examples — and it was a screen and a half of specification
+ * where the stage only had to make one point: a sentence becomes a rule with
+ * a name and a severity, and then another, and then another. The fields are
+ * in the product; the landing shows the shape.
+ *
+ * Each row arrives when app.js drops it, and everything here is behind `.js`:
+ * with no script, or once the watchdog fires, all three are simply already on
+ * the stack.
  */
-.rule-out {
-  position: relative;
-  width: 100%;
-  margin-top: var(--s-7);
-  border-radius: var(--r-xl);
-  background: var(--sunken);
-}
-.rule-out::before {
-  content: '';
-  position: absolute;
-  top: calc(var(--s-7) * -1); left: 50%;
-  width: 1px; height: var(--s-7);
-  background: var(--line-firm);
-}
-
-/* app.js presses the button and then turns this on, a beat later, so the card
-   reads as a consequence of the press. The fields stagger themselves off
-   nth-child rather than costing a second timer. Everything here is behind .js:
-   with no script — or a broken one, once the watchdog fires — the card is
-   simply already open, which is the same contract the rest of the page has. */
-.js .rule-out { opacity: 0; transform: translateY(8px); transition: opacity .5s var(--ease-out), transform .5s var(--ease-out); }
-.js .rule-out.on { opacity: 1; transform: none; }
-.js .rule-out .ruled > * { opacity: 0; transform: translateY(4px); }
-.js .rule-out.on .ruled > * {
-  opacity: 1; transform: none;
-  transition: opacity .4s var(--ease-out) var(--d, 0s), transform .4s var(--ease-out) var(--d, 0s);
-}
-.rule-out .ruled > *:nth-child(2) { --d: .07s; }
-.rule-out .ruled > *:nth-child(3) { --d: .14s; }
-.rule-out .ruled > *:nth-child(4) { --d: .21s; }
-
-.ruled { display: grid; gap: var(--s-5); padding: var(--s-7); }
-
-/* Lifted from the console, where the same three rows describe the same rule.
-   Nothing on the landing needed them until this card existed. */
-.ruled .kv { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
-.ruled .kv .r { display: flex; align-items: baseline; gap: var(--s-5); font-size: var(--fs-3); line-height: var(--lh-snug); }
-.ruled .kv .k { flex: 0 0 92px; color: var(--faint); font-size: var(--fs-2); }
-.ruled .kv .v { flex: 1; min-width: 0; color: var(--ink-2); }
-@media (max-width: 560px) {
-  .ruled .kv .r { display: grid; gap: var(--s-1); }
-}
-.ruled-head { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.ruled-head .id { font-size: var(--fs-3); color: var(--ink); }
-.ruled-from {
-  margin-left: auto;
-  font-family: var(--mono); font-size: var(--fs-1);
-  letter-spacing: var(--ls-label); text-transform: uppercase;
-  color: var(--faint);
-}
-.ruled-text {
-  margin: 0;
-  font-size: var(--fs-4); line-height: var(--lh-snug);
-  letter-spacing: var(--ls-tight);
-  color: var(--ink);
-  max-width: 58ch;
-  text-wrap: pretty;
-}
-
-/* The two example columns. Verdict colour is carried by the same 6px dot the
-   log rows use two panels down, so a reader who has seen one has seen both. */
-.ex {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s-6);
+.ruleset { display: grid; gap: 0; padding: 0 var(--s-7) var(--s-7); }
+.ru {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-4) 0;
   border-top: 1px solid var(--line-soft);
 }
-.ex-col { display: grid; gap: var(--s-3); align-content: start; padding-top: var(--s-5); }
-.ex-i {
-  display: flex; align-items: flex-start; gap: var(--s-3);
-  font-size: var(--fs-2); line-height: var(--lh-snug);
+/* A fixed column, so the three severities line up under each other — the
+   whole point of a stack is that it reads down. */
+.ru .rid { flex: 0 0 148px; font-size: var(--fs-2); color: var(--ink-2); }
+.ru .badge { flex: none; }
+.ru .rtx {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
   color: var(--muted);
 }
-.ex-i .dot { margin-top: .45em; }
+.js .ru { opacity: 0; transform: translateY(6px); }
+.js .ru.on {
+  opacity: 1; transform: none;
+  transition: opacity .32s var(--ease-out), transform .32s var(--ease-out);
+}
+
+.beat-note {
+  margin: var(--s-5) 0 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  text-wrap: pretty;
+}
+.beat-note .mono { color: var(--muted); }
 
 /* ── 02, the same refusal in four tools ────────────────────────────────── */
 /*
@@ -1080,14 +1044,10 @@ footer::before {
 .tools .tool-note .mono { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {
-  .js .rule-out, .js .rule-out .ruled > * { opacity: 1; transform: none; transition: none; }
+  .js .ru { opacity: 1; transform: none; transition: none; }
 }
 
 @media (max-width: 700px) {
-  .ex { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .ex-col + .ex-col { border-top: 1px solid var(--line-soft); }
-  .ruled { padding: var(--s-6); }
-  .ruled-from { margin-left: 0; flex-basis: 100%; }
   .tools .picker { padding: 0 var(--s-2); }
   .tools .picker label { padding: var(--s-3); }
   .tools .tool-note { margin-inline: var(--s-5); }
@@ -1131,15 +1091,6 @@ footer::before {
    missing screenshot. Each is its own height; the caption above them is what
    makes them a pair. */
 
-#spend .spend-note {
-  max-width: 62ch;
-  margin-top: var(--s-9);
-  text-align: center;
-  font-size: var(--fs-3);
-  line-height: var(--lh-body);
-  color: var(--muted);
-  text-wrap: pretty;
-}
 
 /* The hold. The third verdict finally has somewhere on this page to be the
    main event rather than a dot in a legend, and it takes the colour the
@@ -1181,7 +1132,7 @@ footer::before {
 .models {
   width: 100%;
   max-width: 660px;
-  margin: var(--s-10) auto 0;
+  margin: var(--s-9) auto 0;
   display: grid;
   gap: var(--s-5);
   justify-items: center;
@@ -1214,29 +1165,6 @@ footer::before {
   text-wrap: pretty;
 }
 
-/* ── §1 step 03: the legend, and the way to check it ───────────────────── */
-.log-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-3) var(--s-5);
-  margin: 0 var(--s-6);
-  padding: var(--s-5) 0 var(--s-2);
-  border-top: 1px solid var(--line-soft);
-  font-size: var(--fs-2);
-  color: var(--faint);
-}
-.log-foot .lg { display: inline-flex; align-items: center; gap: var(--s-2); }
-/* The dot is the console's, and the console's rule is scoped to `.console` —
-   which this strip is deliberately outside of, because a legend is the page
-   talking about the product rather than the product talking. So it carries the
-   three colours itself, from the same tokens. */
-.log-foot .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--faint); }
-.log-foot .dot.BLOCK { background: var(--block); }
-.log-foot .dot.ESCALATE { background: var(--escalate); }
-.log-foot .dot.ALLOW { background: var(--allow); }
-.log-foot .chk { margin-left: auto; }
-.log-foot .chk .mono { color: var(--muted); }
 .shot.log .rule-ref { color: var(--faint); }
 
 @media (max-width: 900px) {
@@ -1248,8 +1176,6 @@ footer::before {
   .quotas .kv { padding-inline: 0; }
   .models li { display: grid; gap: var(--s-1); }
   .models .j { text-align: left; }
-  .log-foot { margin-inline: var(--s-5); }
-  .log-foot .chk { margin-left: 0; flex-basis: 100%; }
 }
 
 /* ═══ the press, and the pointer that is not there ═══════════════════════ */
@@ -1293,4 +1219,13 @@ footer::before {
   .shot.log .row .who { flex: 0 0 auto; }
   .shot.log .row .meta { margin-left: auto; }
   .shot.log .row .txt { flex: 1 0 100%; white-space: normal; overflow: visible; }
+}
+
+/* The compiled rules read as a phone list rather than a table on a narrow
+   screen: the id and the badge on one line, the sentence under them. */
+@media (max-width: 700px) {
+  .ruleset { padding-inline: var(--s-5); padding-bottom: var(--s-5); }
+  .ru { flex-wrap: wrap; row-gap: var(--s-2); }
+  .ru .rid { flex: 0 0 auto; }
+  .ru .rtx { flex: 1 0 100%; }
 }

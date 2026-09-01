@@ -8,7 +8,7 @@ its place doing.
 |---|---|
 | `index.html` | Structure and copy. The mark and wordmark are inlined from `brand/`, path for path. |
 | `styles.css` | The whole design system. `:root` first, then everything that reads from it. |
-| `app.js` | The prompt that types itself in the hero, the rule that writes itself and compiles in `#how`, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
+| `app.js` | The prompt that types itself in the hero, the three rules that write and compile themselves in `#how`, reveal-on-scroll, and naming the visitor's platform on the download button (the other platform is the quiet link beside it). |
 | `light.js` | The light: the gate line under the hero, on a canvas. Nothing else imports from it and it touches nothing outside `.hero-zone`. |
 
 ## What is on the page
@@ -21,7 +21,7 @@ hero opened.
 |---|---|---|
 | Hero | Writing the rules down is not the same as enforcing them. | the gate line, and the prompt being judged on it |
 | `#gap` | Nothing checks what goes out. | the empty hook both Claude Code and Codex ship with |
-| `#how` | Write a rule, it stops the request, you see that it did. | the compiled rule as `data/seed` holds it, the hook's literal output in four tools, and the four models by name |
+| `#how` | Write a rule, it stops the request, you see that it did. | three rules compiling onto a stack, the hook's literal output in four tools, and the four models by name |
 | `#spend` | A prompt that leaks nothing can still cost you. | the console's own quota cards, and the hold an over-budget session gets |
 | `#download` | Install it. | two installers, from this repo's own CI |
 
@@ -50,6 +50,9 @@ rests on:
   ceilings an administrator ratified and, on an opened decision, that person's
   count for the day. It does not draw a live gauge per role, so neither does
   this.
+- Step 01 types three sentences and gets three rules, not one sentence
+  producing three. The compiler takes one sentence and returns one rule; the
+  loop is allowed to be quick, not to be a different product.
 - The `cursor` tab shows the gateway's 403 body and not a picture of Cursor,
   because what that editor does with a 403 is not ours to draw.
 - The `opencode` tab prints the same words as the other two, because it is the
