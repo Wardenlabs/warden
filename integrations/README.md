@@ -39,6 +39,41 @@ Check it:
 echo '{"user_input":"hello"}' | node ~/.warden-hook.mjs   # exit 0, silent
 ```
 
+And ask it what is on this machine:
+
+```bash
+node ~/.warden-hook.mjs --detect
+```
+
+```
+Agents on this machine
+
+  ✓ Claude Code  governed by Warden
+                 /Users/fede/.claude
+  ○ Codex        installed, NOT governed — add [[hooks.UserPromptSubmit]] to ~/.codex/config.toml
+                 /Users/fede/.codex
+  · OpenCode     not found
+  — Cursor       installed, and cannot be governed on a subscription
+
+  hook       /Users/fede/.warden-hook.mjs
+  gateway    http://192.168.1.42:8080
+  key        set
+```
+
+The installer runs this as its last step, so the employee ends on an inventory
+rather than on a sentence telling them to go and find out. `--detect --json`
+prints the same thing for a script.
+
+It has to live here rather than in the console because the console is on
+another computer. The gateway learns a tool exists when a prompt turns up from
+one — that is `activity.ts`, and it is a liveness view, which means it stays
+empty for exactly the tool nobody wired up. That is the case worth catching,
+and an inventory built from traffic can never see it.
+
+It reads config files, prints, and exits 0 whatever it finds. It sends nothing:
+a list of installed programs is not an identity, and identity here is the API
+key and only the API key.
+
 Employees never clone the repo or download a model — only the machine running
 the gateway does. From inside the repo, `npm link` gives you the same thing as
 `warden-hook` on your PATH.

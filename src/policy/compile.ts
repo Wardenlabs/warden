@@ -184,7 +184,12 @@ async function splitStatement(qvac: QvacAdapter, text: string): Promise<string[]
         role: 'compiler',
         system,
         user: `${iso.envelope}\n\nSplit the instruction above.`,
-        maxTokens: 320,
+        // Five statements of ordinary length are well inside this, and the
+        // margin is deliberate: a split that overran the cap would come back
+        // as truncated JSON, fail to parse, and be caught below as "compile
+        // the administrator's sentence as one rule" — a silent degradation
+        // that looks exactly like the model deciding it was already specific.
+        maxTokens: 512,
         timeoutMs: 60_000
       },
       policySplitSchema,
@@ -227,6 +232,13 @@ async function splitStatement(qvac: QvacAdapter, text: string): Promise<string[]
  * numerics; a rule whose examples depend on what else happened to be in flight
  * is a rule that cannot be reproduced. On the machine this was written for it
  * is also simply faster.
+ *
+ * Which makes this the slowest thing in the product by a distance: the split,
+ * then up to five compilations, each of which takes what a compilation takes.
+ * On the four-core CPU the 46-second figure in CLAUDE.md was measured on, a
+ * five-rule set is minutes. That is a fact about the machine and not a reason
+ * to parallelise it into unreproducibility, but a caller putting this behind a
+ * request needs to know it is not a request that returns quickly.
  *
  * **The boundary is unchanged.** The model drafts, the administrator ratifies,
  * one rule at a time, and a draft nobody ratified has never judged anybody.

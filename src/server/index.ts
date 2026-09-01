@@ -1059,8 +1059,16 @@ WARDEN_BLOCK
 
 echo ""
 echo "Done. Hook at $HOOK, environment in $PROFILE."
-echo "Open a new terminal (or: source $PROFILE), then wire up your tool."
-echo "Setup per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
+echo "Open a new terminal (or: source $PROFILE)."
+
+# What is actually on this machine, rather than a sentence telling them to go
+# and find out. Read-only and it cannot fail the install: the hook exits 0
+# whatever it finds, and \`|| true\` covers the case where node is missing —
+# which would be a strange machine to be installing a node hook on, but not a
+# reason for the install to end on a red line.
+node "$HOOK" --detect || true
+
+echo "Wiring per tool: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
 `);
 });
 

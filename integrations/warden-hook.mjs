@@ -26,7 +26,9 @@
  * refused outright, which is also how revoking one works.
  */
 
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const API_KEY = process.env.WARDEN_API_KEY ?? '';
@@ -467,12 +469,160 @@ async function noteMode(auditId, decisionTimeoutMs) {
   );
 }
 
+/* ── which agents are on this machine ─────────────────────────────────────
+ *
+ * `warden-hook --detect` looks at the disk and says which coding agents are
+ * installed here and which of them Warden is actually wired into.
+ *
+ * It lives in the hook because the hook is the only part of Warden that runs
+ * on the employee's machine. The gateway cannot answer this question — it is
+ * on somebody else's computer, and it learns a tool exists only when a prompt
+ * turns up from one, which is `activity.ts`: a liveness view, and one that
+ * stays empty for exactly the tool nobody wired up. That is the case worth
+ * catching, and it is the one an inventory built from traffic can never see.
+ *
+ * Read-only, and never a blocker. It touches config files, prints, and exits
+ * 0 whatever it finds — the failure mode of a detector that guessed wrong and
+ * refused something would be far worse than the failure mode of one that says
+ * "not found" about a tool sitting somewhere unusual.
+ *
+ * What it does NOT do is decide anything. It cannot tell the gateway who you
+ * are, and nothing here is sent anywhere: identity is the API key and only the
+ * API key, and a list of installed programs is not an identity.
+ */
+
+/** Does this file exist and contain all of these strings? */
+function fileMentions(path, ...needles) {
+  try {
+    const body = readFileSync(path, 'utf8');
+    return needles.every((needle) => body.includes(needle));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where each agent keeps its configuration, and what "wired" looks like there.
+ *
+ * Several candidate paths per tool rather than one, because a wrong single
+ * guess reports "not installed" for something the employee is looking at. The
+ * marker is `warden-hook` in the file that would carry the hook — matching the
+ * command rather than a filename, so it still detects an installation that put
+ * the hook somewhere other than the home directory.
+ */
+const AGENTS = [
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    homes: ['.claude', '.claude.json'],
+    wired: () => fileMentions(join(homedir(), '.claude', 'settings.json'), 'UserPromptSubmit', 'warden-hook'),
+    how: 'add the UserPromptSubmit hook to ~/.claude/settings.json',
+    governable: true
+  },
+  {
+    id: 'codex',
+    name: 'Codex',
+    homes: ['.codex'],
+    wired: () => fileMentions(join(homedir(), '.codex', 'config.toml'), 'hooks.UserPromptSubmit', 'warden-hook'),
+    how: 'add [[hooks.UserPromptSubmit]] to ~/.codex/config.toml',
+    governable: true
+  },
+  {
+    id: 'opencode',
+    name: 'OpenCode',
+    homes: [join('.config', 'opencode'), join('.local', 'share', 'opencode')],
+    wired: () => existsSync(join(homedir(), '.config', 'opencode', 'plugin', 'warden.js')),
+    how: 'copy warden.js into ~/.config/opencode/plugin/',
+    governable: true
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    homes: ['.cursor', join('Library', 'Application Support', 'Cursor'), join('AppData', 'Roaming', 'Cursor')],
+    // Nothing to look for. Cursor has no prompt hook, so there is no wiring on
+    // this machine that could govern it — the only path is the gateway's
+    // OpenAI-compatible endpoint, which needs an API key and therefore cannot
+    // govern a Cursor subscription at all. Saying "not wired" would imply a
+    // step somebody forgot.
+    wired: () => false,
+    how: 'no prompt hook — OPENAI_BASE_URL + a per-employee key, which needs an API key rather than a subscription',
+    governable: false
+  }
+];
+
+function detectAgents() {
+  const home = homedir();
+  return AGENTS.map((agent) => {
+    const found = agent.homes.map((h) => join(home, h)).find((path) => existsSync(path)) ?? null;
+    return {
+      id: agent.id,
+      name: agent.name,
+      installed: found !== null,
+      at: found,
+      governable: agent.governable,
+      wired: found !== null && agent.governable ? agent.wired() : false,
+      how: agent.how
+    };
+  });
+}
+
+function detectMode() {
+  const agents = detectAgents();
+  const hookAt = [join(homedir(), '.warden-hook.mjs'), join(homedir(), '.config', 'warden', 'hook.mjs')]
+    .find((path) => existsSync(path)) ?? null;
+
+  if (process.argv.includes('--json')) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          hook: hookAt,
+          gateway: WARDEN_URL,
+          keySet: API_KEY.length > 0,
+          agents
+        },
+        null,
+        2
+      ) + '\n'
+    );
+    return;
+  }
+
+  const lines = ['', 'Agents on this machine', ''];
+  for (const agent of agents) {
+    const mark = !agent.installed ? '·' : agent.wired ? '✓' : agent.governable ? '○' : '—';
+    const state = !agent.installed
+      ? 'not found'
+      : agent.wired
+        ? 'governed by Warden'
+        : agent.governable
+          ? `installed, NOT governed — ${agent.how}`
+          : `installed, and cannot be governed on a subscription — ${agent.how}`;
+    lines.push(`  ${mark} ${agent.name.padEnd(12)} ${state}`);
+    if (agent.installed && agent.at) lines.push(`    ${' '.repeat(12)} ${agent.at}`);
+  }
+
+  lines.push('');
+  lines.push(`  hook       ${hookAt ?? 'not found — this file is not installed where the tools look for it'}`);
+  lines.push(`  gateway    ${WARDEN_URL}`);
+  // Whether a key is set, never the key. Printing it would put a credential in
+  // whatever the employee pastes this output into.
+  lines.push(`  key        ${API_KEY ? 'set' : 'NOT set — every prompt will be refused by the gateway'}`);
+  lines.push('');
+  lines.push('  ✓ governed   ○ installed but not wired   — cannot be governed here   · not found');
+  lines.push('');
+
+  process.stdout.write(lines.join('\n'));
+}
+
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
+  // Takes no audit id and talks to nothing: it reads this machine and prints.
+  if (process.argv.includes('--detect')) return detectMode();
+
   for (const [flag, run] of [['--rewrite', rewriteMode], ['--note', noteMode]]) {
     const at = process.argv.indexOf(flag);
     if (at === -1) continue;
