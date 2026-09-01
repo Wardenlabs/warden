@@ -337,7 +337,7 @@ async function boot() {
   // because a retention policy nobody can see is one nobody can rely on.
   state.prompts = health?.j?.prompts ?? null;
   if (!health?.ok) {
-    $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>npm run dev</code> and reload this page.</span></div></div>';
+    $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>pnpm run dev</code> and reload this page.</span></div></div>';
     return;
   }
 
@@ -1294,7 +1294,7 @@ function rulesBody() {
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')
-      : '<div class="empty"><b>Nothing is being enforced</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
+      : '<div class="empty"><b>Warden is enforcing nothing yet</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
 
     <div class="section">
       <div class="label">Limits by role</div>
@@ -1618,7 +1618,7 @@ function draftCard() {
       <div class="r">
         <span class="k">Applies to</span>
         <span class="v">${esc(audienceLabel(d.appliesTo))}${locked
-          ? ' — locked, you started this from their page'
+          ? ' · locked, you started this from their page'
           : `<button type="button" class="btn sm" id="editAudience">${state.audienceOpen ? 'Done' : 'Change'}</button>`}</span>
       </div>
     </div>
@@ -2023,7 +2023,7 @@ VIEWS.people = {
     <div class="section">
       <div class="label">Add someone</div>
       <div class="chips">
-        <input type="text" id="newName" class="inline wide" placeholder="Ana Ruiz, Fede Tavano, Jere Souto" autocomplete="off">
+        <input type="text" id="newName" class="inline wide" placeholder="Federico Tavani, Jeremías Souto, Gastón Foncea" autocomplete="off">
         <select class="inline" id="newRole">${roleOptions()}</select>
         <button type="button" class="btn primary" id="addPerson">Add</button>
       </div>
@@ -2147,7 +2147,7 @@ function bindPeopleList() {
     const note = $('addNote');
     if (note) {
       note.textContent = [
-        added.length ? `Added ${added.length} — each has a key on their row.` : '',
+        added.length ? `Added ${added.length}, each with a key on their row.` : '',
         ...failed
       ].filter(Boolean).join(' · ');
     }

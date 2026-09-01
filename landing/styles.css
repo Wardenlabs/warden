@@ -647,6 +647,11 @@ footer::before {
 /* Set apart from the installers, so the buttons read as the thing to press
    and the fine print reads as the floor of the page. */
 .foot .fine { font-size: var(--fs-1); color: var(--faint); text-align: center; margin-top: var(--s-7); }
+/* The honesty line. It used to float mid-page as a grey paragraph in black,
+   which is where a reader least wants a caveat; down here it sits with the
+   licence and the report links, which is what it belongs to. */
+.foot .caveat { max-width: 74ch; margin-top: var(--s-4); line-height: var(--lh-snug); text-wrap: pretty; }
+.foot .caveat strong { color: var(--muted); font-weight: var(--fw-medium); }
 
 .foot .links { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4); justify-content: center; align-items: center; }
 .foot .links .brand { color: var(--muted); transition: color .15s ease; }
@@ -891,17 +896,6 @@ footer::before {
 .chapter .term pre { font-size: var(--fs-2); padding: var(--s-6); }
 .console .composer { padding: var(--s-7) var(--s-7) var(--s-5); }
 
-/* The caveat closes the section on the same left rail the story reads down,
-   at the narration's own size — a page that buries its own caveat in --faint
-   has technically said it and practically hidden it. */
-#how .how-note {
-  max-width: 60ch;
-  margin-top: 0;
-  font-size: var(--fs-2);
-  line-height: var(--lh-body);
-  color: var(--faint);
-  text-wrap: pretty;
-}
 
 @media (max-width: 700px) {
   .chapter .term pre { font-size: var(--fs-1); padding: var(--s-5); }
@@ -1073,12 +1067,6 @@ footer::before {
 }
 
 
-/* The verified/not-verified paragraph. Same measure and same centre as the
-   note under it, one step brighter on its opening clause, because a page that
-   buries its own caveat in --faint has technically said it and practically
-   hidden it. */
-#how .how-note.verified { margin-top: var(--s-9); color: var(--faint); }
-#how .how-note.verified strong { color: var(--ink-2); font-weight: var(--fw-medium); }
 
 /* The log rows are a dense list built for a desktop console, and on a phone
    the ellipsis was eating the half of each row that carries the meaning:
@@ -1169,7 +1157,6 @@ footer::before {
   font-weight: var(--fw-normal);
   line-height: var(--lh-hero);
 }
-#how .how-note { margin-inline: auto; text-align: center; }
 
 /* The loud headline still arrives line by line, out of a mask. */
 h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
