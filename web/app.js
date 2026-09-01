@@ -126,6 +126,10 @@ const state = {
   presets: [],
   chain: null,
   mock: false,
+  /** Role whose limits are open for editing, or null. One at a time. */
+  quotaEdit: null,
+  /** Why the last save of that role's limits was refused, if it was. */
+  quotaError: '',
   /** { days, held, max } while prompt text is kept, null when it is not. */
   prompts: null,
 
@@ -1104,8 +1108,17 @@ function compilerPage() {
       <div class="field">
         <label>Provider</label>
         <div class="hero-sugg tight">
-          ${providers.map((p) => `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}</button>`).join('')}
+          ${providers.map((p) => {
+            // A CLI option that is not installed is still offered, greyed and
+            // labelled, rather than hidden. Hiding it answers "why can I not
+            // use my Claude Code session" with silence; saying "not found on
+            // this machine" answers it with the reason.
+            const cliState = cliFor(p.id);
+            const missing = cliState !== null && !cliState.found;
+            return `<button type="button" class="pill${p.id === d.provider ? ' on' : ''}${missing ? ' faded' : ''}" data-prov="${esc(p.id)}">${esc(p.label)}${missing ? ' · not found' : ''}</button>`;
+          }).join('')}
         </div>
+        ${cliNote(d.provider)}
       </div>
 
       ${cli ? `
@@ -1260,6 +1273,26 @@ function bindCompiler() {
 }
 
 /** One line in the composer saying who is about to write the rule. */
+/**
+ * What the gateway found when it looked for this CLI, or null if this provider
+ * is not one. `cliTools` is absent on a gateway older than the route that
+ * reports it, which reads as "no claim either way" and shows nothing.
+ */
+function cliFor(providerId) {
+  const tool = providerId === 'claude-cli' ? 'claude' : providerId === 'codex-cli' ? 'codex' : null;
+  if (!tool) return null;
+  return (state.compiler?.cliTools ?? []).find((t) => t.tool === tool) ?? null;
+}
+
+/** The one line under the picker that says whether the chosen CLI is there. */
+function cliNote(providerId) {
+  const found = cliFor(providerId);
+  if (!found) return '';
+  return found.found
+    ? `<span class="note good">Found on this machine. It will use the session you are already signed in to, with no API key.</span>`
+    : `<span class="note bad">Not found on this machine. Install ${esc(found.label)} and sign in, then reopen this page.</span>`;
+}
+
 function compilerLine() {
   const c = state.compiler;
   if (!c) return '';
@@ -1298,9 +1331,7 @@ function rulesBody() {
 
     <div class="section">
       <div class="label">Limits by role</div>
-      ${state.policy.quotas.length
-        ? `<div class="quota-grid">${state.policy.quotas.map(quotaCard).join('')}</div>`
-        : '<div class="note">No limits set.</div>'}
+      ${limitsGrid()}
       <div class="note">Token counts are reported by the tool, not measured here.</div>
     </div>
   </div>`;
@@ -1331,7 +1362,118 @@ function quotaCard(q) {
   if (!q.maxSessionOutputTokens && !q.maxContextTokens) {
     rows.push('<div class="quota-row unmetered"><span>tokens</span><b>no limit</b></div>');
   }
-  return `<div class="quota"><span class="quota-role">${esc(q.role)}</span>${rows.join('')}</div>`;
+  return `<button type="button" class="quota" data-quota="${esc(q.role)}">
+    <span class="quota-role">${esc(q.role)}</span>${rows.join('')}</button>`;
+}
+
+/**
+ * Every role, with or without a limit, and one of them possibly open for edit.
+ *
+ * Both halves of that matter. The grid used to render `policy.quotas`, so a
+ * role that had never been given a limit was simply absent — which reads as
+ * "this role does not exist" rather than "nobody is counting what it spends",
+ * and left no way to give it one. And every card was static text: a limit could
+ * be set at the moment a role was created and never again, so an administrator
+ * who typed 20 and meant 200 had to delete the role, which deletes the people
+ * standing in it.
+ */
+function limitsGrid() {
+  const all = state.company.roles ?? [];
+  const byRole = new Map(state.policy.quotas.map((q) => [q.role, q]));
+  const roles = all.length ? all : state.policy.quotas.map((q) => q.role);
+  if (!roles.length) return '<div class="note">No roles yet.</div>';
+
+  return `<div class="quota-grid">${roles.map((role) => {
+    if (state.quotaEdit === role) return quotaEditor(byRole.get(role) ?? { role });
+    const q = byRole.get(role);
+    return q
+      ? quotaCard(q)
+      : `<button type="button" class="quota none" data-quota="${esc(role)}">
+          <span class="quota-role">${esc(role)}</span>
+          <div class="quota-row unmetered"><span>requests</span><b>no limit</b></div>
+        </button>`;
+  }).join('')}</div>`;
+}
+
+/**
+ * One role's limits, open.
+ *
+ * Blank means no limit, in all three boxes, because that is the same sentence
+ * the policy stores — a role with no quota row is the unmetered case, and
+ * giving "no limit" a second spelling (0, or an unchecked box) would put two
+ * representations of one state into a file that is hashed.
+ */
+function quotaEditor(q) {
+  // `step="1"` on the token boxes, not the round 1000 that reads better. With
+  // `min="1"`, a step of 1000 makes the valid values 1, 1001, 2001… so 250000
+  // is invalid and the browser refuses the submit — with a tooltip, no error,
+  // and no request. Caught in a browser; it cannot be caught by reading.
+  return `<form class="quota editing" id="quotaForm" data-role="${esc(q.role)}">
+    <span class="quota-role">${esc(q.role)}</span>
+    <label class="quota-row"><span>requests</span>
+      <input type="number" min="1" step="1" id="qDay" value="${q.maxRequestsPerDay ?? ''}" placeholder="none"></label>
+    <label class="quota-row"><span>output</span>
+      <input type="number" min="1" step="1" id="qOut" value="${q.maxSessionOutputTokens ?? ''}" placeholder="none"></label>
+    <label class="quota-row"><span>context</span>
+      <input type="number" min="1" step="1" id="qCtx" value="${q.maxContextTokens ?? ''}" placeholder="none"></label>
+    ${state.quotaError ? `<div class="note bad">${esc(state.quotaError)}</div>` : ''}
+    <div class="quota-actions">
+      <button type="submit" class="btn primary">Save</button>
+      <button type="button" class="btn" id="qCancel">Cancel</button>
+    </div>
+  </form>`;
+}
+
+/**
+ * Opening, saving and closing one role's limits.
+ *
+ * The save goes through the policy like any other ratified change — quotas are
+ * inside the policy hash, so raising a ceiling re-versions the policy and lands
+ * in the audit trail. That is the reason this is a form with a Save rather than
+ * a field that writes as you type: an administrator changing what their team is
+ * allowed to spend should have to mean it.
+ */
+function bindLimits() {
+  const grid = document.querySelector('.quota-grid');
+  if (grid) grid.onclick = (e) => {
+    const card = e.target.closest('[data-quota]');
+    if (!card) return;
+    state.quotaEdit = card.dataset.quota;
+    state.quotaError = '';
+    render();
+  };
+
+  const form = $('quotaForm');
+  if (!form) return;
+
+  const cancel = $('qCancel');
+  if (cancel) cancel.onclick = () => { state.quotaEdit = null; state.quotaError = ''; render(); };
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const num = (id) => {
+      const raw = $(id)?.value.trim();
+      return raw ? Number(raw) : null;
+    };
+    const role = form.dataset.role;
+    const { ok, j } = await api(`/api/quotas/${encodeURIComponent(role)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maxRequestsPerDay: num('qDay'),
+        maxSessionOutputTokens: num('qOut'),
+        maxContextTokens: num('qCtx')
+      })
+    });
+    if (!ok) {
+      state.quotaError = j.error ?? 'could not save that limit';
+      return render();
+    }
+    state.quotaError = '';
+    state.quotaEdit = null;
+    await refreshPolicy();
+    render();
+  };
 }
 
 /** The conversation before it starts: tabs pinned at the top, the composer
@@ -1569,7 +1711,17 @@ function draftCard() {
   const locked = Boolean(state.draftFor);
   const p = state.preview;
 
-  const verdict = !p
+  // In demo mode the check ran on the stand-in, which judges nothing, so the
+  // counts underneath it are not findings about this rule and must not be
+  // dressed as them. A person evaluating Warden with no models downloaded was
+  // being told their rule missed two of its own examples — a criticism produced
+  // by a test double, of a rule a test double wrote. The honest line is the one
+  // that says so and points at the download.
+  const verdict = state.mock
+    ? `<div class="verdict-line"><span class="dot"></span>
+        <b>Not checked.</b>
+        <span>No model is installed, so nothing on this card was judged.</span></div>`
+    : !p
     ? '<div class="verdict-line"><span class="dot"></span><span>Not checked yet.</span></div>'
     : p.falsePositives > 0
       ? `<div class="verdict-line"><span class="dot BLOCK"></span>
@@ -1791,6 +1943,14 @@ async function runPreview(against = []) {
   else state.open.delete('n:check');
   const logFps = j.rows.filter((r) => r.source === 'log' && r.isFalsePositive);
 
+  if (state.mock) {
+    // Same reason as the verdict line above: no model ran, so there is nothing
+    // to report except that.
+    say('No model is installed, so nothing was actually checked. The rows below came from the demo stand-in. Download the models and the check becomes real.');
+    render();
+    return;
+  }
+
   if (j.falsePositives > 0) {
     say(`<b>${plural(j.falsePositives, 'legitimate request')} would be blocked by this.</b>
       ${logFps.length ? `${logFps.length} of them actually went through the gateway before. ` : ''}
@@ -1824,6 +1984,8 @@ function bindPolicy() {
     await Promise.all([refreshPolicy(), refreshPeople()]);
     go('policy');
   };
+
+  bindLimits();
 
   const cancel = $('cancelDraft');
   if (cancel) cancel.onclick = discardDraft;

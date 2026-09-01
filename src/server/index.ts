@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
 import { resolvedModel } from '../qvac/client.js';
+import { detectCliTools } from '../qvac/cli-compiler.js';
 import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
 import {
   COMPILER_PROVIDERS,
@@ -27,6 +28,7 @@ import {
   redactedCompilerSettings,
   saveCompilerSettings
 } from '../settings.js';
+import { dropUnrequestedSample } from '../policy/boot-migrations.js';
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
@@ -34,9 +36,11 @@ import {
   invalidate as invalidatePeople,
   loadDirectory,
   loadSampleCompany,
+  normaliseRole,
   renameCompany,
   removeEmployee,
   removeRole,
+  roles,
   rotateApiKey,
   upsertEmployee,
   findByInstallToken,
@@ -44,6 +48,7 @@ import {
   actorForCredential
 } from '../policy/people.js';
 import { loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
+import { quotaSchema } from '../policy/types.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
 import { readAppeals, recordAppeal } from '../policy/appeals.js';
@@ -144,16 +149,26 @@ app.use((req, res, next) => {
   requireAdmin(req, res, next);
 });
 
-// Seed the demo policy on boot if the store is empty, so a fresh clone has
-// something to show without a manual step.
+/*
+ * Nothing is seeded at boot. A fresh install has no company, no people and no
+ * rules — which is also the only honest starting state for a thing whose job is
+ * to enforce rules somebody wrote: it should not arrive holding eight it
+ * invented. The console's empty states say so, and the sample company is a
+ * button (POST /api/company/sample) rather than a fact about you.
+ *
+ * What runs here instead is the other half of that, for the installs that
+ * already have one. See `boot-migrations.ts` — an upgrade does not touch the
+ * user's data folder, so the sample an older build seeded outlives the fix
+ * unless the boot removes it, and it may only remove what it can prove nobody
+ * edited.
+ */
 try {
-  // Nothing is seeded at boot. A fresh install has no company, no people and
-  // no rules — which is also the only honest starting state for a thing whose
-  // job is to enforce rules somebody wrote: it should not arrive holding eight
-  // it invented. The console's empty states say so, and the sample company is
-  // a button (POST /api/company/sample) rather than a fact about you.
+  dropUnrequestedSample(
+    join(ASSETS, 'data', 'seed', 'policies.seed.json'),
+    join(ASSETS, 'data', 'seed', 'company.json')
+  );
 } catch {
-  /* seed file not present yet — the store stays empty, which is a valid state */
+  /* a migration must never be the reason the gateway will not start */
 }
 
 /**
@@ -271,9 +286,16 @@ app.get('/api/policy/presets', (_req, res) => {
  * saved" from "the field is empty" without putting the secret back on the wire
  * on every page load.
  */
-app.get('/api/settings/compiler', (_req, res) => {
+app.get('/api/settings/compiler', asyncRoute(async (_req, res) => {
   const source = remoteCompilerSource();
+  // Which CLIs are actually on this machine, so the console can say so beside
+  // the option instead of letting somebody pick one that will fail on the first
+  // compile. `detectCliTools` existed and nothing called it, which is the same
+  // as it not existing: an administrator picked "Claude Code on this machine"
+  // and found out whether that was true a minute later, from a compile error.
+  const cliTools = await detectCliTools().catch(() => []);
   res.json({
+    cliTools,
     ...redactedCompilerSettings(loadCompilerSettings()),
     providers: COMPILER_PROVIDERS,
     // Which source is actually in force. An administrator whose saved settings
@@ -283,7 +305,7 @@ app.get('/api/settings/compiler', (_req, res) => {
     overriddenByEnv: source === 'env',
     localModel: resolvedModel('adjudicator')
   });
-});
+}));
 
 app.put('/api/settings/compiler', asyncRoute(async (req, res) => {
   const body = req.body ?? {};
@@ -374,6 +396,25 @@ app.post('/api/settings/compiler/test', asyncRoute(async (req, res) => {
   }
 }));
 
+/**
+ * Who to credit for a draft.
+ *
+ * `resolvedModel('compiler')` names the model that *would* answer, which is the
+ * wrong answer whenever the mock is the adapter: a draft compiled by the demo
+ * stand-in came back to the console labelled "written by QWEN3_1_7B_INST_Q4",
+ * with mock text in its examples. A person evaluating Warden with no models
+ * downloaded was shown a nonsense rule attributed to a real model — which reads
+ * as the model being nonsense, and is the single most expensive thing this
+ * console could get wrong about itself.
+ *
+ * The mock is a test double and it says so here, in the one field whose whole
+ * job is provenance.
+ */
+function draftedBy(remote: string | null): string {
+  if (remote) return remote;
+  return isMock() ? 'the demo stand-in, not a model' : resolvedModel('compiler');
+}
+
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ error: 'text is required' });
@@ -391,7 +432,7 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const remote = remoteCompiler();
   res.json({
     ...(rule as object),
-    draftedBy: remote ?? resolvedModel('compiler'),
+    draftedBy: draftedBy(remote),
     draftedRemotely: remote !== null
   });
 }));
@@ -428,7 +469,7 @@ app.post('/api/policy/draft-set', asyncRoute(async (req, res) => {
     // to say where that rule came from on its own.
     rules: rules.map((rule) => ({
       ...(rule as object),
-      draftedBy: remote ?? resolvedModel('compiler'),
+      draftedBy: draftedBy(remote),
       draftedRemotely: remote !== null
     }))
   });
@@ -526,7 +567,7 @@ app.put('/api/company', asyncRoute(async (req, res) => {
  * the directory every key in the deployment is resolved against.
  */
 app.post('/api/company/sample', asyncRoute(async (_req, res) => {
-  const dir = loadSampleCompany();
+  const dir = loadSampleCompany(join(ASSETS, 'data', 'seed', 'company.json'));
   const policy = seedIfEmpty(join(ASSETS, 'data', 'seed', 'policies.seed.json'));
   invalidatePeople();
   res.json({ name: dir.name, employees: dir.employees.length, rules: policy.rules.length });
@@ -594,6 +635,65 @@ app.post('/api/roles', asyncRoute(async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
+}));
+
+/**
+ * Change what a role is allowed to spend.
+ *
+ * There was no way to do this. A quota could be set once, at the moment the
+ * role was created, and after that the console rendered it as a fact — six
+ * cards of numbers with no way in. An administrator who typed 20/day for
+ * interns and meant 200 had to delete the role, which deletes the people in it.
+ *
+ * Written as an upsert on the role rather than a patch on the quota, because a
+ * role with no quota row is the unmetered case and that has to be reachable
+ * from here too: send nothing and the row goes, which is the same sentence as
+ * "this role has no limit". Zero and blank both mean that; the schema refuses
+ * a zero quota precisely so that "no limit" has exactly one representation.
+ *
+ * It goes through `savePolicy`, so a limit change re-hashes the policy and
+ * lands in the audit trail like any other ratified change. Quotas are inside
+ * the policy hash — an admin quietly raising a ceiling is a governance event.
+ */
+app.put('/api/quotas/:role', asyncRoute(async (req, res) => {
+  const role = normaliseRole(String(req.params['role'] ?? ''));
+  if (!role) return res.status(400).json({ error: 'role is required' });
+  if (!roles().includes(role)) return res.status(404).json({ error: 'no such role' });
+
+  const positive = (v: unknown): number | undefined => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  const perDay = positive(req.body?.maxRequestsPerDay);
+  const policy = loadPolicy();
+  const rest = policy.quotas.filter((q) => q.role !== role);
+
+  // No daily limit means no row at all, and the token ceilings go with it: a
+  // quota that meters tokens but not requests is a shape the rest of the guard
+  // has never seen, and inventing it here to preserve two numbers would put an
+  // untested state into the policy of record.
+  if (perDay === undefined) {
+    const saved = savePolicy(policy.rules, rest);
+    return res.json({ role, quota: null, version: saved.version });
+  }
+
+  const quota = {
+    role,
+    maxRequestsPerDay: perDay,
+    ...(positive(req.body?.maxSessionOutputTokens) !== undefined
+      ? { maxSessionOutputTokens: positive(req.body?.maxSessionOutputTokens) }
+      : {}),
+    ...(positive(req.body?.maxContextTokens) !== undefined
+      ? { maxContextTokens: positive(req.body?.maxContextTokens) }
+      : {})
+  };
+
+  const parsed = quotaSchema.safeParse(quota);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'invalid limit' });
+
+  const saved = savePolicy(policy.rules, rest.concat(parsed.data));
+  res.json({ role, quota: parsed.data, version: saved.version });
 }));
 
 app.delete('/api/roles/:role', asyncRoute(async (req, res) => {

@@ -11,7 +11,7 @@
  * version won't match a rehash of the contents.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { bindsActor } from './audience.js';
 import { policySpecSchema, type PolicySpec, type Rule, type Quota } from './types.js';
@@ -98,6 +98,42 @@ export function seedIfEmpty(seedPath: string): PolicySpec {
 
   const seed = JSON.parse(readFileSync(seedPath, 'utf8')) as { rules: Rule[]; quotas: Quota[] };
   return savePolicy(seed.rules ?? [], seed.quotas ?? []);
+}
+
+/**
+ * Is the stored policy exactly the one we ship, untouched?
+ *
+ * Compared by the policy's own version hash rather than by rule ids, so a rule
+ * whose text or severity was edited no longer matches even though its id did
+ * not change. That is the property the boot migration needs: it may only
+ * remove a policy that demonstrably contains nothing a human wrote, and an
+ * identical hash is the strongest available statement of that.
+ *
+ * `exemptRoles` is taken from the stored spec, not from the default, because
+ * it is inside the hash — an admin who changed who is exempt has changed the
+ * policy, and this has to say so.
+ */
+export function isShippedSeed(seedPath: string): boolean {
+  if (!existsSync(seedPath)) return false;
+  const current = loadPolicy();
+  if (current.rules.length === 0) return false;
+  try {
+    const seed = JSON.parse(readFileSync(seedPath, 'utf8')) as { rules: Rule[]; quotas: Quota[] };
+    const exempt = current.exemptRoles ?? DEFAULT_EXEMPT_ROLES;
+    return current.version === hashPolicy(seed.rules ?? [], seed.quotas ?? [], exempt);
+  } catch {
+    return false;
+  }
+}
+
+/** Remove the policy file, leaving the install governing nothing. */
+export function discardPolicy(): void {
+  cached = null;
+  try {
+    if (existsSync(POLICY_PATH)) rmSync(POLICY_PATH);
+  } catch {
+    /* a read-only data folder keeps the file; the cache reset still empties this process */
+  }
 }
 
 /**

@@ -704,7 +704,18 @@ input.inline.wide { min-width: 320px; flex: 1 1 320px; }
   text-transform: uppercase;
   color: var(--faint);
 }
-.msg .say { line-height: var(--lh-body); white-space: pre-wrap; max-width: var(--prose); }
+/* `overflow-wrap: anywhere` because a prompt is not prose and cannot be relied
+   on to contain a space. Somebody pasted a 900-character run of letters with no
+   break in it and the Activity feed scrolled sideways off the window, taking
+   the verdict and the pass table with it — `max-width` bounds the box, not a
+   word that is wider than the box. Applied here rather than on `.msg` so it
+   governs the untrusted text and nothing else. */
+.msg .say {
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: var(--prose);
+}
 .msg .say.pending { color: var(--muted); }
 .msg .say.pending::after {
   content: "";
@@ -848,6 +859,28 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .quota-row b { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: var(--fw-normal); color: var(--ink-2); }
 /* Nobody is counting is a different statement from a bar at zero. */
 .quota-row.unmetered b { color: var(--muted); }
+
+/* A card is now a button, so it has to stop looking like one: no browser
+   chrome, the same box as before, and the affordance carried by the hover
+   rather than by a border that would put six outlines on the page. */
+/* Offered, and honest about not being there. Still clickable: somebody who is
+   about to install Claude Code can set it up first and have it work when they
+   do, and refusing the click would only make that a puzzle. */
+.pill.faded { color: var(--muted); border-style: dashed; }
+
+button.quota { text-align: left; background: var(--bg); font: inherit; font-size: var(--fs-2); cursor: pointer; }
+button.quota:hover { border-color: var(--ink-3); }
+button.quota .quota-row b { margin-left: auto; }
+
+.quota.editing { gap: var(--s-2); }
+.quota.editing .quota-row { gap: var(--s-2); }
+.quota.editing input {
+  margin-left: auto; width: 5.5rem; min-width: 0; padding: 2px var(--s-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  font-family: var(--mono); font-size: var(--fs-2); text-align: right;
+  background: var(--bg); color: var(--ink);
+}
+.quota-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
 
 /* The record kept a hash, not the text. A bare em dash reads as missing data;
    this reads as a promise being kept. */
