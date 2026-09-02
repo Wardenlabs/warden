@@ -34,7 +34,27 @@ const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
 const API_KEY = process.env.WARDEN_API_KEY ?? '';
 
 const DEFAULT_HEALTH_TIMEOUT_MS = 2000;
-const DEFAULT_DECISION_TIMEOUT_MS = 30_000;
+/*
+ * The deadline after which the hook gives up and lets the prompt through
+ * unchecked.
+ *
+ * It fails open, which is documented in SECURITY.md as a deliberate trade and
+ * is the reason this number is a security parameter rather than a comfort
+ * setting: every second under the adjudicator's real latency is a second in
+ * which the guard stops guarding, silently, on the path an employee actually
+ * uses.
+ *
+ * 30 s was calibrated against the 1.7B, which answers in a few. The optional
+ * 8B adjudicator was measured at 46 s on four CPU cores, so on that seat the
+ * old default did not judge slowly — it did not judge at all. 90 s covers it
+ * with room for a cold load, and still sits inside Claude Code's own hook
+ * timeout once that is raised alongside it (integrations/claude-code/settings.json).
+ * Both halves are needed: the harness kills the hook on its own clock, and a
+ * hook killed by the harness also fails open.
+ *
+ * The cost is a person waiting. That is the trade being made here, out loud.
+ */
+const DEFAULT_DECISION_TIMEOUT_MS = 90_000;
 
 function timeoutFromEnv(name, fallback) {
   const raw = process.env[name];

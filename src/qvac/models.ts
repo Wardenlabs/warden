@@ -126,3 +126,81 @@ export function toHttpsUrl(entry: RegistryEntry): string | null {
 export function modelsDir(): string {
   return process.env['WARDEN_MODELS_DIR'] ?? 'models';
 }
+
+/**
+ * The two adjudicator seats the console offers, and what the corpus measured
+ * about each.
+ *
+ * These numbers are the whole reason this is a choice rather than a default.
+ * On the 185-prompt paired run the 1.7B refuses 63% of legitimate requests and
+ * catches 89% of attacks; the 8B fixes the first number to 6% and drops the
+ * second to 71%, losing thirteen of sixteen in `hypothetical-testing`,
+ * `multi-turn-escalation` and `roleplay-fiction`. Neither passes both columns,
+ * which is the honestly-unfinished item at the top of `CLAUDE.md`, and picking
+ * between them is a judgement about which failure a given deployment can live
+ * with. So the picker shows both numbers rather than a recommendation: an
+ * administrator who chooses the 8B without being told it misses more attacks
+ * has been misled by the interface.
+ *
+ * `perDecision` is the one number that is not about accuracy and is the reason
+ * the default did not simply move. It was taken on four CPU cores; the note in
+ * `docs/MEASUREMENTS.md` says a machine with a GPU should measure it again,
+ * and nobody has.
+ */
+export type AdjudicatorChoice = {
+  id: 'default' | 'large';
+  label: string;
+  filename: string;
+  approxMB: number;
+  /** Share of corpus attacks the guard caught with this model in the seat. */
+  attacksCaught: string;
+  /** Share of legitimate requests it refused. */
+  falsePositives: string;
+  perDecision: string;
+  /** One line on the seat, in the console. */
+  trade: string;
+  /** What choosing it costs, shown only once it is chosen. */
+  consequence: string;
+  note: string;
+};
+
+export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
+  {
+    id: 'default',
+    label: 'Qwen3 1.7B',
+    filename: 'Qwen3-1.7B-Q4_0.gguf',
+    approxMB: 1100,
+    attacksCaught: '89%',
+    falsePositives: '63%',
+    perDecision: 'A few seconds a decision.',
+    trade: 'Strict. It stops more of what it should, and it turns away plenty that was fine.',
+    // Nothing to warn about: this is the seat every shipped measurement was
+    // taken against, and the one that fits inside the hook's deadline.
+    consequence: '',
+    note: 'The measured default. Catches the most attacks and fits inside the hook deadline, and refuses two of every three honest requests.'
+  },
+  {
+    id: 'large',
+    label: 'Qwen3 8B',
+    filename: 'Qwen3-8B-Q4_K_M.gguf',
+    approxMB: 5030,
+    attacksCaught: '71%',
+    falsePositives: '6%',
+    perDecision: '46 s a decision on four CPU cores.',
+    trade: 'Easier to live with. It waves through more, including some it should not.',
+    // Shown when it is chosen and not before, which is the whole argument for
+    // having a picker at all: the cost is attached to the decision that incurs
+    // it rather than sitting on the screen as a warning nobody reads.
+    consequence:
+      'Qwen3 8B catches fewer attacks than the 1.7B, and 46 s is longer than the Claude Code hook waits by default. A hook that gives up lets the prompt through unchecked, so raise WARDEN_TIMEOUT_MS to 90000 and the harness timeout with it.',
+    note: 'Usable for people, weaker as a guard. At 46 s it exceeds the hook default, which fails open: raise WARDEN_TIMEOUT_MS and the harness timeout with it, or that path stops judging.'
+  }
+];
+
+/** The filename a chosen seat resolves to, for `sourceFor` and the console. */
+export function adjudicatorFilename(choice: 'default' | 'large'): string {
+  const found = ADJUDICATOR_CHOICES.find((c) => c.id === choice);
+  // Unreachable through the schema, which is an enum of exactly these two.
+  if (!found) throw new Error(`no adjudicator choice "${choice}"`);
+  return found.filename;
+}

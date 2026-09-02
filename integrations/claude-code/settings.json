@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.warden-hook.mjs"
+            "command": "node ~/.warden-hook.mjs",
+            "timeout": 120
           }
         ]
       }

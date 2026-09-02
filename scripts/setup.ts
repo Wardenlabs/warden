@@ -99,6 +99,20 @@ function toDownloadSpec(spec: ModelSpec): DownloadSpec {
  * model in MODEL_SPECS and forgets the catalog, this is where they hear it.
  */
 function checkCatalogDrift(): void {
+  // The alternates are mirrored under their catalog id rather than their guard
+  // role: two entries both claiming `adjudicator` would make the lookup below
+  // return whichever came first, and the drift check would pass while the
+  // desktop downloaded the other one.
+  const alternates = Object.entries(ALTERNATE_MODELS).map(([id, spec]) => ({ id, spec }));
+  for (const { id, spec } of alternates) {
+    const mirrored = MODEL_CATALOG.find((c) => c.role === id);
+    const expected = toDownloadSpec(spec);
+    if (!mirrored || mirrored.filename !== expected.filename || mirrored.url !== expected.url) {
+      report.warnings.push(
+        `src/setup/catalog.ts is out of date for "${id}" — the desktop app would download the wrong weights. Update it to match src/qvac/models.ts.`
+      );
+    }
+  }
   for (const spec of MODEL_SPECS) {
     const mirrored = MODEL_CATALOG.find((c) => c.role === spec.role);
     const expected = toDownloadSpec(spec);

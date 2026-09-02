@@ -34,7 +34,7 @@ export const WardenPlugin = async () => ({
         input: JSON.stringify({ prompt: text, source: 'opencode' }),
         env: process.env,
         // A hung hook must not hang the editor's send button.
-        timeout: 15_000
+        timeout: 90_000
       });
     } catch (err) {
       // Exit 2 is the hook refusing; it writes the reason to stderr, and

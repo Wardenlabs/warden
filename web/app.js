@@ -130,6 +130,7 @@ const state = {
   canLeaveDemo: false,
   /** What weights are on disk and which seat each model fills. Null until loaded. */
   models: null,
+  adjudicator: null,
   /** Limits the compiler proposed and nobody has applied yet. */
   pendingLimits: null,
   /** Role whose limits are open for editing, or null. One at a time. */
@@ -354,7 +355,7 @@ async function boot() {
     return;
   }
 
-  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations(), refreshCompiler()]);
+  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations(), refreshCompiler(), refreshAdjudicator()]);
   window.addEventListener('hashchange', route);
   route();
   subscribe();
@@ -387,6 +388,11 @@ async function refreshCompiler() {
   state.compiler = ok ? j : null;
   const inv = await api('/api/models').catch(() => ({ ok: false }));
   state.models = inv.ok ? inv.j : null;
+}
+
+async function refreshAdjudicator() {
+  const { ok, j } = await api('/api/settings/adjudicator').catch(() => ({ ok: false }));
+  state.adjudicator = ok ? j : null;
 }
 
 async function loadPresets() {
@@ -518,28 +524,7 @@ function render() {
   // the model list, and both are on screen together whenever somebody in demo
   // mode opens the compiler page; `$()` returns one, so the other was a button
   // that looked identical and did nothing.
-  for (const models of document.querySelectorAll('#getModels, .js-get-models')) {
-    // Its own label, because there are two of these and they do not say the
-    // same thing: the banner offers all of them, the panel offers the missing
-    // ones. Restoring a hard-coded string put the banner's words on the panel.
-    const label = models.textContent;
-    models.onclick = async () => {
-    models.disabled = true;
-    models.textContent = 'Starting the download…';
-    const { ok, j } = await api('/api/gateway/leave-demo', { method: 'POST' });
-    if (!ok) {
-      models.disabled = false;
-      models.textContent = label;
-      // The one failure worth naming: no shell to do it, so say what to run.
-      models.insertAdjacentHTML('afterend',
-        `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
-      return;
-    }
-    // The shell relaunches the app from under us, so there is nothing after
-    // this to render. Saying so beats a button that looks stuck.
-    models.textContent = 'Downloading. Warden will restart on its own…';
-    };
-  }
+  bindGetModels();
 
   restoreChat(fields.chat);
 }
@@ -581,7 +566,12 @@ const NAV = [
   { view: 'inbox', label: 'Inbox', count: () => pendingEscalations().length + state.appeals.length },
   { sep: true },
   { view: 'policy', label: 'Rules', sel: 'new' },
-  { view: 'people', label: 'Team' }
+  { view: 'people', label: 'Team' },
+  // Its own item rather than a tab inside Rules. What lives here is the answer
+  // to "is the guard working at all", and it used to sit two clicks deep
+  // behind a page about who WRITES the rules — an unrelated question that a
+  // reader has to get past before reaching the one they came with.
+  { view: 'engine', label: 'Engine' }
 ];
 
 function renderNav() {
@@ -1151,8 +1141,6 @@ function compilerPage() {
   return `<div class="sheet settings">
     ${rulesTabs()}
 
-    ${modelsSection()}
-
     <div class="section">
       <div class="label">Which model writes your rules</div>
 
@@ -1534,59 +1522,193 @@ function sendOnEnter(el, send) {
  * machine under any setting on this page, and that sentence belongs here rather
  * than in SECURITY.md where nobody hits it at the moment they are wondering.
  */
-function modelsSection() {
+/**
+ * Is the guard working, in one sentence, before anything else on the page.
+ *
+ * The old screen made you infer this from a red banner that appeared beside an
+ * inventory of five files: everything on disk and still nothing judging looked
+ * exactly like everything on disk and judging fine. The state the gateway
+ * already tracks answers it directly, so it says so.
+ */
+function engineStatus(m) {
+  if (!m) return { tone: 'bad', title: 'The gateway is not answering.', detail: '' };
+  if (m.mock) {
+    return {
+      tone: 'warn',
+      title: 'Demo mode. Nothing is really being judged.',
+      detail: 'A stand-in is answering in place of the models, so no verdict here means anything.'
+    };
+  }
+  if ((m.runtime && !m.runtime.ok) || m.state === 'failed') {
+    return {
+      tone: 'bad',
+      title: 'Judging is not running. Every rule is escalating.',
+      detail: 'Nothing is being let through unchecked: a rule that cannot be evaluated is held for a person, never assumed clean. But nobody is getting an answer either.'
+    };
+  }
+  if (m.state !== 'ready') {
+    return {
+      tone: 'warn',
+      title: 'Judging is warming up.',
+      detail: 'The first prompt will wait for the model to finish loading.'
+    };
+  }
+  return {
+    tone: 'ok',
+    title: 'Judging is running. Every prompt is being checked.',
+    detail: `${m.judging.model} on this machine. Nothing leaves it.`
+  };
+}
+
+function enginePage() {
   const m = state.models;
-  if (!m) return '';
+  const a = state.adjudicator;
+  const st = engineStatus(m);
+  const chosen = a?.model ?? 'default';
+  const picked = (a?.choices ?? []).find((c) => c.id === chosen);
+  // The chosen seat is not always the one answering: choosing the larger model
+  // is what starts its download, and until that lands the default is still
+  // judging. Only for a seat somebody opted into — a machine with nothing
+  // downloaded at all already says so in the banner above the whole console,
+  // and repeating it here produced the sentence "Qwen3 1.7B keeps judging
+  // until the download finishes" about the model that was missing.
+  const fallback = (a?.choices ?? []).find((c) => c.id === 'default');
+  const waiting = Boolean(picked && !picked.onDisk && picked.id !== 'default');
 
-  const size = (b) => (b ? `${(b / 1e9).toFixed(b < 1e9 ? 2 : 1)} GB` : '');
-  // Only what the downloader would actually go and get. Counting the other two
-  // made the button promise work it was never going to do, which is how it came
-  // to be pressed twice with nothing happening either time.
-  const missing = m.models.filter((x) => !x.onDisk && x.fetchable !== false).length;
-  const skipped = m.models.filter((x) => !x.onDisk && x.fetchable === false);
-
-  return `<div class="section">
-    <div class="label">What is running</div>
-
-    <div class="kv">
-      <div class="r"><span class="k">Judging your team's prompts</span>
-        <span class="v">${esc(m.judging.model)} · ${esc(m.judging.where)}</span></div>
-      <div class="r"><span class="k">Writing your rules</span>
-        <span class="v">${esc(m.drafting.model)} · ${esc(m.drafting.where)}</span></div>
-    </div>
-    <div class="note">Judging always runs here, whatever you pick below. A Claude or Codex
-      subscription can write your rules; it never sees an employee prompt.</div>
-
-    ${m.runtime && !m.runtime.ok ? `<div class="banner bad">
-      <b>The inference runtime will not start on this machine.</b>
-      Every rule escalates until it does, because a pass that cannot run is never treated as clean.
-      <div class="code">${esc(m.runtime.path ?? 'bare-runtime not found')}
-${esc(m.runtime.detail)}</div>
-    </div>` : ''}
-
-    <div class="models">
-      ${m.models.map((x) => `<div class="model ${x.onDisk ? 'have' : 'missing'}">
-        <span class="role">${esc(x.role)}</span>
-        <span class="file">${esc(x.name)}</span>
-        <span class="state">${x.onDisk
-          ? `on disk${size(x.bytes) ? ` · ${size(x.bytes)}` : ''}`
-          : x.fetchable === false ? 'optional, no download' : 'not downloaded'}</span>
-      </div>`).join('')}
+  return `<div class="sheet settings">
+    <div class="headline">
+      <span class="dot ${st.tone}"></span>
+      <div>
+        <div class="t">${esc(st.title)}</div>
+        ${st.detail ? `<div class="m">${esc(st.detail)}</div>` : ''}
+      </div>
     </div>
 
-    ${skipped.length ? `<div class="note">Warden runs without ${
-      skipped.map((x) => esc(x.role)).join(' and ')
-    }. ${skipped.some((x) => x.role === 'ocr')
-      ? 'The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.'
-      : ''}</div>` : ''}
-
-    ${missing > 0 ? `<div class="row-actions">
-      ${state.canLeaveDemo
-        ? `<button type="button" class="btn primary js-get-models">Download the missing ${missing === 1 ? 'model' : 'models'}</button>`
-        : `<span class="note">Run <span class="mono">pnpm run setup</span> to fetch ${missing === 1 ? 'it' : 'them'}.</span>`}
+    ${m?.runtime && !m.runtime.ok ? `<div class="section">
+      <div class="label">What is wrong</div>
+      <div class="banner bad">
+        <b>The weights are here. The worker that runs them will not start.</b>
+        <pre class="code">${esc(m.runtime.path ?? 'bare-runtime not found')}
+${esc(m.runtime.detail)}</pre>
+      </div>
     </div>` : ''}
+
+    <div class="section">
+      <div class="label">The model that judges</div>
+      <div class="note">Every prompt your team sends goes through this model before it reaches anything else.</div>
+
+      ${a ? `<div class="seats">
+        ${a.choices.map((c) => `<button type="button" class="seat${c.id === chosen ? ' on' : ''}" data-seat="${esc(c.id)}">
+          <span class="top">
+            <span class="name">${esc(c.label)}</span>
+            <span class="${c.onDisk ? 'have' : 'want'}">${c.onDisk ? 'on disk' : 'not downloaded'} · ${(c.approxMB / 1000).toFixed(1)} GB</span>
+          </span>
+          <span class="trade">${esc(c.trade)}</span>
+          <span class="speed">${esc(c.perDecision)}</span>
+        </button>`).join('')}
+      </div>` : '<div class="note">Could not read which model is in the seat.</div>'}
+
+      ${a?.overriddenByEnv ? `<div class="banner warn">
+        <b>The environment is setting this.</b> <code>WARDEN_MODEL_ADJUDICATOR</code> wins over what you pick here,
+        and <b>${esc(a.inForce)}</b> is what answers.
+      </div>` : picked?.consequence || waiting ? `<div class="banner warn">
+        ${waiting ? `<b>These weights are not on this disk yet.</b>
+          ${esc(fallback?.label ?? 'The smaller model')} keeps judging until the download finishes. ` : ''}${esc(picked?.consequence ?? '')}
+        ${waiting ? `<div class="banner-act">
+          <button type="button" class="btn primary js-get-models">Download it · ${(picked.approxMB / 1000).toFixed(1)} GB</button>
+          <span class="note">Warden restarts on its own when it finishes.</span>
+        </div>` : ''}
+      </div>` : ''}
+    </div>
+
+    <div class="section">
+      <div class="label">Everything else it needs</div>
+      ${m ? `<div class="models">
+        ${m.models.filter((x) => x.role !== 'adjudicator').map((x) => `<div class="model ${x.onDisk ? 'have' : 'off'}">
+          <span class="role">${esc(x.role)}</span>
+          <span class="file">${esc(x.name)}</span>
+          <span class="state">${x.onDisk
+            ? `on disk${x.bytes ? ` · ${(x.bytes / 1e9).toFixed(2)} GB` : ''}`
+            : x.fetchable === false ? 'off — no download exists' : 'not downloaded'}</span>
+        </div>`).join('')}
+      </div>` : ''}
+      <div class="note">The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Not part of judging</div>
+      <div class="elsewhere">
+        <span>Rules are drafted by <b>${esc(m?.drafting.model ?? 'this machine')}</b> through ${esc(m?.drafting.where ?? 'this machine')}, which never sees an employee prompt.</span>
+        <button type="button" class="btn" data-go="compiler">Change it</button>
+      </div>
+    </div>
   </div>`;
 }
+
+/**
+ * The one button that fetches weights, wherever it appears.
+ *
+ * Was inline in the shell's bind pass, which meant the Engine screen could not
+ * offer a download without duplicating it — and a second copy of a button that
+ * relaunches the app is exactly the thing that drifts.
+ */
+function bindGetModels() {
+  for (const models of document.querySelectorAll('#getModels, .js-get-models')) {
+    // Its own label, because there are two of these and they do not say the
+    // same thing: the banner offers all of them, the panel offers the missing
+    // ones. Restoring a hard-coded string put the banner's words on the panel.
+    const label = models.textContent;
+    models.onclick = async () => {
+    models.disabled = true;
+    models.textContent = 'Starting the download…';
+    const { ok, j } = await api('/api/gateway/leave-demo', { method: 'POST' });
+    if (!ok) {
+      models.disabled = false;
+      models.textContent = label;
+      // The one failure worth naming: no shell to do it, so say what to run.
+      models.insertAdjacentHTML('afterend',
+        `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
+      return;
+    }
+    // The shell relaunches the app from under us, so there is nothing after
+    // this to render. Saying so beats a button that looks stuck.
+    models.textContent = 'Downloading. Warden will restart on its own…';
+    };
+  }
+}
+
+function bindEngine() {
+  for (const seat of document.querySelectorAll('[data-seat]')) {
+    seat.onclick = async () => {
+      const model = seat.dataset.seat;
+      if (model === (state.adjudicator?.model ?? 'default')) return;
+      seat.disabled = true;
+      const { ok, j } = await api('/api/settings/adjudicator', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
+      seat.disabled = false;
+      if (!ok) {
+        seat.insertAdjacentHTML('afterend', `<span class="note bad">${esc(readable(j) ?? 'could not change it')}</span>`);
+        return;
+      }
+      await refreshAdjudicator();
+      await refreshCompiler();
+      render();
+    };
+  }
+  // The download button is the same one the banner and the panel have always
+  // used: it hands off to the desktop shell, which relaunches into the
+  // first-run screen and fetches whatever is missing, the chosen seat included.
+  bindGetModels();
+}
+
+VIEWS.engine = {
+  body: enginePage,
+  bind: bindEngine
+};
+
 
 /**
  * An error a person can read, out of whatever the gateway sent.

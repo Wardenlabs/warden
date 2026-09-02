@@ -178,3 +178,62 @@ export function redactedCompilerSettings(s: CompilerSettings): Omit<CompilerSett
     keyHint: apiKey.length > 4 ? `…${apiKey.slice(-4)}` : ''
   };
 }
+
+/**
+ * Which weights sit in the adjudicator's seat.
+ *
+ * A second, smaller kind of the same state as the compiler above: an
+ * operational preference an administrator changes, not part of `PolicySpec`
+ * and deliberately outside the policy hash — swapping the model must not
+ * reversion every rule.
+ *
+ * It is one field because the choice is between two named seats, not a free
+ * path. A free path belongs to `WARDEN_MODEL_ADJUDICATOR`, which is for
+ * benchmarks and still wins over this; what the console offers is the two
+ * options the corpus has numbers for.
+ *
+ * The safe direction on a corrupt or absent file is `default`, and that is not
+ * arbitrary: the 1.7B is the configuration the shipped measurements were taken
+ * against and the one that fits inside the hook's deadline. A settings file
+ * nobody can parse must not silently promote a model that misses 18 more
+ * points of attacks.
+ */
+export const adjudicatorSettingsSchema = z.object({
+  model: z.enum(['default', 'large'])
+});
+export type AdjudicatorSettings = z.infer<typeof adjudicatorSettingsSchema>;
+
+const DEFAULT_ADJUDICATOR: AdjudicatorSettings = { model: 'default' };
+
+export function loadAdjudicatorSettings(): AdjudicatorSettings {
+  if (!existsSync(SETTINGS_PATH)) return { ...DEFAULT_ADJUDICATOR };
+  try {
+    const raw = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as { adjudicator?: unknown };
+    const parsed = adjudicatorSettingsSchema.safeParse(raw.adjudicator);
+    return parsed.success ? parsed.data : { ...DEFAULT_ADJUDICATOR };
+  } catch {
+    return { ...DEFAULT_ADJUDICATOR };
+  }
+}
+
+export function saveAdjudicatorSettings(next: AdjudicatorSettings): AdjudicatorSettings {
+  const settings = adjudicatorSettingsSchema.parse(next);
+  mkdirSync(dirname(SETTINGS_PATH), { recursive: true });
+  let existing: Record<string, unknown> = {};
+  if (existsSync(SETTINGS_PATH)) {
+    try {
+      existing = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as Record<string, unknown>;
+    } catch {
+      existing = {};
+    }
+  }
+  // Merged, not replaced — the compiler settings live in the same file and a
+  // whole-file write here would delete somebody's API key for choosing a model.
+  writeFileSync(SETTINGS_PATH, JSON.stringify({ ...existing, adjudicator: settings }, null, 2));
+  try {
+    chmodSync(SETTINGS_PATH, 0o600);
+  } catch {
+    /* not a POSIX filesystem */
+  }
+  return settings;
+}

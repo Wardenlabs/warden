@@ -121,7 +121,7 @@ profile). The installer writes them for you:
 export WARDEN_URL=http://192.168.1.42:8080   # omit if Warden runs locally
 export WARDEN_API_KEY=wk-fede-YOUR-KEY-HERE       # issued by the admin
 export WARDEN_HEALTH_TIMEOUT_MS=2000
-export WARDEN_TIMEOUT_MS=30000
+export WARDEN_TIMEOUT_MS=90000
 ```
 
 PowerShell (current session):
@@ -130,7 +130,7 @@ PowerShell (current session):
 $env:WARDEN_URL = 'http://192.168.1.42:8080'
 $env:WARDEN_API_KEY = 'wk-fede-YOUR-KEY-HERE'
 $env:WARDEN_HEALTH_TIMEOUT_MS = '2000'
-$env:WARDEN_TIMEOUT_MS = '30000'
+$env:WARDEN_TIMEOUT_MS = '90000'
 ```
 
 **The key is the whole identity.** No name, no role — nothing an employee can

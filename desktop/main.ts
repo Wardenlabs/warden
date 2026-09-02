@@ -127,7 +127,14 @@ async function main(): Promise<void> {
   splash.show();
 
   if (settings.adapter === 'real') {
-    const adapter = await ensureModels({ splash, appRoot: APP_ROOT, modelsDir: modelsDir() });
+    const adapter = await ensureModels({
+      splash,
+      appRoot: APP_ROOT,
+      modelsDir: modelsDir(),
+      // The gateway runs with cwd set to userData, so its `data/settings.json`
+      // is this path. That is where the console records a larger adjudicator.
+      gatewaySettingsPath: join(userData, 'data', 'settings.json')
+    });
     if (adapter === 'mock') {
       settings = { ...settings, adapter: 'mock' };
       writeSettings(userData, settings);

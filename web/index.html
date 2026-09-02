@@ -319,6 +319,39 @@ button, input, select, textarea { font: inherit; font-size: var(--fs-3); color: 
 .model.missing .state { color: var(--escalate); }
 .model.missing .role { color: var(--muted); }
 
+/* The Engine screen: a status sentence, then the seat that judges.
+   Reuses the model row, the banner and the stat ink already defined above —
+   what is new is the headline and the two seats. */
+.headline { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) var(--s-3) 0; }
+.headline .dot { flex: none; margin-top: 6px; }
+.headline .t { font-size: var(--fs-4); font-weight: var(--fw-semi); line-height: var(--lh-snug); letter-spacing: var(--ls-tight); }
+.headline .m { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); margin-top: var(--s-1); }
+.headline .dot.ok  { background: var(--allow); }
+.headline .dot.warn { background: var(--escalate); }
+.headline .dot.bad { background: var(--block); }
+
+.seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+.seat {
+  display: grid; gap: var(--s-4); align-content: start;
+  padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg); font: inherit; text-align: left; cursor: pointer;
+}
+.seat:hover { border-color: var(--line-firm); }
+/* The selected seat is drawn with an inset ring rather than a thicker border,
+   so choosing one does not move the text inside it by a pixel. */
+.seat.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.seat .top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.seat .name { font-size: var(--fs-3); font-weight: var(--fw-semi); color: var(--ink); }
+.seat .have { font-size: var(--fs-1); font-family: var(--mono); color: var(--allow); white-space: nowrap; }
+.seat .want { font-size: var(--fs-1); font-family: var(--mono); color: var(--escalate); white-space: nowrap; }
+.seat .trade { font-size: var(--fs-3); color: var(--ink-2); line-height: var(--lh-snug); }
+.seat .speed { font-size: var(--fs-2); color: var(--muted); border-top: 1px solid var(--line-soft); padding-top: var(--s-4); }
+
+.model.off .state { color: var(--faint); }
+.model.off .role { color: var(--muted); }
+.elsewhere { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); font-size: var(--fs-3); color: var(--ink-2); }
+.elsewhere b { font-weight: var(--fw-semi); color: var(--ink); }
+
 .limit-plan { margin: var(--s-2) 0; }
 .limit-plan .r { display: flex; gap: var(--s-3); padding: 2px 0; font-size: var(--fs-2); }
 .limit-plan .k { color: var(--ink); min-width: 7rem; }
@@ -937,6 +970,8 @@ button.quota .quota-row b { margin-left: auto; }
 }
 
 @media (max-width: 760px) {
+  .seats { grid-template-columns: minmax(0, 1fr); }
+  .elsewhere { flex-direction: column; align-items: flex-start; gap: var(--s-3); }
   .topnav { height: auto; flex-wrap: wrap; padding: var(--s-3) var(--s-4); gap: var(--s-3); }
   nav { width: 100%; }
   .nav-sep { display: none; }

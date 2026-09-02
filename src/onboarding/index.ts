@@ -246,7 +246,7 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
             `      execFileSync("node", [HOOK], {\n` +
             `        input: JSON.stringify({ prompt: text, source: "opencode" }),\n` +
             `        env: { ...process.env, WARDEN_API_KEY: "${employee.apiKey}", WARDEN_URL: "${gatewayUrl}" },\n` +
-            `        timeout: 15000\n` +
+            `        timeout: 90000\n` +
             `      });\n` +
             `    } catch (err) {\n` +
             `      // Exit 2 is Warden refusing; throwing is what stops the message.\n` +

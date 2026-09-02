@@ -43,6 +43,16 @@ export const MODEL_CATALOG: DownloadSpec[] = [
     required: false
   },
   {
+    // Not a guard role: a catalog id for the optional larger adjudicator, kept
+    // distinct from 'adjudicator' so the drift check in scripts/setup.ts pairs
+    // each entry with the right spec instead of matching whichever came first.
+    role: 'adjudicator-large',
+    filename: 'Qwen3-8B-Q4_K_M.gguf',
+    url: 'https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/7c41481f57cb95916b40956ab2f0b139b296d974/Qwen3-8B-Q4_K_M.gguf',
+    approxMB: 5030,
+    required: false
+  },
+  {
     role: 'ocr',
     filename: 'latin_g2.gguf',
     url: null,

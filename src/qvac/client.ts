@@ -12,8 +12,9 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
-import { MODEL_SPECS, modelsDir } from './models.js';
+import { adjudicatorFilename, MODEL_SPECS, modelsDir } from './models.js';
 import { remoteCompilerConfig } from './remote.js';
+import { loadAdjudicatorSettings } from '../settings.js';
 import type { ModelRole } from './types.js';
 
 /** Written by `pnpm run setup` — resolved absolute paths per role. */
@@ -69,6 +70,28 @@ function overrideFor(role: ModelRole): string | null {
 function sourceFor(role: ModelRole): string | object {
   const override = overrideFor(role);
   if (override) return override;
+
+  // The seat an administrator picked in the console, which outranks whatever
+  // `pnpm run setup` happened to record. Below the env override on purpose:
+  // `WARDEN_MODEL_ADJUDICATOR` exists so a bench can pin a model for one run,
+  // and a run pinned from the shell must not be silently redirected by a
+  // setting somebody changed in a browser three weeks ago.
+  //
+  // Missing weights fall through to the default rather than throwing. Choosing
+  // the larger seat is what STARTS a 5 GB download, so between the click and
+  // the restart there is a window where the choice is recorded and the file is
+  // not there yet — and throwing across that window would stop the guard
+  // judging because somebody asked for a better model. It keeps judging with
+  // what it has. Honesty is handled where it belongs, in the answer: every
+  // route that reports the seat reports `inForce` alongside the choice, so the
+  // console can say the download has not landed instead of implying it has.
+  if (role === 'adjudicator') {
+    const chosen = loadAdjudicatorSettings().model;
+    if (chosen !== 'default') {
+      const path = resolve(modelsDir(), adjudicatorFilename(chosen));
+      if (existsSync(path)) return path;
+    }
+  }
 
   const fromConfig = config()?.models[role];
   if (fromConfig && existsSync(fromConfig)) return fromConfig;
@@ -449,6 +472,31 @@ export function thinkingMarker(role: ModelRole): string {
 
   const model = resolvedModel(role);
   return THINKING_MARKERS.find(([pattern]) => pattern.test(model))?.[1] ?? '';
+}
+
+/**
+ * Drop a role's loaded model so the next caller resolves it again.
+ *
+ * Changing the adjudicator from the console has to take effect without a
+ * restart, and `loaded` caches the promise for the lifetime of the process —
+ * so without this the console would report the new model while the old one
+ * kept answering, which is the exact confusion `sourceFor` throws to avoid.
+ *
+ * The unload is awaited rather than fired and forgotten: the two adjudicators
+ * are 1.1 GB and 5 GB of resident memory, and holding both because a switch
+ * did not finish is how a machine starts swapping mid-decision.
+ */
+export async function forgetRole(role: ModelRole): Promise<void> {
+  const previous = loaded.get(role);
+  loaded.delete(role);
+  unloadable.delete(role);
+  if (!previous) return;
+  try {
+    await unloadModel({ modelId: await previous });
+  } catch {
+    // It never loaded, or the worker is already gone. Either way the cache is
+    // clear, which is what the caller asked for.
+  }
 }
 
 /** Load roles ahead of first request so the demo doesn't pay for it on camera. */

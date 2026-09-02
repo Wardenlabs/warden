@@ -14,18 +14,22 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
-import { modelInventory, probeRuntime, resolvedModel } from '../qvac/client.js';
+import { forgetRole, modelInventory, probeRuntime, resolvedModel } from '../qvac/client.js';
+import { ADJUDICATOR_CHOICES, modelsDir } from '../qvac/models.js';
 import { cliCompilerConfig, cliToolLabel, detectCliTools } from '../qvac/cli-compiler.js';
 import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
 import {
+  adjudicatorSettingsSchema,
   COMPILER_PROVIDERS,
   compilerSettingsSchema,
+  loadAdjudicatorSettings,
   loadCompilerSettings,
   redactedCompilerSettings,
+  saveAdjudicatorSettings,
   saveCompilerSettings
 } from '../settings.js';
 import { dropUnrequestedSample } from '../policy/boot-migrations.js';
@@ -314,6 +318,76 @@ app.get('/api/policy/presets', (_req, res) => {
  * saved" from "the field is empty" without putting the secret back on the wire
  * on every page load.
  */
+/**
+ * Which weights judge, and what is known about the alternatives.
+ *
+ * Administrative by default, like every route not on `admin-auth`'s employee
+ * allowlist, and that is the right direction here: choosing the adjudicator
+ * changes what the guard catches, so it belongs to the same person who writes
+ * the rules.
+ *
+ * The measured numbers travel with the options rather than living in the
+ * console's markup. The console renders what this returns, so there is one
+ * place where "the 8B misses 18 more points of attacks" is written down, and
+ * it is next to the thing that decides.
+ */
+app.get('/api/settings/adjudicator', (_req, res) => {
+  const chosen = loadAdjudicatorSettings().model;
+  const dir = modelsDir();
+  res.json({
+    model: chosen,
+    // What is actually loaded, which is not always what was chosen: the env
+    // override outranks this setting and a bench run leaves it set.
+    inForce: resolvedModel('adjudicator'),
+    overriddenByEnv: Boolean(process.env['WARDEN_MODEL_ADJUDICATOR']),
+    // Named fields rather than a spread: the corpus percentages stay on the
+    // server. They are what the choice is grounded in, not what a console has
+    // any business showing — a screen whose largest type is this product's own
+    // worst measurement is a screen nobody opens twice. What a person needs to
+    // decide travels as `trade` and `consequence`, in sentences.
+    choices: ADJUDICATOR_CHOICES.map((c) => ({
+      id: c.id,
+      label: c.label,
+      filename: c.filename,
+      approxMB: c.approxMB,
+      perDecision: c.perDecision,
+      trade: c.trade,
+      consequence: c.consequence,
+      onDisk: existsSync(resolve(dir, c.filename))
+    }))
+  });
+});
+
+/**
+ * Switch the seat.
+ *
+ * Accepts a choice whose weights are absent, because that is exactly the click
+ * that starts the download: refusing it would make the picker unusable for the
+ * only option anybody has to fetch. What it does not do is pretend the switch
+ * happened — `needsDownload` says the file is not here, `inForce` says which
+ * model is actually answering, and the guard goes on judging with the 1.7B
+ * until the download lands.
+ */
+app.post('/api/settings/adjudicator', asyncRoute(async (req, res) => {
+  const parsed = adjudicatorSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'model must be "default" or "large"' });
+    return;
+  }
+  const choice = ADJUDICATOR_CHOICES.find((c) => c.id === parsed.data.model);
+  const onDisk = Boolean(choice && existsSync(resolve(modelsDir(), choice.filename)));
+  const saved = saveAdjudicatorSettings(parsed.data);
+  // The process caches one loaded model per role for its lifetime, so without
+  // this the console would report the new seat while the old model answered.
+  await forgetRole('adjudicator');
+  res.json({
+    ...saved,
+    onDisk,
+    needsDownload: onDisk ? null : (choice?.filename ?? null),
+    inForce: resolvedModel('adjudicator')
+  });
+}));
+
 app.get('/api/settings/compiler', asyncRoute(async (_req, res) => {
   const source = remoteCompilerSource();
   // Which CLIs are actually on this machine, so the console can say so beside

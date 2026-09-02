@@ -11,7 +11,7 @@
  */
 import { ipcMain } from 'electron';
 import type { BrowserWindow } from 'electron';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -78,10 +78,35 @@ export async function modelsPresent(appRoot: string, modelsDir: string): Promise
   }
 }
 
+/**
+ * The optional weights this installation has asked for on top of the required
+ * ones.
+ *
+ * Only the larger adjudicator today. It is read out of the gateway's own
+ * settings file rather than passed down from a menu, because the choice is
+ * made in the console — the gateway's half of the app — and this process must
+ * not import the gateway to find out. A missing or unparseable file means no
+ * extras, which is the same answer as not having chosen.
+ */
+function chosenExtras(settingsPath: string | undefined, catalog: DownloadSpec[]): DownloadSpec[] {
+  if (!settingsPath || !existsSync(settingsPath)) return [];
+  try {
+    const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
+      adjudicator?: { model?: unknown };
+    };
+    if (raw.adjudicator?.model !== 'large') return [];
+    return catalog.filter((spec) => spec.role === 'adjudicator-large' && spec.url);
+  } catch {
+    return [];
+  }
+}
+
 export async function ensureModels(opts: {
   splash: BrowserWindow;
   appRoot: string;
   modelsDir: string;
+  /** The gateway's settings file, for optional weights an administrator picked. */
+  gatewaySettingsPath?: string;
 }): Promise<'real' | 'mock'> {
   const lib = (await import(
     pathToFileURL(join(opts.appRoot, 'dist', 'setup', 'download.js')).href
@@ -91,7 +116,14 @@ export async function ensureModels(opts: {
   )) as CatalogLib;
 
   mkdirSync(opts.modelsDir, { recursive: true });
-  const required = MODEL_CATALOG.filter((spec) => spec.required && spec.url);
+  // The required set plus whatever was chosen. Appended rather than merged
+  // into the catalog so that `modelsPresent` — the boot check — keeps meaning
+  // "can this judge at all", and a 5 GB optional download never decides
+  // whether the app starts.
+  const required = [
+    ...MODEL_CATALOG.filter((spec) => spec.required && spec.url),
+    ...chosenExtras(opts.gatewaySettingsPath, MODEL_CATALOG)
+  ];
 
   for (;;) {
     const missing = lib.missingModels(opts.modelsDir, required);
