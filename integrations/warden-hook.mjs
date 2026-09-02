@@ -781,9 +781,58 @@ function detectMode() {
   process.stdout.write(lines.join('\n'));
 }
 
+/**
+ * What this machine last learned from the gateway, remembered across runs.
+ *
+ * `failClosed` is stated by the gateway on `/health`, which is exactly the call
+ * that fails when the gateway is down — so learning it only from a live
+ * response means never knowing it at the one moment it decides anything. The
+ * first version of this shipped with that hole: an administrator set
+ * `WARDEN_FAIL_CLOSED=1`, the gateway went down, and every hook cheerfully
+ * failed open because it had forgotten to ask while it still could.
+ *
+ * So it is remembered from the last successful contact and applied during the
+ * next outage, which is how HSTS works and for the same reason. Keyed by
+ * gateway URL, because pointing a machine at a different Warden must not
+ * inherit the last one's policy.
+ *
+ * A machine that has never reached this gateway has nothing remembered and
+ * fails open. That is the only answer available and it is worth being plain
+ * about: this closes the door for a team that has been running, not for a
+ * laptop being set up while the gateway is already down.
+ *
+ * Best effort in both directions — an unreadable or unwritable state file must
+ * never stop a prompt, since the whole point is to not be the thing that
+ * breaks somebody's morning.
+ */
+const STATE_PATH = join(homedir(), '.warden-hook.state.json');
+
+function readState() {
+  try {
+    const raw = JSON.parse(readFileSync(STATE_PATH, 'utf8'));
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberGateway(url, failClosed) {
+  try {
+    const state = readState();
+    state[url] = { failClosed: failClosed === true, at: new Date().toISOString() };
+    writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + '\n');
+  } catch {
+    /* a read-only home is not a reason to refuse a prompt */
+  }
+}
+
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   let decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
+  // Whether an unreachable gateway refuses. Stated by the gateway on /health
+  // and remembered here from the last time it answered, because the outage is
+  // when it matters and the outage is when it cannot be asked.
+  let failClosed = readState()[WARDEN_URL]?.failClosed === true;
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
@@ -857,6 +906,12 @@ async function main() {
     // for a gateway too old to answer, and for debugging.
     const stated = health?.deadlines?.decisionMs;
     if (Number.isFinite(stated) && stated > 0) decisionTimeoutMs = stated;
+    // Read on the health call so it is known before the decision can fail. A
+    // gateway that never answered leaves this false, which is the fail-open
+    // default and the only answer available: refusing on the basis of a policy
+    // nobody stated would brick a CLI over a typo'd URL.
+    failClosed = health?.failClosed === true;
+    rememberGateway(WARDEN_URL, failClosed);
     res = await requestJson(
       `${WARDEN_URL}/api/guard/check`,
       {
@@ -897,6 +952,25 @@ async function main() {
      * Note this catch no longer swallows a rejected key: that is handled above
      * as the answer it is.
      */
+    if (failClosed) {
+      // The administrator asked for this gateway to be a gate rather than a
+      // recommendation, so an unreachable one refuses. Same shape as any other
+      // block: exit 2 with a reason the tool will show.
+      const reason = [
+        '🛡 Warden could not be reached, and this gateway is set to refuse when that happens.',
+        '',
+        `   ${WARDEN_URL} — ${err?.message ?? err}`,
+        '',
+        '   Nothing about your prompt was judged. Ask your administrator whether the',
+        '   gateway is up; there is no way around this from here.'
+      ].join('\n');
+      process.stderr.write(`${reason}\n`);
+      process.stdout.write(
+        JSON.stringify({ continue: false, stopReason: reason, decision: 'block', reason })
+      );
+      process.exitCode = 2;
+      return;
+    }
     process.stderr.write(
       `⚠ Warden unreachable at ${WARDEN_URL} (${err?.message ?? err}). Prompt allowed unchecked.\n`
     );

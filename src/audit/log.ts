@@ -18,7 +18,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Decision } from '../guard/types.js';
-import type { AuditedDecision, AuditEntry } from '../guard/types-audit.js';
+import type { AdminAuditEntry, AuditedDecision, AuditEntry } from '../guard/types-audit.js';
 
 const AUDIT_PATH = process.env['WARDEN_AUDIT_PATH'] ?? 'data/audit.jsonl';
 
@@ -126,14 +126,68 @@ export function recordDecision(
   return entry;
 }
 
-/** Most recent entries, newest first. */
-export async function readAudit(limit = 50): Promise<AuditEntry[]> {
+/**
+ * Record an administrative change in the same chain as the decisions.
+ *
+ * Deliberately the same append and the same hashing as `recordDecision`, so
+ * `verifyChain` covers both without knowing there are two kinds — it rebuilds
+ * each entry's hash from whatever fields the entry has.
+ */
+export function recordAdminAction(
+  actor: { id: string; role: string },
+  action: string,
+  status: number
+): AdminAuditEntry {
+  const prevHash = tailHash();
+  const body = {
+    auditId: randomUUID().slice(0, 8),
+    ts: new Date().toISOString(),
+    actor,
+    kind: 'admin' as const,
+    action,
+    status,
+    prevHash
+  };
+  const entry: AdminAuditEntry = {
+    ...body,
+    entryHash: createHash('sha256').update(prevHash + JSON.stringify(body)).digest('hex')
+  };
+  const nextCount = currentCount() + 1;
+  mkdirSync(dirname(AUDIT_PATH), { recursive: true });
+  appendFileSync(AUDIT_PATH, JSON.stringify(entry) + '\n');
+  lastHash = entry.entryHash;
+  entryCount = nextCount;
+  writeFileSync(WITNESS_PATH, JSON.stringify({ entries: nextCount, head: entry.entryHash }) + '\n');
+  return entry;
+}
+
+/**
+ * Every line in the file, newest first, whichever kind it is.
+ *
+ * Both readers below filter this rather than slicing the tail first: the two
+ * kinds are interleaved, so "the last 50 lines" is not "the last 50 decisions"
+ * and a busy afternoon of policy edits would push real decisions out of the
+ * console's list without anybody noticing they had gone.
+ */
+function chain(): Array<AuditEntry | AdminAuditEntry> {
   if (!existsSync(AUDIT_PATH)) return [];
   return readFileSync(AUDIT_PATH, 'utf8')
     .trimEnd().split('\n').filter(Boolean)
-    .slice(-limit)
-    .map((l) => JSON.parse(l) as AuditEntry)
+    .map((l) => JSON.parse(l) as AuditEntry | AdminAuditEntry)
     .reverse();
+}
+
+const isAdmin = (e: AuditEntry | AdminAuditEntry): e is AdminAuditEntry =>
+  'kind' in e && e.kind === 'admin';
+
+/** Administrative changes, newest first. */
+export async function readAdminActions(limit = 50): Promise<AdminAuditEntry[]> {
+  return chain().filter(isAdmin).slice(0, limit);
+}
+
+/** Most recent entries, newest first. */
+export async function readAudit(limit = 50): Promise<AuditEntry[]> {
+  return chain().filter((e): e is AuditEntry => !isAdmin(e)).slice(0, limit);
 }
 
 /**
@@ -151,8 +205,12 @@ export function findDecision(auditId: string): AuditEntry | null {
   const lines = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
-      const entry = JSON.parse(lines[i]!) as AuditEntry;
-      if (entry.auditId === auditId) return entry;
+      const entry = JSON.parse(lines[i]!) as AuditEntry | AdminAuditEntry;
+      // Administrative entries carry ids from the same generator, and every
+      // caller here is answering a question about a decision — an appeal, a
+      // rewrite. Handing one an admin entry would give it an object with no
+      // verdict and no rules, which fails somewhere further away than here.
+      if (entry.auditId === auditId && !isAdmin(entry)) return entry;
     } catch {
       // A damaged line is a verification finding, not a reason to stop looking.
     }

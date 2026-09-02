@@ -247,8 +247,41 @@ directory file — the install route has to hand an employee their key, so
 hashing them means reworking delivery rather than changing a column, and half a
 secret store is worse than an admitted one. Rate limits live in memory: they do
 not survive a restart and do not coordinate across instances. There is no
-account lockout beyond the per-address throttle, no audit of administrative
-actions distinct from decisions, and the hook still fails open on timeout.
+account lockout beyond the per-address throttle.
+
+### Administrative actions are in the chain
+
+Every mutating request to an administrative route is appended to the same
+hash-chained log as the decisions, and `verifyChain()` covers both. The chain
+held every decision and none of the edits that produced them, so somebody could
+rewrite the policy, issue themselves a key or delete a person and leave nothing
+behind but the effect.
+
+Recorded on the way out and keyed to the status, from **before** the
+authorisation check — a stranger turned away from the administrative API is the
+entry an incident looks for, and `requireAdmin` ends the response itself, so
+nothing mounted after it ever sees a refusal. Three kinds of actor are kept
+apart deliberately: a named key, `local`/`administrator` for the machine
+itself, and `unknown`/`unauthenticated` for everyone else — the first version
+of this labelled a refused stranger as the local administrator, which is a log
+that lies. The method and the path, never the body: `/api/people/:id/key`
+carries a credential and `/api/policy/ratify` carries rule text, and this log's
+promise is that it holds neither. 429s are skipped so a flood cannot write the
+log. Read it at `GET /api/audit/admin`.
+
+### A gateway can require its hooks to refuse
+
+`WARDEN_FAIL_CLOSED=1` makes an unreachable gateway block rather than let the
+prompt through. Stated on `/health` like the deadline, and **remembered by the
+hook across runs** in `~/.warden-hook.state.json`, because the outage is when
+the policy matters and the outage is when the gateway cannot be asked. Learning
+it only from a live response means never knowing it at the one moment it
+decides anything — the first version of this shipped with exactly that hole.
+
+A machine that has never reached this gateway has nothing remembered and fails
+open, which is the only answer available: this closes the door for a team that
+has been running, not for a laptop being set up while the gateway is already
+down. The default stays open, and stays the documented trade it always was.
 - `WARDEN_CORS_ORIGIN` is unset by default and should stay that way. The console
   is served by the same process and needs no cross-origin access.
 - Keep `data/` off shared storage. It holds the directory, the policy and the

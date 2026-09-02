@@ -34,7 +34,7 @@ import {
 } from '../settings.js';
 import { dropUnrequestedSample } from '../policy/boot-migrations.js';
 import { callerKey, limiter } from './rate-limit.js';
-import { needsAdmin, requireAdmin } from './admin-auth.js';
+import { isLoopback, needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
   clearDemoDirectory,
@@ -59,7 +59,7 @@ import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
 import { readAppeals, recordAppeal } from '../policy/appeals.js';
 import { escalationQueue, recordReview, type ReviewOutcome } from '../policy/escalations.js';
-import { findDecision } from '../audit/log.js';
+import { findDecision, readAdminActions, recordAdminAction } from '../audit/log.js';
 import { checkQuota } from '../guard/quota.js';
 import type { RewriteRefusal, RewriteResult } from '../guard/rewrite.js';
 import { onboardingFor, supportedTools } from '../onboarding/index.js';
@@ -296,10 +296,82 @@ app.use((req, res, next) => {
  * one. Before this, every policy write, key issue and audit read on this server
  * was reachable by anyone who could open the port.
  */
+/*
+ * Who changed what, and when.
+ *
+ * The audit chain covered every decision and none of the edits that produced
+ * them: somebody could rewrite the policy, issue themselves a key or delete a
+ * person and leave nothing behind but the effect. For a gateway on a laptop
+ * that was a gap; for one an organisation points at as its control, it is the
+ * half of the record a regulator would ask for first.
+ *
+ * A middleware rather than a call in each handler, for the same reason
+ * `requireAdmin` is one: the per-handler version is silent when the route
+ * somebody adds next month forgets it.
+ *
+ * Mounted BEFORE the authorisation check, which is the opposite of where it
+ * started and the correction matters. `requireAdmin` ends the response itself,
+ * so nothing downstream of it ever runs for a refusal — and a stranger trying
+ * the administrative API and being turned away is the entry an incident is
+ * looking for, more than any successful edit. From here the status carries
+ * both outcomes.
+ *
+ * The method and the path, and nothing else. A body here would put a
+ * credential (`/api/people/:id/key`) and rule text into a log whose entire
+ * promise is that it holds neither — what changed is recoverable from the
+ * policy version hash, and who and when is what was missing.
+ *
+ * Written on the way out, keyed to the status, because an attempt that was
+ * refused is as much a part of the record as one that worked.
+ */
+const AUDITED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+app.use((req, res, next) => {
+  if (!AUDITED_METHODS.has(req.method) || !needsAdmin(req.path)) return next();
+
+  const actor = actorForCredential(req.header('authorization'));
+  res.on('finish', () => {
+    // 429 is the rate limiter working, and recording it would let a flood
+    // write the log: the throttle bounds the attempts, not the lines they
+    // would produce. The refusal itself is still counted where it belongs.
+    if (res.statusCode === 429) return;
+    try {
+      recordAdminAction(
+        // Three different callers, and conflating them is how a log lies. A
+        // credential names somebody. No credential from the machine itself is
+        // the loopback administrator, and `local` is the honest amount this
+        // gateway knows about them. No credential from anywhere else is a
+        // stranger — labelling that one `local administrator`, which the first
+        // version of this did, would have written an intruder into the record
+        // as the person they were trying to impersonate.
+        actor
+          ? { id: actor.id, role: actor.role }
+          : isLoopback(req)
+            ? { id: 'local', role: 'administrator' }
+            : { id: 'unknown', role: 'unauthenticated' },
+        `${req.method} ${req.path}`,
+        res.statusCode
+      );
+    } catch (err) {
+      // An unwritable chain must not turn a completed change into a 500 the
+      // caller retries: the response has already been sent. It is loud in the
+      // log instead, and `verify-audit` is what notices a chain that stopped
+      // growing.
+      console.error(`  audit     could not record ${req.method} ${req.path}: ${String(err)}`);
+    }
+  });
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS' || !needsAdmin(req.path)) return next();
   requireAdmin(req, res, next);
 });
+
+app.get('/api/audit/admin', asyncRoute(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query['limit'] ?? 50), 1), 500);
+  res.json(await readAdminActions(limit));
+}));
 
 /*
  * Nothing is seeded at boot. A fresh install has no company, no people and no
@@ -1640,7 +1712,22 @@ app.get('/health', (_req, res) =>
      * needs on their machine is a URL and a key, which is the whole point of
      * identity being the key and only the key.
      */
-    deadlines: { decisionMs: hookDecisionDeadlineMs() }
+    deadlines: { decisionMs: hookDecisionDeadlineMs() },
+    /*
+     * Whether a hook that cannot reach this gateway may let the prompt through.
+     *
+     * Open by default and under protest, which is the trade SECURITY.md has
+     * always named: a crashed gateway bricking every developer's CLI at once
+     * gets Warden uninstalled the first morning it happens, and a guard nobody
+     * runs stops nothing. That reasoning is about a laptop on a desk.
+     *
+     * It stops being obviously right the moment a gateway is the control an
+     * organisation says it has. `WARDEN_FAIL_CLOSED=1` refuses instead, and
+     * like the deadline it is stated here rather than set per machine — an
+     * employee who can choose whether their own guard is optional does not
+     * have one.
+     */
+    failClosed: process.env['WARDEN_FAIL_CLOSED'] === '1'
   })
 );
 
