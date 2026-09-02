@@ -27,6 +27,7 @@ import {
   type RunningServer
 } from './server-manager.js';
 import { readSettings, writeSettings, type DesktopSettings } from './settings.js';
+import * as tunnel from './tunnel.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const APP_ROOT = app.getAppPath();
@@ -38,7 +39,7 @@ const ICON_PNG = join(APP_ROOT, 'desktop', 'icons', 'icon.png');
 const SMOKE = process.env['WARDEN_SMOKE'] === '1';
 
 let userData = '';
-let settings: DesktopSettings = { lanEnabled: false, adapter: 'real' };
+let settings: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real' };
 let splash: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let gateway: RunningServer | null = null;
@@ -64,9 +65,13 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (quitting) return;
     quitting = true;
-    if (!gateway) return;
+    // The tunnel holds a public address open and is a separate process, so a
+    // quit that only stopped the gateway would leave the internet pointed at a
+    // port with nothing behind it — and leave `cloudflared` running until
+    // somebody noticed it in Activity Monitor.
+    if (!gateway && !tunnel.isRunning()) return;
     event.preventDefault();
-    void gateway.stop().then(() => {
+    void Promise.all([gateway?.stop() ?? Promise.resolve(), tunnel.stop()]).then(() => {
       gateway = null;
       app.quit();
     });
@@ -98,7 +103,7 @@ async function main(): Promise<void> {
   userData = app.getPath('userData');
   settings = readSettings(userData);
   if (SMOKE) {
-    settings = { ...settings, adapter: 'mock', lanEnabled: false };
+    settings = { ...settings, adapter: 'mock', lanEnabled: false, exposeEnabled: false };
     setTimeout(() => {
       console.error('WARDEN_SMOKE_TIMEOUT');
       app.exit(1);
@@ -162,6 +167,7 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       cwd: userData,
       port,
       host: settings.lanEnabled ? '0.0.0.0' : '127.0.0.1',
+      publicUrl,
       assetsDir: APP_ROOT,
       modelsDir: modelsDir(),
       adapter: settings.adapter,
@@ -209,6 +215,24 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
 
   openConsole(port);
   Menu.setApplicationMenu(buildMenu());
+
+  /*
+   * Restore the tunnel the administrator left on.
+   *
+   * Only from a cold start — `launchGateway` also runs on every restart, and
+   * `setExposeEnabled` restarts the gateway itself after bringing the tunnel
+   * up. Without this guard that path would tear down the tunnel it had just
+   * created and build another, changing the public URL immediately after
+   * telling somebody what it was.
+   *
+   * The gateway is already listening at this point but does not yet know its
+   * public URL, so the restart at the end is what hands it over. It is one
+   * extra restart on a boot that was exposed, and it is the difference between
+   * an onboarding pack that works and one that quietly hands out a LAN address.
+   */
+  if (settings.exposeEnabled && !tunnel.isRunning() && publicUrl === null) {
+    void setExposeEnabled(true);
+  }
 }
 
 function openConsole(port: number): void {
@@ -330,6 +354,74 @@ async function restartGateway(): Promise<void> {
   await launchGateway();
 }
 
+/**
+ * The address the world reaches this gateway at, or null when nothing does.
+ *
+ * Read by `launchGateway`, so a restart for any other reason — changing the LAN
+ * setting, recovering from a crash — comes back up still knowing it is exposed.
+ */
+let publicUrl: string | null = null;
+
+/**
+ * Put the gateway on the internet, or take it off.
+ *
+ * The tunnel comes up first and the gateway restarts second, because the
+ * gateway's environment has to carry the public URL: the onboarding pack builds
+ * the link employees are given from it, and a pack copied while the URL was
+ * still unknown would send everybody a LAN address they cannot reach. That
+ * ordering is the whole reason this is not two independent switches.
+ *
+ * A failure leaves the setting off and says why. Half-exposed — a tunnel with
+ * no gateway behind it, or a gateway that believes it is public and is not —
+ * is the state worth refusing.
+ */
+async function setExposeEnabled(enabled: boolean): Promise<void> {
+  if (!enabled) {
+    await tunnel.stop();
+    publicUrl = null;
+    settings = { ...settings, exposeEnabled: false };
+    writeSettings(userData, settings);
+    await restartGateway();
+    Menu.setApplicationMenu(buildMenu());
+    return;
+  }
+
+  try {
+    publicUrl = await tunnel.start(activePort);
+  } catch (err) {
+    publicUrl = null;
+    settings = { ...settings, exposeEnabled: false };
+    writeSettings(userData, settings);
+    void dialog.showMessageBox({
+      type: 'warning',
+      message: 'Warden is not on the internet.',
+      detail: err instanceof Error ? err.message : String(err),
+      buttons: ['OK']
+    });
+    return;
+  }
+
+  settings = { ...settings, exposeEnabled: true };
+  writeSettings(userData, settings);
+  await restartGateway();
+  Menu.setApplicationMenu(buildMenu());
+
+  // Said once, on the way in, because both of these are properties of a quick
+  // tunnel that an administrator will otherwise discover the hard way: the
+  // first by handing the link to somebody who should not have had it, the
+  // second when every employee's configuration stops working overnight.
+  void dialog.showMessageBox({
+    type: 'info',
+    message: 'Warden is on the internet.',
+    detail:
+      `${publicUrl}\n\n` +
+      'Anyone with this address can reach the gateway; employees still need their own ' +
+      'key, and administration is refused through it. The address changes every time ' +
+      'the tunnel restarts, and everyone has to be given the new one.',
+    buttons: ['OK']
+  });
+}
+
 async function setLanEnabled(enabled: boolean): Promise<void> {
   settings = { ...settings, lanEnabled: enabled };
   writeSettings(userData, settings);
@@ -386,6 +478,18 @@ function buildMenu(): Menu {
           type: 'checkbox',
           checked: settings.lanEnabled,
           click: (item) => void setLanEnabled(item.checked)
+        },
+        {
+          label: 'Put Warden on the internet…',
+          type: 'checkbox',
+          checked: settings.exposeEnabled,
+          enabled: settings.adapter !== 'mock',
+          click: (item) => void setExposeEnabled(item.checked)
+        },
+        {
+          label: publicUrl ? `Copy public URL (${publicUrl.replace('https://', '')})` : 'Copy public URL',
+          enabled: publicUrl !== null,
+          click: () => publicUrl && clipboard.writeText(publicUrl)
         },
         // Offered in both modes now. An install in real mode with weights that
         // never arrived needs this exactly as much as one in demo mode does,

@@ -12,11 +12,13 @@ export type DesktopSettings = {
   port?: number;
   /** false → 127.0.0.1 only. true → 0.0.0.0, the team-facing LAN mode. */
   lanEnabled: boolean;
+  /** Whether a public tunnel should come up with the gateway. */
+  exposeEnabled: boolean;
   /** 'mock' is the no-models demo mode the first-run screen can fall back to. */
   adapter: 'real' | 'mock';
 };
 
-const DEFAULTS: DesktopSettings = { lanEnabled: false, adapter: 'real' };
+const DEFAULTS: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real' };
 
 export function settingsPath(userData: string): string {
   return join(userData, 'desktop-settings.json');
@@ -32,6 +34,7 @@ export function readSettings(userData: string): DesktopSettings {
     return {
       ...(port !== undefined ? { port } : {}),
       lanEnabled: raw.lanEnabled === true,
+      exposeEnabled: raw.exposeEnabled === true,
       adapter: raw.adapter === 'mock' ? 'mock' : 'real'
     };
   } catch {

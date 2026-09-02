@@ -19,6 +19,8 @@ export type ServerConfig = {
   entry: string;
   /** The user's app-data folder — becomes the gateway's working directory. */
   cwd: string;
+  /** The public URL this gateway is reachable at, when a tunnel is up. */
+  publicUrl?: string | null;
   port: number;
   host: '127.0.0.1' | '0.0.0.0';
   /** Where web/, integrations/ and data/seed/ live (the app bundle root). */
@@ -87,6 +89,36 @@ export function startServer(
     // menus away from the screen that just failed.
     WARDEN_LOG_PATH: config.logPath
   };
+
+  /*
+   * The posture a gateway on the internet has to run in, set here rather than
+   * asked of the administrator.
+   *
+   * `WARDEN_PUBLIC_URL` is what the onboarding pack hands employees — without
+   * it the pack derives an address from the Host header, so an administrator
+   * copying instructions while a tunnel is up would send everyone a LAN URL
+   * they cannot reach.
+   *
+   * `WARDEN_TRUSTED_PROXY` because behind a tunnel every request reports the
+   * tunnel's own loopback address, and without it the whole internet shares one
+   * rate-limit bucket: the first flood locks out every real employee.
+   *
+   * `WARDEN_REQUIRE_HTTPS` because a tunnel terminates TLS and states it, so
+   * anything arriving marked http is either misconfigured or not from the
+   * tunnel at all — and every request here carries a credential.
+   *
+   * Deliberately NOT `WARDEN_ADMIN_REQUIRE_KEY`. It is on the checklist in
+   * SECURITY.md and it belongs there, but the app already binds loopback only
+   * and `isLoopback` already refuses anything carrying a proxy header, so
+   * forcing it would demand a key from the administrator sitting at the machine
+   * and buy nothing the two of those do not already cover. An operator running
+   * the gateway some other way should still set it.
+   */
+  if (config.publicUrl) {
+    env['WARDEN_PUBLIC_URL'] = config.publicUrl;
+    env['WARDEN_TRUSTED_PROXY'] = '1';
+    env['WARDEN_REQUIRE_HTTPS'] = '1';
+  }
 
   /*
    * Tell the SDK where its worker is, because it cannot work that out from here.

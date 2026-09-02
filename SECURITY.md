@@ -232,6 +232,19 @@ guess whether it came off their own machine.
 
 ### Running one in production
 
+The desktop app does steps 1 to 4 from its own menu — **Put Warden on the
+internet…** starts a Cloudflare quick tunnel, hands the gateway the public URL
+so the onboarding pack gives employees an address that works, and sets
+`WARDEN_TRUSTED_PROXY` and `WARDEN_REQUIRE_HTTPS` itself. `cloudflared` is not
+bundled: it is tens of megabytes of somebody else's binary inside a security
+product, so a missing one is a message saying how to install it rather than a
+download. A quick tunnel's address is public to anyone holding it and changes
+on every restart, which the app says on the way in rather than leaving to be
+discovered. For anything long-lived, use a named tunnel with Cloudflare Access
+in front of it.
+
+Doing it by hand, or running the gateway some other way:
+
 1. Put a tunnel or reverse proxy in front that terminates TLS. Nothing here
    handles certificates.
 2. `WARDEN_TRUSTED_PROXY=1`, so rate limits count real callers.
