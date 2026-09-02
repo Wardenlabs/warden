@@ -80,6 +80,18 @@ jobs:
           kill %1
       - name: Package (linux x64 — exercises the QVAC forge plugin)
         run: pnpm exec electron-forge package --platform=linux --arch=x64
+      # The smoke run below boots in mock mode, which never spawns the QVAC
+      # worker, so it cannot see the one thing that broke inference in four
+      # consecutive releases: `bare` shipped 0644 inside the bundle and every
+      # spawn died with EACCES, silently, because a process that never starts
+      # writes no stderr. Checked here because packaging is where it is fixed
+      # and where it can regress.
+      - name: The runtime the SDK spawns is executable in the package
+        run: |
+          BARE=out/Warden-linux-x64/resources/app/node_modules/bare-runtime/bin/bare
+          test -f "$BARE" || { echo "not packaged: $BARE"; find out -name bare -path '*bare-runtime*'; exit 1; }
+          test -x "$BARE" || { echo "packaged without the execute bit: $(ls -l "$BARE")"; exit 1; }
+          "$BARE" --version
       - name: Packaged app boots headless in mock mode
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb

@@ -73,6 +73,49 @@ module.exports = {
     ...macSigning
   },
   plugins: [new QvacForgePlugin({ logLevel: 'info' })],
+
+  hooks: {
+    /**
+     * Put the execute bit back on the runtime the SDK spawns.
+     *
+     * `@qvac/sdk` runs inference in a separate process and spawns it through
+     * `bare-runtime/spawn`, which execs `node_modules/bare-runtime/bin/bare`.
+     * That file is 0755 in a checkout and arrives 0644 inside the packaged app,
+     * so the spawn fails with EACCES — silently, because a process that never
+     * starts writes nothing to stderr, and all the SDK can say afterwards is
+     * "RPC initialization timed out after 30000ms, the worker process may have
+     * failed to start". Which is what a machine with every model downloaded
+     * reported, and what cost two releases of guessing at Electron env vars
+     * before a probe that runs `bare --version` answered EACCES in one line.
+     *
+     * Here rather than at runtime, and this is the part that matters: on macOS
+     * the bundle is signed and notarized after this hook, so a chmod any later
+     * invalidates the signature. Packaging is the last moment the mode can be
+     * fixed for free.
+     *
+     * Best effort by design. A platform where this is meaningless (Windows) or
+     * a layout where the file is elsewhere must not fail somebody's build; a
+     * runtime that will not start is loud on its own now.
+     */
+    packageAfterCopy: async (_config, buildPath) => {
+      const { chmodSync, existsSync } = require('node:fs');
+      const { join } = require('node:path');
+      for (const rel of [
+        join('node_modules', 'bare-runtime', 'bin', 'bare'),
+        join('node_modules', 'bare-runtime', 'bin', 'bare.exe')
+      ]) {
+        const file = join(buildPath, rel);
+        if (!existsSync(file)) continue;
+        try {
+          chmodSync(file, 0o755);
+          console.log(`[warden] made executable: ${rel}`);
+        } catch (err) {
+          console.warn(`[warden] could not chmod ${rel}: ${err.message}`);
+        }
+      }
+    }
+  },
+
   makers: [
     { name: '@electron-forge/maker-zip', platforms: ['darwin', 'win32', 'linux'] },
     {
