@@ -174,10 +174,16 @@ something. The parts that matter while you are editing:
   turns it off and deletes the file. If you make this longer, you are making
   the blast radius of a stolen gateway larger by the same factor — say so out
   loud when you do.
-- **The hook fails open on timeout, by design and under protest.** A 30-second
-  deadline that passes lets the prompt through unchecked. This is documented in
+- **The hook fails open on timeout, by design and under protest.** A deadline
+  that passes lets the prompt through unchecked. This is documented in
   `SECURITY.md` and in `docs/HOOK-VERIFICATION.md`; it is a known, deliberate
-  trade, not an oversight to fix quietly.
+  trade, not an oversight to fix quietly. It was 30 seconds until v0.1.18 and
+  is 90 now, because the optional 8B adjudicator was measured at 46 seconds on
+  four CPU cores and a guard that cannot answer inside the deadline is not a
+  slow guard, it is an absent one. Raising it costs a person waiting; leaving
+  it costs the check. Both halves of the deadline have to move together — the
+  harness kills the hook on its own clock, so `integrations/claude-code/settings.json`
+  carries `timeout: 120` beside it.
 
 ## What is honestly unfinished
 

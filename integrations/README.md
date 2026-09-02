@@ -247,11 +247,15 @@ gets uninstalled the first morning it does. The missing heartbeat in the admin
 console is the alert.
 
 Availability and inference use separate deadlines. `/health` gets 2 seconds by
-default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets 30 seconds
+default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets 90 seconds
 (`WARDEN_TIMEOUT_MS`). Both values must be positive and finite. The decision
 deadline includes reading and validating the complete HTTP body. A decision
-that exceeds 30 seconds still fails open; on 2026-08-23 one cold Windows Codex
-check took 35.954 seconds and reached the model, so Codex remains NOT VERIFIED.
+that exceeds the deadline still fails open; on 2026-08-23, when the deadline
+was 30 seconds, one cold Windows Codex check took 35.954 seconds and reached
+the model, so Codex remains NOT VERIFIED. The deadline moved to 90 in v0.1.18
+to cover the optional 8B adjudicator, which was measured at 46 seconds on four
+CPU cores — that raises the number a decision has to beat, and changes nothing
+about what happens when it does not.
 
 **Secrets are masked before the guard sees them.** An API key pasted into a
 prompt is replaced with `[REDACTED:OpenAI key]` before any model runs, and only

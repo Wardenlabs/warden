@@ -538,6 +538,21 @@ input.inline.wide { min-width: 320px; flex: 1 1 320px; }
 .group { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
 .group > .btn { justify-self: start; }
 
+/* The onboarding pack is followed with a terminal open beside it, and it
+   rendered as one unbroken column: a title, a command, another title, another
+   command, every gap the same size. Nothing said where one step ended. The
+   spacing now carries the structure — a title sits with its own command and
+   away from the next one — and the two headings get a rule above them, the
+   same separator `.section + .section` uses everywhere else. */
+#onboarding { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+#onboarding .group { gap: var(--s-3); }
+#onboarding .group .group { margin-top: var(--s-6); }
+#toolBody > .group { gap: var(--s-5); }
+#onboarding > .label { padding-top: var(--s-5); border-top: 1px solid var(--line); }
+/* A step title is a heading doing a note's job. Reads as one now. */
+#onboarding .group > .note b { display: block; color: var(--ink); font-size: var(--fs-3); font-weight: var(--fw-semi); }
+#onboarding .code { padding: var(--s-5); }
+
 .kv { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
 .kv .r { display: flex; align-items: baseline; gap: var(--s-4); font-size: var(--fs-3); }
 .kv .k { flex: 0 0 108px; color: var(--faint); font-size: var(--fs-2); }

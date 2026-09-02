@@ -133,6 +133,8 @@ const state = {
   adjudicator: null,
   /** Limits the compiler proposed and nobody has applied yet. */
   pendingLimits: null,
+  // True from the moment a prompt is sent until its verdict is rendered.
+  sending: false,
   /** Role whose limits are open for editing, or null. One at a time. */
   quotaEdit: null,
   /** Why the last save of that role's limits was refused, if it was. */
@@ -3074,8 +3076,8 @@ VIEWS.simulator = {
     <div class="composer">
       <div class="sheet">
         <div class="hero-box">
-          <textarea id="prompt" rows="2" placeholder="Write a prompt as this employee…"></textarea>
-          <button type="button" class="btn primary send" id="send">Send</button>
+          <textarea id="prompt" rows="2" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Write a prompt as this employee…'}"${state.sending ? ' disabled' : ''}></textarea>
+          <button type="button" class="btn primary send" id="send"${state.sending ? ' disabled' : ''}>${state.sending ? 'Judging…' : 'Send'}</button>
         </div>
       </div>
     </div>
@@ -3108,7 +3110,18 @@ function renderMessage(m, i) {
   </div>`;
 }
 
+/**
+ * Send one prompt and wait for its verdict, one at a time.
+ *
+ * The composer locks until the answer lands. Nothing stopped a second Enter
+ * before, and the gap it opens is not theoretical: a decision costs seconds on
+ * the 1.7B and was measured at 46 s on the larger adjudicator, which is a long
+ * time to look at a screen that accepts more typing. Two prompts in flight
+ * also arrive back in whatever order the model finishes them, so the answers
+ * pair with the wrong questions in the transcript.
+ */
 async function doSend() {
+  if (state.sending) return;
   const box = $('prompt');
   const text = box.value.trim();
   if (!text) return;
@@ -3117,7 +3130,18 @@ async function doSend() {
   box.value = '';
 
   state.chat.push({ from: 'employee', who: person ? `${person.name} · ${person.role}` : who, text });
+  state.sending = true;
   render();
+
+  try {
+    await judge(text, person, who);
+  } finally {
+    state.sending = false;
+    render();
+  }
+}
+
+async function judge(text, person, who) {
 
   // The person's own API key, exactly as their laptop would send it. The
   // console deliberately has no privileged way to assert an identity — it
