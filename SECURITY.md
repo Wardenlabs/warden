@@ -243,11 +243,19 @@ guess whether it came off their own machine.
    laptop.
 
 **What is still missing, on the honest list.** API keys are plaintext in the
-directory file — the install route has to hand an employee their key, so
-hashing them means reworking delivery rather than changing a column, and half a
-secret store is worse than an admitted one. Rate limits live in memory: they do
-not survive a restart and do not coordinate across instances. There is no
-account lockout beyond the per-address throttle.
+directory file. The install route has to hand an employee their key and the
+console re-displays it, so anything that stores a hash has to stop the server
+being able to re-display one — keys shown once at issue, rotate to replace.
+That is the right change and it is a change to how the product delivers
+credentials, not a column swap; half a secret store in the meantime would be
+worse than an admitted plaintext one.
+
+The failed-administrative-attempt counter is persisted (`data/admin-attempts.json`,
+0600, gitignored), because a restart there handed a guesser ten fresh attempts
+and a gateway restarts every time the desktop app is reopened. The request
+counters are still in memory: losing one costs a caller a minute of allowance.
+Neither coordinates across instances. There is no account lockout beyond the
+per-address throttle.
 
 ### Administrative actions are in the chain
 

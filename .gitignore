@@ -98,6 +98,9 @@ data/audit-eval.witness.json
 # Operational settings set from the console. Holds a provider API key.
 data/settings.json
 data/prompts.jsonl
+# Failed administrative attempts, kept across restarts so a restart is not a
+# fresh set of guesses. Written 0600.
+data/admin-attempts.json
 
 # The seeded design canvas: 2.4 MB of editor payload with the artboards baked
 # in, rebuilt from the .dc.html sources beside it whenever the design changes.

@@ -51,7 +51,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { actorForCredential } from '../policy/people.js';
 import { isExempt, loadPolicy } from '../policy/store.js';
-import { callerKey, limiter } from './rate-limit.js';
+import { callerKey, persistentLimiter } from './rate-limit.js';
 
 /** The shape `installToken` produces: 128 bits, hex. */
 const INSTALL_TOKEN = /^[0-9a-f]{32}$/;
@@ -218,7 +218,11 @@ export function hasAdminKey(req: Request): boolean {
  * then gets it right pays nothing, and the window is short enough that being
  * locked out of your own console is minutes rather than an afternoon.
  */
-const adminFailures = limiter(15 * 60_000, 10);
+const adminFailures = persistentLimiter(
+  15 * 60_000,
+  10,
+  process.env['WARDEN_RATE_STATE_PATH'] ?? 'data/admin-attempts.json'
+);
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const who = callerKey(undefined, req.socket.remoteAddress);
