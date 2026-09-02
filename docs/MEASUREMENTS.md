@@ -811,3 +811,52 @@ asks it nothing, and removing a rule, which asks it one question fewer.
   before that and was stale. Measured directly on the corpus, the deterministic
   layer now flags 15 of 80 attacks and 0 of 18 controls — see the section above
   for the breakdown and for what it still cannot see.
+
+## The compiler prompt, and the sentences it could not refuse
+
+2026-09-02. Four sentences through `compileRule` on `claude -p --model sonnet`,
+before and after rewriting the prompt in `compile.ts`. Small n and no corpus
+behind it, so this is a record of what was seen rather than a rate.
+
+Before, the compiler had exactly one shape to put anything in: convert this into
+a prohibition. Two of the four sentences are not prohibitions, and it wrote one
+anyway.
+
+| sentence | before | after |
+|---|---|---|
+| `quiero reducir mi uso al 50%` | `warn`: "No employee request may be refused, throttled, or otherwise limited on the basis of a stated goal to reduce overall usage" | declines: "a usage budget, not a prohibition" |
+| `quiero que dejen de filtrar datos de clientes` | `warn` against *filtering*, compliant example "send customer data to a third-party for analysis" (on the 1.7B, 2026-09-01) | `block`, sharing or exporting customer data outside authorised channels |
+| `nadie puede aprobar pagos de mas de 5000 sin mi firma` | — | `escalate`, carries the 5,000 and the signature |
+| `PUYO` | `block`, text "N/A" | declines: "contains no policy statement" |
+
+The first row is the one worth keeping. A goal to spend less came back as a rule
+forbidding anyone to be limited, which is the administrator's own sentence
+turned inside out and then handed to them to ratify. Warden expresses spending
+as a quota per role, and there was no way for the compiler to say so, so it
+manufactured a prohibition to fit the only shape it had. `notARule` is that way
+out.
+
+Three things had to change together, and the middle one is the one that cost a
+round: the prompt, the zod draft schema, **and** `RULE_DRAFT_JSON_SCHEMA`. A
+field absent from the decoder's grammar cannot be emitted at all under
+`additionalProperties: false`, so adding the escape hatch to zod alone left the
+grammar-constrained local model unable to say the thing it had just been told to
+say. Then, told the other fields are ignored when it declines, a capable model
+stops emitting them — and a schema still demanding them turns a correct refusal
+into "schema-invalid output twice", which reads as the model failing. The draft
+schema now requires the rule fields only when `notARule` is falsy. The grammar's
+`required` list is untouched, so the local model is still forced to fill a real
+draft.
+
+`maxTokens` on the compile call went 640 to 900. The compliant examples are now
+asked to be nearest-miss requests rather than any legitimate ones, three of
+those in Spanish do not fit in 640, and a draft cut off mid-array arrives as
+"examples.compliant: expected array, received undefined" — a budget failure
+wearing a model failure's clothes. It makes local compiles slower and was not
+measured on the 1.7B.
+
+Not measured: any of this on `Qwen3-1.7B-Q4_0`, which is the default compiler.
+The prompt asks for narrower rules and harder compliant examples, and both are
+things a 1.7B is worse at than a large model. The bench (`pnpm run bench`)
+measures adjudication, not compilation, so there is no paired instrument for
+this yet — which is the same gap the splitter row records.

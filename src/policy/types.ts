@@ -167,10 +167,36 @@ export type PolicySpec = z.infer<typeof policySpecSchema>;
  * a compiler emits is enacted without the administrator pressing Activate, so
  * this is not on the measured path the guard's numbers come from.
  */
-export const ruleDraftSchema = ruleSchema.omit({ id: true, embedding: true }).extend({
-  notARule: z.boolean().optional(),
-  notARuleReason: z.string().optional()
-});
+export const ruleDraftSchema = ruleSchema
+  .omit({ id: true, embedding: true })
+  .partial()
+  .extend({
+    notARule: z.boolean().optional(),
+    notARuleReason: z.string().optional(),
+    // `text` loses its min(1) here and gets it back in the refinement below.
+    // Declining, a model writes `notARule: true` next to `text: ""`, and the
+    // inherited minimum rejected the whole answer before anything could read
+    // the flag: "PUYO" came back as "schema-invalid output twice" when the
+    // model had in fact answered it correctly.
+    text: z.string().optional()
+  })
+  .superRefine((draft, ctx) => {
+    // A refusal carries nothing else, and a rule carries everything. Told that
+    // the other fields are ignored when it declines, a capable model stops
+    // emitting them, and a schema that still demanded them turned a correct
+    // refusal into "Claude Code returned schema-invalid output twice".
+    //
+    // Only zod is relaxed. `RULE_DRAFT_JSON_SCHEMA` keeps its `required` list,
+    // so the grammar-constrained local model is still forced to fill a real
+    // draft; this tolerance is for the unconstrained path, which is the only
+    // one that can omit a field in the first place.
+    if (draft.notARule) return;
+    for (const key of ['text', 'scope', 'appliesTo', 'severity', 'guidance', 'examples'] as const) {
+      if (draft[key] === undefined || draft[key] === '') {
+        ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required unless notARule is true` });
+      }
+    }
+  });
 export type RuleDraft = z.infer<typeof ruleDraftSchema>;
 
 /** JSON Schema handed to the decoder as a grammar when compiling a rule. */
@@ -205,6 +231,12 @@ export const POLICY_SPLIT_JSON_SCHEMA = {
 export const RULE_DRAFT_JSON_SCHEMA = {
   type: 'object',
   properties: {
+    // Both halves of the refusal live in the grammar, not only in the zod
+    // schema. A field the decoder's grammar does not list cannot be emitted at
+    // all under `additionalProperties: false`, so adding it to zod alone left
+    // the local model unable to say the one thing it had just been told to say.
+    notARule: { type: 'boolean' },
+    notARuleReason: { type: 'string' },
     text: { type: 'string' },
     scope: { type: 'string', enum: ['input', 'output', 'both'] },
     appliesTo: { type: 'array', items: { type: 'string' } },
