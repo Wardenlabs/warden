@@ -154,8 +154,31 @@ const loaded = new Map<ModelRole, Promise<string>>();
  * network, and a gateway that has been up for a day should not still be
  * refusing a role because the wifi was bad at breakfast.
  */
-const unloadable = new Map<ModelRole, number>();
+const unloadable = new Map<ModelRole, { until: number; why: string }>();
 const LOAD_RETRY_AFTER_MS = 5 * 60_000;
+
+/**
+ * What to say when a model will not load, in the order the reader needs it.
+ *
+ * The SDK's own message is the useful part and it goes first. What it cannot
+ * know is whether the weights are even on this disk: when `sourceFor` falls
+ * through to the registry constant there is no local file at all, the load is
+ * a P2P fetch, and "RPC initialization timed out" is then a description of a
+ * download that was never going to arrive rather than of a broken runtime.
+ * Those two need different actions, so the sentence says which one it is.
+ */
+function loadFailure(role: ModelRole, err: unknown): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  let onDisk = false;
+  try {
+    onDisk = typeof sourceFor(role) === 'string';
+  } catch {
+    /* unresolvable counts as not present */
+  }
+  return onDisk
+    ? `${detail} (the ${role} weights are on this disk, so this is the runtime, not a download)`
+    : `${detail} (the ${role} weights are NOT on this disk: download them from Rules, or run pnpm run setup)`;
+}
 
 /**
  * Resolve a role to a loaded model id, loading it on first use.
@@ -169,10 +192,15 @@ export function modelFor(role: ModelRole): Promise<string> {
 
   const cooling = unloadable.get(role);
   if (cooling !== undefined) {
-    if (Date.now() < cooling) {
-      return Promise.reject(
-        new Error(`the ${role} model failed to load and is not being retried yet`)
-      );
+    if (Date.now() < cooling.until) {
+      // The original failure, not a sentence about the cooldown. Every request
+      // for the next five minutes used to come back "the adjudicator model
+      // failed to load and is not being retried yet", which says a retry is
+      // being withheld and says nothing about why the first attempt died. So
+      // the one screen built to explain an unevaluated rule explained the
+      // rate limiter instead, and the reason, which had been thrown once and
+      // dropped, was gone before anybody could read it.
+      return Promise.reject(new Error(cooling.why));
     }
     unloadable.delete(role);
   }
@@ -204,8 +232,8 @@ export function modelFor(role: ModelRole): Promise<string> {
     // permanently inheriting a transient failure, and start the cooldown so
     // that retry is not immediate.
     loaded.delete(role);
-    unloadable.set(role, Date.now() + LOAD_RETRY_AFTER_MS);
-    throw err;
+    unloadable.set(role, { until: Date.now() + LOAD_RETRY_AFTER_MS, why: loadFailure(role, err) });
+    throw new Error(loadFailure(role, err));
   });
 
   loaded.set(role, loading);
