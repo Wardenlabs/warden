@@ -98,19 +98,30 @@ module.exports = {
      * runtime that will not start is loud on its own now.
      */
     packageAfterCopy: async (_config, buildPath) => {
-      const { chmodSync, existsSync } = require('node:fs');
+      const { chmodSync, existsSync, readdirSync } = require('node:fs');
       const { join } = require('node:path');
-      for (const rel of [
-        join('node_modules', 'bare-runtime', 'bin', 'bare'),
-        join('node_modules', 'bare-runtime', 'bin', 'bare.exe')
-      ]) {
-        const file = join(buildPath, rel);
-        if (!existsSync(file)) continue;
-        try {
-          chmodSync(file, 0o755);
-          console.log(`[warden] made executable: ${rel}`);
-        } catch (err) {
-          console.warn(`[warden] could not chmod ${rel}: ${err.message}`);
+      const modules = join(buildPath, 'node_modules');
+      if (!existsSync(modules)) return;
+
+      // Every `bare-runtime-<platform>-<arch>` package, plus the launcher in
+      // `bare-runtime` itself. The platform packages are the ones that matter:
+      // `lib/spawn.js` runs in-process and execs the ~95 MB binary in there
+      // directly, so `bin/bare` in `bare-runtime` is a 130-byte shim the SDK
+      // never touches. Doing both costs nothing and stops the next person
+      // fixing only the one they happened to look at, which is what I did.
+      const dirs = readdirSync(modules).filter(
+        (name) => name === 'bare-runtime' || name.startsWith('bare-runtime-')
+      );
+      for (const dir of dirs) {
+        const bin = join(modules, dir, 'bin');
+        if (!existsSync(bin)) continue;
+        for (const name of readdirSync(bin)) {
+          try {
+            chmodSync(join(bin, name), 0o755);
+            console.log(`[warden] made executable: node_modules/${dir}/bin/${name}`);
+          } catch (err) {
+            console.warn(`[warden] could not chmod ${dir}/bin/${name}: ${err.message}`);
+          }
         }
       }
     }

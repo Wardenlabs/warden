@@ -88,8 +88,12 @@ jobs:
       # and where it can regress.
       - name: The runtime the SDK spawns is executable in the package
         run: |
-          BARE=out/Warden-linux-x64/resources/app/node_modules/bare-runtime/bin/bare
-          test -f "$BARE" || { echo "not packaged: $BARE"; find out -name bare -path '*bare-runtime*'; exit 1; }
+          # The platform package, not bare-runtime/bin/bare. That one is a
+          # 130-byte shim for a shell prompt; the SDK imports
+          # bare-runtime/spawn in-process and execs this binary directly, so
+          # this is the file whose mode decides whether inference runs.
+          BARE=out/Warden-linux-x64/resources/app/node_modules/bare-runtime-linux-x64/bin/bare
+          test -f "$BARE" || { echo "not packaged: $BARE"; find out -path '*bare-runtime*' -name bare; exit 1; }
           test -x "$BARE" || { echo "packaged without the execute bit: $(ls -l "$BARE")"; exit 1; }
           "$BARE" --version
       - name: Packaged app boots headless in mock mode

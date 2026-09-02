@@ -321,20 +321,26 @@ export async function probeRuntime(): Promise<{ path: string | null; ok: boolean
 }
 
 async function runProbe(): Promise<{ path: string | null; ok: boolean; detail: string }> {
-  // Resolved through the package entry and then walked to `bin/`, because the
-  // package's `exports` map does not publish `./bin/bare` and asking for it
-  // directly fails with "subpath is not defined by exports" — which looks like
-  // a missing binary and is not one.
+  // Resolved exactly the way `bare-runtime/lib/spawn.js` resolves it, which is
+  // the only resolution worth probing. The first version of this probed
+  // `bare-runtime/bin/bare` and was testing the wrong file: that is a
+  // 130-byte `#!/usr/bin/env node` shim for people typing `bare` at a prompt,
+  // and the SDK never runs it — it imports `bare-runtime/spawn` in-process and
+  // execs the platform package's binary directly. Probing the shim reported
+  // first EACCES and then "env: node: No such file or directory", both true of
+  // the shim and neither the reason inference was failing.
   let binary: string;
   try {
-    const entry = createRequire(import.meta.url).resolve('bare-runtime');
-    const pkgRoot = entry.slice(0, entry.lastIndexOf('bare-runtime') + 'bare-runtime'.length);
-    binary = resolve(pkgRoot, 'bin', process.platform === 'win32' ? 'bare.exe' : 'bare');
+    const require_ = createRequire(import.meta.url);
+    const pkg = `bare-runtime-${process.platform}-${process.arch}`;
+    const entry = require_.resolve(pkg);
+    const root = entry.slice(0, entry.lastIndexOf(pkg) + pkg.length);
+    binary = resolve(root, 'bin', process.platform === 'win32' ? 'bare.exe' : 'bare');
   } catch (err) {
     return {
       path: null,
       ok: false,
-      detail: `bare-runtime is not resolvable from the gateway: ${
+      detail: `no bare runtime for ${process.platform}-${process.arch}: ${
         err instanceof Error ? err.message : String(err)
       }`
     };
