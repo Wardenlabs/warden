@@ -221,7 +221,7 @@ if (reduced || !hasIO) {
      signal; there is deliberately no scroll listener and no geometry read
      on scroll. Unobserving also makes a chapter a one-shot, so revisiting it
      shows the completed story instead of resetting under the reader. */
-  const STEP_MS = 1000;
+  const STEP_MS = 1500;
   const play = async (ch) => {
     setStep(ch, 0);
     await wait(STEP_MS);

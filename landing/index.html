@@ -64,6 +64,14 @@
   "author": { "@type": "Organization", "name": "Warden Labs", "url": "https://github.com/Wardenlabs" }
 }
 </script>
+<!-- Arm the animated states before first paint. If the module cannot start,
+     the watchdog restores the fully readable, no-JavaScript version. -->
+<script>
+document.documentElement.classList.add('js');
+setTimeout(function () {
+  if (!window.__wardenReady) document.documentElement.classList.remove('js');
+}, 2500);
+</script>
 <link rel="stylesheet" href="styles.css">
 <!-- app.js imports light.js, so without these the browser does not learn the
      second file exists until the first one has arrived and parsed. Two hints

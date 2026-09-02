@@ -1352,7 +1352,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
     min-height: 0;
     height: auto;
     overflow: visible;
-    padding-bottom: var(--s-8);
+    padding-bottom: clamp(48px, 6svh, 64px);
   }
 }
 
@@ -1597,7 +1597,7 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
   }
   /* The parent grid owns the space between scenes; an extra chapter margin
      doubled it on phones. */
-  .stage { gap: var(--s-4); padding: var(--s-3) 0 var(--s-5); }
+  .stage { gap: var(--s-4); padding: var(--s-3) 0 var(--s-7); }
   .says { min-height: clamp(144px, 40vw, 184px); gap: 0; align-items: end; }
   .say h3 { font-size: clamp(26px, 7.4vw, 34px); }
   .say p { font-size: var(--fs-4); }
