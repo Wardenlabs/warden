@@ -1611,13 +1611,13 @@ ${esc(m.runtime.detail)}</pre>
       ${a?.overriddenByEnv ? `<div class="banner warn">
         <b>The environment is setting this.</b> <code>WARDEN_MODEL_ADJUDICATOR</code> wins over what you pick here,
         and <b>${esc(a.inForce)}</b> is what answers.
-      </div>` : picked?.consequence || waiting ? `<div class="banner warn">
-        ${waiting ? `<b>These weights are not on this disk yet.</b>
-          ${esc(fallback?.label ?? 'The smaller model')} keeps judging until the download finishes. ` : ''}${esc(picked?.consequence ?? '')}
-        ${waiting ? `<div class="banner-act">
+      </div>` : waiting ? `<div class="banner warn">
+        <b>These weights are not on this disk yet.</b>
+        ${esc(fallback?.label ?? 'The smaller model')} keeps judging until the download finishes.
+        <div class="banner-act">
           <button type="button" class="btn primary js-get-models">Download it · ${(picked.approxMB / 1000).toFixed(1)} GB</button>
           <span class="note">Warden restarts on its own when it finishes.</span>
-        </div>` : ''}
+        </div>
       </div>` : ''}
     </div>
 

@@ -344,7 +344,7 @@ app.get('/api/settings/adjudicator', (_req, res) => {
     // server. They are what the choice is grounded in, not what a console has
     // any business showing — a screen whose largest type is this product's own
     // worst measurement is a screen nobody opens twice. What a person needs to
-    // decide travels as `trade` and `consequence`, in sentences.
+    // decide travels as `trade`, in a sentence.
     choices: ADJUDICATOR_CHOICES.map((c) => ({
       id: c.id,
       label: c.label,
@@ -352,7 +352,6 @@ app.get('/api/settings/adjudicator', (_req, res) => {
       approxMB: c.approxMB,
       perDecision: c.perDecision,
       trade: c.trade,
-      consequence: c.consequence,
       onDisk: existsSync(resolve(dir, c.filename))
     }))
   });

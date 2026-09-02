@@ -159,8 +159,6 @@ export type AdjudicatorChoice = {
   perDecision: string;
   /** One line on the seat, in the console. */
   trade: string;
-  /** What choosing it costs, shown only once it is chosen. */
-  consequence: string;
   note: string;
 };
 
@@ -174,9 +172,6 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     falsePositives: '63%',
     perDecision: 'A few seconds a decision.',
     trade: 'Strict. It stops more of what it should, and it turns away plenty that was fine.',
-    // Nothing to warn about: this is the seat every shipped measurement was
-    // taken against, and the one that fits inside the hook's deadline.
-    consequence: '',
     note: 'The measured default. Catches the most attacks and fits inside the hook deadline, and refuses two of every three honest requests.'
   },
   {
@@ -188,11 +183,10 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     falsePositives: '6%',
     perDecision: '46 s a decision on four CPU cores.',
     trade: 'Easier to live with. It waves through more, including some it should not.',
-    // Shown when it is chosen and not before, which is the whole argument for
-    // having a picker at all: the cost is attached to the decision that incurs
-    // it rather than sitting on the screen as a warning nobody reads.
-    consequence:
-      'Qwen3 8B catches fewer attacks than the 1.7B, and 46 s is longer than the Claude Code hook waits by default. A hook that gives up lets the prompt through unchecked, so raise WARDEN_TIMEOUT_MS to 90000 and the harness timeout with it.',
+    // The console printed this note's substance in a banner the moment somebody
+    // picked this seat. Removed on the owner's instruction. It stays written
+    // down here because it is still true, and because whoever wires the next
+    // surface to these choices should read it before deciding what to show.
     note: 'Usable for people, weaker as a guard. At 46 s it exceeds the hook default, which fails open: raise WARDEN_TIMEOUT_MS and the harness timeout with it, or that path stops judging.'
   }
 ];
