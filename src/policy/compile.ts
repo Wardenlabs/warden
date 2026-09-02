@@ -82,11 +82,20 @@ export async function compileRule(
     'A rule states what is PROHIBITED. Never write a rule that prohibits limiting,',
     'restricting or refusing people: that inverts what the administrator asked for.',
     '',
-    'Some sentences are not rules at all. Set notARule to true, with a short reason,',
-    'when the administrator is describing:',
-    '- how much may be spent or used (a budget, a percentage, a daily cap): these are',
-    '  role limits in Warden, not rules about what anyone may ask;',
-    '- a question, a greeting, or anything with no prohibition in it.',
+    'Two kinds of sentence are not rules, and they are answered differently.',
+    '',
+    'A target for how much gets used or spent is something Warden CAN do, with',
+    'per-role limits rather than with a rule about what anyone may ask. Set',
+    'notARule to true and set usageFactor to the fraction of today\'s limits the',
+    'administrator is asking for: "reducir mi uso al 50%" is 0.5, "un tercio menos"',
+    'is 0.67, "la mitad de lo que gastamos" is 0.5. Do not compute the new limits',
+    'and do not name the roles; Warden has the current numbers and does the',
+    'arithmetic. A reason is still useful: say what you understood.',
+    '',
+    'A sentence with no prohibition and no target in it — a name, a greeting, a',
+    'question, a fragment — is nothing Warden can act on. Set notARule to true with',
+    'a short reason, and leave usageFactor out.',
+    '',
     'When notARule is true the other fields are ignored, so do not labour over them.',
     '',
     `Valid role names: ${roles.join(', ')}.`,
@@ -196,7 +205,8 @@ export async function compileRule(
   if (draft.notARule) {
     return {
       notARule: true,
-      notARuleReason: draft.notARuleReason ?? ''
+      notARuleReason: draft.notARuleReason ?? '',
+      ...(draft.usageFactor !== undefined ? { usageFactor: draft.usageFactor } : {})
     } as unknown as Rule;
   }
 
@@ -343,7 +353,12 @@ export async function compilePolicy(
   text: string,
   policy: PolicySpec,
   options: CompileOptions = {}
-): Promise<{ statements: string[]; rules: Rule[]; declined: string[] }> {
+): Promise<{
+  statements: string[];
+  rules: Rule[];
+  declined: string[];
+  declinedFactors: (number | undefined)[];
+}> {
   const statements = await splitStatement(qvac, text);
 
   // A refusal from `compileRule` is not a rule and must not be carried as one.
@@ -356,16 +371,20 @@ export async function compilePolicy(
   // in the user's face with an error about our own schema.
   const rules: Rule[] = [];
   const declined: string[] = [];
+  const declinedFactors: (number | undefined)[] = [];
   for (const statement of statements) {
     const compiled = (await compileRule(qvac, statement, policy, options)) as Rule & {
       notARule?: boolean;
       notARuleReason?: string;
+      usageFactor?: number;
     };
-    if (compiled.notARule) declined.push(compiled.notARuleReason || 'It contains no prohibition.');
-    else rules.push(compiled);
+    if (compiled.notARule) {
+      declined.push(compiled.notARuleReason || 'It contains no prohibition.');
+      declinedFactors.push(compiled.usageFactor);
+    } else rules.push(compiled);
   }
 
-  return { statements, rules, declined };
+  return { statements, rules, declined, declinedFactors };
 }
 
 export type PreviewRow = {

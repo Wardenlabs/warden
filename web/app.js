@@ -130,6 +130,8 @@ const state = {
   canLeaveDemo: false,
   /** What weights are on disk and which seat each model fills. Null until loaded. */
   models: null,
+  /** Limits the compiler proposed and nobody has applied yet. */
+  pendingLimits: null,
   /** Role whose limits are open for editing, or null. One at a time. */
   quotaEdit: null,
   /** Why the last save of that role's limits was refused, if it was. */
@@ -1612,6 +1614,31 @@ function readable(err) {
   return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }
 
+/**
+ * What to say when the compiler did not write a rule, which is two answers.
+ *
+ * "Quiero reducir mi uso del mes 50%" is not the same kind of thing as "juan".
+ * One is a request Warden can satisfy in the only currency it has for spending,
+ * and refusing it flat was wrong: the point of typing a sentence is that
+ * something comes back. So the gateway multiplies the limits it already has by
+ * the fraction the compiler read, and this puts the arithmetic on screen with
+ * a button. The other really is nothing to act on, and says so in one line.
+ */
+function notARuleAnswer(j) {
+  const reason = esc(j.reason || 'There is no prohibition in it.');
+  if (!Array.isArray(j.limits) || j.limits.length === 0) {
+    return `<b>Nothing to enforce there.</b> ${reason}`;
+  }
+  const pct = Math.round((1 - j.factor) * 100);
+  state.pendingLimits = j.limits;
+  return `<b>That is a spending target, not a rule.</b> ${reason}
+    <div>Cutting every daily limit by ${pct}%:</div>
+    <div class="limit-plan">${j.limits.map((row) => `
+      <div class="r"><span class="k">${esc(row.role)}</span>
+        <span class="v num">${row.from} → ${row.to} a day</span></div>`).join('')}</div>
+    <div><button type="button" class="btn primary" id="applyLimits">Apply these limits</button></div>`;
+}
+
 /** Roles the policy declines to govern. Read from the policy, never guessed. */
 function exemptRoles() {
   return state.policy.exemptRoles ?? [];
@@ -2151,9 +2178,7 @@ async function sendRuleMessage(text) {
   // be limited on the basis of a usage goal, which is the request inside out.
   if (ok && j.notARule) {
     state.ruleBusy = false;
-    say(`<b>That is not a rule.</b> ${esc(j.reason || 'There is no prohibition in it.')}
-      <div>If it is about how much your team may spend, that lives under
-      <button type="button" class="linkish" data-go="policy">Limits by role</button>.</div>`);
+    say(notARuleAnswer(j));
     render();
     return;
   }
@@ -2228,9 +2253,7 @@ async function sendRuleSet(text) {
   // Same refusal, same handling. This route is the one that was forgotten.
   if (ok && j.notARule) {
     state.ruleBusy = false;
-    say(`<b>That is not a rule.</b> ${esc(j.reason || 'There is no prohibition in it.')}
-      <div>If it is about how much your team may spend, that lives under
-      <button type="button" class="linkish" data-go="policy">Limits by role</button>.</div>`);
+    say(notARuleAnswer(j));
     render();
     return;
   }
@@ -2329,6 +2352,21 @@ function bindPolicy() {
 
   bindLimits();
   bindSweeps();
+
+  const apply = $('applyLimits');
+  if (apply) apply.onclick = async () => {
+    apply.disabled = true;
+    apply.textContent = 'Applying…';
+    const { ok, j } = await api('/api/quotas/apply', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ limits: state.pendingLimits ?? [] })
+    });
+    if (!ok) { apply.disabled = false; apply.textContent = 'Apply these limits'; return; }
+    state.pendingLimits = null;
+    await refreshPolicy();
+    say(`Done. ${plural(j.applied, 'role')} now on the new daily limit.`);
+    render();
+  };
 
   const cancel = $('cancelDraft');
   if (cancel) cancel.onclick = discardDraft;

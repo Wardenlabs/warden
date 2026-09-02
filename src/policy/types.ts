@@ -173,6 +173,19 @@ export const ruleDraftSchema = ruleSchema
   .extend({
     notARule: z.boolean().optional(),
     notARuleReason: z.string().optional(),
+    /**
+     * The fraction of today's limits the administrator is asking for.
+     *
+     * One number, and the model is asked for nothing else about it: not the
+     * new limits, not which roles, not the arithmetic. "Reducir mi uso al 50%"
+     * is `0.5`. Warden multiplies the quotas it already has, which is the part
+     * a model has no business doing and gets wrong in a way nobody would catch.
+     *
+     * This exists because refusing was the wrong answer to that sentence. It
+     * is not nonsense the way "juan" is nonsense; it is a request Warden can
+     * satisfy, in the one currency it has for spending.
+     */
+    usageFactor: z.number().gt(0).lt(1).optional(),
     // `text` loses its min(1) here and gets it back in the refinement below.
     // Declining, a model writes `notARule: true` next to `text: ""`, and the
     // inherited minimum rejected the whole answer before anything could read
@@ -237,6 +250,7 @@ export const RULE_DRAFT_JSON_SCHEMA = {
     // the local model unable to say the one thing it had just been told to say.
     notARule: { type: 'boolean' },
     notARuleReason: { type: 'string' },
+    usageFactor: { type: 'number' },
     text: { type: 'string' },
     scope: { type: 'string', enum: ['input', 'output', 'both'] },
     appliesTo: { type: 'array', items: { type: 'string' } },

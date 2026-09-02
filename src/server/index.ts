@@ -443,6 +443,38 @@ function draftedBy(remote: string | null): string {
   return isMock() ? 'the demo stand-in, not a model' : resolvedModel('compiler');
 }
 
+/**
+ * Today's limits, multiplied, for the administrator to look at.
+ *
+ * "Quiero reducir mi uso del mes 50%" is not nonsense and refusing it was the
+ * wrong answer: it is a request Warden can satisfy, in the one currency it has
+ * for spending. What it is not is a rule, so it produces numbers rather than a
+ * prohibition, and the numbers come from here rather than from the model. The
+ * model supplies the fraction and nothing else; multiplying seven quotas and
+ * rounding them is arithmetic, and a model doing arithmetic on a policy is a
+ * mistake nobody would notice until somebody hit a limit that was never agreed.
+ *
+ * Proposed, not applied. Same boundary as a rule: the administrator presses the
+ * button, and until they do the policy is untouched.
+ */
+function proposedLimits(factor: number | undefined): {
+  limits?: { role: string; from: number; to: number }[];
+  factor?: number;
+} {
+  if (typeof factor !== 'number' || !(factor > 0) || !(factor < 1)) return {};
+  const limits = loadPolicy()
+    .quotas.map((q) => ({
+      role: q.role,
+      from: q.maxRequestsPerDay,
+      // Never below one: a quota of zero is a role that cannot ask anything,
+      // which is a suspension and not a reduction, and nobody typing "half"
+      // means that.
+      to: Math.max(1, Math.round(q.maxRequestsPerDay * factor))
+    }))
+    .filter((row) => row.to !== row.from);
+  return limits.length ? { limits, factor } : {};
+}
+
 app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ error: 'text is required' });
@@ -457,12 +489,17 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   const rule = (await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {})) as {
     notARule?: boolean;
     notARuleReason?: string;
+    usageFactor?: number;
   };
   // The compiler declining is an answer, not a failure. It reaches the console
   // as its own shape so the console can send somebody to the limits editor
   // rather than handing them a prohibition built out of a budget sentence.
   if (rule.notARule) {
-    return res.json({ notARule: true, reason: rule.notARuleReason ?? '' });
+    return res.json({
+      notARule: true,
+      reason: rule.notARuleReason ?? '',
+      ...proposedLimits(rule.usageFactor)
+    });
   }
   // Who wrote the draft, so the administrator ratifying it can see whether it
   // came off their own machine. `null` means local, which is the default.
@@ -497,12 +534,17 @@ app.post('/api/policy/draft-set', asyncRoute(async (req, res) => {
       t: string,
       p: unknown,
       o?: unknown
-    ) => Promise<{ statements: string[]; rules: unknown[]; declined: string[] }>;
+    ) => Promise<{
+      statements: string[];
+      rules: unknown[];
+      declined: string[];
+      declinedFactors: (number | undefined)[];
+    }>;
   }>('../policy/compile.js');
   const compilePolicy = mod?.compilePolicy;
   if (!compilePolicy) return res.status(503).json({ error: 'compiler not available' });
   const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
-  const { statements, rules, declined } = await compilePolicy(
+  const { statements, rules, declined, declinedFactors } = await compilePolicy(
     adapter(),
     text,
     loadPolicy(),
@@ -511,7 +553,11 @@ app.post('/api/policy/draft-set', asyncRoute(async (req, res) => {
   // Everything the compiler was given, it declined. Same answer the single-rule
   // route gives, in the same shape, so the console has one case to handle.
   if (rules.length === 0 && declined.length > 0) {
-    return res.json({ notARule: true, reason: declined[0] });
+    return res.json({
+      notARule: true,
+      reason: declined[0] ?? '',
+      ...proposedLimits(declinedFactors[0])
+    });
   }
   const remote = remoteCompiler();
   res.json({
@@ -746,6 +792,33 @@ app.post('/api/roles', asyncRoute(async (req, res) => {
  * lands in the audit trail like any other ratified change. Quotas are inside
  * the policy hash — an admin quietly raising a ceiling is a governance event.
  */
+/**
+ * Apply a set of proposed limits, all at once.
+ *
+ * The compiler proposes and the administrator applies, which is the same
+ * boundary a rule crosses at Activate and for the same reason: a model that
+ * could change what people may spend without anybody agreeing is a model
+ * setting policy. One `savePolicy`, so the whole reduction is one ratified
+ * version in the audit trail rather than seven.
+ */
+app.post('/api/quotas/apply', asyncRoute(async (req, res) => {
+  const rows = Array.isArray(req.body?.limits) ? req.body.limits : [];
+  const policy = loadPolicy();
+  const wanted = new Map<string, number>();
+  for (const row of rows) {
+    const role = normaliseRole(String((row as { role?: unknown }).role ?? ''));
+    const to = Math.floor(Number((row as { to?: unknown }).to));
+    if (role && Number.isFinite(to) && to > 0) wanted.set(role, to);
+  }
+  if (wanted.size === 0) return res.status(400).json({ error: 'no limits to apply' });
+
+  const quotas = policy.quotas.map((q) =>
+    wanted.has(q.role) ? { ...q, maxRequestsPerDay: wanted.get(q.role)! } : q
+  );
+  const saved = savePolicy(policy.rules, quotas);
+  res.json({ applied: wanted.size, version: saved.version });
+}));
+
 app.put('/api/quotas/:role', asyncRoute(async (req, res) => {
   const role = normaliseRole(String(req.params['role'] ?? ''));
   if (!role) return res.status(400).json({ error: 'role is required' });
