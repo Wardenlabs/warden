@@ -783,7 +783,7 @@ function detectMode() {
 
 async function main() {
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
-  const decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
+  let decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
@@ -841,12 +841,22 @@ async function main() {
 
   let res;
   try {
-    await requestJson(
+    const health = await requestJson(
       `${WARDEN_URL}/health`,
       { method: 'GET' },
       healthTimeoutMs,
       validateHealth
     );
+    // The gateway's number beats this machine's. The deadline decides when the
+    // hook stops checking and lets the prompt through, so leaving it to each
+    // employee's shell profile put a security parameter in the hands of the
+    // person it constrains — and the failure is silent in both directions: too
+    // short and they stop being checked, too long and they wait without
+    // knowing why. An administrator who raises it for a slower adjudicator now
+    // reaches every laptop on its next prompt. `WARDEN_TIMEOUT_MS` still works
+    // for a gateway too old to answer, and for debugging.
+    const stated = health?.deadlines?.decisionMs;
+    if (Number.isFinite(stated) && stated > 0) decisionTimeoutMs = stated;
     res = await requestJson(
       `${WARDEN_URL}/api/guard/check`,
       {

@@ -187,7 +187,7 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     // picked this seat. Removed on the owner's instruction. It stays written
     // down here because it is still true, and because whoever wires the next
     // surface to these choices should read it before deciding what to show.
-    note: 'Usable for people, weaker as a guard. At 46 s it exceeds the hook default, which fails open: raise WARDEN_TIMEOUT_MS and the harness timeout with it, or that path stops judging.'
+    note: 'Usable for people, weaker as a guard. At 46 s it fits inside the 90 s hook deadline, but not by much: raise WARDEN_HOOK_TIMEOUT_MS on the gateway if decisions here run slower, since a hook that gives up fails open.'
   }
 ];
 

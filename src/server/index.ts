@@ -1472,6 +1472,24 @@ let modelState: 'cold' | 'loading' | 'ready' | 'failed' = 'cold';
 // `mode` is surfaced for the same reason `mock` is: a gateway running with the
 // guard switched off (`WARDEN_MODE=baseline`) must not present an identical
 // green UI to one that is enforcing.
+/**
+ * The decision deadline this deployment hands to its hooks.
+ *
+ * 90 seconds by default, which is what `integrations/warden-hook.mjs` falls
+ * back to when a gateway is too old to say. Raise it on the gateway when the
+ * adjudicator is slower than the deadline — the optional 8B was measured at
+ * 46 s on four CPU cores — and every hook picks it up on its next prompt
+ * without anybody editing a shell profile.
+ */
+function hookDecisionDeadlineMs(): number {
+  const raw = process.env['WARDEN_HOOK_TIMEOUT_MS'];
+  if (raw === undefined) return 90_000;
+  const value = Number(raw);
+  // A deadline nobody can parse is not a reason to invent a shorter one: the
+  // shorter it is, the sooner the hook stops checking.
+  return Number.isFinite(value) && value > 0 ? value : 90_000;
+}
+
 app.get('/health', (_req, res) =>
   res.json({
     ok: true,
@@ -1485,7 +1503,24 @@ app.get('/health', (_req, res) =>
     // Whether there is a desktop shell listening that could actually fetch the
     // models. In a browser against a checkout there is not, and the console has
     // to offer the command instead of a button that would do nothing.
-    canLeaveDemo: parentPort !== undefined
+    canLeaveDemo: parentPort !== undefined,
+    /*
+     * How long this gateway asks a hook to wait for a decision.
+     *
+     * It is here because it is the gateway's number, not the employee's. The
+     * onboarding pack used to hand every employee an `export
+     * WARDEN_TIMEOUT_MS=...` line, which meant each laptop chose its own
+     * deadline — and the direction that matters is down: a hook that gives up
+     * early fails OPEN, so an employee who shortened it, or who kept an old
+     * value from a pack written two releases ago, quietly stopped being
+     * checked. Nobody would see it. The administrator who raised the deadline
+     * for a slower model would not see it either.
+     *
+     * So the gateway states it and the hook takes it. What an employee still
+     * needs on their machine is a URL and a key, which is the whole point of
+     * identity being the key and only the key.
+     */
+    deadlines: { decisionMs: hookDecisionDeadlineMs() }
   })
 );
 

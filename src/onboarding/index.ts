@@ -91,20 +91,18 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
         'Served by the gateway itself, so this works on a network with no way out ' +
         'to the internet. It carries your API key, so treat the link as a secret. ' +
         'Safe to re-run: it replaces its own block rather than stacking a second one. ' +
-        'Availability checks default to 2 seconds and full decisions to 90 seconds.',
+        'It sets two things and no more: where the gateway is, and who you are.',
       code: `curl -fsSL ${gatewayUrl}/install/${installToken(employee)} | sh`
     },
     {
       title: 'Windows PowerShell alternative (current session)',
       language: 'powershell',
       note:
-        'The API key is your identity. The 90 second decision deadline is fail-open; a machine whose cold decisions exceed it is not verified.',
+        'The API key is your identity. How long a decision may take is the gateway\'s setting, not yours — the hook asks it on every prompt.',
       code:
         `Invoke-WebRequest -Uri '${gatewayUrl}/warden-hook.mjs' -OutFile "$HOME\\.warden-hook.mjs"\n` +
         `$env:WARDEN_URL = '${gatewayUrl}'\n` +
-        `$env:WARDEN_API_KEY = '${employee.apiKey}'\n` +
-        `$env:WARDEN_HEALTH_TIMEOUT_MS = '2000'\n` +
-        `$env:WARDEN_TIMEOUT_MS = '90000'`
+        `$env:WARDEN_API_KEY = '${employee.apiKey}'`
     },
     {
       title: 'Then open a new terminal, and check it reaches the gateway',
@@ -123,9 +121,7 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
         `chmod +x ${HOOK_PATH}\n\n` +
         `# in ~/.zshrc or ~/.bashrc\n` +
         `export WARDEN_URL=${gatewayUrl}\n` +
-        `export WARDEN_API_KEY=${employee.apiKey}\n` +
-        `export WARDEN_HEALTH_TIMEOUT_MS=2000\n` +
-        `export WARDEN_TIMEOUT_MS=90000`
+        `export WARDEN_API_KEY=${employee.apiKey}`
     }
   ];
 }

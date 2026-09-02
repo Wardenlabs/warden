@@ -247,8 +247,13 @@ gets uninstalled the first morning it does. The missing heartbeat in the admin
 console is the alert.
 
 Availability and inference use separate deadlines. `/health` gets 2 seconds by
-default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets 90 seconds
-(`WARDEN_TIMEOUT_MS`). Both values must be positive and finite. The decision
+default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets whatever the
+gateway states on `/health`, 90 seconds unless `WARDEN_HOOK_TIMEOUT_MS` says
+otherwise on the gateway. `WARDEN_TIMEOUT_MS` on the employee's machine is a
+fallback for a gateway too old to answer, and is deliberately no longer part
+of what an employee is asked to set: the deadline decides when the hook stops
+checking, so it belongs to the administrator who owns the policy, not to the
+person the policy constrains. Both values must be positive and finite. The decision
 deadline includes reading and validating the complete HTTP body. A decision
 that exceeds the deadline still fails open; on 2026-08-23, when the deadline
 was 30 seconds, one cold Windows Codex check took 35.954 seconds and reached
