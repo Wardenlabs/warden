@@ -343,15 +343,29 @@ export async function compilePolicy(
   text: string,
   policy: PolicySpec,
   options: CompileOptions = {}
-): Promise<{ statements: string[]; rules: Rule[] }> {
+): Promise<{ statements: string[]; rules: Rule[]; declined: string[] }> {
   const statements = await splitStatement(qvac, text);
 
+  // A refusal from `compileRule` is not a rule and must not be carried as one.
+  // It was: `notARule` was handled on the single-rule route and nowhere else, so
+  // the word "juan" came back through this path as `{ notARule: true }`, was put
+  // on screen as a draft, and reached `previewRule`, where `ruleSchema.parse`
+  // rejected an object with no id, text, scope, audience, severity or examples
+  // and printed all six zod issues into the conversation. One route wired and
+  // one forgotten is worse than neither, because the forgotten one fails loudly
+  // in the user's face with an error about our own schema.
   const rules: Rule[] = [];
+  const declined: string[] = [];
   for (const statement of statements) {
-    rules.push(await compileRule(qvac, statement, policy, options));
+    const compiled = (await compileRule(qvac, statement, policy, options)) as Rule & {
+      notARule?: boolean;
+      notARuleReason?: string;
+    };
+    if (compiled.notARule) declined.push(compiled.notARuleReason || 'It contains no prohibition.');
+    else rules.push(compiled);
   }
 
-  return { statements, rules };
+  return { statements, rules, declined };
 }
 
 export type PreviewRow = {

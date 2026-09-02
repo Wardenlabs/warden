@@ -1555,6 +1555,13 @@ function modelsSection() {
     <div class="note">Judging always runs here, whatever you pick below. A Claude or Codex
       subscription can write your rules; it never sees an employee prompt.</div>
 
+    ${m.runtime && !m.runtime.ok ? `<div class="banner bad">
+      <b>The inference runtime will not start on this machine.</b>
+      Every rule escalates until it does, because a pass that cannot run is never treated as clean.
+      <div class="code">${esc(m.runtime.path ?? 'bare-runtime not found')}
+${esc(m.runtime.detail)}</div>
+    </div>` : ''}
+
     <div class="models">
       ${m.models.map((x) => `<div class="model ${x.onDisk ? 'have' : 'missing'}">
         <span class="role">${esc(x.role)}</span>
@@ -1577,6 +1584,32 @@ function modelsSection() {
         : `<span class="note">Run <span class="mono">pnpm run setup</span> to fetch ${missing === 1 ? 'it' : 'them'}.</span>`}
     </div>` : ''}
   </div>`;
+}
+
+/**
+ * An error a person can read, out of whatever the gateway sent.
+ *
+ * A zod failure arrives as a JSON array of issue objects, and the console
+ * printed the whole thing: forty lines of `"code": "invalid_type"` in the
+ * middle of a conversation, about a schema the reader has never heard of. The
+ * messages inside it are the only part with any meaning, and even those are
+ * ours rather than theirs, so they are capped.
+ */
+function readable(err) {
+  if (!err) return 'unknown error';
+  const text = String(err);
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      const fields = parsed.map((i) => (Array.isArray(i?.path) ? i.path.join('.') : '')).filter(Boolean);
+      return fields.length
+        ? `the draft was missing ${fields.slice(0, 6).join(', ')}`
+        : 'the draft did not match the expected shape';
+    }
+  } catch {
+    /* not JSON, which is the ordinary case */
+  }
+  return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }
 
 /** Roles the policy declines to govern. Read from the policy, never guessed. */
@@ -2191,6 +2224,17 @@ async function sendRuleSet(text) {
   });
 
   dropPending();
+
+  // Same refusal, same handling. This route is the one that was forgotten.
+  if (ok && j.notARule) {
+    state.ruleBusy = false;
+    say(`<b>That is not a rule.</b> ${esc(j.reason || 'There is no prohibition in it.')}
+      <div>If it is about how much your team may spend, that lives under
+      <button type="button" class="linkish" data-go="policy">Limits by role</button>.</div>`);
+    render();
+    return;
+  }
+
   if (!ok || !Array.isArray(j.rules) || j.rules.length === 0) {
     state.ruleBusy = false;
     say(compileFailure(j));
@@ -2231,7 +2275,7 @@ async function runPreview(against = []) {
 
   dropPending();
   state.ruleBusy = false;
-  if (!ok) { say(`The check failed: ${esc(j.error ?? 'unknown error')}`); render(); return; }
+  if (!ok) { say(`The check failed: ${esc(readable(j.error))}`); render(); return; }
 
   state.preview = j;
   // Anything the check found — a legitimate request wrongly stopped, or a

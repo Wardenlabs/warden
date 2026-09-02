@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
-import { modelInventory, resolvedModel } from '../qvac/client.js';
+import { modelInventory, probeRuntime, resolvedModel } from '../qvac/client.js';
 import { cliCompilerConfig, cliToolLabel, detectCliTools } from '../qvac/cli-compiler.js';
 import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
 import {
@@ -492,12 +492,27 @@ app.post('/api/policy/draft-set', asyncRoute(async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ error: 'text is required' });
   const mod = await optional<{
-    compilePolicy: (a: unknown, t: string, p: unknown, o?: unknown) => Promise<{ statements: string[]; rules: unknown[] }>;
+    compilePolicy: (
+      a: unknown,
+      t: string,
+      p: unknown,
+      o?: unknown
+    ) => Promise<{ statements: string[]; rules: unknown[]; declined: string[] }>;
   }>('../policy/compile.js');
   const compilePolicy = mod?.compilePolicy;
   if (!compilePolicy) return res.status(503).json({ error: 'compiler not available' });
   const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
-  const { statements, rules } = await compilePolicy(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {});
+  const { statements, rules, declined } = await compilePolicy(
+    adapter(),
+    text,
+    loadPolicy(),
+    lockTo ? { lockTo } : {}
+  );
+  // Everything the compiler was given, it declined. Same answer the single-rule
+  // route gives, in the same shape, so the console has one case to handle.
+  if (rules.length === 0 && declined.length > 0) {
+    return res.json({ notARule: true, reason: declined[0] });
+  }
   const remote = remoteCompiler();
   res.json({
     statements,
@@ -1379,12 +1394,15 @@ app.get('/health', (_req, res) =>
  */
 const FETCHABLE_ROLES = new Set(['adjudicator', 'embedder', 'detector']);
 
-app.get('/api/models', (_req, res) => {
+app.get('/api/models', asyncRoute(async (_req, res) => {
   const cli = cliCompilerConfig();
   const remote = remoteCompiler();
+  // Cheap, and it is the one question nothing else on this machine can answer.
+  const runtime = isMock() ? null : await probeRuntime();
   res.json({
     mock: isMock(),
     state: modelState,
+    runtime,
     // `fetchable` is what the first-run downloader would actually go and get:
     // `required` and carrying an HTTPS url. OCR_LATIN has neither (`url: null`,
     // it resolves only over the P2P registry) and the assistant is optional, so
@@ -1405,7 +1423,7 @@ app.get('/api/models', (_req, res) => {
         ? { where: 'a configured endpoint', model: remote }
         : { where: 'this machine', model: resolvedModel('compiler') }
   });
-});
+}));
 
 app.get('/api/gateway/log', (_req, res) => {
   const path = process.env['WARDEN_LOG_PATH'];

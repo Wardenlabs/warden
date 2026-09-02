@@ -6,7 +6,9 @@
  * evaluation touches three roles; reloading per call would make the pipeline
  * unusable.
  */
+import { execFile } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
@@ -272,6 +274,66 @@ export function resolvedModel(role: ModelRole): string {
   } catch (err) {
     return `unresolved (${err instanceof Error ? err.message : String(err)})`;
   }
+}
+
+/**
+ * Can the runtime the SDK spawns actually run on this machine?
+ *
+ * Two wrong guesses at "RPC initialization timed out after 30000ms, the worker
+ * process may have failed to start" cost two releases, and the thing that made
+ * both of them guesses is that the error carries no `Worker stderr:` section. A
+ * process that starts and dies leaves stderr behind. An empty tail means it
+ * never started, and nothing downstream can tell the difference between a
+ * binary that is missing, one the OS refused to execute, and one that is fine
+ * while something else is broken.
+ *
+ * So ask it directly: run `bare --version` and keep whatever comes back. It is
+ * the same binary `@qvac/sdk` spawns through `bare-runtime/spawn`, so a failure
+ * here is the failure there, named, in under a second, on the machine that has
+ * the problem rather than on mine.
+ */
+export async function probeRuntime(): Promise<{ path: string | null; ok: boolean; detail: string }> {
+  // Resolved through the package entry and then walked to `bin/`, because the
+  // package's `exports` map does not publish `./bin/bare` and asking for it
+  // directly fails with "subpath is not defined by exports" — which looks like
+  // a missing binary and is not one.
+  let binary: string;
+  try {
+    const entry = createRequire(import.meta.url).resolve('bare-runtime');
+    const pkgRoot = entry.slice(0, entry.lastIndexOf('bare-runtime') + 'bare-runtime'.length);
+    binary = resolve(pkgRoot, 'bin', process.platform === 'win32' ? 'bare.exe' : 'bare');
+  } catch (err) {
+    return {
+      path: null,
+      ok: false,
+      detail: `bare-runtime is not resolvable from the gateway: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    };
+  }
+
+  if (!existsSync(binary)) {
+    return { path: binary, ok: false, detail: 'the file is not there' };
+  }
+
+  return new Promise((resolve) => {
+    execFile(binary, ['--version'], { timeout: 10_000 }, (err, stdout, stderr) => {
+      if (!err) {
+        resolve({ path: binary, ok: true, detail: String(stdout || stderr).trim() || 'ran' });
+        return;
+      }
+      // The code is the useful part. EACCES is a permission bit, ENOENT after
+      // an existsSync is a missing interpreter or library, and a kill signal on
+      // macOS is Gatekeeper refusing an executable it will not vouch for.
+      const code = (err as NodeJS.ErrnoException).code ?? '';
+      const signal = (err as { signal?: string }).signal ?? '';
+      resolve({
+        path: binary,
+        ok: false,
+        detail: [code, signal, String(stderr || err.message).trim()].filter(Boolean).join(' · ').slice(0, 300)
+      });
+    });
+  });
 }
 
 /**
