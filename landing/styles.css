@@ -378,8 +378,14 @@ header {
 }
 header .bar { display: flex; align-items: center; justify-content: space-between; height: 56px; gap: var(--s-6); }
 .brand { display: flex; align-items: center; gap: var(--s-3); color: var(--ink); text-decoration: none; }
-.brand .mark { width: 19px; height: 19px; }
-.brand .word { height: 13px; width: auto; }
+header .brand > svg, .foot .links .brand > svg { display: none; }
+header .brand::before, .foot .links .brand::before {
+  content: "";
+  display: block;
+  flex: none;
+  background: url("warden-logo.png") center / contain no-repeat;
+}
+header .brand::before { width: 90px; height: 26px; }
 header nav { display: flex; align-items: center; gap: var(--s-6); }
 header nav a { font-size: var(--fs-3); color: var(--muted); text-decoration: none; transition: color .15s ease; }
 header nav a:hover { color: var(--ink); }
@@ -651,8 +657,7 @@ footer::before {
 .foot .links { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4); justify-content: center; align-items: center; }
 .foot .links .brand { color: var(--muted); transition: color .15s ease; }
 .foot .links .brand:hover { color: var(--ink); }
-.foot .links .brand .mark { width: 15px; height: 15px; }
-.foot .links .brand .word { height: 10px; }
+.foot .links .brand::before { width: 67px; height: 19px; }
 .foot .sep { color: var(--line-firm); }
 .foot a { color: var(--muted); text-decoration: none; }
 .foot .links a:hover { color: var(--ink); }
