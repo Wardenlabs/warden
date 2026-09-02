@@ -30,18 +30,15 @@ have seen it work.
 Below the hero the page is one story with a clock, and each scene is built
 out of the hero's own parts: a centred statement in the hero's weight, one
 quiet line under it, a gate line beneath that, and the thing being judged
-below the line. On a wide screen the whole stage pins for a full screen
-while the scroll swaps the statement and walks the panel through a state
-machine keyed to the active step — every reveal, collapse, spotlight and
-border is a `[data-step]` selector, so the panel answers the scroll in both
-directions and walking back up folds it away again. Terminals grow
+below the line. Each chapter starts a three-beat autoplay once it enters the
+viewport while the page keeps native, unpinned scrolling. Every reveal,
+collapse, spotlight and border is a `[data-step]` selector, and `app.js`
+advances those steps on a short timeline. Terminals grow
 line-group by line-group the way real ones do, the ledger fills row by row
 with a spotlight that follows the narration, and the last beat of scene 02
 flips the real tool tabs itself. The scene's gate line carries the verdict, warm while nothing is wrong and
-taking the block's coral in scene 02 and the hold's amber in scene 04, and
-three dots at the stage's foot say how many beats a scene has and which one
-is showing. On a phone nothing pins: the statements stack and the panel
-walks its states once, paced, as it arrives. The connective tissue is content, not
+taking the block's coral in scene 02 and the hold's amber in scene 04. Phones
+play the same sequence in a shorter text frame. The connective tissue is content, not
 decoration: the 14:22 row of the scene-03 ledger *is* the scene-02 block,
 and the 14:21 hold is the rule ratified in scene 01.
 
@@ -229,16 +226,13 @@ the scene engine assembling a panel. Every one of them is off under
 `prefers-reduced-motion` — the hero then shows the finished state, prompt
 typed and verdict on, and every scene panel is simply complete.
 
-Below the hero, motion is the panel answering the scroll: a headline rising
-out of its mask, a terminal growing a group of lines, a ledger row unfolding,
-a spotlight moving one row down — and all of it in reverse on the way back
-up, because the states live in CSS `[data-step]` selectors rather than in
-one-way classes. The engine in `app.js` never invents content — it types
+Below the hero, motion is a self-running sequence: a headline rising out of
+its mask, a terminal growing a group of lines, a ledger row unfolding, and a
+spotlight moving one row down. The states live in CSS `[data-step]` selectors.
+The engine in `app.js` never invents content — it types
 over text that ships in the markup, presses one button, and flips the real
-tool tabs; everything else is a selector. None of it loops, and a fast
-scroll lands on the current step's state rather than a queue of catch-up
-animation. The growth happens inside the pinned column, so nothing under a
-chapter ever shifts while it plays.
+tool tabs; everything else is a selector. None of it loops, and the scroll
+never scrubs, reverses, or accelerates a chapter.
 
 The tool switch in `#how` has no animation and no JavaScript at all. It is four
 radios and `:checked ~`, so it works with scripting off, takes arrow keys for

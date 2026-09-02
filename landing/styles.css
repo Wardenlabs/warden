@@ -855,9 +855,9 @@ footer::before {
 /* ── §1, the day in scenes ─────────────────────────────────────────────── */
 /*
  * The three centred stages became four chapters on a left rail — the scene
- * grid at the end of this file. What made the panels a sequence used to be
- * order in time alone; now it is the scroll itself: the narration walks and
- * the pinned panel assembles at the step that explains it. The handoff
+ * grid at the end of this file. Each chapter now plays its own short timeline:
+ * the narration advances and the panel assembles at the step that explains
+ * it, independently of scroll position. The handoff
  * stayed — when the refusal lands in scene 02 the sentence written in 01
  * takes the hit for a beat — and the hero's gate is still the only light
  * on the page, which is the one place light means something.
@@ -869,8 +869,7 @@ footer::before {
 #ruleMsg.hit { color: var(--ink); text-shadow: 0 0 14px rgba(239, 107, 112, .45); }
 
 /* The card the verdict lands in takes a trace of its colour on the frame at
-   the moment the verdict lands — well under the text's saturation, and gone
-   again when the reader scrolls back above the refusal. */
+   the moment the verdict lands — well under the text's saturation. */
 #how .chapter.stops .term { transition: border-color .6s var(--ease-out); }
 #how .chapter.stops[data-step="1"] .term,
 #how .chapter.stops[data-step="2"] .term { border-color: color-mix(in srgb, var(--block) 38%, transparent); }
@@ -967,8 +966,7 @@ footer::before {
   color: var(--muted);
 }
 /* The rows' hidden/shown states are decided by the scene machinery at the
-   end of this file — [data-step] on the chapter, not a class per row — so
-   scrolling backwards folds them away again. */
+   end of this file — [data-step] on the chapter, not a class per row. */
 
 /* What was `.beat-note` under each panel is narration now: the notes moved
    into the scene steps, where a reader actually meets them. */
@@ -1129,9 +1127,9 @@ footer::before {
 /*
  * The hero is the page's best screen, so the scenes below it are built out
  * of its parts: a centred statement in the hero's own weight, a gate line
- * under it, and the thing being judged beneath the line. Each chapter pins
- * a full screen; scrolling through it swaps the statement and walks the
- * panel through its [data-step] states, in both directions. The canvas
+ * under it, and the thing being judged beneath the line. Each chapter plays
+ * its own three-beat sequence when it enters view; scrolling remains native
+ * and only moves the page. The canvas
  * light stays the hero's alone — a scene's line is the CSS gate, a static
  * gradient hairline that takes the scene's verdict: warm while nothing is
  * wrong, the block's coral in scene 02, the hold's amber in scene 04.
@@ -1194,7 +1192,6 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 }
 [data-chapter="hit"][data-step="1"] .stage, [data-chapter="hit"][data-step="2"] .stage { --pool: rgba(239, 107, 112, .085); }
 [data-chapter="spend"][data-step="1"] .stage, [data-chapter="spend"][data-step="2"] .stage { --pool: rgba(210, 155, 52, .075); }
-.cap .scene { color: var(--faint); }
 
 /* The statements share one cell and trade places as the step changes —
    the same spot on screen, the way the hero holds one headline. */
@@ -1327,56 +1324,32 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 }
 .pstick .console .hero-box textarea { font-size: var(--fs-4); }
 
-/* Wide screens: the stage pins a full screen and the scroll drives it. */
-@media (min-width: 900px) {
-  .chapter { min-height: 155vh; min-height: 155svh; }
-  .stage {
-    position: sticky;
-    top: 56px;
-    height: calc(100vh - 56px);
-    height: calc(100svh - 56px);
-    overflow: clip;
-    contain: layout paint;
-  }
-  .js .say {
-    grid-area: 1 / 1;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
-  }
-  .js .chapter:not([data-step]) .say:nth-child(1),
-  .js [data-step="0"] .say:nth-child(1),
-  .js [data-step="1"] .say:nth-child(2),
-  .js [data-step="2"] .say:nth-child(3) { opacity: 1; transform: none; }
+/* With JavaScript the three statements share one frame and trade places as
+   the chapter's autoplay advances. Phones and desktops see the same short
+   sequence. */
+.js .say {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
 }
+.js .chapter:not([data-step]) .say:nth-child(1),
+.js [data-step="0"] .say:nth-child(1),
+.js [data-step="1"] .say:nth-child(2),
+.js [data-step="2"] .say:nth-child(3) { opacity: 1; transform: none; }
 
-/* The stage's own scroll affordance: three dots at its foot, the active one
-   stretched to a pill. Greys only — a beat is not a verdict. */
-.dots {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: clamp(12px, 3.2svh, 30px);
-  display: none;
-  gap: var(--s-3);
+/* Wide screens use the content's real height. Reserving almost a viewport per
+   chapter left a large dead zone after the shorter scenes. */
+@media (min-width: 900px) {
+  .chapter { min-height: 0; }
+  .stage {
+    position: relative;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+    padding-bottom: var(--s-8);
+  }
 }
-.dots i {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-pill);
-  background: var(--line-firm);
-  transition: background .3s ease, width .3s var(--ease-out);
-}
-.chapter:not([data-step]) .dots i:nth-child(1),
-[data-step="0"] .dots i:nth-child(1),
-[data-step="1"] .dots i:nth-child(2),
-[data-step="2"] .dots i:nth-child(3) { width: 20px; background: var(--ink-2); }
-[data-chapter="hit"][data-step="1"] .dots i:nth-child(2),
-[data-chapter="hit"][data-step="2"] .dots i:nth-child(3) { background: var(--block); }
-[data-chapter="spend"][data-step="1"] .dots i:nth-child(2),
-[data-chapter="spend"][data-step="2"] .dots i:nth-child(3) { background: var(--escalate); }
-@media (min-width: 900px) { .js .dots { display: flex; } }
-@media (prefers-reduced-motion: reduce) { .js .dots { display: none; } }
 
 /* Short screens: the tallest terminal still has to fit under the statement. */
 @media (min-width: 900px) and (max-height: 780px) {
@@ -1389,16 +1362,14 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 /*
  * Everything keys off [data-step] on the chapter. Hidden things are
  * collapsed, not spaced-for: a terminal grows line-group by line-group the
- * way a real one does, the ledger grows row by row, and walking back up
- * folds them away again. The caps are generous maxima for the transitions;
+ * way a real one does, and the ledger grows row by row. The caps are generous maxima for the transitions;
  * --tg-max and --row-max widen on a phone where the same lines wrap taller.
  */
 
 .chapter { --tg-max: 300px; --row-max: 140px; }
 
-/* The panel arrives. Without this the object is simply present the moment
-   the stage pins, which is the difference between a page that plays and a
-   page that has already finished. */
+/* The panel arrives when autoplay starts. Without this the object is simply
+   present before its chapter begins. */
 .js .chapter .panel { opacity: 0; transform: translateY(18px) scale(.99); filter: blur(3px); }
 .js [data-chapter="hit"] .panel { transform: translateY(10px) scale(.975); }
 .js [data-chapter="log"] .panel { transform: translateY(26px) scale(1); filter: blur(2px); }
@@ -1602,11 +1573,11 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
 
 /* ── the phone ─────────────────────────────────────────────────────────── */
 /*
- * No pinning: the statements stack, centred like the hero, the scene's gate
- * under them, and the panel walks its states once, paced, as it arrives.
+ * The same free-scroll autoplay on phones, with a shorter text frame and
+ * edge-to-edge machine surfaces where the content needs the width.
  */
 @media (max-width: 899px) {
-  .chapter { --tg-max: 520px; --row-max: 240px; margin-top: var(--s-8); }
+  .chapter { --tg-max: 520px; --row-max: 240px; margin-top: 0; }
   /* The rail's 20px gutters cost a phone a tenth of its width on the one
      element that needs every pixel: a terminal with fixed-width type. Only
      the framed panels break out, because they carry their own padding; the
@@ -1619,12 +1590,10 @@ h2.loud .ln { display: block; overflow: hidden; padding-block: .06em; }
     margin-inline: calc(var(--s-6) * -1);
     border-radius: var(--r-lg);
   }
-  /* and the air between one scene and the next stops being a screen of it */
-  .chapter { margin-top: var(--s-7); }
-  .stage { gap: var(--s-4); padding-top: var(--s-3); }
-  .says { gap: var(--s-6); }
-  .dots { display: flex; position: static; transform: none; justify-content: center; margin-top: var(--s-5); }
-  .says { min-height: 0; gap: var(--s-7); align-items: start; }
+  /* The parent grid owns the space between scenes; an extra chapter margin
+     doubled it on phones. */
+  .stage { gap: var(--s-4); padding: var(--s-3) 0 var(--s-5); }
+  .says { min-height: clamp(144px, 40vw, 184px); gap: 0; align-items: end; }
   .say h3 { font-size: clamp(26px, 7.4vw, 34px); }
   .say p { font-size: var(--fs-4); }
   .chapter .panel { margin-top: var(--s-4); }

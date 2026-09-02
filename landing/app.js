@@ -1,7 +1,7 @@
 /*
  * Everything on this page that needs JavaScript: the light in the hero, the
  * prompt that types itself under it, reveal-on-scroll, the scene engine that
- * walks the four chapters, and naming the visitor's platform on the download
+ * plays the four chapters, and naming the visitor's platform on the download
  * button.
  *
  * No build step and no dependencies — see README.md. These are ES modules
@@ -98,14 +98,11 @@ if (reduced || !hasIO) {
 
 /* ── the scene engine ──────────────────────────────────────────────────── */
 /*
- * Four scenes below the hero, each built like the hero: a pinned full
- * screen with a centred statement, a gate line, and the panel under it.
- * The scroll drives them directly, both directions, no timers: on a wide
- * screen the pin's travel picks the step, and on a phone, where nothing
- * pins, the panel's own climb up the viewport does. A phone used to autoplay
- * the sequence when the panel arrived, which meant anybody scrolling at
- * their own speed watched it happen off-screen and arrived at a finished
- * panel.
+ * Four scenes below the hero, each built like the hero: a centred statement,
+ * a gate line, and the panel under it. Every chapter is a short, self-running
+ * sequence. It starts once when enough of the chapter enters the viewport;
+ * scrolling only moves the page and never scrubs, pins, reverses, or speeds
+ * up the sequence.
  *
  * The engine only ever reveals markup that is already on the page. It
  * types over text that is in the document and flips [data-step]; CSS does
@@ -154,9 +151,8 @@ const spendTyper = byName.spend && typer($$('.pt', byName.spend), 14, 20);
 
 /* The panel is a state machine keyed to the narration step. CSS owns the
    states — every reveal, collapse, spotlight and border is a [data-step]
-   selector, so walking backwards undoes what walking forward did and the
-   panel answers the scroll in both directions. This file only does the
-   things CSS cannot: type, press the button once, and flip the tool tabs. */
+   selector. This file advances those steps on a short timeline and only does
+   the things CSS cannot: type, press the button once, and flip the tool tabs. */
 
 const typed = {};
 const typers = { write: ruleTyper, hit: hitTyper, spend: spendTyper };
@@ -220,57 +216,31 @@ const finishAll = () => chapters.forEach(finishChapter);
 if (reduced || !hasIO) {
   finishAll();
 } else {
-  const desktop = window.matchMedia('(min-width: 900px)');
-
-  /* One rAF picks every scene's step off the scroll position. It reads the
-     breakpoint each frame rather than wiring itself once, so a window
-     dragged across 900px, or a phone turned on its side, just starts
-     measuring the other thing.
-
-     Only the chapters actually on screen get measured. Reading a rect forces
-     the browser to settle layout, and doing that for every chapter on every
-     frame of a scroll is how a page that should feel weightless starts to
-     drag; an IntersectionObserver keeps the live set, and it is usually one. */
-  const HEADER = 56;
-  const live = new Set();
-  const vis = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) e.isIntersecting ? live.add(e.target) : live.delete(e.target);
-    },
-    { rootMargin: '10% 0px 10% 0px' }
-  );
-  chapters.forEach((ch) => vis.observe(ch));
-
-  let ticking = false;
-  const track = () => {
-    ticking = false;
-    const vh = window.innerHeight;
-    const wide = desktop.matches;
-    for (const ch of live) {
-      if (wide) {
-        /* The pin's travel is the scrubber: thirds of it are the three steps. */
-        const r = ch.getBoundingClientRect();
-        const travel = r.height - (vh - HEADER);
-        if (travel <= 0) { setStep(ch, 0); continue; }
-        const sp = Math.min(1, Math.max(0, (HEADER - r.top) / travel));
-        setStep(ch, sp < 0.34 ? 0 : sp < 0.67 ? 1 : 2);
-      } else {
-        /* Nothing pins on a phone, so the panel's own climb up the screen is
-           the scrubber instead. It reaches its last state while it is still
-           well inside the viewport, which is the point: the reader has to be
-           looking at the panel for the panel to finish. */
-        const el = ch.querySelector('.pstick') || ch;
-        const r = el.getBoundingClientRect();
-        const p = (vh - r.top) / (vh * 0.62 + r.height * 0.38);
-        setStep(ch, p < 0.42 ? 0 : p < 0.72 ? 1 : 2);
-      }
-    }
+  /* The chapters behave like short videos: entry presses play, and the
+     timeline owns the three beats from there. The observer is only a start
+     signal; there is deliberately no scroll listener and no geometry read
+     on scroll. Unobserving also makes a chapter a one-shot, so revisiting it
+     shows the completed story instead of resetting under the reader. */
+  const STEP_MS = 1000;
+  const play = async (ch) => {
+    setStep(ch, 0);
+    await wait(STEP_MS);
+    setStep(ch, 1);
+    await wait(STEP_MS);
+    setStep(ch, 2);
   };
-  window.addEventListener('scroll', () => {
-    if (!ticking) { ticking = true; requestAnimationFrame(track); }
-  }, { passive: true });
-  window.addEventListener('resize', track, { passive: true });
-  track();
+
+  const autoplay = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        autoplay.unobserve(entry.target);
+        play(entry.target);
+      }
+    },
+    { rootMargin: '0px 0px -10% 0px', threshold: 0.22 }
+  );
+  chapters.forEach((ch) => autoplay.observe(ch));
 }
 
 /* ── name the platform on the hero button ──────────────────────────────── */

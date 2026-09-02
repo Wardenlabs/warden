@@ -143,11 +143,10 @@
      from scene 02, which is the whole trick: the reader watches one day
      happen instead of reading three claims.
 
-     On a wide screen each scene pins its product panel while the narration
-     scrolls past it, and the panel assembles at the step that explains it.
-     On a phone the panel sits between the narration and assembles once, as
-     it arrives. app.js only ever reveals markup that is already here: with
-     scripting off, or under reduced motion, every panel is simply complete.
+     Each scene starts its own three-beat sequence when it enters the viewport.
+     The page keeps native, unpinned scrolling while the narration and product
+     panel advance on their own. app.js only ever reveals markup that is already
+     here: with scripting off, or under reduced motion, every panel is simply complete.
 
      Every panel is the product's own markup or the hook's own output.
      Nothing here is drawn: if a panel cannot be traced to a file in this
@@ -168,7 +167,6 @@
          not invented for the page. -->
     <div class="chapter" data-chapter="write">
       <div class="stage">
-      <div class="cap"><span class="label scene">Scene 01 · You say it once</span></div>
       <div class="says">
       <div class="say">
         <h3>You write one sentence.</h3>
@@ -205,7 +203,6 @@
           </div>
         </div>
       </div>
-      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
 
@@ -215,7 +212,6 @@
          siblings of the inputs so plain `:checked ~` does all of it. -->
     <div class="chapter stops" data-chapter="hit">
       <div class="stage">
-      <div class="cap"><span class="label scene">Scene 02 · Somebody hits one</span></div>
       <div class="says">
       <div class="say">
         <h3>Somebody asks for a salary.</h3>
@@ -286,7 +282,6 @@
           </div>
         </div>
       </div>
-      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
 
@@ -295,7 +290,6 @@
          says out loud that a verdict has three values and not two. -->
     <div class="chapter" data-chapter="log">
       <div class="stage">
-      <div class="cap"><span class="label scene">Scene 03 · The day, signed</span></div>
       <div class="says">
       <div class="say">
         <h3>The day comes back as a ledger.</h3>
@@ -329,7 +323,6 @@
           <p class="pnote"><span>Top line at 14:22: the refusal you just watched happen.</span><span>One minute earlier, in amber, the payment your morning rule stopped.</span><span>Eight honest questions went through untouched, and nothing here can be edited without breaking the chain.</span></p>
         </div>
       </div>
-      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
 
@@ -353,7 +346,6 @@
 
     <div class="chapter" data-chapter="spend">
       <div class="stage">
-      <div class="cap"><span class="label scene">Scene 04 · Day two · The same gate, counting</span></div>
       <div class="says">
       <div class="say">
         <h3>An agent, left running.</h3>
@@ -395,7 +387,6 @@
           </div>
         </div>
       </div>
-      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
 
