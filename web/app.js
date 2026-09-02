@@ -512,14 +512,22 @@ function render() {
   // Same reason as the button above it: the demo banner is drawn by the shell
   // on every screen, so binding this inside any one view would make it dead on
   // the screen the console actually opens on.
-  const models = $('getModels');
-  if (models) models.onclick = async () => {
+  // Every one of them, not the first. The id appears on the demo banner and on
+  // the model list, and both are on screen together whenever somebody in demo
+  // mode opens the compiler page; `$()` returns one, so the other was a button
+  // that looked identical and did nothing.
+  for (const models of document.querySelectorAll('#getModels, .js-get-models')) {
+    // Its own label, because there are two of these and they do not say the
+    // same thing: the banner offers all of them, the panel offers the missing
+    // ones. Restoring a hard-coded string put the banner's words on the panel.
+    const label = models.textContent;
+    models.onclick = async () => {
     models.disabled = true;
     models.textContent = 'Starting the download…';
     const { ok, j } = await api('/api/gateway/leave-demo', { method: 'POST' });
     if (!ok) {
       models.disabled = false;
-      models.textContent = 'Download the models';
+      models.textContent = label;
       // The one failure worth naming: no shell to do it, so say what to run.
       models.insertAdjacentHTML('afterend',
         `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
@@ -528,7 +536,8 @@ function render() {
     // The shell relaunches the app from under us, so there is nothing after
     // this to render. Saying so beats a button that looks stuck.
     models.textContent = 'Downloading. Warden will restart on its own…';
-  };
+    };
+  }
 
   restoreChat(fields.chat);
 }
@@ -1550,7 +1559,7 @@ function modelsSection() {
 
     ${missing > 0 ? `<div class="row-actions">
       ${state.canLeaveDemo
-        ? `<button type="button" class="btn primary" id="getModels">Download the missing ${missing === 1 ? 'model' : 'models'}</button>`
+        ? `<button type="button" class="btn primary js-get-models">Download the missing ${missing === 1 ? 'model' : 'models'}</button>`
         : `<span class="note">Run <span class="mono">pnpm run setup</span> to fetch ${missing === 1 ? 'it' : 'them'}.</span>`}
     </div>` : ''}
   </div>`;

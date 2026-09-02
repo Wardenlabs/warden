@@ -165,7 +165,14 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
     // console has no preload, so it POSTs to the gateway and the gateway relays
     // it here. Same action as the menu item, from where people look for it.
     (msg) => {
-      if (msg === 'leave-demo' && settings.adapter === 'mock') leaveDemoMode();
+      // No `adapter === 'mock'` check. That guard made the button dead in the
+      // exact case it exists for: an install already in real mode whose weights
+      // never landed, where the console correctly says "not downloaded" and the
+      // one control offered to fix it did nothing at all. `fetchModels` sets
+      // real and relaunches either way, and `ensureModels` on the next boot
+      // downloads only what is missing, so pressing it with everything already
+      // on disk costs a restart and no bytes.
+      if (msg === 'leave-demo') fetchModels();
     }
   );
 
@@ -323,7 +330,15 @@ async function setLanEnabled(enabled: boolean): Promise<void> {
 }
 
 /** Leave demo mode: relaunch so the first-run screen can download models. */
-function leaveDemoMode(): void {
+/**
+ * Fetch whatever is missing and come back up on it.
+ *
+ * Named for what it does rather than for the state it used to leave, because it
+ * is now reached from two places that are not the same situation: the demo
+ * banner, where nothing has ever been downloaded, and the model list, where
+ * some of it has and some has not.
+ */
+function fetchModels(): void {
   settings = { ...settings, adapter: 'real' };
   writeSettings(userData, settings);
   quitting = true;
@@ -365,9 +380,15 @@ function buildMenu(): Menu {
           checked: settings.lanEnabled,
           click: (item) => void setLanEnabled(item.checked)
         },
-        ...(settings.adapter === 'mock'
-          ? [{ label: 'Download models & leave demo mode…', click: () => leaveDemoMode() }]
-          : []),
+        // Offered in both modes now. An install in real mode with weights that
+        // never arrived needs this exactly as much as one in demo mode does,
+        // and hiding it there was half of why the button appeared to do nothing.
+        {
+          label: settings.adapter === 'mock'
+            ? 'Download models & leave demo mode…'
+            : 'Download any missing models…',
+          click: () => fetchModels()
+        },
         { type: 'separator' },
         { label: 'Restart gateway', click: () => void restartGateway() },
         { label: 'Open data folder', click: () => void shell.openPath(userData) },
