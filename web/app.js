@@ -48,8 +48,8 @@ const adminKey = () => {
 const askForAdminKey = () => {
   const entered = window.prompt(
     'This gateway wants an administrator key.\n\n' +
-      'Paste the API key of a person whose role the policy exempts — People → ' +
-      'that person → API key. It is kept for this browser tab only.'
+      'Paste the API key of somebody whose role the policy exempts. Team, then ' +
+      'that person, then API key. It stays in this browser tab and nowhere else.'
   );
   if (!entered) return false;
   try {
@@ -128,6 +128,8 @@ const state = {
   mock: false,
   /** True when a desktop shell is listening that can fetch the models. */
   canLeaveDemo: false,
+  /** What weights are on disk and which seat each model fills. Null until loaded. */
+  models: null,
   /** Role whose limits are open for editing, or null. One at a time. */
   quotaEdit: null,
   /** Why the last save of that role's limits was refused, if it was. */
@@ -381,6 +383,8 @@ async function refreshChain() {
 async function refreshCompiler() {
   const { ok, j } = await api('/api/settings/compiler').catch(() => ({ ok: false }));
   state.compiler = ok ? j : null;
+  const inv = await api('/api/models').catch(() => ({ ok: false }));
+  state.models = inv.ok ? inv.j : null;
 }
 
 async function loadPresets() {
@@ -508,14 +512,22 @@ function render() {
   // Same reason as the button above it: the demo banner is drawn by the shell
   // on every screen, so binding this inside any one view would make it dead on
   // the screen the console actually opens on.
-  const models = $('getModels');
-  if (models) models.onclick = async () => {
+  // Every one of them, not the first. The id appears on the demo banner and on
+  // the model list, and both are on screen together whenever somebody in demo
+  // mode opens the compiler page; `$()` returns one, so the other was a button
+  // that looked identical and did nothing.
+  for (const models of document.querySelectorAll('#getModels, .js-get-models')) {
+    // Its own label, because there are two of these and they do not say the
+    // same thing: the banner offers all of them, the panel offers the missing
+    // ones. Restoring a hard-coded string put the banner's words on the panel.
+    const label = models.textContent;
+    models.onclick = async () => {
     models.disabled = true;
     models.textContent = 'Starting the download…';
     const { ok, j } = await api('/api/gateway/leave-demo', { method: 'POST' });
     if (!ok) {
       models.disabled = false;
-      models.textContent = 'Download the models';
+      models.textContent = label;
       // The one failure worth naming: no shell to do it, so say what to run.
       models.insertAdjacentHTML('afterend',
         `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
@@ -524,7 +536,8 @@ function render() {
     // The shell relaunches the app from under us, so there is nothing after
     // this to render. Saying so beats a button that looks stuck.
     models.textContent = 'Downloading. Warden will restart on its own…';
-  };
+    };
+  }
 
   restoreChat(fields.chat);
 }
@@ -766,13 +779,7 @@ function decisionDetail(entry, head = '') {
   // Latency lives here and only here — this is the section about how it ran.
   // "None of it left this machine" is the conclusion of the same paragraph,
   // which is a better home for that claim than a light in a corner.
-  const passes = `<div>${(d.passes ?? []).map((p) => `
-      <div class="pass">
-        <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
-        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
-        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
-        <span class="ms">${p.ms ?? 0}ms</span>
-      </div>`).join('')}
+  const passes = `<div>${(d.passes ?? []).map((p) => passRow(p, slowest)).join('')}
     <div class="note">${((d.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`;
 
   const chain = `<div class="chain">
@@ -834,6 +841,30 @@ function decisionDetail(entry, head = '') {
   </div>`;
 }
 
+/**
+ * One row of the pass table, and the reason when the row failed closed.
+ *
+ * `adjudicateAll` has always recorded why a pass threw, in `detail.error`, and
+ * nothing has ever rendered it. So the guard would fail closed correctly, the
+ * decision would read "rule could not be evaluated, escalated rather than
+ * assumed clean", and the sentence that says whether the model timed out or the
+ * worker never started sat in the record with no way to see it. Somebody whose
+ * models are installed and whose rules still will not evaluate could not find
+ * out why from the screen telling them it happened.
+ *
+ * Shown only when the pass actually failed: a healthy run keeps the tight table
+ * it had.
+ */
+function passRow(p, slowest) {
+  const why = p.failedClosed && p.detail?.error ? String(p.detail.error) : '';
+  return `<div class="pass">
+      <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
+      <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
+      <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
+      <span class="ms">${p.ms ?? 0}ms</span>
+    </div>${why ? `<div class="pass-why">${esc(why)}</div>` : ''}`;
+}
+
 /** Filters live with the list they filter, not in the app chrome. */
 function activityToolbar() {
   const opts = state.company.employees
@@ -874,7 +905,7 @@ VIEWS.activity = {
     return `<div class="sheet">
       ${filtered ? '' : todayCard()}
       ${activityToolbar()}
-      ${decisionRows(rows, '<div class="empty"><b>Nothing matches</b><span>No decision in the log fits these filters. Clear one to widen the search.</span></div>')}
+      ${decisionRows(rows, '<div class="empty"><b>Nothing matches</b><span>Nothing in the log matches. Drop a filter.</span></div>')}
     </div>`;
   }
 };
@@ -896,7 +927,7 @@ VIEWS.inbox = {
     if (!state.appeals.length && !state.escalations.length) {
       return `<div class="sheet"><div class="empty">
         <b>Nothing waiting</b>
-        <span>Two things land here: requests Warden held instead of deciding, and blocks an employee said were wrong.</span>
+        <span>Held requests wait here for your call, next to blocks somebody says were wrong.</span>
       </div></div>`;
     }
     return `<div class="sheet">
@@ -1118,15 +1149,10 @@ function compilerPage() {
   return `<div class="sheet settings">
     ${rulesTabs()}
 
+    ${modelsSection()}
+
     <div class="section">
       <div class="label">Which model writes your rules</div>
-
-      <div class="where">
-        <span class="dot ${remote ? 'ESCALATE' : 'ALLOW'}"></span>
-        <span>${remote
-          ? `Drafting runs at <b>${esc(host || 'the endpoint below')}</b>. Judging your team's prompts stays on this machine.`
-          : `Drafting and judging both run here, on <b>${esc(c.localModel ?? 'the local model')}</b>.`}</span>
-      </div>
 
       ${c.overriddenByEnv ? `<div class="banner warn">
         <b>The environment is setting this.</b> <code>WARDEN_COMPILER_API</code> wins over what you save here.
@@ -1325,18 +1351,27 @@ function cliNote(providerId) {
   const found = cliFor(providerId);
   if (!found) return '';
   return found.found
-    ? `<span class="note good">Found on this machine. It will use the session you are already signed in to, with no API key.</span>`
-    : `<span class="note bad">Not found on this machine. Install <span class="mono">${esc(found.tool)}</span> and sign in, then reopen this page.</span>`;
+    ? `<span class="note good">Found. It uses the session you are already signed in to, so there is no key to paste and no second bill.</span>`
+    : `<span class="note bad">Not on this machine. Install <span class="mono">${esc(found.tool)}</span>, sign in, then come back to this page.</span>`;
 }
 
+/**
+ * Which model is drafting, read from the one place that actually knows.
+ *
+ * This used to derive it from `activeSource`, which the gateway computes from
+ * `remoteCompilerSource()` alone: that function knows about a configured
+ * endpoint and knows nothing about a signed-in CLI. So somebody who picked
+ * Claude Code, saved it, and watched the panel above say "opus · Claude Code"
+ * still read "Drafting and judging both run here, on Qwen3-1.7B" underneath it.
+ * Two lines on one screen disagreeing about the same fact.
+ *
+ * `/api/models` resolves the CLI, the endpoint and the local weights together,
+ * so both lines come from it now.
+ */
 function compilerLine() {
-  const c = state.compiler;
-  if (!c) return '';
-  const remote = c.activeSource !== 'local';
-  const where = remote
-    ? `${esc(c.model || 'a remote model')} · off this machine`
-    : `${esc(c.localModel ?? 'local model')} · on this machine`;
-  return `<div class="note compiler-line">Drafting with ${where}
+  const d = state.models?.drafting;
+  if (!d) return '';
+  return `<div class="note compiler-line">Drafting with ${esc(d.model)} · ${esc(d.where)}
     <button type="button" class="linkish" data-go="compiler">Change</button></div>`;
 }
 
@@ -1363,7 +1398,12 @@ function rulesBody() {
 
     ${state.policy.rules.length
       ? state.policy.rules.map(ruleRow).join('')
-      : '<div class="empty"><b>Warden is enforcing nothing yet</b><span>Warden only stops what the policy says to stop, and the policy is empty. Write the first rule under New rule.</span></div>'}
+      : '<div class="empty"><b>No rules yet, so nothing gets stopped</b><span>Every prompt your team sends goes straight through until you write one.</span></div>'}
+
+    ${state.policy.rules.length ? `<div class="row-actions">
+      <button type="button" class="btn quiet" id="clearSample">Take out what came with Warden</button>
+      <button type="button" class="btn quiet danger" id="wipeRules">Delete every rule</button>
+    </div>` : ''}
 
     <div class="section">
       <div class="label">Limits by role</div>
@@ -1458,6 +1498,196 @@ function quotaEditor(q) {
       <button type="button" class="btn" id="qCancel">Cancel</button>
     </div>
   </form>`;
+}
+
+/**
+ * Enter sends, Shift+Enter writes a newline.
+ *
+ * Both composers used to want Cmd or Ctrl held down, which is the shortcut a
+ * text editor teaches and not the one a chat does. Every box on this screen
+ * looks like a chat, so people press Enter, and Enter did nothing but grow the
+ * textarea by one line.
+ *
+ * `isComposing` is checked because an IME uses Enter to accept a candidate:
+ * without it, typing anything through a Japanese or Korean keyboard sends the
+ * message halfway through the word.
+ */
+function sendOnEnter(el, send) {
+  if (!el) return;
+  el.onkeydown = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    send();
+  };
+}
+
+/**
+ * What is on this disk, and which of the two seats your subscription can take.
+ *
+ * Two complaints, one panel. The console named the adjudicator without ever
+ * saying whether its weights exist, so a filename in a config and an installed
+ * model looked the same on screen; `onDisk` comes from the file system, not
+ * from what would be loaded. And people configure Claude Code expecting it to
+ * do the work, because nothing said which work. Judging never leaves the
+ * machine under any setting on this page, and that sentence belongs here rather
+ * than in SECURITY.md where nobody hits it at the moment they are wondering.
+ */
+function modelsSection() {
+  const m = state.models;
+  if (!m) return '';
+
+  const size = (b) => (b ? `${(b / 1e9).toFixed(b < 1e9 ? 2 : 1)} GB` : '');
+  // Only what the downloader would actually go and get. Counting the other two
+  // made the button promise work it was never going to do, which is how it came
+  // to be pressed twice with nothing happening either time.
+  const missing = m.models.filter((x) => !x.onDisk && x.fetchable !== false).length;
+  const skipped = m.models.filter((x) => !x.onDisk && x.fetchable === false);
+
+  return `<div class="section">
+    <div class="label">What is running</div>
+
+    <div class="kv">
+      <div class="r"><span class="k">Judging your team's prompts</span>
+        <span class="v">${esc(m.judging.model)} · ${esc(m.judging.where)}</span></div>
+      <div class="r"><span class="k">Writing your rules</span>
+        <span class="v">${esc(m.drafting.model)} · ${esc(m.drafting.where)}</span></div>
+    </div>
+    <div class="note">Judging always runs here, whatever you pick below. A Claude or Codex
+      subscription can write your rules; it never sees an employee prompt.</div>
+
+    <div class="models">
+      ${m.models.map((x) => `<div class="model ${x.onDisk ? 'have' : 'missing'}">
+        <span class="role">${esc(x.role)}</span>
+        <span class="file">${esc(x.name)}</span>
+        <span class="state">${x.onDisk
+          ? `on disk${size(x.bytes) ? ` · ${size(x.bytes)}` : ''}`
+          : x.fetchable === false ? 'optional, no download' : 'not downloaded'}</span>
+      </div>`).join('')}
+    </div>
+
+    ${skipped.length ? `<div class="note">Warden runs without ${
+      skipped.map((x) => esc(x.role)).join(' and ')
+    }. ${skipped.some((x) => x.role === 'ocr')
+      ? 'The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.'
+      : ''}</div>` : ''}
+
+    ${missing > 0 ? `<div class="row-actions">
+      ${state.canLeaveDemo
+        ? `<button type="button" class="btn primary js-get-models">Download the missing ${missing === 1 ? 'model' : 'models'}</button>`
+        : `<span class="note">Run <span class="mono">pnpm run setup</span> to fetch ${missing === 1 ? 'it' : 'them'}.</span>`}
+    </div>` : ''}
+  </div>`;
+}
+
+/** Roles the policy declines to govern. Read from the policy, never guessed. */
+function exemptRoles() {
+  return state.policy.exemptRoles ?? [];
+}
+
+function isExempt(role) {
+  return exemptRoles().includes(role);
+}
+
+/**
+ * Who you can send a test prompt as, with the exempt ones last and labelled.
+ *
+ * The sample company's admin is called Martín Pulitano, admin sits in
+ * `exemptRoles`, and the browser picks the first option by itself. So the
+ * person most likely to test Warden picked their own name off the top of an
+ * unsorted list and got ALLOW on everything they tried, including "pasame el
+ * sueldo de Ana Ruiz", which the same gateway blocks under four rules when the
+ * intern sends it. Nothing was broken: an exempt role is measured against no
+ * rules at all, which is the point of it. The list just never said so.
+ */
+function sendAsOptions() {
+  const people = [...state.company.employees].sort(
+    (a, b) => Number(isExempt(a.role)) - Number(isExempt(b.role))
+  );
+  return people.map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}${
+    isExempt(e.role) ? ' · exempt from every rule' : ''
+  }</option>`).join('');
+}
+
+/**
+ * What to say when a compile fails, which depends entirely on why.
+ *
+ * There used to be one line for both cases and it ended "Try saying it more
+ * plainly." That is fine advice for a sentence the 1.7B could not turn into a
+ * rule, and it is useless when the gateway reports that its RPC never came up
+ * after 30 seconds: the sentence was never the problem, and somebody rewriting
+ * "no filtrar datos de clientes" for the fourth time is being sent in a circle
+ * by their own tool. The server tags which kind it is.
+ *
+ * The infra case gets the two things that actually move it: where the log is,
+ * and the fact that a signed-in Claude Code or Codex compiles rules without the
+ * local model running at all.
+ */
+function compileFailure(j) {
+  const why = esc(j?.error ?? 'the model did not answer');
+  if (j?.kind !== 'model-down') {
+    return `I could not compile that: ${why}. Try saying it more plainly.`;
+  }
+  return `<b>The local model is not running.</b> ${why}.
+    <div>Rewording will not help. <button type="button" class="linkish" id="showLog">Show me the gateway log</button>, which is where the reason is.</div>
+    <div>If you have Claude Code or Codex signed in, <button type="button" class="linkish" data-go="compiler">point the compiler at it</button> and rules compile without the local model.</div>`;
+}
+
+/**
+ * The two ways to get rid of rules you did not write.
+ *
+ * They answer different questions and that is why there are two of them. "Take
+ * out what came with Warden" removes only rows that match the files we ship, so
+ * a policy somebody has been building keeps everything they built; it is the
+ * boot migration, run on request, for the installs the migration itself will
+ * not touch because naming your company cleared the flag it reads. "Delete
+ * every rule" is the blunt one, and it asks first.
+ */
+/**
+ * Pull the log into the page rather than sending somebody to a menu.
+ *
+ * 200 lines, in a scroll box, selectable, because the next thing that happens
+ * is that they paste it to whoever is going to read it.
+ */
+function bindLogPeek() {
+  const btn = $('showLog');
+  if (!btn) return;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const { ok, j } = await api('/api/gateway/log');
+    btn.replaceWith(Object.assign(document.createElement('div'), {
+      className: 'code',
+      textContent: ok ? (j.lines ?? []).join('\n') : (j.error ?? 'could not read the log')
+    }));
+  };
+}
+
+function bindSweeps() {
+  bindLogPeek();
+  const clear = $('clearSample');
+  if (clear) clear.onclick = async () => {
+    clear.disabled = true;
+    const { ok, j } = await api('/api/company/sample/clear', { method: 'POST' });
+    clear.disabled = false;
+    if (!ok) return;
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+    // Nothing matched, so say that rather than leaving a button that looks
+    // broken: the policy is already all theirs.
+    if (!j.people && !j.rules && !j.quotas) {
+      clear.insertAdjacentHTML('afterend',
+        '<span class="note">Nothing here came with Warden. Every rule and every person is yours.</span>');
+    }
+  };
+
+  const wipe = $('wipeRules');
+  if (wipe) wipe.onclick = async () => {
+    const n = state.policy.rules.length;
+    if (!confirm(`Delete all ${n} rules? Warden will stop nothing until you write another. Limits by role are kept.`)) return;
+    wipe.disabled = true;
+    await api('/api/policy/rules', { method: 'DELETE' });
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+  };
 }
 
 /**
@@ -1571,9 +1801,9 @@ function emptyPolicyBanner() {
 function firstRunBanner() {
   if (state.company.employees.length || state.policy.rules.length) return '';
   return `<div class="banner">
-    <b>Warden is not stopping anything yet.</b> Write a rule on
+    <b>Nothing is being stopped yet.</b> Write a rule on
     <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>,
-    or add people on <button type="button" class="linkish" data-go="people">Team</button>.
+    or put your team in on <button type="button" class="linkish" data-go="people">Team</button>.
     <div class="chips">
       <button type="button" class="btn" id="loadSample">Load the sample company instead</button>
     </div>
@@ -1594,13 +1824,13 @@ function firstRunBanner() {
  */
 function mockBanner() {
   return `<div class="banner warn">
-    <b>Demo mode: nothing here is real.</b> No model has judged anything on this screen.
+    <b>Demo mode. None of this is real.</b> No model has judged anything you see here.
     ${state.canLeaveDemo
       ? `<div class="banner-act">
            <button type="button" class="btn primary" id="getModels">Download the models</button>
-           <span class="note">About 1.8&nbsp;GB, once. Warden restarts when they land.</span>
+           <span class="note">1.8&nbsp;GB, once. Warden restarts by itself when they land.</span>
          </div>`
-      : '<div class="note">Run <span class="mono">pnpm run setup</span>. About 1.8&nbsp;GB, once.</div>'}
+      : '<div class="note">Run <span class="mono">pnpm run setup</span>. 1.8&nbsp;GB, once.</div>'}
   </div>`;
 }
 
@@ -1806,7 +2036,7 @@ function draftCard() {
         // is on screen the composer is gone — and this is the point where it
         // matters whether the sentence came off this machine.
         d.draftedBy
-          ? `<span class="when">written by ${esc(d.draftedBy)}${d.draftedRemotely ? ' · off this machine' : ''}</span>`
+          ? `<span class="when">written by ${esc(d.draftedBy)}</span>`
           : ''
       }
       <span class="when">not active yet</span>
@@ -1880,9 +2110,24 @@ async function sendRuleMessage(text) {
   });
 
   dropPending();
+
+  // The compiler read the sentence and says it is not a rule. "Quiero reducir
+  // mi uso al 50%" is a spending target, and the honest answer is the screen
+  // that holds spending targets, not a prohibition invented to fit the shape.
+  // Before it had one, that sentence compiled into a rule forbidding anyone to
+  // be limited on the basis of a usage goal, which is the request inside out.
+  if (ok && j.notARule) {
+    state.ruleBusy = false;
+    say(`<b>That is not a rule.</b> ${esc(j.reason || 'There is no prohibition in it.')}
+      <div>If it is about how much your team may spend, that lives under
+      <button type="button" class="linkish" data-go="policy">Limits by role</button>.</div>`);
+    render();
+    return;
+  }
+
   if (!ok) {
     state.ruleBusy = false;
-    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    say(compileFailure(j));
     render();
     return;
   }
@@ -1948,7 +2193,7 @@ async function sendRuleSet(text) {
   dropPending();
   if (!ok || !Array.isArray(j.rules) || j.rules.length === 0) {
     state.ruleBusy = false;
-    say(`I could not compile that: ${esc(j.error ?? 'the model did not answer')}. Try saying it more plainly.`);
+    say(compileFailure(j));
     render();
     return;
   }
@@ -2039,6 +2284,7 @@ function bindPolicy() {
   };
 
   bindLimits();
+  bindSweeps();
 
   const cancel = $('cancelDraft');
   if (cancel) cancel.onclick = discardDraft;
@@ -2046,7 +2292,7 @@ function bindPolicy() {
   const send = $('ruleSend');
   if (send) send.onclick = () => writeRule($('ruleMsg').value);
   const msg = $('ruleMsg');
-  if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) writeRule(msg.value); };
+  sendOnEnter(msg, () => writeRule(msg.value));
 
   const cats = $('cats');
   if (cats) cats.onclick = (e) => {
@@ -2233,7 +2479,7 @@ VIEWS.people = {
     ${companyBlock()}
     ${state.company.employees.length
       ? state.company.employees.map(personRow).join('')
-      : '<div class="empty"><b>Nobody yet</b><span>Add the first person below to issue them a key.</span></div>'}
+      : '<div class="empty"><b>Nobody yet</b><span>Add somebody below and Warden issues them a key.</span></div>'}
 
     <div class="section">
       <div class="label">Add someone</div>
@@ -2311,7 +2557,7 @@ function bindPeopleList() {
     const people = state.company.employees.length;
     if (!confirm(
       `Remove ${people === 1 ? 'the 1 person' : `all ${people} people`} and issue the administrator a new key?\n\n` +
-      'Their existing keys stop working immediately. Your rules are left alone.'
+      'Their keys stop working right away. Your rules stay.'
     )) return;
     const { ok, j } = await api('/api/company/reset', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -2613,12 +2859,12 @@ VIEWS.simulator = {
           <span class="spacer"></span>
           <span class="label">Send as</span>
           <select class="inline" id="who" aria-label="Employee to send as">
-            ${state.company.employees.map((e) => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.role)}</option>`).join('')}
+            ${sendAsOptions()}
           </select>
         </div>
         ${state.chat.length
           ? state.chat.map(renderMessage).join('')
-          : '<div class="empty"><b>See what Warden would do</b><span>Pick someone and send a prompt as them. Nothing here is privileged; it goes through the gateway on their own key, like any other request.</span></div>'}
+          : '<div class="empty"><b>See what Warden would do</b><span>Send a prompt as somebody on your team. It runs on their key and gets judged like anything else they send.</span></div>'}
       </div>
     </div>
     <div class="composer">
@@ -2633,8 +2879,7 @@ VIEWS.simulator = {
   bind: () => {
     const send = $('send');
     if (send) send.onclick = doSend;
-    const prompt = $('prompt');
-    if (prompt) prompt.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSend(); };
+    sendOnEnter($('prompt'), doSend);
     bindFollowUps();
   }
 };
@@ -2647,13 +2892,7 @@ function renderMessage(m, i) {
   // same disclosure, same place in the hierarchy, as a decision in Activity.
   const slowest = Math.max(1, ...(m.passes ?? []).map((p) => p.ms ?? 0));
   const passes = (m.passes ?? []).length ? `<div class="folds">${disclosure(`s:${i}`, 'How it was decided', `
-    <div>${m.passes.map((p) => `
-      <div class="pass">
-        <span class="n">${esc(p.pass)}</span>
-        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
-        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
-        <span class="ms">${p.ms ?? 0}ms</span>
-      </div>`).join('')}</div>
+    <div>${m.passes.map((p) => passRow(p, slowest)).join('')}</div>
     <div class="note">${((m.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`)}</div>` : '';
 
   return `<div class="msg">
@@ -2696,9 +2935,16 @@ async function doSend() {
   }
 
   const rule = j.firedRules?.[0];
-  const label = { ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict;
+  const exempt = person && isExempt(person.role);
+  const label = exempt && j.verdict === 'ALLOW'
+    ? 'Allowed without being judged'
+    : ({ ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict);
 
   let why = '';
+  if (exempt && j.verdict === 'ALLOW') {
+    why += `<div><b>${esc(person.role)} is exempt</b>, so no rule was applied and nothing here tells you
+      whether the prompt would pass. Send it as somebody the policy governs to find out.</div>`;
+  }
   if (rule) {
     // A refusal that only names the rule leaves the person holding a question
     // with nowhere to take it. What they can do instead is the part that keeps
@@ -2834,7 +3080,7 @@ VIEWS.redteam = {
     </div>`;
 
     if (!s) {
-      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite, or load the most recent report, to see how the guard holds up against known attacks.</span></div></div>`;
+      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite to see how the guard does against attacks somebody already wrote down.</span></div></div>`;
     }
     const attacks = (s.warden ?? []).filter((c) => !c.isControl);
     const controls = (s.warden ?? []).filter((c) => c.isControl);

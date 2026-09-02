@@ -38,9 +38,19 @@ on:
       - 'qvac.config.json'
       - '.github/workflows/desktop.yml'
 
+# A release run gets a group of its own, keyed on the tag it is publishing, so
+# pushing to main while one is building no longer kills it. Cutting five
+# releases in an afternoon cancelled four ordinary CI runs and two release runs
+# between them, and every one of those shows on the commit list as a red X that
+# looks like a failing test and is not: they die in "Set up job", seconds in,
+# having run nothing. Ordinary pushes still supersede each other, which is what
+# cancel-in-progress is actually for.
 concurrency:
-  group: desktop-${{ github.ref }}
-  cancel-in-progress: true
+  group: >-
+    desktop-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+      && format('release-{0}', inputs.release_tag)
+      || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.release_tag != '') }}
 
 # The release job publishes installers to GitHub Releases on v* tags.
 permissions:

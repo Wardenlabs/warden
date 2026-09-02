@@ -66,6 +66,29 @@ export async function compileRule(
   const system = [
     'You convert a policy statement written by a company administrator into a structured rule.',
     '',
+    // Two failures this paragraph exists for, both seen on a capable compiler.
+    //
+    // "Quiero reducir mi uso al 50%" came back as "No employee request may be
+    // refused, throttled, or otherwise limited on the basis of a stated goal to
+    // reduce overall usage" — the exact opposite of what was asked, because the
+    // sentence is a spending target and the prompt only had one shape to put it
+    // in. Warden expresses spending as a quota per role, not as a rule about
+    // what anyone may ask, so the honest answer is to decline and say where the
+    // setting lives.
+    //
+    // And a rule always states what is PROHIBITED. Asked to compile a goal, the
+    // model wrote the prohibition inside out. Saying so is cheaper than
+    // catching it afterwards.
+    'A rule states what is PROHIBITED. Never write a rule that prohibits limiting,',
+    'restricting or refusing people: that inverts what the administrator asked for.',
+    '',
+    'Some sentences are not rules at all. Set notARule to true, with a short reason,',
+    'when the administrator is describing:',
+    '- how much may be spent or used (a budget, a percentage, a daily cap): these are',
+    '  role limits in Warden, not rules about what anyone may ask;',
+    '- a question, a greeting, or anything with no prohibition in it.',
+    'When notARule is true the other fields are ignored, so do not labour over them.',
+    '',
     `Valid role names: ${roles.join(', ')}.`,
     // Naming the people is what makes "Ana cannot ask for payroll" compile into
     // a rule about Ana rather than a rule about everyone. Without the roster the
@@ -76,9 +99,29 @@ export async function compileRule(
       : '',
     'Use ["*"] when the rule binds everyone.',
     '',
+    // The failure this whole block is written against is one number: on the
+    // 185-prompt paired run the shipped adjudicator refuses 63% of legitimate
+    // requests. Some of that is the 1.7B, and some of it is rules that were
+    // compiled wider than the sentence they came from. A guard that stops two
+    // of every three honest requests gets switched off, so a rule that is too
+    // narrow is a smaller failure than one that is too wide, and this says so
+    // rather than leaving the model to guess which way to err.
+    'The administrator is describing one worry. Compile the NARROWEST rule that',
+    'covers it. A rule that misses a case can be widened later; a rule that stops',
+    'honest work gets Warden switched off. Err narrow.',
+    '',
     'Fields:',
-    '- text: one unambiguous sentence stating what is prohibited, in English.',
+    '- text: one sentence, in English, naming what is prohibited concretely enough',
+    '  that somebody reading only this sentence and one request can decide.',
+    '  Name the thing: "another employee\'s salary", "an unreleased revenue figure",',
+    '  "a customer list with contact details". Not "sensitive data", not',
+    '  "confidential information", not "inappropriate requests" — those are',
+    '  categories, and the judge stretches a category over anything nearby.',
+    '  Carry over any limit the administrator gave (an amount, a role, a system,',
+    '  a moment in time) instead of generalising past it.',
     '- scope: "input" for what employees send, "output" for what the assistant returns, "both".',
+    '  Use "output" when the worry is what the assistant might say or commit to,',
+    '  and "input" when it is what somebody might ask for. Most are "input".',
     '- appliesTo: who the rule binds — role names, @employee tokens, or ["*"].',
     '  Bind it to a person only when the administrator named that person.',
     '- severity: "block" to refuse outright, "escalate" to route to a human,',
@@ -86,14 +129,30 @@ export async function compileRule(
     '  Choose "warn" when the admin asks to be told rather than protected — when',
     '  they say to flag, note, remind, or keep an eye on something rather than',
     '  stop it, or when the rule is a preference rather than a prohibition.',
+    '  Choose "escalate" when they want it to depend on a person rather than be',
+    '  refused: approvals, exceptions, anything with "unless" or "without" in it.',
     '- guidance: one sentence telling an employee who just hit this rule what to do',
     '  instead — who to ask, or which nearby request is fine. Write it to them, not',
     '  about them. Never restate the prohibition; they already saw it.',
-    '- examples.violating: 2-3 realistic requests this rule should stop.',
+    '- examples.violating: 2-3 realistic requests this rule should stop. Ordinary',
+    '  working sentences, not caricatures: the ones that will actually be typed.',
     '- examples.compliant: 2-3 realistic requests that are NEARBY but legitimate and',
     '  must still be allowed. These matter most. Without them the rule blocks honest work.',
+    '  Make them hard: the closest thing to the prohibition that is still fine.',
+    '  For a rule about salaries, "what is the payroll deadline this month?".',
+    '  For one about customer data, "how many customers churned last quarter?".',
+    '  Asking how a process works, or about a total with nobody named in it, is',
+    '  almost always fine and is what gets wrongly blocked.',
     '',
     'Write examples in the same language the administrator used.',
+    // The 1.7B compiled "dejen de filtrar datos de clientes" into a `warn` rule
+    // against *filtering* customer data, with "send customer data to a
+    // third-party for analysis" as a compliant example: a draft that permits
+    // the leak it was asked to stop. The boundary held and the administrator
+    // would have rejected it, but the false friend is worth naming.
+    'The administrator may write in Spanish. Compile the meaning, not the cognate:',
+    '"filtrar datos" is to LEAK data, never to filter it; "aprobar" is to authorise;',
+    '"mandar afuera" is to send outside the company.',
     isolationPreamble(iso.nonce),
     // The compiler's marker, not the adjudicator's. They are the same local
     // model by default, and they are not the same model at all once
@@ -114,7 +173,11 @@ export async function compileRule(
       role: 'compiler',
       system,
       user: `${iso.envelope}\n\nConvert the statement above into a rule.`,
-      maxTokens: 640,
+      // 640 was enough before the compliant examples were asked to be hard.
+      // Three nearest-miss requests in Spanish are long, and a draft cut off
+      // mid-array arrives as "examples.compliant: expected array, received
+      // undefined", which reads as the model failing rather than the budget.
+      maxTokens: 900,
       timeoutMs: 60_000
     },
     ruleDraftSchema,
@@ -122,15 +185,32 @@ export async function compileRule(
   );
 
   const draft = res.value;
+
+  // The refusal leaves here as itself, before `ruleSchema.parse` throws the
+  // field away. Measured on `claude -p --model sonnet` with the prompt above:
+  // "quiero reducir mi uso al 50%" and "PUYO" both set `notARule` and filled
+  // the rest with "placeholder" and "N/A" exactly as instructed, and both
+  // arrived at the console as rules containing those words, because the flag
+  // was dropped one line below this. A model that answered correctly and a
+  // caller that ignored it look identical from the screen.
+  if (draft.notARule) {
+    return {
+      notARule: true,
+      notARuleReason: draft.notARuleReason ?? ''
+    } as unknown as Rule;
+  }
+
+  // Past the refusal branch every field is present; `superRefine` on the draft
+  // schema is what guarantees it, and `ruleSchema.parse` below re-checks.
   return ruleSchema.parse({
     ...draft,
-    id: `r-${slug(draft.text)}-${randomUUID().slice(0, 4)}`,
+    id: `r-${slug(draft.text ?? '')}-${randomUUID().slice(0, 4)}`,
     // Keep only audiences that exist. A hallucinated role or employee id would
     // silently narrow the rule to nobody, which fails open — the one direction
     // we never accept.
     appliesTo:
       options.lockTo ??
-      sanitiseAudience(draft.appliesTo, roles, people.map((p) => p.id))
+      sanitiseAudience(draft.appliesTo ?? [], roles, people.map((p) => p.id))
   });
 }
 

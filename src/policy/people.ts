@@ -412,9 +412,14 @@ export function sampleWasRequested(): boolean {
  * name and the `demo` flag go instead — what remains is theirs, and it should
  * not still be sitting under a freight company's name they never typed.
  */
-export function discardSeededPeople(seedPath = SEED_PATH): number {
+export function discardSeededPeople(seedPath = SEED_PATH, force = false): number {
   const current = loadDirectory();
-  if (current.demo !== true) return 0;
+  // The `demo` gate is evidence, and evidence is only needed when nobody asked.
+  // An administrator pressing the button in the console has asked, and by then
+  // the flag has usually been cleared anyway: naming your company clears it, so
+  // the person most likely to want the ghosts gone is the person the gate would
+  // refuse. `force` is that press, and nothing else sets it.
+  if (!force && current.demo !== true) return 0;
 
   const seeded = readIfPresent(seedPath);
   if (!seeded) return 0;

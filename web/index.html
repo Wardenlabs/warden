@@ -302,6 +302,33 @@ button, input, select, textarea { font: inherit; font-size: var(--fs-3); color: 
 .btn.quiet { border-color: transparent; background: none; color: var(--muted); }
 .btn.quiet:hover { background: var(--hover); color: var(--ink); }
 
+/* Destructive actions sit under the thing they destroy, not in the toolbar
+   over it: they are the last resort on the page, not one of its options. */
+.models { display: flex; flex-direction: column; gap: 1px; margin-top: var(--s-3); }
+.model {
+  display: grid; grid-template-columns: 7rem 1fr auto; gap: var(--s-3);
+  align-items: baseline; padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line); font-size: var(--fs-2);
+}
+.model:last-child { border-bottom: 0; }
+.model .role { color: var(--ink); font-weight: var(--fw-semi); }
+.model .file { font-family: var(--mono); font-size: var(--fs-1); color: var(--muted); overflow-wrap: anywhere; }
+.model .state { color: var(--allow); white-space: nowrap; }
+/* Not downloaded is a fact to act on, not an error, so it reads as a warning
+   rather than a block: the app still works, it just works on nothing. */
+.model.missing .state { color: var(--escalate); }
+.model.missing .role { color: var(--muted); }
+
+.pass-why {
+  margin: 0 0 var(--s-2) var(--s-3);
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  color: var(--block);
+  overflow-wrap: anywhere;
+}
+
+.row-actions { display: flex; gap: var(--s-2); margin-top: var(--s-4); flex-wrap: wrap; align-items: center; }
+
 .btn.danger { color: var(--block); }
 .btn.danger:hover { background: var(--block-bg); border-color: var(--block); color: var(--block); }
 
