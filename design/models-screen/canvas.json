@@ -1,0 +1,68 @@
+{
+  "artboards": [
+    {
+      "file": "Today.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1040,
+      "h": 1080,
+      "title": "Today \u2014 buried under Rules"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 1160,
+      "y": 0,
+      "w": 1040,
+      "h": 1080,
+      "title": "Engine \u2014 healthy"
+    },
+    {
+      "file": "RuntimeDown.dc.html",
+      "x": 2320,
+      "y": 0,
+      "w": 1040,
+      "h": 1080,
+      "title": "Engine \u2014 worker will not start"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "access",
+      "x": 0,
+      "y": -150,
+      "w": 340,
+      "text": "Access: this lives at Rules \u2192 Models, a sub-tab of the page about who WRITES rules. The screen that answers \"is the guard working\" is two clicks deep behind an unrelated question."
+    },
+    {
+      "id": "mixed",
+      "x": 400,
+      "y": -150,
+      "w": 320,
+      "text": "Comprehension: four things, one flat list, no hierarchy \u2014 what judges, what drafts, runtime health, five files with disk status. Nothing tells you whether it works."
+    },
+    {
+      "id": "fix",
+      "x": 1160,
+      "y": -150,
+      "w": 340,
+      "text": "Engine becomes its own nav item, and the first line is the answer in a sentence. Rule-drafting moves out to one line at the bottom \u2014 it was never part of judging."
+    },
+    {
+      "id": "numbers",
+      "x": 1560,
+      "y": -150,
+      "w": 340,
+      "text": "The picker is clickable. Each seat says what it costs you in a line, and the consequence of the 8B shows up only when you choose it \u2014 including that it outruns the hook deadline."
+    },
+    {
+      "id": "fail",
+      "x": 2320,
+      "y": -150,
+      "w": 340,
+      "text": "The failure you actually hit. Today it is buried inside one escalation record\u2019s \"How it was decided\". Here it is the status line, and it says which of the three lookalike causes this is."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --bg:#ffffff;--sunken:#f7f7f8;--hover:#f4f4f6;--selected:#f0f0f2;
+      --line-soft:#f3f3f5;--line:#eaeaed;--line-firm:#dcdce1;
+      --ink:#17181c;--ink-2:#44474e;--muted:#70747c;--faint:#9da1a9;
+      --accent:#1a1d23;--accent-ink:#ffffff;
+      --allow:#2f8256;--block:#c5383d;--escalate:#96650f;--escalate-bg:#fbf2e2;
+      --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;
+      --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+    }
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+    a{color:var(--ink);}a:hover{color:var(--accent);}
+    .topnav{display:flex;align-items:center;gap:8px;height:48px;padding:0 20px;border-bottom:1px solid var(--line);}
+    .mark{font-size:13px;font-weight:590;letter-spacing:-.011em;margin-right:8px;}
+    .nav-item{border:none;background:none;font-family:inherit;font-size:13px;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;}
+    .nav-item.on{background:var(--selected);color:var(--ink);font-weight:500;}
+    .count{font-size:11px;color:var(--escalate);margin-left:6px;font-variant-numeric:tabular-nums;}
+    .sheet{max-width:880px;margin:0 auto;padding:20px 20px 64px;}
+    .tabs{display:flex;gap:6px;padding-bottom:8px;}
+    .label{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);}
+    .section{padding:28px 8px 0;display:grid;gap:12px;}
+    .section+.section{border-top:1px solid var(--line);margin-top:28px;}
+    .kv{display:grid;gap:6px;}
+    .kv .r{display:flex;align-items:baseline;gap:12px;font-size:13px;}
+    .kv .k{flex:0 0 108px;color:var(--faint);font-size:12px;}
+    .kv .v{flex:1;color:var(--ink-2);}
+    .note{font-size:12px;color:var(--muted);line-height:1.45;}
+    .models{display:flex;flex-direction:column;margin-top:8px;}
+    .model{display:grid;grid-template-columns:7rem 1fr auto;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;}
+    .model .role{color:var(--ink);font-weight:590;}
+    .model .file{font-family:var(--mono);font-size:11px;color:var(--muted);}
+    .model .state{color:var(--allow);white-space:nowrap;}
+    .model.missing .state{color:var(--escalate);}
+    .model.missing .role{color:var(--muted);}
+    .pill{border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--muted);font-family:inherit;font-size:12px;padding:6px 12px;}
+    .pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  </style>
+</helmet>
+<div>
+  <div class="topnav">
+    <span class="mark">Warden</span>
+    <div style="display:flex;gap:4px">
+      <button class="nav-item" type="button">Activity</button>
+      <button class="nav-item" type="button">Inbox<span class="count">8</span></button>
+      <button class="nav-item on" type="button">Rules</button>
+      <button class="nav-item" type="button">Team</button>
+    </div>
+  </div>
+  <div class="sheet">
+    <div class="tabs">
+      <button class="pill" type="button">Rules</button>
+      <button class="pill" type="button">People</button>
+      <button class="pill on" type="button">Models</button>
+    </div>
+
+    <div class="section">
+      <div class="label">What is running</div>
+      <div class="kv">
+        <div class="r"><span class="k">Judging your team's prompts</span><span class="v">Qwen3-1.7B-Q4_0.gguf · this machine</span></div>
+        <div class="r"><span class="k">Writing your rules</span><span class="v">opus · Claude Code</span></div>
+      </div>
+      <div class="note">Judging always runs here, whatever you pick below. A Claude or Codex subscription can write your rules; it never sees an employee prompt.</div>
+
+      <div class="models">
+        <div class="model"><span class="role">adjudicator</span><span class="file">Qwen3-1.7B-Q4_0.gguf</span><span class="state">on disk · 1.1 GB</span></div>
+        <div class="model"><span class="role">embedder</span><span class="file">embeddinggemma-300M-Q8_0.gguf</span><span class="state">on disk · 0.33 GB</span></div>
+        <div class="model"><span class="role">detector</span><span class="file">Qwen3-0.6B-Q4_0.gguf</span><span class="state">on disk · 0.38 GB</span></div>
+        <div class="model missing"><span class="role">ocr</span><span class="file">OCR_LATIN</span><span class="state">optional, no download</span></div>
+        <div class="model missing"><span class="role">assistant</span><span class="file">LLAMA_3_2_1B_INST_Q4_0</span><span class="state">optional, no download</span></div>
+      </div>
+      <div class="note">Warden runs without ocr and assistant. The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Which model writes your rules</div>
+      <div class="label" style="text-transform:none;letter-spacing:0;color:var(--muted)">Provider</div>
+      <div class="chips">
+        <button class="pill" type="button">This machine</button>
+        <button class="pill on" type="button">Claude Code on this machine</button>
+        <button class="pill" type="button">Codex on this machine · not found</button>
+        <button class="pill" type="button">Gemini CLI on this machine · not found</button>
+        <button class="pill" type="button">opencode on this machine · not found</button>
+        <button class="pill" type="button">Cursor on this machine · not found</button>
+        <button class="pill" type="button">GitHub Copilot on this machine · not found</button>
+        <button class="pill" type="button">Anthropic</button>
+        <button class="pill" type="button">Google (Gemini)</button>
+        <button class="pill" type="button">OpenAI</button>
+        <button class="pill" type="button">Something else</button>
+      </div>
+      <div class="note" style="color:var(--allow)">Found. It uses the session you are already signed in to, so there is no key to paste and no second bill.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

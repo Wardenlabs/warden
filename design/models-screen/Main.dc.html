@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --bg:#ffffff;--sunken:#f7f7f8;--hover:#f4f4f6;--selected:#f0f0f2;
+      --line-soft:#f3f3f5;--line:#eaeaed;--line-firm:#dcdce1;
+      --ink:#17181c;--ink-2:#44474e;--muted:#70747c;--faint:#9da1a9;
+      --accent:#1a1d23;--accent-hover:#2b2f37;--accent-ink:#ffffff;
+      --allow:#2f8256;--allow-bg:#edf6f1;--block:#c5383d;--block-bg:#fcedee;
+      --escalate:#96650f;--escalate-bg:#fbf2e2;
+      --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;
+      --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+    }
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+    a{color:var(--ink);}a:hover{color:var(--accent-hover);}
+    button{font-family:inherit;}
+    .topnav{display:flex;align-items:center;gap:8px;height:48px;padding:0 20px;border-bottom:1px solid var(--line);}
+    .mark{font-size:13px;font-weight:590;letter-spacing:-.011em;margin-right:8px;}
+    .nav-item{border:none;background:none;font-size:13px;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;}
+    .nav-item.on{background:var(--selected);color:var(--ink);font-weight:500;}
+    .count{font-size:11px;color:var(--escalate);margin-left:6px;font-variant-numeric:tabular-nums;}
+    .sheet{max-width:880px;margin:0 auto;padding:20px 20px 64px;display:grid;gap:0;}
+    .label{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);}
+    .section{padding:28px 8px 0;display:grid;gap:12px;}
+    .section+.section{border-top:1px solid var(--line);margin-top:28px;}
+    .note{font-size:12px;color:var(--muted);line-height:1.45;}
+    .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+
+    .headline{display:flex;align-items:flex-start;gap:12px;padding:8px 8px 0;}
+    .dot{width:9px;height:9px;border-radius:999px;flex:none;margin-top:6px;}
+    .headline .t{font-size:15px;font-weight:590;line-height:1.45;letter-spacing:-.011em;}
+    .headline .m{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px;}
+
+    .seats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .seat{display:grid;gap:12px;align-content:start;text-align:left;padding:16px;border-radius:8px;background:var(--bg);cursor:pointer;}
+    .seat .top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+    .seat .name{font-size:13px;font-weight:590;color:var(--ink);}
+    .seat .have{font-size:11px;font-family:var(--mono);color:var(--allow);}
+    .seat .want{font-size:11px;font-family:var(--mono);color:var(--escalate);}
+    .seat .trade{font-size:13px;color:var(--ink-2);line-height:1.45;}
+    .seat .speed{font-size:12px;color:var(--ink-2);border-top:1px solid var(--line-soft);padding-top:12px;}
+
+    .banner{border:1px solid var(--line);border-radius:8px;padding:12px;font-size:13px;line-height:1.45;color:var(--ink-2);background:var(--sunken);}
+    .banner.warn{background:var(--escalate-bg);border-color:transparent;color:var(--escalate);}
+    .banner b{font-weight:590;}
+    .banner-act{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+    .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-firm);border-radius:6px;background:var(--bg);color:var(--ink-2);padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;}
+    .btn:hover{background:var(--hover);color:var(--ink);}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+
+    .models{display:flex;flex-direction:column;}
+    .model{display:grid;grid-template-columns:7rem 1fr auto;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;}
+    .model:last-child{border-bottom:0;}
+    .model .role{color:var(--ink);font-weight:590;}
+    .model .file{font-family:var(--mono);font-size:11px;color:var(--muted);}
+    .model .state{color:var(--allow);white-space:nowrap;}
+    .model.off .state{color:var(--faint);}
+    .model.off .role{color:var(--muted);}
+    .elsewhere{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;color:var(--ink-2);}
+  </style>
+</helmet>
+<div>
+  <div class="topnav">
+    <span class="mark">Warden</span>
+    <div style="display:flex;gap:4px">
+      <button class="nav-item" type="button">Activity</button>
+      <button class="nav-item" type="button">Inbox<span class="count">8</span></button>
+      <button class="nav-item" type="button">Rules</button>
+      <button class="nav-item" type="button">Team</button>
+      <button class="nav-item on" type="button">Engine</button>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <div class="headline">
+      <span class="dot" style="background: {{ status.color }}"></span>
+      <div>
+        <div class="t">{{ status.title }}</div>
+        <div class="m">{{ status.detail }}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">The model that judges</div>
+      <div class="note">Every prompt your team sends goes through this model before it reaches anything else.</div>
+
+      <div class="seats">
+        <div class="seat" style="{{ small.frame }}" onClick="{{ pickSmall }}">
+          <div class="top">
+            <span class="name">Qwen3 1.7B</span>
+            <span class="have">on disk · 1.1 GB</span>
+          </div>
+          <div class="trade">Strict. It stops more of what it should, and it turns away plenty that was fine.</div>
+          <div class="speed">A few seconds a decision.</div>
+        </div>
+
+        <div class="seat" style="{{ big.frame }}" onClick="{{ pickBig }}">
+          <div class="top">
+            <span class="name">Qwen3 8B</span>
+            <span class="want">not downloaded · 5.0 GB</span>
+          </div>
+          <div class="trade">Easier to live with. It waves through more, including some it should not.</div>
+          <div class="speed">46 s a decision on four CPU cores.</div>
+        </div>
+      </div>
+
+      <sc-if value="{{ warn.show }}" hint-placeholder-val="{{ true }}">
+        <div class="banner warn">
+          <b>{{ warn.title }}</b> {{ warn.body }}
+          <div class="banner-act">
+            <button class="btn primary" type="button">Download it · 5.0 GB</button>
+            <span class="note" style="color:inherit">Warden restarts when it finishes.</span>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div class="section">
+      <div class="label">Everything else it needs</div>
+      <div class="models">
+        <div class="model"><span class="role">detector</span><span class="file">Qwen3-0.6B-Q4_0.gguf</span><span class="state">on disk · 0.38 GB</span></div>
+        <div class="model"><span class="role">embedder</span><span class="file">embeddinggemma-300M-Q8_0.gguf</span><span class="state">on disk · 0.33 GB</span></div>
+        <div class="model off"><span class="role">ocr</span><span class="file">OCR_LATIN</span><span class="state">off — attachments are not read</span></div>
+        <div class="model off"><span class="role">assistant</span><span class="file">LLAMA_3_2_1B_INST_Q4_0</span><span class="state">off — demo only</span></div>
+      </div>
+      <div class="note">The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Not part of judging</div>
+      <div class="elsewhere">
+        <span>Rules are drafted by <b>opus</b> through Claude Code, which never sees an employee prompt.</span>
+        <a href="#" style="font-size:12px;white-space:nowrap">Change in Rules →</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // The 8B ships undownloaded, which is the state that matters: choosing it
+    // is a 5 GB decision, so the picker has to say so before it is made.
+    this.state = { picked: 'small', bigOnDisk: false };
+  }
+
+  frame(selected) {
+    return selected
+      ? 'border: 1px solid var(--accent); box-shadow: inset 0 0 0 1px var(--accent);'
+      : 'border: 1px solid var(--line);';
+  }
+
+  renderVals() {
+    const pickedBig = this.state.picked === 'big';
+    // Choosing weights that are absent must not look like a switch that
+    // happened: the seat in force stays the 1.7B until the file is there.
+    const blocked = pickedBig && !this.state.bigOnDisk;
+    const inForce = blocked || !pickedBig ? 'Qwen3 1.7B' : 'Qwen3 8B';
+
+    return {
+      pickSmall: () => this.setState({ picked: 'small' }),
+      pickBig: () => this.setState({ picked: 'big' }),
+      small: { frame: this.frame(!pickedBig) },
+      big: { frame: this.frame(pickedBig) },
+      status: {
+        color: 'var(--allow)',
+        title: 'Judging is running. Every prompt is being checked.',
+        detail: inForce + ' on this machine · nothing leaves it · ready in 5.9 s'
+      },
+      warn: {
+        show: pickedBig,
+        title: blocked
+          ? 'These weights are not on this disk yet.'
+          : 'A decision will take about 46 seconds.',
+        body: blocked
+          ? 'Qwen3 1.7B keeps judging until the download finishes. Worth knowing before you wait for 5 GB: the 8B catches fewer attacks than what you are running now, and at 46 s a decision it outlasts the Claude Code hook, which lets prompts through unchecked once it gives up.'
+          : 'Longer than the Claude Code hook waits by default, and a hook that gives up lets the prompt through unchecked, so raise WARDEN_TIMEOUT_MS to 90000 and the harness timeout with it. This seat also catches fewer attacks than the 1.7B.'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

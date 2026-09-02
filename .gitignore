@@ -98,3 +98,8 @@ data/audit-eval.witness.json
 # Operational settings set from the console. Holds a provider API key.
 data/settings.json
 data/prompts.jsonl
+
+# The seeded design canvas: 2.4 MB of editor payload with the artboards baked
+# in, rebuilt from the .dc.html sources beside it whenever the design changes.
+design/**/*.html
+!design/**/*.dc.html
