@@ -1599,6 +1599,18 @@ function preloadModels(): void {
   modelState = 'loading';
   console.log('  models    preloading adjudicator + embedder…');
   void import('../qvac/client.js')
+    // Probed before the warmup, so the first load failure of the boot already
+    // carries the answer. The whole point of the probe is to be in the message
+    // somebody screenshots, and the first message is the one they screenshot.
+    .then(async (mod) => {
+      const probe = await mod.probeRuntime();
+      console.log(
+        probe.ok
+          ? `  runtime   ${probe.path} ok (${probe.detail})`
+          : `  runtime   WILL NOT RUN: ${probe.path ?? 'not found'} — ${probe.detail}`
+      );
+      return mod;
+    })
     .then(({ warmup }) => warmup(['adjudicator', 'embedder']))
     .then(() => {
       modelState = 'ready';

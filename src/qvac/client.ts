@@ -177,10 +177,32 @@ function loadFailure(role: ModelRole, err: unknown): string {
   } catch {
     /* unresolvable counts as not present */
   }
-  return onDisk
-    ? `${detail} (the ${role} weights are on this disk, so this is the runtime, not a download)`
-    : `${detail} (the ${role} weights are NOT on this disk: download them from Rules, or run pnpm run setup)`;
+  if (!onDisk) {
+    return `${detail} (the ${role} weights are NOT on this disk: download them from Rules, or run pnpm run setup)`;
+  }
+  // The probe belongs in this sentence and not on another screen. The panel in
+  // Rules has carried it since the last release and the reports kept arriving
+  // as screenshots of this line, which is fair: this is the line that appears
+  // when the thing goes wrong, and asking somebody to go and read a different
+  // one is asking them to do the diagnosis. It is a boot-time result, so
+  // reading it here costs nothing.
+  const probe = lastRuntimeProbe;
+  const runtime = !probe
+    ? ''
+    : probe.ok
+      ? ` The bare runtime at ${probe.path} runs (${probe.detail}), so the binary is fine and the worker is failing after it starts.`
+      : ` The bare runtime will not run: ${probe.path ?? 'not found'} — ${probe.detail}`;
+  return `${detail} (the ${role} weights are on this disk, so this is the runtime, not a download.${runtime})`;
 }
+
+/**
+ * The last answer `probeRuntime` gave, so a failure can quote it.
+ *
+ * Filled at boot and refreshed whenever the console asks. Absent only in the
+ * window before the first probe finishes, which is short and which the message
+ * simply omits rather than guessing about.
+ */
+let lastRuntimeProbe: { path: string | null; ok: boolean; detail: string } | null = null;
 
 /**
  * Resolve a role to a loaded model id, loading it on first use.
@@ -293,6 +315,12 @@ export function resolvedModel(role: ModelRole): string {
  * the problem rather than on mine.
  */
 export async function probeRuntime(): Promise<{ path: string | null; ok: boolean; detail: string }> {
+  const answer = await runProbe();
+  lastRuntimeProbe = answer;
+  return answer;
+}
+
+async function runProbe(): Promise<{ path: string | null; ok: boolean; detail: string }> {
   // Resolved through the package entry and then walked to `bin/`, because the
   // package's `exports` map does not publish `./bin/bare` and asking for it
   // directly fails with "subpath is not defined by exports" — which looks like
