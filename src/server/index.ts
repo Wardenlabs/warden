@@ -169,8 +169,35 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  if (req.header('x-forwarded-proto') === 'https') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+
+  const proto = req.header('x-forwarded-proto');
+  if (proto === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+
+  /*
+   * Refuse a request a proxy has told us arrived over plain HTTP.
+   *
+   * Every employee request carries an API key in a header, and the install
+   * link carries one in its path. Over http through a tunnel that is a
+   * credential handed to every hop, and the credential is somebody's whole
+   * identity here.
+   *
+   * Only when the proxy SAYS http. A proxy that sets no `x-forwarded-proto` is
+   * not making a claim, and refusing on an absent header would break working
+   * deployments to protect against a guess — so that case is allowed and
+   * `WARDEN_REQUIRE_HTTPS=1` is there for an administrator who knows their
+   * proxy sets it and wants the stricter reading. A direct request on a LAN
+   * has no forwarded headers at all and is untouched: this is about what
+   * happens once somebody puts the gateway on the internet.
+   */
+  const proxied = req.header('x-forwarded-for') !== undefined || proto !== undefined;
+  const insecure = proto === 'http' || (REQUIRE_HTTPS && proxied && proto !== 'https');
+  if (insecure) {
+    return void res.status(403).json({
+      error: 'https required',
+      detail:
+        'This gateway is reachable through a proxy that is not terminating TLS. ' +
+        'Every request here carries a credential, so plain HTTP is refused.'
+    });
   }
   next();
 });
@@ -196,6 +223,27 @@ app.use((req, res, next) => {
  * is always safe; raising them is a decision about how much of this machine a
  * single caller may take.
  */
+const REQUIRE_HTTPS = process.env['WARDEN_REQUIRE_HTTPS'] === '1';
+
+/*
+ * Whether to believe `x-forwarded-for` when counting requests.
+ *
+ * Behind a tunnel every request reports the proxy's own loopback address, so
+ * without this the whole internet shares one bucket: the first flood locks out
+ * every unauthenticated caller, which is a denial of service performed by the
+ * rate limiter. With it, callers are counted by the address the proxy reports.
+ *
+ * Off by default and deliberately not inferred, because the header is written
+ * by the caller when there is no proxy — believing it then would let anyone
+ * evade the limit by rotating a string. Set it only when something you trust
+ * is in front, which is the same condition under which it is true.
+ *
+ * It never affects authorisation. `isLoopback` still refuses a proxied request
+ * regardless of this flag; this decides which bucket a request is counted in
+ * and nothing else.
+ */
+const TRUSTED_PROXY = process.env['WARDEN_TRUSTED_PROXY'] === '1';
+
 const DECISIONS_PER_MINUTE = Number(process.env['WARDEN_RATE_DECISIONS'] ?? 60);
 const REQUESTS_PER_MINUTE = Number(process.env['WARDEN_RATE_REQUESTS'] ?? 600);
 const decisionLimit = limiter(60_000, DECISIONS_PER_MINUTE);
@@ -208,7 +256,8 @@ app.use((req, res, next) => {
   const decides = DECISION_PATHS.has(path);
   if (!decides && !path.startsWith('/api/')) return next();
 
-  const who = callerKey(req.header('authorization'), req.socket.remoteAddress);
+  const forwarded = TRUSTED_PROXY ? req.header('x-forwarded-for')?.split(',')[0]?.trim() : undefined;
+  const who = callerKey(req.header('authorization'), forwarded || req.socket.remoteAddress);
   const limit = decides ? decisionLimit : generalLimit;
   if (limit.take(who)) return next();
 

@@ -207,13 +207,48 @@ guess whether it came off their own machine.
   per 15 minutes, because the administrative surface is guarded by a string and
   unlimited guesses against a string is not a lock. Counters live in memory and
   reset with the process, like the quotas.
-- **What is still missing before a gateway faces the open internet.** There is
-  no TLS termination here and no certificate handling: run it behind a tunnel or
-  a proxy that terminates TLS, and the gateway sets HSTS only once it sees
-  `x-forwarded-proto: https`. API keys remain plaintext in the directory file.
-  Rate limits are per process, so they do not survive a restart and do not
-  coordinate across instances. None of that is hidden anywhere else in this
-  document, and none of it is fixed by the paragraphs above it.
+- **Plain HTTP through a proxy is refused.** Every employee request carries an
+  API key in a header and every install link carries one in its path, so a
+  gateway reachable over http through a tunnel is handing credentials to every
+  hop. A request whose proxy says `x-forwarded-proto: http` gets 403. An absent
+  header is not a claim and is allowed, because refusing on a guess breaks
+  working deployments; `WARDEN_REQUIRE_HTTPS=1` takes the stricter reading for
+  an administrator who knows their proxy sets it. A direct request on a LAN
+  carries no forwarded headers and is untouched.
+- **Set `WARDEN_TRUSTED_PROXY=1` behind a tunnel, and only there.** Without it
+  every proxied request reports the proxy's own loopback address, so the whole
+  internet shares one rate-limit bucket and the first flood locks out every
+  other caller — a denial of service performed by the rate limiter. With it,
+  callers are counted by the address the proxy reports. It is off by default
+  and deliberately not inferred: with nothing in front, that header is written
+  by the caller, and believing it would let anyone evade the limit by rotating
+  a string. It never affects authorisation — `isLoopback` refuses a proxied
+  request either way.
+- **The directory file is written 0600.** It holds every employee's API key in
+  plaintext and was 0644 until v0.1.23: readable by every account on the
+  machine, and by anything that picked up the data folder in a backup, a sync
+  client or a container image. The mode change removes readers who never needed
+  those keys; it does not make them not plaintext.
+
+### Running one in production
+
+1. Put a tunnel or reverse proxy in front that terminates TLS. Nothing here
+   handles certificates.
+2. `WARDEN_TRUSTED_PROXY=1`, so rate limits count real callers.
+3. `WARDEN_ADMIN_REQUIRE_KEY=1`. Proxied requests already lose loopback trust
+   without it; this closes the case where something reaches the port directly.
+4. `WARDEN_HOST=127.0.0.1`, so the only way in is through the proxy.
+5. Decide `WARDEN_PROMPT_RETENTION_DAYS`. The default keeps masked prompt text
+   for seven days, and an exposed gateway is a larger blast radius than a
+   laptop.
+
+**What is still missing, on the honest list.** API keys are plaintext in the
+directory file — the install route has to hand an employee their key, so
+hashing them means reworking delivery rather than changing a column, and half a
+secret store is worse than an admitted one. Rate limits live in memory: they do
+not survive a restart and do not coordinate across instances. There is no
+account lockout beyond the per-address throttle, no audit of administrative
+actions distinct from decisions, and the hook still fails open on timeout.
 - `WARDEN_CORS_ORIGIN` is unset by default and should stay that way. The console
   is served by the same process and needs no cross-origin access.
 - Keep `data/` off shared storage. It holds the directory, the policy and the

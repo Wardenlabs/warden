@@ -18,7 +18,7 @@
  * credential rather than a convenience.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 
@@ -171,6 +171,26 @@ function save(next: Directory): Directory {
   const validated = directorySchema.parse(next);
   mkdirSync(dirname(COMPANY_PATH), { recursive: true });
   writeFileSync(COMPANY_PATH, JSON.stringify(validated, null, 2) + '\n');
+  /*
+   * This file holds every employee's API key in plaintext, and it was writing
+   * 0644 — readable by every account on the machine, and by anything that ends
+   * up with the data folder in a backup, a sync client or a container image.
+   * The settings file beside it has been 0600 since it started holding a
+   * compiler key, for exactly this reason; the directory is the more valuable
+   * of the two and had the weaker mode.
+   *
+   * It does not make the keys not plaintext. That is the honest limitation in
+   * SECURITY.md and this does not close it — it removes the readers who never
+   * needed to be trusted with them in the first place.
+   *
+   * Best effort: a filesystem without POSIX modes throws here and the file is
+   * still written, which is the right trade for a save that already succeeded.
+   */
+  try {
+    chmodSync(COMPANY_PATH, 0o600);
+  } catch {
+    /* not a POSIX filesystem */
+  }
   cached = validated;
   return validated;
 }
