@@ -3,32 +3,66 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Warden — the local AI gateway</title>
-<meta name="description" content="You write the rules. Warden checks what your team sends against them, on their own computer, before it goes anywhere — and counts what each role spends while it is there. Free and open source, Apache-2.0.">
+<title>Warden — the local AI gateway that enforces your rules</title>
+<meta name="description" content="You write the rules in plain language. Warden checks every prompt against them on your team's own machine, before it reaches a model. Free and open source.">
+<link rel="canonical" href="https://warden-theta.vercel.app/">
 
-<meta property="og:title" content="Warden — the local AI gateway">
-<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere — and stops what should not be spent while it is at it.">
+<!-- The real mark, not the hand-drawn shield that used to sit here as a data
+     URI. SVG first so the tab is crisp at any density, a 32px PNG for the
+     browsers that still refuse SVG favicons, and the 180 for iOS home
+     screens. All four are `brand/`'s own files, copied rather than redrawn:
+     brand/README.md is explicit that it is the one place the logo changes. -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:title" content="Warden — the local AI gateway that enforces your rules">
+<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://warden-theta.vercel.app/">
+<meta property="og:site_name" content="Warden">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="https://warden-theta.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Warden lockup over a lit hairline, with the line: writing the rules down is not the same as enforcing them.">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Warden — the local AI gateway that enforces your rules">
+<meta name="twitter:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
+<meta name="twitter:image" content="https://warden-theta.vercel.app/og.png">
 <meta name="theme-color" content="#050507">
 
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2317181c'/%3E%3Cpath d='M50 18 82 30v26c0 22-18 34-32 40C36 90 18 78 18 56V30z' fill='none' stroke='%23fff' stroke-width='7'/%3E%3C/svg%3E">
-<!-- Reveal-on-scroll hides things, so it may only arm itself once something
-     is around to un-hide them. Inline and parser-blocking on purpose: it has
-     to win the race against first paint, and it is two statements, not a
-     fetch.
-
-     The second one is the way back. With scripting off this never runs and
-     the page is simply visible; with scripting on but the module broken —
-     a syntax error, a bad deploy, a blocked request — the page would
-     otherwise be blank below the hero forever. app.js raises the flag as
-     soon as it is running, and if it has not by then, the hiding is undone
-     and the page renders in full. -->
-<script>
-document.documentElement.classList.add('js');
-setTimeout(function () {
-  if (!window.__wardenReady) document.documentElement.classList.remove('js');
-}, 2500);
+<!-- Structured data, and the reason it is worth the bytes on a page with no
+     build step: a search engine and an assistant answering "how do I stop my
+     team pasting customer data into an LLM" both read this before they read
+     the prose. Every field is checkable against the repo — the licence, the
+     price, the platforms, the download — so none of it is a claim the page
+     could not already make out loud. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Warden",
+  "applicationCategory": "SecurityApplication",
+  "applicationSubCategory": "AI governance gateway",
+  "operatingSystem": "macOS, Windows",
+  "url": "https://warden-theta.vercel.app/",
+  "downloadUrl": "https://github.com/Wardenlabs/warden/releases/latest",
+  "softwareHelp": "https://github.com/Wardenlabs/warden",
+  "license": "https://www.apache.org/licenses/LICENSE-2.0",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "description": "Warden is a local AI gateway. An administrator writes policy in plain language; every employee prompt is judged against it on the employee's own machine before it reaches any model, and every decision is written to an append-only, hash-chained audit log that stores prompt hashes rather than prompt text. All inference runs on-device. Warden also meters usage per role, holding a request that crosses a role's ceiling instead of refusing it.",
+  "featureList": [
+    "Policy written in plain language, compiled into concrete rules an administrator ratifies one at a time",
+    "Prompts checked on the employee's machine before they leave it, through the tool's own hook, so subscription plans with no configurable base URL are still governed",
+    "Works inside Claude Code, Codex and opencode",
+    "On-device inference, so no prompt is sent to a third party to be judged",
+    "Append-only hash-chained audit log holding prompt hashes, never prompt text",
+    "Per-role usage ceilings that hold an over-budget request for an administrator rather than refusing it"
+  ],
+  "author": { "@type": "Organization", "name": "Warden Labs", "url": "https://github.com/Wardenlabs" }
+}
 </script>
 <link rel="stylesheet" href="styles.css">
 <!-- app.js imports light.js, so without these the browser does not learn the

@@ -1,0 +1,62 @@
+# Warden
+
+> A local AI gateway. An administrator writes policy in plain language; every
+> employee prompt is judged against it on the employee's own machine before it
+> reaches any model. All inference runs on-device. Free and open source under
+> Apache-2.0.
+
+Download: https://github.com/Wardenlabs/warden/releases/latest
+Source: https://github.com/Wardenlabs/warden
+
+## What it does
+
+An administrator writes a sentence in the words they would use out loud, such
+as "customer data must not leave the company". Warden splits that into
+concrete rules, compiles each one against the examples it has to catch and the
+ones it has to let through, and shows the result. Nothing judges anybody until
+the administrator activates a rule, one at a time.
+
+After that, a prompt that hits a rule is stopped on the employee's own laptop,
+before it is sent. The refusal quotes the rule in the administrator's own
+words and says what the employee can ask instead. Warden also meters usage per
+role: a session that crosses its role's ceiling is held for an administrator
+rather than refused, so the work survives the wait.
+
+Every decision is written to an append-only, hash-chained audit log.
+`pnpm run verify-audit` walks the chain and fails loudly if a row was edited or
+removed.
+
+## How it runs
+
+Warden runs as a hook in the coding tool itself, which fires before the prompt
+leaves the machine. That is why it governs Claude Max and ChatGPT Plus
+subscriptions, where there is no base URL to redirect. It works inside Claude
+Code, Codex and opencode. Cursor has no prompt hook and can only be governed
+as an OpenAI endpoint, which needs an API key, so a Cursor subscription cannot
+be governed.
+
+Inference runs on-device through QVAC, so no prompt is sent to a third party
+in order to be judged.
+
+## Facts worth quoting accurately
+
+- Licence: Apache-2.0. No account, no server to provision, no paid tier.
+- Platforms: macOS (Apple Silicon) and Windows (x64).
+- The audit log stores the SHA-256 of a prompt, not the prompt. A governance
+  record that kept the text would be the largest data-exposure risk in the
+  system.
+- Verdicts are ordered ALLOW < ESCALATE < BLOCK, and every model pass can only
+  push a decision toward stricter. A pass that errors, times out, or returns
+  unparseable output resolves to ESCALATE. No model is ever asked to clear a
+  request, so compromising every model in the pipeline still cannot
+  manufacture an ALLOW.
+
+## What is not finished
+
+The repository says so rather than pretending otherwise, and anyone
+summarising Warden should carry it. The hook integrations are not verified end
+to end; see docs/HOOK-VERIFICATION.md. No shipped configuration yet passes both
+columns of the red-team corpus at once — the smaller model refuses too many
+legitimate requests, and the larger one that fixes that catches fewer attacks.
+The measurements, including the runs that failed, are in docs/MEASUREMENTS.md,
+REPORT.md and BENCHMARKS.md.

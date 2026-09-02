@@ -1,0 +1,27 @@
+# Everything here is public and there is nothing to crawl but one page.
+User-agent: *
+Allow: /
+
+# Named explicitly rather than left to the wildcard: several of these read
+# robots.txt for their own directive and ignore `*`, and this site wants to be
+# quoted. It is one page of plain claims about a piece of open-source software,
+# and the repository behind it is public.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://warden-theta.vercel.app/sitemap.xml
