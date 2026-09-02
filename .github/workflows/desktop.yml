@@ -101,6 +101,35 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
           WARDEN_SMOKE=1 xvfb-run -a out/Warden-linux-x64/Warden --no-sandbox 2>&1 | tee smoke.log
           grep -q WARDEN_SMOKE_OK smoke.log
+      # Last, because it moves the package: `qvac bundle sdk` writes the SDK
+      # imports in the worker entry as absolute file:// URLs under the build
+      # machine's path, so the worker starts and dies on its first import
+      # everywhere except the machine that built it. Nothing above can see
+      # that — the smoke run boots in mock mode and never spawns the worker,
+      # and even if it did, on this runner the baked-in path is still valid.
+      # Only relocating the package reproduces what a user downloads, and a
+      # rename is enough.
+      - name: The worker entry survives leaving the machine that built it
+        run: |
+          mv out/Warden-linux-x64 out/relocated
+          APP=out/relocated/resources/app
+          ENTRY="$APP/qvac/worker.entry.mjs"
+          test -f "$ENTRY" || { echo "not packaged: $ENTRY"; exit 1; }
+          grep '^import' "$ENTRY"
+          if grep -q 'from "file://' "$ENTRY"; then
+            echo "the worker entry imports by absolute path — it resolves on this runner and nowhere else"
+            exit 1
+          fi
+          # Bounded because a worker with no RPC config registers its plugins
+          # and then idles, which is the passing outcome: exit 124 is the
+          # timeout doing its job. The failure this catches is loud and fast.
+          ( cd "$APP" && timeout 20 node_modules/bare-runtime-linux-x64/bin/bare qvac/worker.entry.mjs ) \
+            > "$GITHUB_WORKSPACE/worker.log" 2>&1 || true
+          cat "$GITHUB_WORKSPACE/worker.log"
+          if grep -q 'MODULE_NOT_FOUND\|Uncaught' "$GITHUB_WORKSPACE/worker.log"; then
+            echo "the worker died on startup"
+            exit 1
+          fi
 
   make-macos:
     runs-on: macos-14

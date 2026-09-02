@@ -121,7 +121,23 @@ export function startServer(
     join(config.assetsDir.replace(/app\.asar(?=[\\/]|$)/, 'app.asar.unpacked'), 'qvac', 'worker.entry.mjs'),
     join(config.assetsDir, 'qvac', 'worker.entry.mjs')
   ].find((candidate) => existsSync(candidate));
-  if (workerEntry) env['QVAC_WORKER_PATH'] = workerEntry;
+  /*
+   * The bundled entry is the default, not an override. An operator who set
+   * `QVAC_WORKER_PATH` before launching meant it, and until now the spread of
+   * `process.env` above carried their value in and this line threw it away four
+   * lines later — silently, which is the part that cost an afternoon. It
+   * mattered because the entry inside a shipped bundle was itself broken
+   * (`qvac bundle sdk` writes the SDK imports as absolute paths under the build
+   * machine's tree, so the worker dies on its first import anywhere else), and
+   * the one repair available to somebody who already had the app installed —
+   * point it at a fixed copy outside the bundle — could not work, because the
+   * app overwrote the variable with the file that was broken.
+   *
+   * The bundled entry is correct again as of 0.1.17. This stays, because a
+   * signed bundle is the one thing a user cannot edit, so the escape hatch has
+   * to live outside it.
+   */
+  if (workerEntry && !env['QVAC_WORKER_PATH']) env['QVAC_WORKER_PATH'] = workerEntry;
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];
   /*

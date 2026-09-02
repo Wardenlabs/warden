@@ -98,10 +98,13 @@ module.exports = {
      * runtime that will not start is loud on its own now.
      */
     packageAfterCopy: async (_config, buildPath) => {
-      const { chmodSync, existsSync, readdirSync } = require('node:fs');
+      const { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } = require('node:fs');
       const { join } = require('node:path');
       const modules = join(buildPath, 'node_modules');
-      if (!existsSync(modules)) return;
+      if (!existsSync(modules)) {
+        console.warn('[warden] no node_modules in the packaged app — skipping runtime fixups');
+        return;
+      }
 
       // Every `bare-runtime-<platform>-<arch>` package, plus the launcher in
       // `bare-runtime` itself. The platform packages are the ones that matter:
@@ -123,6 +126,63 @@ module.exports = {
             console.warn(`[warden] could not chmod ${dir}/bin/${name}: ${err.message}`);
           }
         }
+      }
+
+      /**
+       * Make the worker entry point at this bundle instead of at the machine
+       * that built it.
+       *
+       * `npx qvac bundle sdk` writes `qvac/worker.entry.mjs`, and it writes the
+       * SDK imports as absolute `file://` URLs under the SDK's realpath —
+       * deliberately, so that bare-pack resolves the `bare-*` modules next to
+       * the SDK rather than against the consumer project. That is correct in a
+       * checkout and wrong in anything shipped, because the realpath it bakes
+       * in is the build machine's. On the release runner that is
+       * `/Users/runner/work/warden/warden/node_modules/@qvac/sdk/...`, a path
+       * which exists nowhere else, so on every user's machine `bare` starts,
+       * fails the first import, and dies:
+       *
+       *   Uncaught ModuleError: MODULE_NOT_FOUND: Cannot find module
+       *   'file:///Users/runner/work/warden/warden/node_modules/@qvac/sdk/dist/server/worker-core.js'
+       *
+       * Which the SDK reports, again, as "RPC initialization timed out after
+       * 30000ms — the worker process may have failed to start". That sentence
+       * has now stood for a missing binary, a permission bit, and this; the
+       * probe added in 0.1.16 is what separates them, and on the report that
+       * found this one it said the runtime was fine and the worker was dying
+       * after it started. It was right.
+       *
+       * The rewrite is `<anything>/node_modules/` to `../node_modules/`, which
+       * is the same file inside the packaged app: the entry lives at
+       * `app/qvac/worker.entry.mjs` and the SDK at `app/node_modules/@qvac/sdk`.
+       * Relative resolution then anchors on the bundle's own tree, which keeps
+       * the property the absolute URL was there to buy — the `bare-*` modules
+       * resolve as siblings of the SDK — without pinning it to a disk.
+       *
+       * Here for the same reason as the chmod above: macOS signs and notarizes
+       * after this hook, so this is the last moment the file can change without
+       * invalidating the signature, and a runtime rewrite would be writing into
+       * a signed bundle owned by root.
+       *
+       * A specifier that does not pass through a `node_modules` — a custom
+       * plugin living in the project — is left alone and stays absolute. CI
+       * fails the build on any `file://` import that survives this, because
+       * that is the shape of the bug and it should not ship a second time.
+       */
+      const entry = join(buildPath, 'qvac', 'worker.entry.mjs');
+      if (!existsSync(entry)) {
+        console.warn('[warden] no qvac/worker.entry.mjs in the packaged app — inference will not start');
+        return;
+      }
+      const before = readFileSync(entry, 'utf8');
+      const after = before.replace(/"file:\/\/[^"]*\/node_modules\//g, '"../node_modules/');
+      if (after === before) {
+        console.log('[warden] qvac/worker.entry.mjs imports no absolute paths, left as is');
+        return;
+      }
+      writeFileSync(entry, after);
+      for (const line of after.split('\n').filter((l) => l.startsWith('import '))) {
+        console.log(`[warden] worker entry: ${line}`);
       }
     }
   },
