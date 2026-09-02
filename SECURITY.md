@@ -181,16 +181,39 @@ guess whether it came off their own machine.
 - `WARDEN_HOST` defaults to `0.0.0.0` so employees can reach the gateway. The
   administrative surface is authenticated, but set `127.0.0.1` if the gateway
   serves only the machine it runs on.
-- **Set `WARDEN_ADMIN_REQUIRE_KEY=1` behind any proxy, tunnel or load
-  balancer.** Not only on a shared host — this one is sharper than it reads.
-  `requireAdmin` grants administration to loopback, and it reads the peer
-  address off the socket precisely so a header cannot forge it. A reverse proxy
-  connects from `127.0.0.1`, so *every* request arriving through it satisfies
-  that check and everyone who can reach the proxy is an administrator: the
-  directory with every employee's API key in plain text, policy edits, deleting
-  people. Confirmed against a running gateway while preparing a tunnel — with
-  the flag off the admin API answered unauthenticated; with it on, `/api/people`
-  returned 403 without a key and 200 with one.
+- **A proxied request no longer counts as loopback, and that is now enforced
+  rather than configured.** `requireAdmin` grants administration to loopback and
+  reads the peer address off the socket precisely so a header cannot forge it.
+  A reverse proxy connects from `127.0.0.1`, so *every* request arriving through
+  one used to satisfy that check: everyone who could reach the tunnel was an
+  administrator, with the directory of plaintext API keys, policy edits and
+  deleting people behind it. Confirmed against a running gateway while preparing
+  a tunnel — the admin API answered unauthenticated.
+
+  The guard against it was `WARDEN_ADMIN_REQUIRE_KEY=1`, which worked and which
+  somebody had to remember. `isLoopback` now returns false whenever a request
+  carries any header a proxy adds (`x-forwarded-for`, `forwarded`,
+  `cf-connecting-ip`, and the rest of the list in `admin-auth.ts`). A forged
+  header can only *withdraw* trust, never grant it, so the check is safe to make
+  from data the caller controls. Setting the flag as well costs nothing and is
+  still worth doing on a shared host.
+- **Both expensive paths are rate limited**, per API key where there is one and
+  per address where there is not: 60 decisions a minute
+  (`WARDEN_RATE_DECISIONS`) and 600 requests a minute on `/api/`
+  (`WARDEN_RATE_REQUESTS`). Each decision costs a model call, so before this one
+  loop from one caller pinned the CPU every real decision was queued behind —
+  a denial of service against the guard itself, in one line. Failed
+  administrative authentication is capped separately at 10 attempts per address
+  per 15 minutes, because the administrative surface is guarded by a string and
+  unlimited guesses against a string is not a lock. Counters live in memory and
+  reset with the process, like the quotas.
+- **What is still missing before a gateway faces the open internet.** There is
+  no TLS termination here and no certificate handling: run it behind a tunnel or
+  a proxy that terminates TLS, and the gateway sets HSTS only once it sees
+  `x-forwarded-proto: https`. API keys remain plaintext in the directory file.
+  Rate limits are per process, so they do not survive a restart and do not
+  coordinate across instances. None of that is hidden anywhere else in this
+  document, and none of it is fixed by the paragraphs above it.
 - `WARDEN_CORS_ORIGIN` is unset by default and should stay that way. The console
   is served by the same process and needs no cross-origin access.
 - Keep `data/` off shared storage. It holds the directory, the policy and the

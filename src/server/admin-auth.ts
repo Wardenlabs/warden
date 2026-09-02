@@ -51,6 +51,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { actorForCredential } from '../policy/people.js';
 import { isExempt, loadPolicy } from '../policy/store.js';
+import { callerKey, limiter } from './rate-limit.js';
 
 /** The shape `installToken` produces: 128 bits, hex. */
 const INSTALL_TOKEN = /^[0-9a-f]{32}$/;
@@ -133,11 +134,52 @@ const REQUIRE_KEY = process.env['WARDEN_ADMIN_REQUIRE_KEY'] === '1';
  * whole 127/8 block, since `127.0.0.2` is just as local as `127.0.0.1`.
  */
 export function isLoopback(req: Request): boolean {
+  // A proxy in front of the gateway connects to it from the same machine, so
+  // everything arriving through one reports a loopback socket. That is how a
+  // tunnel works — `cloudflared`, a Tailscale Funnel, ngrok, nginx — and it
+  // meant that the moment somebody exposed their gateway, every stranger who
+  // opened the URL arrived holding the administrator's own trust: policy
+  // writes, key issuance, the audit log, all of it. The socket was telling the
+  // truth and answering the wrong question.
+  //
+  // These headers are what a proxy adds, and none of them survives a direct
+  // connection from the machine itself. Their presence cannot grant anything —
+  // it only ever withdraws loopback trust — so a caller who forges one loses
+  // access they never had. That is the safe direction, and it is why this is a
+  // header check rather than a configuration flag: an administrator who puts a
+  // tunnel in front of the gateway does not have to know to also set an
+  // environment variable, and the release that forgets to say so does not
+  // silently open somebody's company.
+  for (const name of FORWARDED_HEADERS) {
+    if (req.header(name) !== undefined) return false;
+  }
+
   const address = req.socket.remoteAddress;
   if (!address) return false;
   const bare = address.startsWith('::ffff:') ? address.slice(7) : address;
   return bare === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bare);
 }
+
+/**
+ * Headers that mean "this request was relayed", whoever relayed it.
+ *
+ * Deliberately broad. A header on this list that a direct caller happens to
+ * send costs them loopback trust and nothing else — they can still send an
+ * administrator's key — while one missing from it costs somebody their
+ * company. The two errors are not the same size.
+ */
+const FORWARDED_HEADERS = [
+  'x-forwarded-for',
+  'x-forwarded-proto',
+  'x-forwarded-host',
+  'forwarded',
+  'x-real-ip',
+  'cf-connecting-ip',
+  'cf-ray',
+  'true-client-ip',
+  'fly-client-ip',
+  'x-client-ip'
+] as const;
 
 /** Does this request carry a key belonging to a role the policy exempts? */
 export function hasAdminKey(req: Request): boolean {
@@ -163,8 +205,36 @@ export function hasAdminKey(req: Request): boolean {
  * because the person hitting this is usually the administrator on the wrong
  * interface rather than an attacker.
  */
+/**
+ * How many times one address may fail to prove it is an administrator.
+ *
+ * The administrative surface is guarded by a key that is also somebody's
+ * employee key, stored in plaintext in the directory file — so the thing
+ * standing between a stranger and every policy write on this gateway is that
+ * they do not know a string. Unlimited guesses against a string is not a lock.
+ *
+ * Counted per address rather than per key, because a guesser has no key yet.
+ * Cleared the moment a request succeeds, so an administrator who mistypes and
+ * then gets it right pays nothing, and the window is short enough that being
+ * locked out of your own console is minutes rather than an afternoon.
+ */
+const adminFailures = limiter(15 * 60_000, 10);
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if ((!REQUIRE_KEY && isLoopback(req)) || hasAdminKey(req)) return next();
+  const who = callerKey(undefined, req.socket.remoteAddress);
+
+  if ((!REQUIRE_KEY && isLoopback(req)) || hasAdminKey(req)) {
+    adminFailures.clear(who);
+    return next();
+  }
+
+  if (!adminFailures.take(who)) {
+    res.setHeader('Retry-After', String(adminFailures.retryAfter(who)));
+    // Deliberately the same shape as any other refusal from here, minus the
+    // advice: telling a guesser they have been throttled tells them the
+    // guessing was worth throttling.
+    return void res.status(429).json({ error: 'too many attempts' });
+  }
 
   // The onboarding route's whole output is piped into `sh`. A JSON body sent
   // there is a syntax error arriving inside a shell, which reads to the

@@ -33,6 +33,7 @@ import {
   saveCompilerSettings
 } from '../settings.js';
 import { dropUnrequestedSample } from '../policy/boot-migrations.js';
+import { callerKey, limiter } from './rate-limit.js';
 import { needsAdmin, requireAdmin } from './admin-auth.js';
 import {
   addRole,
@@ -150,6 +151,76 @@ if (CORS_ORIGIN) {
   });
   app.options(/.*/, (_req, res) => res.sendStatus(204));
 }
+
+/*
+ * Headers a browser needs whether or not anybody exposes this gateway.
+ *
+ * Cheap, and none of them can break a caller that is not a browser. `nosniff`
+ * because the console serves user-named content; `DENY` because nothing here
+ * is meant to be framed and framing it is how an attacker's page borrows an
+ * administrator's session; `no-referrer` because a gateway URL carrying an
+ * install token must not travel to whatever a person clicks next.
+ *
+ * HSTS only when the request actually arrived over TLS. Sending it on plain
+ * HTTP would pin a browser to https for a host that may only ever speak http
+ * on a LAN, which locks somebody out of their own console.
+ */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  if (req.header('x-forwarded-proto') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  }
+  next();
+});
+
+/*
+ * A ceiling on how fast anybody can spend this machine.
+ *
+ * `/api/guard/check` and the OpenAI-shaped proxy each cost a model call, and
+ * until now nothing bounded them: one loop from anyone holding a key — or from
+ * anyone at all, since a rejected key still costs the round trip — pins the CPU
+ * that every real decision is waiting on. On a laptop on a desk that was
+ * somebody else's problem. Exposed, it is a one-line denial of service, and the
+ * thing denied is the guard.
+ *
+ * Two windows. The decision limit is what a person cannot reach and a script
+ * crosses immediately; the general one bounds everything else on `/api/` so a
+ * flood of cheap reads cannot do by volume what the expensive routes cannot do
+ * by cost. Both are per caller — per key where there is one, per address where
+ * there is not — so one office behind a NAT does not spend everybody's
+ * allowance, and one stranger cannot spend a whole company's.
+ *
+ * Raise them on the gateway if a deployment genuinely needs more. Lowering them
+ * is always safe; raising them is a decision about how much of this machine a
+ * single caller may take.
+ */
+const DECISIONS_PER_MINUTE = Number(process.env['WARDEN_RATE_DECISIONS'] ?? 60);
+const REQUESTS_PER_MINUTE = Number(process.env['WARDEN_RATE_REQUESTS'] ?? 600);
+const decisionLimit = limiter(60_000, DECISIONS_PER_MINUTE);
+const generalLimit = limiter(60_000, REQUESTS_PER_MINUTE);
+const DECISION_PATHS = new Set(['/api/guard/check', '/v1/chat/completions', '/api/guard/rewrite']);
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const path = req.path;
+  const decides = DECISION_PATHS.has(path);
+  if (!decides && !path.startsWith('/api/')) return next();
+
+  const who = callerKey(req.header('authorization'), req.socket.remoteAddress);
+  const limit = decides ? decisionLimit : generalLimit;
+  if (limit.take(who)) return next();
+
+  // 429 with `Retry-After`, and no detail about which limit was hit or how
+  // much of it is left: a counter that reports its own state is a counter an
+  // attacker can tune against.
+  res.setHeader('Retry-After', String(limit.retryAfter(who)));
+  res.status(429).json({
+    error: 'too many requests',
+    detail: 'Slow down and try again shortly.'
+  });
+});
 
 /**
  * Authorisation, ahead of every route so no route can forget it.
