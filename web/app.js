@@ -128,6 +128,8 @@ const state = {
   mock: false,
   /** True when a desktop shell is listening that can fetch the models. */
   canLeaveDemo: false,
+  /** What weights are on disk and which seat each model fills. Null until loaded. */
+  models: null,
   /** Role whose limits are open for editing, or null. One at a time. */
   quotaEdit: null,
   /** Why the last save of that role's limits was refused, if it was. */
@@ -381,6 +383,8 @@ async function refreshChain() {
 async function refreshCompiler() {
   const { ok, j } = await api('/api/settings/compiler').catch(() => ({ ok: false }));
   state.compiler = ok ? j : null;
+  const inv = await api('/api/models').catch(() => ({ ok: false }));
+  state.models = inv.ok ? inv.j : null;
 }
 
 async function loadPresets() {
@@ -766,13 +770,7 @@ function decisionDetail(entry, head = '') {
   // Latency lives here and only here — this is the section about how it ran.
   // "None of it left this machine" is the conclusion of the same paragraph,
   // which is a better home for that claim than a light in a corner.
-  const passes = `<div>${(d.passes ?? []).map((p) => `
-      <div class="pass">
-        <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
-        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
-        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
-        <span class="ms">${p.ms ?? 0}ms</span>
-      </div>`).join('')}
+  const passes = `<div>${(d.passes ?? []).map((p) => passRow(p, slowest)).join('')}
     <div class="note">${((d.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`;
 
   const chain = `<div class="chain">
@@ -832,6 +830,30 @@ function decisionDetail(entry, head = '') {
       ${disclosure('d:record', 'Technical record', record)}
     </div>
   </div>`;
+}
+
+/**
+ * One row of the pass table, and the reason when the row failed closed.
+ *
+ * `adjudicateAll` has always recorded why a pass threw, in `detail.error`, and
+ * nothing has ever rendered it. So the guard would fail closed correctly, the
+ * decision would read "rule could not be evaluated, escalated rather than
+ * assumed clean", and the sentence that says whether the model timed out or the
+ * worker never started sat in the record with no way to see it. Somebody whose
+ * models are installed and whose rules still will not evaluate could not find
+ * out why from the screen telling them it happened.
+ *
+ * Shown only when the pass actually failed: a healthy run keeps the tight table
+ * it had.
+ */
+function passRow(p, slowest) {
+  const why = p.failedClosed && p.detail?.error ? String(p.detail.error) : '';
+  return `<div class="pass">
+      <span class="n">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
+      <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
+      <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
+      <span class="ms">${p.ms ?? 0}ms</span>
+    </div>${why ? `<div class="pass-why">${esc(why)}</div>` : ''}`;
 }
 
 /** Filters live with the list they filter, not in the app chrome. */
@@ -1117,6 +1139,8 @@ function compilerPage() {
 
   return `<div class="sheet settings">
     ${rulesTabs()}
+
+    ${modelsSection()}
 
     <div class="section">
       <div class="label">Which model writes your rules</div>
@@ -1463,6 +1487,73 @@ function quotaEditor(q) {
       <button type="button" class="btn" id="qCancel">Cancel</button>
     </div>
   </form>`;
+}
+
+/**
+ * Enter sends, Shift+Enter writes a newline.
+ *
+ * Both composers used to want Cmd or Ctrl held down, which is the shortcut a
+ * text editor teaches and not the one a chat does. Every box on this screen
+ * looks like a chat, so people press Enter, and Enter did nothing but grow the
+ * textarea by one line.
+ *
+ * `isComposing` is checked because an IME uses Enter to accept a candidate:
+ * without it, typing anything through a Japanese or Korean keyboard sends the
+ * message halfway through the word.
+ */
+function sendOnEnter(el, send) {
+  if (!el) return;
+  el.onkeydown = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    send();
+  };
+}
+
+/**
+ * What is on this disk, and which of the two seats your subscription can take.
+ *
+ * Two complaints, one panel. The console named the adjudicator without ever
+ * saying whether its weights exist, so a filename in a config and an installed
+ * model looked the same on screen; `onDisk` comes from the file system, not
+ * from what would be loaded. And people configure Claude Code expecting it to
+ * do the work, because nothing said which work. Judging never leaves the
+ * machine under any setting on this page, and that sentence belongs here rather
+ * than in SECURITY.md where nobody hits it at the moment they are wondering.
+ */
+function modelsSection() {
+  const m = state.models;
+  if (!m) return '';
+
+  const size = (b) => (b ? `${(b / 1e9).toFixed(b < 1e9 ? 2 : 1)} GB` : '');
+  const missing = m.models.filter((x) => !x.onDisk).length;
+
+  return `<div class="section">
+    <div class="label">What is running</div>
+
+    <div class="kv">
+      <div class="r"><span class="k">Judging your team's prompts</span>
+        <span class="v">${esc(m.judging.model)} · ${esc(m.judging.where)}</span></div>
+      <div class="r"><span class="k">Writing your rules</span>
+        <span class="v">${esc(m.drafting.model)} · ${esc(m.drafting.where)}</span></div>
+    </div>
+    <div class="note">Judging always runs here, whatever you pick below. A Claude or Codex
+      subscription can write your rules; it never sees an employee prompt.</div>
+
+    <div class="models">
+      ${m.models.map((x) => `<div class="model ${x.onDisk ? 'have' : 'missing'}">
+        <span class="role">${esc(x.role)}</span>
+        <span class="file">${esc(x.name)}</span>
+        <span class="state">${x.onDisk ? `on disk${size(x.bytes) ? ` · ${size(x.bytes)}` : ''}` : 'not downloaded'}</span>
+      </div>`).join('')}
+    </div>
+
+    ${missing > 0 ? `<div class="row-actions">
+      ${state.canLeaveDemo
+        ? `<button type="button" class="btn primary" id="getModels">Download the missing ${missing === 1 ? 'model' : 'models'}</button>`
+        : `<span class="note">Run <span class="mono">pnpm run setup</span> to fetch ${missing === 1 ? 'it' : 'them'}.</span>`}
+    </div>` : ''}
+  </div>`;
 }
 
 /** Roles the policy declines to govern. Read from the policy, never guessed. */
@@ -2163,7 +2254,7 @@ function bindPolicy() {
   const send = $('ruleSend');
   if (send) send.onclick = () => writeRule($('ruleMsg').value);
   const msg = $('ruleMsg');
-  if (msg) msg.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) writeRule(msg.value); };
+  sendOnEnter(msg, () => writeRule(msg.value));
 
   const cats = $('cats');
   if (cats) cats.onclick = (e) => {
@@ -2750,8 +2841,7 @@ VIEWS.simulator = {
   bind: () => {
     const send = $('send');
     if (send) send.onclick = doSend;
-    const prompt = $('prompt');
-    if (prompt) prompt.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSend(); };
+    sendOnEnter($('prompt'), doSend);
     bindFollowUps();
   }
 };
@@ -2764,13 +2854,7 @@ function renderMessage(m, i) {
   // same disclosure, same place in the hierarchy, as a decision in Activity.
   const slowest = Math.max(1, ...(m.passes ?? []).map((p) => p.ms ?? 0));
   const passes = (m.passes ?? []).length ? `<div class="folds">${disclosure(`s:${i}`, 'How it was decided', `
-    <div>${m.passes.map((p) => `
-      <div class="pass">
-        <span class="n">${esc(p.pass)}</span>
-        <span class="v ${esc(p.verdict ?? '')}">${esc(p.verdict ?? '')}</span>
-        <span class="track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
-        <span class="ms">${p.ms ?? 0}ms</span>
-      </div>`).join('')}</div>
+    <div>${m.passes.map((p) => passRow(p, slowest)).join('')}</div>
     <div class="note">${((m.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`)}</div>` : '';
 
   return `<div class="msg">

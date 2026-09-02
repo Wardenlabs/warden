@@ -6,7 +6,7 @@
  * evaluation touches three roles; reloading per call would make the pipeline
  * unusable.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
@@ -244,6 +244,52 @@ export function resolvedModel(role: ModelRole): string {
   } catch (err) {
     return `unresolved (${err instanceof Error ? err.message : String(err)})`;
   }
+}
+
+/**
+ * Which weights are on this disk, per role, and which are not.
+ *
+ * `resolvedModel` answers "what would load", which is not the same question and
+ * is the only one the console could ask. So a person with no models installed
+ * saw the adjudicator named after a file that is not there, decided it was
+ * fine, and then could not work out why every rule came back unevaluated. The
+ * name of a thing is not evidence that the thing exists.
+ *
+ * `onDisk` is false when `sourceFor` fell through to the SDK registry constant,
+ * which resolves over P2P and, on a normal corporate network, hangs until the
+ * load deadline instead of arriving. Reporting that as "installed" would be the
+ * console telling somebody their download finished when it never started.
+ */
+export function modelInventory(): {
+  role: ModelRole;
+  name: string;
+  onDisk: boolean;
+  bytes: number | null;
+}[] {
+  const roles: ModelRole[] = ['adjudicator', 'embedder', 'detector', 'ocr', 'assistant'];
+  return roles.map((role) => {
+    try {
+      const src = sourceFor(role);
+      if (typeof src !== 'string') {
+        const entry = src as { name?: string; src?: string };
+        return { role, name: entry.name ?? entry.src ?? 'registry', onDisk: false, bytes: null };
+      }
+      let bytes: number | null = null;
+      try {
+        bytes = statSync(src).size;
+      } catch {
+        /* present per existsSync but unreadable; size is a nicety */
+      }
+      return { role, name: src.split('/').pop() ?? src, onDisk: true, bytes };
+    } catch (err) {
+      return {
+        role,
+        name: `unresolved (${err instanceof Error ? err.message : String(err)})`,
+        onDisk: false,
+        bytes: null
+      };
+    }
+  });
 }
 
 /**

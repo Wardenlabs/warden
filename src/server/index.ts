@@ -18,8 +18,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { adapter, adapterName, isMock, remoteCompiler } from '../qvac/index.js';
-import { resolvedModel } from '../qvac/client.js';
-import { detectCliTools } from '../qvac/cli-compiler.js';
+import { modelInventory, resolvedModel } from '../qvac/client.js';
+import { cliCompilerConfig, cliToolLabel, detectCliTools } from '../qvac/cli-compiler.js';
 import { remoteCompilerSource, validate as validateCompilerEndpoint } from '../qvac/remote.js';
 import {
   COMPILER_PROVIDERS,
@@ -1350,6 +1350,35 @@ app.get('/health', (_req, res) =>
  * gateway's own stdout, which carries decisions as verdict plus rule id plus
  * timing, never prompt text. Same promise the audit chain makes.
  */
+/**
+ * What Warden is actually running on, said plainly enough to act on.
+ *
+ * The console could name the adjudicator and could not say whether its weights
+ * exist, so "the model is installed" and "the model is a filename in a config"
+ * looked identical, and somebody with neither spent an evening wondering why
+ * every rule came back unevaluated. It also never said the thing people ask
+ * first: whether the Claude or Codex subscription they just configured is doing
+ * the judging. It is not, it never will be, and the reason belongs on screen
+ * next to the setting rather than in SECURITY.md.
+ */
+app.get('/api/models', (_req, res) => {
+  const cli = cliCompilerConfig();
+  const remote = remoteCompiler();
+  res.json({
+    mock: isMock(),
+    state: modelState,
+    models: modelInventory(),
+    // Two seats, one of which never leaves. Named separately because conflating
+    // them is the misunderstanding this route exists to end.
+    judging: { where: 'this machine', model: resolvedModel('adjudicator') },
+    drafting: cli
+      ? { where: cliToolLabel(cli.tool), model: cli.model || 'its default' }
+      : remote
+        ? { where: 'a configured endpoint', model: remote }
+        : { where: 'this machine', model: resolvedModel('compiler') }
+  });
+});
+
 app.get('/api/gateway/log', (_req, res) => {
   const path = process.env['WARDEN_LOG_PATH'];
   if (!path) return res.status(404).json({ error: 'this gateway does not write to a log file' });
