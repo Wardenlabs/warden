@@ -10,7 +10,7 @@
 import { utilityProcess } from 'electron';
 import { createWriteStream, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 
 type Child = ReturnType<typeof utilityProcess.fork>;
 
@@ -87,6 +87,41 @@ export function startServer(
     // menus away from the screen that just failed.
     WARDEN_LOG_PATH: config.logPath
   };
+
+  /*
+   * Tell the SDK where its worker is, because it cannot work that out from here.
+   *
+   * This is the reason on-device inference never ran in the packaged app, and
+   * the symptom was "RPC initialization timed out after 30000ms, the worker
+   * process may have failed to start" on a machine whose weights were all
+   * present. `resolveWorkerPath` in @qvac/sdk tries, in order:
+   * `QVAC_WORKER_PATH`; then `process.resourcesPath`, which is a main-process
+   * property and is not defined in a `utilityProcess`; then a walk up from
+   * `process.cwd()` looking for a package.json, and the gateway's cwd is the
+   * user's data folder, which has no package.json above it; then a default
+   * inside node_modules that `bare` cannot read out of app.asar.
+   *
+   * Every path after the first fails for a packaged Warden specifically. The
+   * first is an env var, and the main process is the one place that knows
+   * `resourcesPath` and the app root, so it sets it.
+   *
+   * Nothing is set when no candidate exists, which is the checkout case: there
+   * cwd is the repo, the package.json walk works, and the SDK finds it alone.
+   */
+  const workerEntry = [
+    ...(typeof process.resourcesPath === 'string'
+      ? [
+          join(process.resourcesPath, 'app.asar.unpacked', 'qvac', 'worker.entry.mjs'),
+          join(process.resourcesPath, 'app', 'qvac', 'worker.entry.mjs'),
+          join(process.resourcesPath, 'qvac', 'worker.entry.mjs')
+        ]
+      : []),
+    // `bare` reads the worker off the filesystem and cannot read it out of an
+    // asar, so the unpacked sibling comes before the archive path itself.
+    join(config.assetsDir.replace(/app\.asar(?=[\\/]|$)/, 'app.asar.unpacked'), 'qvac', 'worker.entry.mjs'),
+    join(config.assetsDir, 'qvac', 'worker.entry.mjs')
+  ].find((candidate) => existsSync(candidate));
+  if (workerEntry) env['QVAC_WORKER_PATH'] = workerEntry;
   if (config.adapter === 'mock') env['WARDEN_ADAPTER'] = 'mock';
   else delete env['WARDEN_ADAPTER'];
   /*

@@ -66,6 +66,29 @@ export async function compileRule(
   const system = [
     'You convert a policy statement written by a company administrator into a structured rule.',
     '',
+    // Two failures this paragraph exists for, both seen on a capable compiler.
+    //
+    // "Quiero reducir mi uso al 50%" came back as "No employee request may be
+    // refused, throttled, or otherwise limited on the basis of a stated goal to
+    // reduce overall usage" — the exact opposite of what was asked, because the
+    // sentence is a spending target and the prompt only had one shape to put it
+    // in. Warden expresses spending as a quota per role, not as a rule about
+    // what anyone may ask, so the honest answer is to decline and say where the
+    // setting lives.
+    //
+    // And a rule always states what is PROHIBITED. Asked to compile a goal, the
+    // model wrote the prohibition inside out. Saying so is cheaper than
+    // catching it afterwards.
+    'A rule states what is PROHIBITED. Never write a rule that prohibits limiting,',
+    'restricting or refusing people: that inverts what the administrator asked for.',
+    '',
+    'Some sentences are not rules at all. Set notARule to true, with a short reason,',
+    'when the administrator is describing:',
+    '- how much may be spent or used (a budget, a percentage, a daily cap): these are',
+    '  role limits in Warden, not rules about what anyone may ask;',
+    '- a question, a greeting, or anything with no prohibition in it.',
+    'When notARule is true the other fields are ignored, so do not labour over them.',
+    '',
     `Valid role names: ${roles.join(', ')}.`,
     // Naming the people is what makes "Ana cannot ask for payroll" compile into
     // a rule about Ana rather than a rule about everyone. Without the roster the

@@ -454,7 +454,16 @@ app.post('/api/policy/draft', asyncRoute(async (req, res) => {
   // `lockTo` is set when the admin writes a rule from inside one person's page.
   // They already said who it is for by being there.
   const lockTo = Array.isArray(req.body?.lockTo) ? req.body.lockTo.map(String) : undefined;
-  const rule = await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {});
+  const rule = (await compileRule(adapter(), text, loadPolicy(), lockTo ? { lockTo } : {})) as {
+    notARule?: boolean;
+    notARuleReason?: string;
+  };
+  // The compiler declining is an answer, not a failure. It reaches the console
+  // as its own shape so the console can send somebody to the limits editor
+  // rather than handing them a prohibition built out of a budget sentence.
+  if (rule.notARule) {
+    return res.json({ notARule: true, reason: rule.notARuleReason ?? '' });
+  }
   // Who wrote the draft, so the administrator ratifying it can see whether it
   // came off their own machine. `null` means local, which is the default.
   const remote = remoteCompiler();
@@ -1361,13 +1370,32 @@ app.get('/health', (_req, res) =>
  * the judging. It is not, it never will be, and the reason belongs on screen
  * next to the setting rather than in SECURITY.md.
  */
+/**
+ * The roles `ensureModels` will actually fetch: required, and with a URL.
+ *
+ * Kept beside the route rather than imported from the desktop catalog, because
+ * the gateway is also the thing a checkout runs and it must not depend on the
+ * Electron half to describe itself.
+ */
+const FETCHABLE_ROLES = new Set(['adjudicator', 'embedder', 'detector']);
+
 app.get('/api/models', (_req, res) => {
   const cli = cliCompilerConfig();
   const remote = remoteCompiler();
   res.json({
     mock: isMock(),
     state: modelState,
-    models: modelInventory(),
+    // `fetchable` is what the first-run downloader would actually go and get:
+    // `required` and carrying an HTTPS url. OCR_LATIN has neither (`url: null`,
+    // it resolves only over the P2P registry) and the assistant is optional, so
+    // the panel offered to download two models that the download step skips by
+    // design, and pressing the button changed nothing about either. Saying
+    // which is which is the difference between a broken button and a fact.
+    models: modelInventory().map((m) => ({
+      ...m,
+      fetchable: FETCHABLE_ROLES.has(m.role),
+      optional: !FETCHABLE_ROLES.has(m.role)
+    })),
     // Two seats, one of which never leaves. Named separately because conflating
     // them is the misunderstanding this route exists to end.
     judging: { where: 'this machine', model: resolvedModel('adjudicator') },

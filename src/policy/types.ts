@@ -153,7 +153,24 @@ export type PolicySpec = z.infer<typeof policySpecSchema>;
  * the model, which matters both as a security property and as the answer to
  * "what stops someone talking the compiler into writing a permissive rule".
  */
-export const ruleDraftSchema = ruleSchema.omit({ id: true, embedding: true });
+/**
+ * A compiled draft, or the compiler declining to make one.
+ *
+ * `notARule` is the only field here the model can use to refuse the task, and
+ * it exists because refusing was impossible: asked to turn "quiero reducir mi
+ * uso al 50%" into a prohibition, a very capable model produced one that
+ * prohibited *limiting* people, which is the administrator's sentence turned
+ * inside out and then handed to them to ratify. A spending target is a role
+ * limit in Warden; there was nowhere to say that.
+ *
+ * The rest of the fields stay required so the common path is unchanged. Nothing
+ * a compiler emits is enacted without the administrator pressing Activate, so
+ * this is not on the measured path the guard's numbers come from.
+ */
+export const ruleDraftSchema = ruleSchema.omit({ id: true, embedding: true }).extend({
+  notARule: z.boolean().optional(),
+  notARuleReason: z.string().optional()
+});
 export type RuleDraft = z.infer<typeof ruleDraftSchema>;
 
 /** JSON Schema handed to the decoder as a grammar when compiling a rule. */

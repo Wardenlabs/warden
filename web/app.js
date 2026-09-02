@@ -1154,13 +1154,6 @@ function compilerPage() {
     <div class="section">
       <div class="label">Which model writes your rules</div>
 
-      <div class="where">
-        <span class="dot ${remote ? 'ESCALATE' : 'ALLOW'}"></span>
-        <span>${remote
-          ? `Drafting runs at <b>${esc(host || 'the endpoint below')}</b>. Judging your team's prompts stays on this machine.`
-          : `Drafting and judging both run here, on <b>${esc(c.localModel ?? 'the local model')}</b>.`}</span>
-      </div>
-
       ${c.overriddenByEnv ? `<div class="banner warn">
         <b>The environment is setting this.</b> <code>WARDEN_COMPILER_API</code> wins over what you save here.
       </div>` : ''}
@@ -1362,14 +1355,23 @@ function cliNote(providerId) {
     : `<span class="note bad">Not on this machine. Install <span class="mono">${esc(found.tool)}</span>, sign in, then come back to this page.</span>`;
 }
 
+/**
+ * Which model is drafting, read from the one place that actually knows.
+ *
+ * This used to derive it from `activeSource`, which the gateway computes from
+ * `remoteCompilerSource()` alone: that function knows about a configured
+ * endpoint and knows nothing about a signed-in CLI. So somebody who picked
+ * Claude Code, saved it, and watched the panel above say "opus · Claude Code"
+ * still read "Drafting and judging both run here, on Qwen3-1.7B" underneath it.
+ * Two lines on one screen disagreeing about the same fact.
+ *
+ * `/api/models` resolves the CLI, the endpoint and the local weights together,
+ * so both lines come from it now.
+ */
 function compilerLine() {
-  const c = state.compiler;
-  if (!c) return '';
-  const remote = c.activeSource !== 'local';
-  const where = remote
-    ? `${esc(c.model || 'a remote model')} · off this machine`
-    : `${esc(c.localModel ?? 'local model')} · on this machine`;
-  return `<div class="note compiler-line">Drafting with ${where}
+  const d = state.models?.drafting;
+  if (!d) return '';
+  return `<div class="note compiler-line">Drafting with ${esc(d.model)} · ${esc(d.where)}
     <button type="button" class="linkish" data-go="compiler">Change</button></div>`;
 }
 
@@ -1535,7 +1537,11 @@ function modelsSection() {
   if (!m) return '';
 
   const size = (b) => (b ? `${(b / 1e9).toFixed(b < 1e9 ? 2 : 1)} GB` : '');
-  const missing = m.models.filter((x) => !x.onDisk).length;
+  // Only what the downloader would actually go and get. Counting the other two
+  // made the button promise work it was never going to do, which is how it came
+  // to be pressed twice with nothing happening either time.
+  const missing = m.models.filter((x) => !x.onDisk && x.fetchable !== false).length;
+  const skipped = m.models.filter((x) => !x.onDisk && x.fetchable === false);
 
   return `<div class="section">
     <div class="label">What is running</div>
@@ -1553,9 +1559,17 @@ function modelsSection() {
       ${m.models.map((x) => `<div class="model ${x.onDisk ? 'have' : 'missing'}">
         <span class="role">${esc(x.role)}</span>
         <span class="file">${esc(x.name)}</span>
-        <span class="state">${x.onDisk ? `on disk${size(x.bytes) ? ` · ${size(x.bytes)}` : ''}` : 'not downloaded'}</span>
+        <span class="state">${x.onDisk
+          ? `on disk${size(x.bytes) ? ` · ${size(x.bytes)}` : ''}`
+          : x.fetchable === false ? 'optional, no download' : 'not downloaded'}</span>
       </div>`).join('')}
     </div>
+
+    ${skipped.length ? `<div class="note">Warden runs without ${
+      skipped.map((x) => esc(x.role)).join(' and ')
+    }. ${skipped.some((x) => x.role === 'ocr')
+      ? 'The OCR weights have no download; they arrive over the peer registry or not at all, which is why attachments have never been measured.'
+      : ''}</div>` : ''}
 
     ${missing > 0 ? `<div class="row-actions">
       ${state.canLeaveDemo
@@ -2022,7 +2036,7 @@ function draftCard() {
         // is on screen the composer is gone — and this is the point where it
         // matters whether the sentence came off this machine.
         d.draftedBy
-          ? `<span class="when">written by ${esc(d.draftedBy)}${d.draftedRemotely ? ' · off this machine' : ''}</span>`
+          ? `<span class="when">written by ${esc(d.draftedBy)}</span>`
           : ''
       }
       <span class="when">not active yet</span>
@@ -2096,6 +2110,21 @@ async function sendRuleMessage(text) {
   });
 
   dropPending();
+
+  // The compiler read the sentence and says it is not a rule. "Quiero reducir
+  // mi uso al 50%" is a spending target, and the honest answer is the screen
+  // that holds spending targets, not a prohibition invented to fit the shape.
+  // Before it had one, that sentence compiled into a rule forbidding anyone to
+  // be limited on the basis of a usage goal, which is the request inside out.
+  if (ok && j.notARule) {
+    state.ruleBusy = false;
+    say(`<b>That is not a rule.</b> ${esc(j.reason || 'There is no prohibition in it.')}
+      <div>If it is about how much your team may spend, that lives under
+      <button type="button" class="linkish" data-go="policy">Limits by role</button>.</div>`);
+    render();
+    return;
+  }
+
   if (!ok) {
     state.ruleBusy = false;
     say(compileFailure(j));
