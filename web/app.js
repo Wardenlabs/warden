@@ -128,6 +128,7 @@ const state = {
   mock: false,
   /** True when a desktop shell is listening that can fetch the models. */
   canLeaveDemo: false,
+  publicUrl: null,
   /** What weights are on disk and which seat each model fills. Null until loaded. */
   models: null,
   adjudicator: null,
@@ -349,6 +350,8 @@ async function boot() {
   // Whether a desktop shell is listening that could actually fetch the models.
   // False in a browser against a checkout, where the honest offer is a command.
   state.canLeaveDemo = Boolean(health?.j?.canLeaveDemo);
+  // The address the team reaches this gateway at, when a tunnel is up.
+  state.publicUrl = health?.j?.publicUrl ?? null;
   // How long prompt text stays readable. Shown on the screen that shows it,
   // because a retention policy nobody can see is one nobody can rely on.
   state.prompts = health?.j?.prompts ?? null;
@@ -2640,6 +2643,44 @@ function renderAudienceChips() {
  * starting over is that the demo's keys stop working. It leaves the policy
  * alone: rules and people are separate decisions.
  */
+/**
+ * How the team reaches this gateway, on the screen where somebody is handing
+ * out addresses.
+ *
+ * The control lived only in the macOS menu bar, which is a place you find if
+ * you already know it is there. The person who needs it is the administrator
+ * looking at Team wondering what URL to send.
+ *
+ * Both honest properties of a quick tunnel are on the screen rather than in a
+ * dialog somebody dismissed a week ago: the address is public to whoever holds
+ * it, and it changes every time the tunnel restarts.
+ */
+function reachBlock() {
+  const on = Boolean(state.publicUrl);
+  return `<div class="section">
+    <div class="label">How your team reaches this</div>
+
+    <div class="kv">
+      <div class="r"><span class="k">Address</span>
+        <span class="v">${on
+          ? `<span class="mono">${esc(state.publicUrl)}</span>`
+          : 'This machine only. Teammates elsewhere cannot reach it.'}</span></div>
+    </div>
+
+    ${on ? `<div class="note">Anyone with this address reaches the gateway. Employees still
+      need their own key, and administration is refused through it. The address changes every
+      time the tunnel restarts, and everyone has to be given the new one.</div>` : ''}
+
+    ${state.canLeaveDemo ? `<div class="row-actions">
+      <button type="button" class="btn${on ? '' : ' primary'}" id="toggleExpose">
+        ${on ? 'Take it off the internet' : 'Put it on the internet'}
+      </button>
+      ${state.mock ? '<span class="note">Not while Warden is in demo mode: nothing here is really judged.</span>' : ''}
+    </div>` : `<div class="note">Run this inside the Warden app to open a tunnel from here,
+      or put your own proxy in front of it.</div>`}
+  </div>`;
+}
+
 function companyBlock() {
   const demo = Boolean(state.company.demo);
   return `<div class="section company">
@@ -2683,6 +2724,7 @@ function roleOptions() {
 VIEWS.people = {
   body: () => `<div class="sheet">
     ${companyBlock()}
+    ${reachBlock()}
     ${state.company.employees.length
       ? state.company.employees.map(personRow).join('')
       : '<div class="empty"><b>Nobody yet</b><span>Add somebody below and Warden issues them a key.</span></div>'}

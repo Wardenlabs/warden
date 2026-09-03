@@ -186,6 +186,10 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       // downloads only what is missing, so pressing it with everything already
       // on disk costs a restart and no bytes.
       if (msg === 'leave-demo') fetchModels();
+      // Same round trip, from the Team screen. `setExposeEnabled` owns the
+      // ordering and the failure dialog, so this is only the doorbell.
+      if (msg === 'expose-on') void setExposeEnabled(true);
+      if (msg === 'expose-off') void setExposeEnabled(false);
     }
   );
 

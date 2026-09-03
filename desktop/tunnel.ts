@@ -22,6 +22,8 @@
  * is public to anyone who has it, and it changes on every restart.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 export type TunnelState =
   | { status: 'off' }
@@ -40,6 +42,38 @@ const URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloudflare\.com/i;
  * slow morning, short enough that a silent failure does not look like a hang.
  */
 const READY_TIMEOUT_MS = 30_000;
+
+/**
+ * Where to look for `cloudflared`, because PATH is not enough here.
+ *
+ * A macOS app launched from the Dock inherits launchd's environment, not a
+ * shell's: PATH is `/usr/bin:/bin:/usr/sbin:/sbin` and nothing else. Homebrew
+ * installs to `/opt/homebrew/bin` on Apple silicon and `/usr/local/bin` on
+ * Intel, so `spawn('cloudflared')` fails with ENOENT for somebody who has it
+ * installed and working in every terminal they own — and the message they get
+ * is "install it", which they just did. That loop is worse than no feature.
+ *
+ * PATH first, since it is right when the app was started from a shell and it
+ * respects an administrator who put the binary somewhere of their own.
+ */
+const SEARCH_PATHS = [
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  '/opt/local/bin',
+  join(process.env['HOME'] ?? '', '.local', 'bin')
+];
+
+function resolveBinary(): string {
+  for (const dir of (process.env['PATH'] ?? '').split(':')) {
+    if (dir && existsSync(join(dir, 'cloudflared'))) return join(dir, 'cloudflared');
+  }
+  for (const dir of SEARCH_PATHS) {
+    if (existsSync(join(dir, 'cloudflared'))) return join(dir, 'cloudflared');
+  }
+  // Nothing found: spawn the bare name so the ENOENT path produces the install
+  // message rather than a path nobody recognises.
+  return 'cloudflared';
+}
 
 let child: ChildProcess | null = null;
 
@@ -62,7 +96,7 @@ export async function start(port: number): Promise<string> {
     let settled = false;
     let output = '';
 
-    const proc = spawn('cloudflared', ['tunnel', '--url', `http://127.0.0.1:${port}`], {
+    const proc = spawn(resolveBinary(), ['tunnel', '--url', `http://127.0.0.1:${port}`], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
     child = proc;

@@ -1712,6 +1712,10 @@ app.get('/health', (_req, res) =>
      * needs on their machine is a URL and a key, which is the whole point of
      * identity being the key and only the key.
      */
+    // Where the team reaches this gateway, so the console can say it on the
+    // screen where somebody is handing out addresses rather than leaving them
+    // to guess whether the tunnel came up.
+    publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
     deadlines: { decisionMs: hookDecisionDeadlineMs() },
     /*
      * Whether a hook that cannot reach this gateway may let the prompt through.
@@ -1822,6 +1826,30 @@ app.get('/api/gateway/log', (_req, res) => {
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : 'log unreadable' });
   }
+});
+
+/**
+ * Put this gateway on the internet, or take it off, from the console.
+ *
+ * The same relay the model download uses: the console has no preload, so it
+ * asks the gateway and the gateway asks the shell. It existed only in the
+ * macOS menu bar before, which is a place you find if you already know it is
+ * there — and the person who needs it is the administrator handing out URLs on
+ * the Team screen, not somebody browsing menus.
+ *
+ * 202 rather than 200: the tunnel takes seconds and the gateway restarts on the
+ * far side of it, so this answers "asked", never "done". The console learns the
+ * outcome from `/health` once the gateway is back.
+ */
+app.post('/api/gateway/expose', (req, res) => {
+  if (!parentPort) {
+    return res.status(409).json({
+      error: 'This gateway is not running inside the desktop app, so it cannot open a tunnel for you.'
+    });
+  }
+  const enabled = (req.body as { enabled?: unknown })?.enabled === true;
+  parentPort.postMessage(enabled ? 'expose-on' : 'expose-off');
+  res.status(202).json({ ok: true });
 });
 
 app.post('/api/gateway/leave-demo', (_req, res) => {
