@@ -23,6 +23,13 @@ export const MODEL_CATALOG: DownloadSpec[] = [
   },
   {
     role: 'adjudicator',
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    url: 'https://huggingface.co/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    required: true
+  },
+  {
+    role: 'compiler',
     filename: 'Qwen3-1.7B-Q4_0.gguf',
     url: 'https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/d7f544eead698dbd1f15126ef60b45a1e1933222/Qwen3-1.7B-Q4_0.gguf',
     approxMB: 1100,
@@ -57,13 +64,6 @@ export const MODEL_CATALOG: DownloadSpec[] = [
     filename: 'DynaGuard-1.7B.Q8_0.gguf',
     url: 'https://huggingface.co/mradermacher/DynaGuard-1.7B-GGUF/resolve/8ac2780c26c909110f97bdc55a06bc96d6bdc5b7/DynaGuard-1.7B.Q8_0.gguf',
     approxMB: 2170,
-    required: false
-  },
-  {
-    role: 'adjudicator-dynaguard-4b',
-    filename: 'DynaGuard-4B.Q6_K.gguf',
-    url: 'https://huggingface.co/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf',
-    approxMB: 3630,
     required: false
   },
   {

@@ -113,7 +113,7 @@ runtime is express, zod, and the QVAC SDK.
 
 ```bash
 pnpm install
-pnpm run setup                    # downloads the models (~1.8 GB)
+pnpm run setup                    # downloads the models (~5.4 GB)
 pnpm run dev                      # gateway + console on :8080
 WARDEN_ADAPTER=mock pnpm run dev  # no models, no GPU — the mock stands in
 pnpm run typecheck
@@ -196,21 +196,21 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 
 - Both hook integrations are **NOT VERIFIED** end to end. See
   [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
-- **The default configuration does not pass both columns.** On the 185-prompt
-  paired run the shipped 1.7B refuses 63–72% of legitimate requests (CPU and
-  GPU machines respectively), and the 8B that fixes that (6–9%) drops attacks
-  caught to 71–72%, losing the `hypothetical-testing`, `multi-turn-escalation`
-  and `roleplay-fiction` classes. Two things measured on 2026-09-04 move this
-  without being the default yet: a **rule boundary** (what a rule is *not*
-  about) takes the 1.7B to 52% for two attacks and is now a schema field the
-  compiler fills; and **DynaGuard-4B**, a Qwen3 fine-tune for user-written
-  policies, sits at 23% refused / 87% attacks stopped on one run on one GPU
-  machine and is offered as a seat marked as such. Neither becomes the default
-  before `--reps 3` and a second machine. `docs/MEASUREMENTS.md` has every row
-  and where the remaining error lives: developer sentences about code against
-  `r-instruction-override`, on every model, in both languages, and the fix for
-  it is coupled to the seat — a boundary clause helps the base model and hurts
-  the fine-tune.
+- **The default judge has one run behind it.** Since 2026-09-04 the default
+  adjudicator is **DynaGuard-4B** (a Qwen3 fine-tune for user-written
+  policies): 23% of honest requests refused and 87% of attacks stopped, on one
+  185-prompt run on one GPU machine, against 72% / 95% for the Qwen3-1.7B it
+  replaced and 9% / 72% for the 8B. It was made the default on the owner's
+  decision, not because it cleared this file's measurement rule, and
+  `docs/MEASUREMENTS.md` says so. Owed before anyone relies on the numbers:
+  `--reps 3`, a second machine, and a CPU-only machine — 4.4 s a decision on
+  Metal will be several times slower on CPU, against a hook that fails open at
+  90 s. The compiler keeps its own Qwen3-1.7B weights because DynaGuard can only
+  say PASS or FAIL. Where the remaining error lives: developer sentences about
+  code against `r-instruction-override`, on every model, in both languages; a
+  **rule boundary** (what a rule is *not* about, now a schema field the
+  compiler fills) fixes twenty points of it on the base model and hurts the
+  fine-tune, so the judge reads it only under the base model's prompt forms.
 - The 8B also costs **46 s per decision** on four CPU cores, against a hook that
   gives up at 30 and fails open. That is a fact about the machine, and it is why
   the number is worth having: a deployment with a GPU should measure it again.

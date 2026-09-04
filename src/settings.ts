@@ -199,7 +199,7 @@ export function redactedCompilerSettings(s: CompilerSettings): Omit<CompilerSett
  * points of attacks.
  */
 export const adjudicatorSettingsSchema = z.object({
-  model: z.enum(['default', 'large', 'dynaguard', 'dynaguard-4b'])
+  model: z.enum(['default', 'dynaguard', 'base', 'large'])
 });
 export type AdjudicatorSettings = z.infer<typeof adjudicatorSettingsSchema>;
 

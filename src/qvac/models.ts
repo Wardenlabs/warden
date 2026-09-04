@@ -45,12 +45,44 @@ export const MODEL_SPECS: ModelSpec[] = [
     why: 'Injection detection — one narrow binary question, so the smallest model is enough and its speed matters more than its judgement.'
   },
   {
+    /**
+     * The default judge is DynaGuard-4B since 2026-09-04, on the owner's
+     * decision and against this repo's own measurement rule, which the log
+     * records in as many words. What is behind it: on one 185-prompt run on one
+     * GPU machine it refuses 23% of honest requests and stops 87% of attacks,
+     * where the Qwen3-1.7B it replaces refused 72% and stopped 95%, and the 8B
+     * refused 9% and stopped 72%; on the bench, 99.3% of legitimate cells
+     * against 84.8%, p = 0.0000, no attack lost. Not yet measured: `--reps 3`,
+     * a second machine, and any CPU-only machine, where 4B weights at 4.4 s a
+     * decision on Metal will be several times slower against a 90 s hook.
+     * `adjudicate.ts` switches to the PASS/FAIL prompt it was trained on by
+     * the filename. Q6_K, not Q4: the brief was not to lose quality.
+     */
     role: 'adjudicator',
+    entry: {
+      name: 'DynaGuard-4B.Q6_K',
+      src: 'registry://hf/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf'
+    } as unknown as RegistryEntry,
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    required: true,
+    why: 'Per-rule adjudication — the pass that actually needs judgement. A Qwen3-4B fine-tuned on user-written policies.'
+  },
+  {
+    /**
+     * Rule compilation needs weights that can write a rule, and DynaGuard can
+     * only say PASS or FAIL. Until the 4B took the seat the compiler borrowed
+     * the adjudicator's Qwen3-1.7B; it keeps those exact weights as its own
+     * required download, so drafting on a machine with no CLI and no endpoint
+     * behaves as it did before. The same file is the `base` adjudicator seat,
+     * which is why that seat needs no download of its own.
+     */
+    role: 'compiler',
     entry: QWEN3_1_7B_INST_Q4 as unknown as RegistryEntry,
     filename: 'Qwen3-1.7B-Q4_0.gguf',
     approxMB: 1100,
     required: true,
-    why: 'Per-rule adjudication — the pass that actually needs judgement.'
+    why: 'Turns an administrator\'s sentence into a rule. The adjudicator seat\'s weights cannot: DynaGuard answers PASS or FAIL and nothing else.'
   },
   {
     role: 'embedder',
@@ -99,7 +131,13 @@ export const MODEL_SPECS: ModelSpec[] = [
 export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
   'adjudicator-large': {
     role: 'adjudicator',
-    entry: QWEN3_8B_INST_Q4_K_M as unknown as RegistryEntry,
+    // Pinned by hand rather than the SDK constant: `QWEN3_8B_INST_Q4_K_M`
+    // points at `/main/`, the catalog pins a revision, and `pnpm run setup`
+    // warned about the difference on every run. Same file, same revision.
+    entry: {
+      name: QWEN3_8B_INST_Q4_K_M.name,
+      src: 'registry://hf/Qwen/Qwen3-8B-GGUF/resolve/7c41481f57cb95916b40956ab2f0b139b296d974/Qwen3-8B-Q4_K_M.gguf'
+    } as unknown as RegistryEntry,
     filename: 'Qwen3-8B-Q4_K_M.gguf',
     approxMB: 5030,
     required: false,
@@ -131,24 +169,7 @@ export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
     filename: 'DynaGuard-1.7B.Q8_0.gguf',
     approxMB: 2170,
     required: false,
-    why: 'Qwen3-1.7B fine-tuned on user-written policies; the measured alternative to the default seat.'
-  },
-  /**
-   * The 4B of the same family. Q6_K: at 3.6 GB it is the proportionate step
-   * between the two seats Warden had, which `Qwen3-4B` could never be because
-   * the SDK's constant for it is S3-only. Measured 2026-09-04 before it was
-   * offered; see `ADJUDICATOR_CHOICES`.
-   */
-  'adjudicator-dynaguard-4b': {
-    role: 'adjudicator',
-    entry: {
-      name: 'DynaGuard-4B.Q6_K',
-      src: 'registry://hf/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf'
-    } as unknown as RegistryEntry,
-    filename: 'DynaGuard-4B.Q6_K.gguf',
-    approxMB: 3630,
-    required: false,
-    why: 'DynaGuard at 4B; the middle seat, measured on both columns.'
+    why: 'Qwen3-1.7B fine-tuned on user-written policies; the faster seat, at some accuracy.'
   }
 };
 
@@ -173,8 +194,8 @@ export function modelsDir(): string {
 }
 
 /**
- * The two adjudicator seats the console offers, and what the corpus measured
- * about each.
+ * The adjudicator seats the console offers, and what the corpus measured about
+ * each.
  *
  * These numbers are the whole reason this is a choice rather than a default.
  * On the 185-prompt paired run the 1.7B refuses 63% of legitimate requests and
@@ -195,7 +216,7 @@ export function modelsDir(): string {
  * are in the sentence, because the machine decides which one applies.
  */
 export type AdjudicatorChoice = {
-  id: 'default' | 'large' | 'dynaguard' | 'dynaguard-4b';
+  id: 'default' | 'dynaguard' | 'base' | 'large';
   label: string;
   filename: string;
   approxMB: number;
@@ -207,40 +228,19 @@ export type AdjudicatorChoice = {
   /** One line on the seat, in the console. */
   trade: string;
   note: string;
-  /**
-   * The seat the measurements point at on a machine with a GPU. One seat at
-   * most, and only with both columns measured behind it; the card says it and
-   * the default does not move on it.
-   */
-  recommendedOnGpu?: boolean;
 };
 
 export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
   {
     id: 'default',
-    label: 'Qwen3 1.7B',
-    filename: 'Qwen3-1.7B-Q4_0.gguf',
-    approxMB: 1100,
-    attacksCaught: '89%',
-    falsePositives: '63%',
-    perDecision: 'About 2.5 s a decision on an Apple GPU; a few more on CPU.',
-    trade: 'Strict. It stops more of what it should, and it turns away plenty that was fine.',
-    note: 'The measured default. Catches the most attacks and fits inside the hook deadline, and refuses two of every three honest requests.'
-  },
-  {
-    id: 'large',
-    label: 'Qwen3 8B',
-    filename: 'Qwen3-8B-Q4_K_M.gguf',
-    approxMB: 5030,
-    attacksCaught: '71%',
-    falsePositives: '6%',
-    perDecision: 'About 11 s a decision on an Apple GPU with 16 GB; 46 s on four CPU cores.',
-    trade: 'Easier to live with. It waves through more, including some it should not.',
-    // The console printed this note's substance in a banner the moment somebody
-    // picked this seat. Removed on the owner's instruction. It stays written
-    // down here because it is still true, and because whoever wires the next
-    // surface to these choices should read it before deciding what to show.
-    note: 'Usable for people, weaker as a guard. At 46 s it fits inside the 90 s hook deadline, but not by much: raise WARDEN_HOOK_TIMEOUT_MS on the gateway if decisions here run slower, since a hook that gives up fails open.'
+    label: 'DynaGuard 4B',
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    attacksCaught: '87%',
+    falsePositives: '23%',
+    perDecision: 'About 4.5 s a decision on an Apple GPU; not yet measured on CPU.',
+    trade: 'The default. Refuses a quarter of honest requests and stops most attacks.',
+    note: 'Measured 2026-09-04 on an M1 Pro, one run: 25/109 honest requests refused, 66/76 attacks stopped; on the bench 99.3% of legitimate cells cleared against 84.8% for Qwen3 1.7B, no attack lost, p = 0.0000. Made the default on the owner\'s decision with that one run behind it; --reps 3, a second machine and a CPU machine are still owed. Records in docs/MEASUREMENTS.md.'
   },
   {
     id: 'dynaguard',
@@ -250,20 +250,34 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     attacksCaught: '93%',
     falsePositives: '45%',
     perDecision: 'About 2 s a decision on an Apple GPU.',
-    trade: 'Same size as the default, trained for this. Stops as many attacks and turns away fewer honest requests — still too many.',
-    note: 'Measured 2026-09-04 on an M1 Pro, paired against the shipped 1.7B on the same machine and run: 39 prompts fixed, 11 broken (8 honest requests newly refused, 3 attacks newly missed), false positives 72% to 45%, attacks 95% to 93%. The bench said 96.7% of legitimate cells against 84.8% at p = 0.0000; four rules per decision compound that to 45%. Trained on English policies; half the measured traffic is Spanish. Both records are in docs/MEASUREMENTS.md.'
+    trade: 'Faster and stricter than the default: stops a few more attacks and turns away twice as many honest requests.',
+    note: 'Measured 2026-09-04 on an M1 Pro, paired against Qwen3 1.7B on the same run: 39 prompts fixed, 11 broken, false positives 72% to 45%, attacks 95% to 93%. Records in docs/MEASUREMENTS.md.'
   },
   {
-    id: 'dynaguard-4b',
-    label: 'DynaGuard 4B',
-    filename: 'DynaGuard-4B.Q6_K.gguf',
-    approxMB: 3630,
-    attacksCaught: '87%',
-    falsePositives: '23%',
-    perDecision: 'About 4.5 s a decision on an Apple GPU.',
-    trade: 'The middle seat. Refuses a quarter of honest requests and stops most attacks; the 8B refuses fewer and stops fewer.',
-    recommendedOnGpu: true,
-    note: 'Measured 2026-09-04 on an M1 Pro, paired against DynaGuard 1.7B on the same machine and run: 29 prompts fixed, 10 broken (4 honest requests newly refused, 6 attacks newly missed, in roleplay, hypothetical and multi-turn). False positives 45% to 23%, attacks 93% to 87%. On the bench 99.3% of legitimate cells against 84.8% for the shipped 1.7B, attacks 92.7% against 85.4%. 19 of its 25 remaining refusals are r-instruction-override on developer sentences. Records in docs/MEASUREMENTS.md.'
+    id: 'base',
+    label: 'Qwen3 1.7B',
+    filename: 'Qwen3-1.7B-Q4_0.gguf',
+    approxMB: 1100,
+    attacksCaught: '95%',
+    falsePositives: '72%',
+    perDecision: 'About 2.5 s a decision on an Apple GPU; 10 s on four CPU cores.',
+    trade: 'The old default. Strict: stops the most attacks and turns away most honest requests.',
+    note: 'Always on disk, because the compiler uses these weights. 63% refused on the CPU run, 72% on the GPU run, with 23 verdicts moving between machines on identical code. Rules with a boundary sentence bring it to 52%.'
+  },
+  {
+    id: 'large',
+    label: 'Qwen3 8B',
+    filename: 'Qwen3-8B-Q4_K_M.gguf',
+    approxMB: 5030,
+    attacksCaught: '72%',
+    falsePositives: '9%',
+    perDecision: 'About 11 s a decision on an Apple GPU with 16 GB; 46 s on four CPU cores.',
+    trade: 'Easiest to live with and weakest as a guard: waves through a quarter of attacks.',
+    // The console printed this note's substance in a banner the moment somebody
+    // picked this seat. Removed on the owner's instruction. It stays written
+    // down here because it is still true, and because whoever wires the next
+    // surface to these choices should read it before deciding what to show.
+    note: 'Usable for people, weaker as a guard. At 46 s on CPU it fits inside the 90 s hook deadline, but not by much: raise WARDEN_HOOK_TIMEOUT_MS on the gateway if decisions here run slower, since a hook that gives up fails open.'
   }
 ];
 

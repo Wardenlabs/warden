@@ -95,7 +95,7 @@ systemRoutes.get('/health', (_req, res) =>
  * the gateway is also the thing a checkout runs and it must not depend on the
  * Electron half to describe itself.
  */
-const FETCHABLE_ROLES = new Set(['adjudicator', 'embedder', 'detector']);
+const FETCHABLE_ROLES = new Set(['adjudicator', 'compiler', 'embedder', 'detector']);
 
 /**
  * What Warden is actually running on, said plainly enough to act on.

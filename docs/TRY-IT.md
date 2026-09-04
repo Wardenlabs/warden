@@ -35,7 +35,7 @@ pnpm install
 pnpm run setup
 ```
 
-`pnpm run setup` diagnostica tu máquina, baja tres modelos por HTTPS (~1.8 GB) y
+`pnpm run setup` diagnostica tu máquina, baja cuatro modelos por HTTPS (~5.4 GB) y
 prueba que la inferencia funcione de verdad. Al final imprime esto:
 
 ```

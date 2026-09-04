@@ -318,9 +318,9 @@ export function mockBanner() {
     ${state.canLeaveDemo
       ? `<div class="banner-act">
            <button type="button" class="btn primary" id="getModels">Download the models</button>
-           <span class="note">1.8&nbsp;GB, once. Warden restarts by itself when they land.</span>
+           <span class="note">5.4&nbsp;GB, once. Warden restarts by itself when they land.</span>
          </div>`
-      : '<div class="note">Run <span class="mono">pnpm run setup</span>. 1.8&nbsp;GB, once.</div>'}
+      : '<div class="note">Run <span class="mono">pnpm run setup</span>. 5.4&nbsp;GB, once.</div>'}
   </div>`;
 }
 

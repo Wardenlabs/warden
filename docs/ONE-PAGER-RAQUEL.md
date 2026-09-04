@@ -64,13 +64,13 @@ legítimos: dos por lado es el punto.
 | Qwen3 1.7B Q4_0 (default actual) | 72% | 95% | 2.5 s |
 | Qwen3 8B Q4_K_M | 9% | 72% | 11 s |
 | **DynaGuard 1.7B Q8_0** (fine-tune para políticas) | 45% | 93% | 2.0 s |
-| **DynaGuard 4B Q6_K** | **23%** | **87%** | 4.4 s |
+| **DynaGuard 4B Q6_K** — default desde hoy | **23%** | **87%** | 4.4 s |
 
 DynaGuard (tomg-group-umd, Apache 2.0) es Qwen3 entrenado sobre 40 000
 políticas escritas por usuarios para responder si un diálogo las cumple: el
 fine-tune de Hugging Face que pediste buscar, y el primero que queda dentro de
-las dos columnas a la vez. Está en la consola como asiento elegible con estos
-números; el default no se movió con una sola corrida en una sola máquina.
+las dos columnas a la vez. Es el default desde hoy, por decisión del equipo con
+una sola corrida en una sola máquina detrás; lo que falta medir está al final.
 
 Sobre la lentitud que mencionaron: el 8B tarda 1.6 s por llamada acá pero 11 s
 por decisión, porque cada decisión hace 4 llamadas con prompts largos. No es

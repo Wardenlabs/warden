@@ -41,7 +41,7 @@ pnpm run app:dev         # correr la app sin empaquetar, para desarrollo
 
 ## Primer arranque
 
-1. La app detecta que faltan los modelos y ofrece **descargarlos (~1.8 GB)**
+1. La app detecta que faltan los modelos y ofrece **descargarlos (~5.4 GB)**
    desde HuggingFace, con barra de progreso por modelo. Una descarga cortada
    se reanuda donde quedó — es la misma lógica con `Range` que usa
    `pnpm run setup`.

@@ -78,7 +78,7 @@ function platformNotes(): void {
   }
   if (report.ramGB < 8) {
     report.warnings.push(
-      `Only ${report.ramGB} GB RAM. The 1.7B adjudicator wants ~2 GB resident; set WARDEN_ADJUDICATOR=detector to run the whole pipeline on the 0.6B model.`
+      `Only ${report.ramGB} GB RAM. The default 4B adjudicator wants ~5 GB resident; pick the Qwen3 1.7B seat in the console, or set WARDEN_MODEL_ADJUDICATOR to a smaller file.`
     );
   }
 }

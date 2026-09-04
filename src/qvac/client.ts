@@ -96,14 +96,12 @@ function sourceFor(role: ModelRole): string | object {
   const fromConfig = config()?.models[role];
   if (fromConfig && existsSync(fromConfig)) return fromConfig;
 
-  // The compiler has no weights of its own. It ran on the adjudicator's model
-  // before it was a separate role and it still does when nothing else is
-  // configured, so splitting the role changed no defaults — it only made the
-  // seat something a deployment can fill separately, locally with
-  // `WARDEN_MODEL_COMPILER` or off-machine with `WARDEN_COMPILER_API`.
-  const specRole: ModelRole = role === 'compiler' ? 'adjudicator' : role;
-
-  const spec = MODEL_SPECS.find((m) => m.role === specRole);
+  // The compiler used to borrow the adjudicator's weights. Since the
+  // adjudicator seat became a PASS/FAIL fine-tune it has its own required
+  // entry in MODEL_SPECS — the Qwen3-1.7B it always ran on — and is filled
+  // separately, locally with `WARDEN_MODEL_COMPILER` or off-machine with
+  // `WARDEN_COMPILER_API`.
+  const spec = MODEL_SPECS.find((m) => m.role === role);
   if (!spec) throw new Error(`no model registered for role "${role}"`);
 
   // Resolved for the same reason as the override above: this is the path taken
@@ -413,7 +411,7 @@ export function modelInventory(): {
   onDisk: boolean;
   bytes: number | null;
 }[] {
-  const roles: ModelRole[] = ['adjudicator', 'embedder', 'detector', 'ocr', 'assistant'];
+  const roles: ModelRole[] = ['adjudicator', 'compiler', 'embedder', 'detector', 'ocr', 'assistant'];
   return roles.map((role) => {
     try {
       const src = sourceFor(role);
