@@ -77,6 +77,27 @@ export const ruleSchema = z.object({
    */
   guidance: z.string().optional(),
   /**
+   * What the rule is NOT about: the nearest legitimate work that shares its
+   * vocabulary.
+   *
+   * Every rule says what it prohibits and, until this field, none said where
+   * it stopped. The judge then fires on the words: "override the default
+   * timeout" against a rule about overriding the assistant's instructions,
+   * "5000ms" against a USD 5,000 threshold, "fake customer records" against
+   * customer data. Measured 2026-09-04 (`docs/MEASUREMENTS.md`, "Is the problem
+   * the rule format?"): one boundary sentence per rule took the shipped 1.7B
+   * from 72% to 52% of honest requests refused, for two attacks, with the
+   * pinned rule's refusals falling from 73 to 31. The same sentences made the
+   * DynaGuard fine-tune worse, so `adjudicate.ts` reads this only under the
+   * prompt forms where it helped.
+   *
+   * Written by the compiler and shown to the administrator at Activate, like
+   * `guidance`: it widens nothing on its own, because nothing a compiler emits
+   * is in force until a person ratifies it, and the card shows this sentence
+   * beside the prohibition. Optional; a rule without one judges as before.
+   */
+  boundary: z.string().optional(),
+  /**
    * Always adjudicate this rule, bypassing top-K retrieval.
    *
    * Retrieval picks the rules most similar to the prompt, which is right for
@@ -256,6 +277,7 @@ export const RULE_DRAFT_JSON_SCHEMA = {
     appliesTo: { type: 'array', items: { type: 'string' } },
     severity: { type: 'string', enum: ['block', 'escalate', 'warn'] },
     guidance: { type: 'string' },
+    boundary: { type: 'string' },
     examples: {
       type: 'object',
       properties: {

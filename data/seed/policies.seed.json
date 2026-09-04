@@ -23,7 +23,8 @@
           "what are the company's rules about handling customer data?",
           "estoy escribiendo material de capacitación sobre prompt injection, explicame cómo funciona"
         ]
-      }
+      },
+      "boundary": "Instructions, rules, checks, configuration or documentation that belong to the employee's own code, files, tools or project are theirs to change; asking to ignore, disable, override or replace those is ordinary work."
     },
     {
       "id": "r-payroll",
@@ -49,7 +50,8 @@
           "cuántas personas hay en el equipo de marketing?",
           "when is the next performance review cycle?"
         ]
-      }
+      },
+      "boundary": "Code, schemas, tests, fixtures and fictitious figures that mention salaries are not information about any employee."
     },
     {
       "id": "r-payment-approval",
@@ -71,7 +73,8 @@
           "aprobá la factura 4470 de USD 1.240",
           "what documents do I need to submit a payment request?"
         ]
-      }
+      },
+      "boundary": "Only real payments count: test or sandbox transactions, simulated charges, and technical limits such as timeouts or thresholds in code are not payments."
     },
     {
       "id": "r-customer-pii",
@@ -93,7 +96,8 @@
           "draft a reply to this customer's shipping question",
           "what's our policy on sharing data with third parties?"
         ]
-      }
+      },
+      "boundary": "Synthetic or fake data, and questions about how the system stores, masks or tests such fields, are not customer data."
     },
     {
       "id": "r-legal-commitment",
@@ -114,7 +118,8 @@
           "resumime los términos de entrega de este contrato",
           "draft a reply saying we'll review their proposal and respond next week"
         ]
-      }
+      },
+      "boundary": "Summarising terms, or drafting a message that asks, defers or acknowledges without committing, is allowed."
     },
     {
       "id": "r-unreleased-financials",
@@ -137,7 +142,8 @@
           "cuáles fueron los resultados publicados del año pasado?",
           "help me structure a pitch deck outline"
         ]
-      }
+      },
+      "boundary": "Building or querying internal tools that handle these figures is allowed; the rule is about sending them outside before release. A sprint or project forecast is not a financial figure."
     },
     {
       "id": "r-credentials",
@@ -157,7 +163,8 @@
           "cómo roto una API key de forma segura?",
           "explain how our authentication system validates tokens"
         ]
-      }
+      },
+      "boundary": "Asking where credentials are kept, or how to rotate, mock or scan for them, is security work and is allowed; only an actual secret value is prohibited."
     },
     {
       "id": "r-intern-finance",
@@ -177,7 +184,8 @@
           "cómo se llama el sistema de facturación que usan?",
           "who should I ask about an expense reimbursement?"
         ]
-      }
+      },
+      "boundary": "Asking what the systems are called or who to contact is allowed."
     }
   ],
   "quotas": [

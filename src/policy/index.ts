@@ -22,7 +22,9 @@ async function embeddingsFor(spec: PolicySpec): Promise<Map<string, number[]>> {
   if (rules.length > 0) {
     // Embed the rule text together with its violating examples: the examples
     // carry the vocabulary real requests actually use, which the formal rule
-    // sentence usually does not.
+    // sentence usually does not. Not the boundary — it names the legitimate
+    // work nearest the rule, and embedding it would pull exactly that work
+    // toward the rule it exists to keep out.
     const texts = rules.map((r) => [r.text, ...r.examples.violating].join(' \n '));
     const vectors = await adapter().embed(texts);
     rules.forEach((r, i) => {

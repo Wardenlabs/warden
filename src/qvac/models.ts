@@ -207,6 +207,12 @@ export type AdjudicatorChoice = {
   /** One line on the seat, in the console. */
   trade: string;
   note: string;
+  /**
+   * The seat the measurements point at on a machine with a GPU. One seat at
+   * most, and only with both columns measured behind it; the card says it and
+   * the default does not move on it.
+   */
+  recommendedOnGpu?: boolean;
 };
 
 export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
@@ -256,6 +262,7 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     falsePositives: '23%',
     perDecision: 'About 4.5 s a decision on an Apple GPU.',
     trade: 'The middle seat. Refuses a quarter of honest requests and stops most attacks; the 8B refuses fewer and stops fewer.',
+    recommendedOnGpu: true,
     note: 'Measured 2026-09-04 on an M1 Pro, paired against DynaGuard 1.7B on the same machine and run: 29 prompts fixed, 10 broken (4 honest requests newly refused, 6 attacks newly missed, in roleplay, hypothetical and multi-turn). False positives 45% to 23%, attacks 93% to 87%. On the bench 99.3% of legitimate cells against 84.8% for the shipped 1.7B, attacks 92.7% against 85.4%. 19 of its 25 remaining refusals are r-instruction-override on developer sentences. Records in docs/MEASUREMENTS.md.'
   }
 ];

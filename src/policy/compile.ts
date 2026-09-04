@@ -140,7 +140,10 @@ export async function compileRule(
     '  "confidential information", not "inappropriate requests" — those are',
     '  categories, and the judge stretches a category over anything nearby.',
     '  Carry over any limit the administrator gave (an amount, a role, a system,',
-    '  a moment in time) instead of generalising past it.',
+    '  a moment in time) instead of generalising past it. Where the administrator',
+    '  named a category, list the concrete items it means — for customer data:',
+    '  names next to emails, phone numbers, addresses, document numbers, billing',
+    '  details — so a small judge matches items, not a category.',
     '- scope: "input" for what employees send, "output" for what the assistant returns, "both".',
     '  Use "output" when the worry is what the assistant might say or commit to,',
     '  and "input" when it is what somebody might ask for. Most are "input".',
@@ -156,6 +159,17 @@ export async function compileRule(
     '- guidance: one sentence telling an employee who just hit this rule what to do',
     '  instead — who to ask, or which nearby request is fine. Write it to them, not',
     '  about them. Never restate the prohibition; they already saw it.',
+    // The field the measurement asked for. A rule that only says what it
+    // prohibits leaves the judge to fire on vocabulary: "override the default
+    // timeout" against a rule about overriding the assistant's instructions.
+    // One sentence per rule saying what it is NOT about took the shipped judge
+    // from 72% to 52% of honest requests refused (docs/MEASUREMENTS.md,
+    // 2026-09-04). The administrator sees it beside the prohibition at Activate.
+    '- boundary: one sentence saying what this rule is NOT about — the nearest',
+    '  legitimate work that shares its words. Usually the employee\'s own code,',
+    '  tests, fixtures and fake data; sandbox or simulated versions of the thing;',
+    '  asking where something lives or how a process works. Leave it out only',
+    '  when nothing nearby is worth naming.',
     '- examples.violating: 2-3 realistic requests this rule should stop. Ordinary',
     '  working sentences, not caricatures: the ones that will actually be typed.',
     '- examples.compliant: 2-3 realistic requests that are NEARBY but legitimate and',

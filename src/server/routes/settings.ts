@@ -56,6 +56,7 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
       approxMB: c.approxMB,
       perDecision: c.perDecision,
       trade: c.trade,
+      recommendedOnGpu: Boolean(c.recommendedOnGpu),
       onDisk: existsSync(resolve(dir, c.filename))
     }))
   });

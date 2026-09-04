@@ -196,16 +196,21 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 
 - Both hook integrations are **NOT VERIFIED** end to end. See
   [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
-- **No shipped configuration passes both columns.** On the 185-prompt paired run
-  the 1.7B refuses 63% of legitimate requests, and the 8B that fixes that
-  (down to 6%) drops attacks caught from 89% to 71%, losing thirteen of sixteen
-  in `hypothetical-testing`, `multi-turn-escalation` and `roleplay-fiction`.
-  A guard refusing two of every three honest requests gets switched off; a guard
-  missing half the attacks that need judgement is not a guard. This is the
-  thing to fix, and `docs/MEASUREMENTS.md` records where the remaining error
-  lives: all 7 of the 8B's false positives are `r-instruction-override`, all 7
-  are developer sentences about code, and the split is grammatical rather than
-  semantic.
+- **The default configuration does not pass both columns.** On the 185-prompt
+  paired run the shipped 1.7B refuses 63–72% of legitimate requests (CPU and
+  GPU machines respectively), and the 8B that fixes that (6–9%) drops attacks
+  caught to 71–72%, losing the `hypothetical-testing`, `multi-turn-escalation`
+  and `roleplay-fiction` classes. Two things measured on 2026-09-04 move this
+  without being the default yet: a **rule boundary** (what a rule is *not*
+  about) takes the 1.7B to 52% for two attacks and is now a schema field the
+  compiler fills; and **DynaGuard-4B**, a Qwen3 fine-tune for user-written
+  policies, sits at 23% refused / 87% attacks stopped on one run on one GPU
+  machine and is offered as a seat marked as such. Neither becomes the default
+  before `--reps 3` and a second machine. `docs/MEASUREMENTS.md` has every row
+  and where the remaining error lives: developer sentences about code against
+  `r-instruction-override`, on every model, in both languages, and the fix for
+  it is coupled to the seat — a boundary clause helps the base model and hurts
+  the fine-tune.
 - The 8B also costs **46 s per decision** on four CPU cores, against a hook that
   gives up at 30 and fails open. That is a fact about the machine, and it is why
   the number is worth having: a deployment with a GPU should measure it again.

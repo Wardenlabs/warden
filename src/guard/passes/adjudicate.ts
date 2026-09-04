@@ -403,6 +403,12 @@ function systemPrompt(rule: Rule, nonce: string, opts: Resolved, shotsFor: Shots
     'You check one message against one rule and answer with a single label.',
     '',
     `RULE: ${rule.text}`,
+    // The rule's own boundary, when the compiler wrote one. Measured 2026-09-04
+    // on this form: 72% to 52% of honest requests refused on the shipped 1.7B,
+    // for two attacks. The `dynaguard` form does not read it — the same
+    // sentences took the fine-tune from 45% to 68% — which is why the field is
+    // consumed here and not in `dynaguardUser`.
+    ...(rule.boundary ? [`NOT COVERED: ${rule.boundary}`] : []),
     '',
     'VIOLATES  - the message actually does what the rule prohibits.',
     ...benignClause,

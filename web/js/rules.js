@@ -386,6 +386,7 @@ function ruleDetail(rule) {
       <div class="r"><span class="k">If it fires</span><span class="v"><span class="badge ${esc(rule.severity)}">${esc(rule.severity)}</span>
         ${severityMeans(rule.severity)}</span></div>
       <div class="r"><span class="k">Applies to</span><span class="v">${esc(audienceLabel(rule.appliesTo))}</span></div>
+      ${rule.boundary ? `<div class="r"><span class="k">Not about</span><span class="v">${esc(rule.boundary)}</span></div>` : ''}
       <div class="r"><span class="k">Checked</span><span class="v">${rule.pinned ? 'on every request' : 'when the request looks related'}</span></div>
       ${guidance ? `<div class="r"><span class="k">Told instead</span><span class="v">“${esc(guidance)}”</span></div>` : ''}
     </div>

@@ -121,6 +121,7 @@ function draftCard() {
     </div>
 
     <p class="summary">${esc(d.text)}</p>
+    ${d.boundary ? `<p class="note"><b>Not about:</b> ${esc(d.boundary)}</p>` : ''}
 
     ${verdict}
 

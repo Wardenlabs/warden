@@ -1170,3 +1170,14 @@ Not run: the bounded policy on the 4B, because the 1.7B fine-tune's response
 makes the outcome predictable and the GPU time was better spent on the base
 model's pairing.
 
+**What shipped from this row, the same day.** `Rule.boundary`, optional: the
+compiler is asked for it (and, per the advisor's note, for concrete items
+rather than categories in `text`), the administrator sees it beside the
+prohibition at Activate and on the rule's detail, retrieval does not embed it,
+and the judge appends it as `NOT COVERED:` under the compliance and choice
+forms only — the `dynaguard` form leaves it out, for the reason in the table.
+The eight sample rules carry boundaries written against their own wording; the
+benchmark policy does not, so every earlier row still pairs. The default seat
+did not move: DynaGuard-4B is marked as the measured best on a GPU on its card,
+and the numbers behind that are one run on one machine.
+

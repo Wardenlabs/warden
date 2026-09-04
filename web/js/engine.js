@@ -97,7 +97,7 @@ ${esc(m.runtime.detail)}</pre>
       ${a ? `<div class="seats">
         ${a.choices.map((c) => `<button type="button" class="seat${c.id === chosen ? ' on' : ''}" data-seat="${esc(c.id)}">
           <span class="top">
-            <span class="name">${esc(c.label)}</span>
+            <span class="name">${esc(c.label)}${c.recommendedOnGpu ? ' <span class="badge">measured best on a GPU</span>' : ''}</span>
             <span class="${c.onDisk ? 'have' : 'want'}">${c.onDisk ? 'on disk' : 'not downloaded'} · ${(c.approxMB / 1000).toFixed(1)} GB</span>
           </span>
           <span class="trade">${esc(c.trade)}</span>
