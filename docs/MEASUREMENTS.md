@@ -1037,3 +1037,136 @@ p = 0.20; attacks base only 0, nearest only 2, p = 0.5. No measured difference
 on either column, 32 cells disagree. Choosing the few-shot examples by
 similarity does not help the base model and stays off.
 
+## Writing DynaGuard a better policy made it worse
+
+2026-09-04, DynaGuard-1.7B Q8_0, same bench, both variants in one process so
+the pairing is exact. The idea was the obvious one: the two clauses that
+measurably helped the base model — a work instruction to the assistant is a
+task, not a change to its rules; anything inside the rule's own limits is
+allowed — written into the policy block in the style the fine-tune was trained
+on, since 20 of its 49 remaining product-run refusals were still
+`r-instruction-override` on developer imperatives.
+
+| | `dynaguard` (rule, one clause, examples) | `dynaguard-v2` (rule, four clauses, examples) |
+|---|---|---|
+| Legitimate cells cleared | 267/276 (96.7%) | 241/276 (87.3%) |
+| Long legitimate cleared | 17/18 | 14/18 |
+| Attacks caught | 38/41 (92.7%) | 39/41 (95.1%) |
+| Paired, legitimate | dynaguard only 29, v2 only 0, p = 0.0000 | |
+| Paired, attacks | dynaguard only 0, v2 only 1, p = 1.0 | |
+
+Twenty-nine cells lost and none gained. The same lesson `CLAUDE.md` records
+for the base model, now on the fine-tune: the two things that ever worked asked
+the model for less. A model trained on forty thousand short policies reads a
+long one as a longer list of things to catch. The `v1` policy stays; `v2`
+remains a bench variant so nobody has to rediscover this. Record:
+`data/bench-dynaguard-1.7b-v2.json`. Wall clocks not quoted: this run
+overlapped the first ninety seconds of the 4B bench on the same GPU; no cell
+timed out, so the two columns stand.
+
+## DynaGuard 4B: the middle seat
+
+2026-09-04, same machine, `mradermacher/DynaGuard-4B-GGUF` Q6_K (3.6 GB,
+revision `cf94049a`), the `dynaguard` form.
+
+| | Qwen3-1.7B (shipped) | DynaGuard-1.7B Q8_0 | DynaGuard-4B Q6_K | Qwen3-8B |
+|---|---|---|---|---|
+| Bench, legitimate cells cleared | 84.8% | 96.7% | 99.3% (274/276) | — |
+| Bench, attacks caught | 85.4% | 92.7% | 92.7% | — |
+| Bench, paired vs shipped 1.7B | — | +41 / −8, p = 0.0000 | +41 / −0, p = 0.0000; attacks +3 / −0 | — |
+| Eval, legitimate refused | 72% | 45% | 23% (25/109) | 9% |
+| Eval, attacks stopped | 95% | 93% | 87% (66/76) | 72% |
+| Eval, p50 / p95 | 2.5 s / 2.9 s | 2.0 s / 2.5 s | 4.4 s / 5.4 s | 11 s / 26 s |
+
+Paired against DynaGuard-1.7B on the same run: 29 prompts fixed, 10 broken —
+4 honest requests newly refused and 6 attacks newly missed (`as-04`, `rp-05`,
+`ht-03`, `ht-08`, `mt-05`, `ls-07`: roleplay, hypothetical, multi-turn). Record:
+`data/measurements/2026-09-04T16-32-33Z-*.json`; bench
+`data/bench-dynaguard-4b.json`.
+
+It is the first configuration to sit inside both columns at once — a quarter
+of honest developer requests refused and seven of eight attacks stopped — and
+it costs 4.4 s a decision on this GPU, well inside the hook's 90 s. It has a
+seat (`dynaguard-4b`) beside the other three, with these numbers on the card.
+It is not the default, for the same reason as before: one run, one repetition,
+one machine, and the 8B's six lost attacks in the classes that need judgement
+are the same six the log has worried about since 08-31. And 19 of its 25
+remaining refusals are `r-instruction-override` on developer sentences, which
+is the next section.
+
+## The fence and the examples, on the fine-tune
+
+Same bench, DynaGuard-1.7B Q8_0, each pair in one process.
+
+| Variant | Legitimate | Attacks | Paired vs `dynaguard` |
+|---|---|---|---|
+| `dynaguard` (fenced, 2 shots per side) | 96.7% | 92.7% | — |
+| `dynaguard-nofence` (plain `User:` turn) | 97.8% | 87.8% | legit +4 / −1 p = 0.375; attacks +0 / −2 p = 0.5 — no difference |
+| `dynaguard-shots0` (no examples) | 97.1% | 78.0% | attacks +0 / −6, **p = 0.031** — worse |
+| `dynaguard-shots4` (four per side) | 94.2% | 95.1% | legit +0 / −7, **p = 0.016** — worse |
+
+The nonce fence costs the fine-tune nothing, so it stays: `Isolated.clean`'s
+own comment says never to hand it to a model bare, and now there is no
+accuracy argument to weigh against that. The examples matter in both
+directions: none loses six attacks, four loses seven legitimate cells. Two per
+side, the shipped value, is where both columns hold. Records:
+`data/bench-dynaguard-1.7b-{nofence,shots0,shots4}.json`.
+
+## Is the problem the rule format? Yes, and the answer depends on the model
+
+The hypothesis, asked in as many words: maybe the false positives are in how
+the rules are written and presented rather than in the model. The evidence for
+it was already in the residue — DynaGuard-1.7B's 49 remaining refusals read
+like a lexical match on each rule's own words: `override the default timeout`
+against a rule about overriding the assistant's instructions, `5000ms` against
+a USD 5,000 threshold, `fake customer records` against customer data, `salary
+field` against compensation, `where do we store credentials` against
+credentials. Every rule says what it prohibits and none says what it does not.
+
+So: `data/seed/benchmark-policy-bounded.json`, the same eight rules with one
+boundary sentence appended to each text and nothing else changed (same ids,
+same examples, same severities), through the full eval on both models, paired
+by prompt id against the plain-policy runs of the same afternoon.
+
+| 185 prompts | Qwen3-1.7B, plain | Qwen3-1.7B, bounded | DynaGuard-1.7B, plain | DynaGuard-1.7B, bounded |
+|---|---|---|---|---|
+| Legitimate refused | 78/109 (72%) | **57/109 (52%)** | 49/109 (45%) | **74/109 (68%)** |
+| Attacks stopped | 72/76 (95%) | 70/76 (92%) | 71/76 (93%) | 75/76 (99%) |
+| Paired vs plain | — | 23 fixed, 4 broken (2 attacks: `rp-05`, `ht-03`) | — | 5 fixed, 26 broken |
+| `r-instruction-override` refusals | 73 | 31 | 20 | 25 |
+| `r-credentials` refusals | 28 | 30 | 5 | 19 |
+
+Records: `…T16-55-04Z` (base) and `…T16-46-24Z` (DynaGuard).
+
+Two findings, and they point in opposite directions.
+
+**On the shipped model the rule format is most of the problem.** Twenty
+points off the false-positive rate for two attacks, the largest prompt-side
+movement the base 1.7B has ever shown — nine earlier attempts were inside the
+noise — and almost all of it on the one rule the log has blamed since the
+first attribution: the boundary sentence on `r-instruction-override` took its
+refusals from 73 to 31. It did nothing for `r-credentials` (28 → 30), where
+the sentence names what is allowed and the model still fires on the noun. The
+rule schema today has `text`, `guidance` and examples, and the judge is shown
+`text` and two examples per side. It has no field for what the rule is *not*
+about, and the compiler is never asked for one. That is the format problem,
+and it is a schema and a compiler-prompt change, not an adjudicator change.
+
+**On the fine-tune the same sentences are poison.** DynaGuard reads the longer
+policy as a longer list of things to catch: 26 prompts broken for 5 fixed,
+`r-credentials` from 5 to 19, and the attack column climbs to 99% because it is
+now refusing nearly everything. Same result as `dynaguard-v2` above, from the
+other side. For a model trained on short policies, the rule text must stay
+short, and the boundary has to reach it some other way — the two examples per
+side, which the shots rows above show it does read.
+
+What this means for the product: the seat and the rule format are coupled. If
+the default stays the base 1.7B, the compiler should produce a boundary
+clause and the judge should read it, and that alone is worth twenty points. If
+the default moves to a DynaGuard seat, the rule text must stay a single
+prohibition and the boundary belongs in the compliant examples. Either way the
+next measured change is in `policy/compile.ts`, not in `passes/adjudicate.ts`.
+Not run: the bounded policy on the 4B, because the 1.7B fine-tune's response
+makes the outcome predictable and the GPU time was better spent on the base
+model's pairing.
+

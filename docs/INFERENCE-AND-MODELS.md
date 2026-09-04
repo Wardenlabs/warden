@@ -113,13 +113,14 @@ sat inside the noise. The candidates below are ranked by how directly they
 address *that*, not by a leaderboard.
 
 **1. DynaGuard** — `tomg-group-umd/DynaGuard-{1.7B,4B,8B}`, Apache 2.0.
-**Measured the same afternoon**, 1.7B Q8_0: on the bench 96.7% of legitimate
-cells cleared against 84.8% for the shipped 1.7B (p = 0.0000) with attacks
-92.7% against 85.4% (inside the noise, not lost); in the 185-prompt product run
-45% of honest requests refused against 72%, attacks 93% against 95%, 2.0 s a
-decision. It now has a seat in the console beside the default and the 8B. The
-full rows are in `docs/MEASUREMENTS.md`; the rest of this entry is what was
-known before the run.
+**Measured the same afternoon**, both sizes. 1.7B Q8_0: 45% of honest
+requests refused against 72% for the shipped model, attacks 93% against 95%,
+2.0 s a decision. 4B Q6_K: 23% refused, attacks 87%, 4.4 s a decision — the
+first configuration inside both columns at once. Both have seats in the
+console beside the default and the 8B. Writing the fine-tune a longer policy
+made it worse every time (see the rule-format rows); it wants a short rule and
+two examples per side. The full rows are in `docs/MEASUREMENTS.md`; the rest
+of this entry is what was known before the run.
 Qwen3-1.7B/4B/8B fine-tuned on 40 000 user-written policies to answer PASS or
 FAIL about a dialogue. This is the pass's job on the pass's base model. On
 DynaBench (free-form policy compliance) it scores F1 65.2 / 72.0 / 73.1 for the
@@ -164,6 +165,19 @@ is the cheapest possible answer to the most expensive rule.
 budget of a few hundred tokens on the pinned rule only, on the 8B, is an
 unmeasured hypothesis that costs latency in exactly the place the GPU just
 made affordable. A bench variant is two lines.
+
+## The rule format
+
+Asked directly whether the problem is how rules are written and presented, the
+answer is yes for the shipped model: one boundary sentence per rule — what the
+rule is *not* about — took the base 1.7B from 72% to 52% honest requests
+refused for two attacks, almost all of it on the pinned rule, and no prompt
+change on that model had ever left the noise before. The rule schema has no
+field for a boundary and the compiler is never asked for one; that is where the
+next change belongs. The same sentences made DynaGuard worse (45% to 68%), so
+the fix is coupled to the seat: a boundary clause for the base model, short
+rules with good compliant examples for the fine-tune. Rows and per-rule
+attribution in `docs/MEASUREMENTS.md`.
 
 ## RAG, honestly
 

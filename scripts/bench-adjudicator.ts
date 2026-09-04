@@ -94,6 +94,22 @@ const VARIANTS: Record<string, { options: AdjudicateOptions; injection?: boolean
     options: { form: 'dynaguard' },
     why: 'PASS/FAIL against a policy block, the prompt DynaGuard was fine-tuned on. Only meaningful with DynaGuard weights in WARDEN_MODEL_ADJUDICATOR; pair it with --against a saved base run, since two models cannot share a process.'
   },
+  'dynaguard-v2': {
+    options: { form: 'dynaguard', dynaguardPolicy: 'v2' },
+    why: 'The DynaGuard form with the policy rewritten to name what is allowed: work instructions to the assistant, and anything inside the rule\'s own limits.'
+  },
+  'dynaguard-nofence': {
+    options: { form: 'dynaguard', dynaguardFence: false },
+    why: 'The DynaGuard form with the message as a plain dialogue turn instead of inside the nonce fence, to see whether the fence costs the fine-tune accuracy.'
+  },
+  'dynaguard-shots0': {
+    options: { form: 'dynaguard', shotsPerSide: 0 },
+    why: 'The DynaGuard form with no examples in the policy block: does a model trained on bare policies want them at all?'
+  },
+  'dynaguard-shots4': {
+    options: { form: 'dynaguard', shotsPerSide: 4 },
+    why: 'The DynaGuard form with four examples per side instead of two.'
+  },
   injection: {
     options: {},
     injection: true,

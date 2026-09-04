@@ -132,6 +132,23 @@ export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
     approxMB: 2170,
     required: false,
     why: 'Qwen3-1.7B fine-tuned on user-written policies; the measured alternative to the default seat.'
+  },
+  /**
+   * The 4B of the same family. Q6_K: at 3.6 GB it is the proportionate step
+   * between the two seats Warden had, which `Qwen3-4B` could never be because
+   * the SDK's constant for it is S3-only. Measured 2026-09-04 before it was
+   * offered; see `ADJUDICATOR_CHOICES`.
+   */
+  'adjudicator-dynaguard-4b': {
+    role: 'adjudicator',
+    entry: {
+      name: 'DynaGuard-4B.Q6_K',
+      src: 'registry://hf/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf'
+    } as unknown as RegistryEntry,
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    required: false,
+    why: 'DynaGuard at 4B; the middle seat, measured on both columns.'
   }
 };
 
@@ -178,7 +195,7 @@ export function modelsDir(): string {
  * are in the sentence, because the machine decides which one applies.
  */
 export type AdjudicatorChoice = {
-  id: 'default' | 'large' | 'dynaguard';
+  id: 'default' | 'large' | 'dynaguard' | 'dynaguard-4b';
   label: string;
   filename: string;
   approxMB: number;
@@ -229,6 +246,17 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     perDecision: 'About 2 s a decision on an Apple GPU.',
     trade: 'Same size as the default, trained for this. Stops as many attacks and turns away fewer honest requests — still too many.',
     note: 'Measured 2026-09-04 on an M1 Pro, paired against the shipped 1.7B on the same machine and run: 39 prompts fixed, 11 broken (8 honest requests newly refused, 3 attacks newly missed), false positives 72% to 45%, attacks 95% to 93%. The bench said 96.7% of legitimate cells against 84.8% at p = 0.0000; four rules per decision compound that to 45%. Trained on English policies; half the measured traffic is Spanish. Both records are in docs/MEASUREMENTS.md.'
+  },
+  {
+    id: 'dynaguard-4b',
+    label: 'DynaGuard 4B',
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    attacksCaught: '87%',
+    falsePositives: '23%',
+    perDecision: 'About 4.5 s a decision on an Apple GPU.',
+    trade: 'The middle seat. Refuses a quarter of honest requests and stops most attacks; the 8B refuses fewer and stops fewer.',
+    note: 'Measured 2026-09-04 on an M1 Pro, paired against DynaGuard 1.7B on the same machine and run: 29 prompts fixed, 10 broken (4 honest requests newly refused, 6 attacks newly missed, in roleplay, hypothetical and multi-turn). False positives 45% to 23%, attacks 93% to 87%. On the bench 99.3% of legitimate cells against 84.8% for the shipped 1.7B, attacks 92.7% against 85.4%. 19 of its 25 remaining refusals are r-instruction-override on developer sentences. Records in docs/MEASUREMENTS.md.'
   }
 ];
 

@@ -60,6 +60,13 @@ export const MODEL_CATALOG: DownloadSpec[] = [
     required: false
   },
   {
+    role: 'adjudicator-dynaguard-4b',
+    filename: 'DynaGuard-4B.Q6_K.gguf',
+    url: 'https://huggingface.co/mradermacher/DynaGuard-4B-GGUF/resolve/cf94049a948f35ea5b57ad6b3b83cb2e4cc60773/DynaGuard-4B.Q6_K.gguf',
+    approxMB: 3630,
+    required: false
+  },
+  {
     role: 'ocr',
     filename: 'latin_g2.gguf',
     url: null,

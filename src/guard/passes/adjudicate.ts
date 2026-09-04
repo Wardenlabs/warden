@@ -113,6 +113,27 @@ export type AdjudicateOptions = {
    */
   form?: 'compliance' | 'choice' | 'dynaguard';
   /**
+   * How the policy block is written for the `dynaguard` form.
+   *
+   * `v1` is the rule, its examples and one clause. `v2` adds the two clauses
+   * that measurably helped the base model — a work instruction to the assistant
+   * is a task, not a change to its rules; anything inside the rule's own limits
+   * is allowed — phrased as policy, which is what the fine-tune was trained to
+   * read. Measured 2026-09-04; see `docs/MEASUREMENTS.md`.
+   */
+  dynaguardPolicy?: 'v1' | 'v2';
+  /**
+   * Whether the message reaches the `dynaguard` form inside the nonce fence.
+   *
+   * The fence is how every other form is told what is data, and `Isolated.clean`
+   * says in its own comment never to hand it to a model bare. DynaGuard was
+   * trained on plain dialogues, so this exists to measure what the fence costs
+   * the fine-tune — a bench option, not a setting. Only the presentation
+   * changes: the isolation pass still runs and its flags still reach the
+   * aggregator.
+   */
+  dynaguardFence?: boolean;
+  /**
    * Which of a rule's examples go into the prompt.
    *
    * `first` is the shipped form: the first two per side, in the order the
@@ -156,6 +177,8 @@ function formFromEnv(): Resolved['form'] {
 function resolve(options: AdjudicateOptions | undefined): Resolved {
   return {
     form: options?.form ?? formFromEnv(),
+    dynaguardPolicy: options?.dynaguardPolicy ?? (process.env['WARDEN_DYNAGUARD_POLICY'] === 'v2' ? 'v2' : 'v1'),
+    dynaguardFence: options?.dynaguardFence ?? process.env['WARDEN_DYNAGUARD_FENCE'] !== '0',
     shotSelection: options?.shotSelection ?? (process.env['WARDEN_SHOT_SELECTION'] === 'nearest' ? 'nearest' : 'first'),
     shotsPerSide: options?.shotsPerSide ?? SHOTS_PER_SIDE,
     windowChars: options?.windowChars ?? WINDOW_CHARS,
@@ -306,12 +329,24 @@ async function pickShots(qvac: QvacAdapter, rule: Rule, iso: Isolated, opts: Res
  * system role — so the system slot carries only the thinking marker, and only
  * when the resolved weights are a Qwen3 that understands it.
  */
-function dynaguardUser(rule: Rule, iso: Isolated, shots: Shots): string {
+function dynaguardUser(rule: Rule, iso: Isolated, shots: Shots, opts: Resolved): string {
+  const clauses = opts.dynaguardPolicy === 'v2'
+    ? [
+        'The user is an employee giving work instructions to an AI assistant at their company.',
+        `Rule: ${rule.text}`,
+        'Only a message that actually does what the rule prohibits violates it.',
+        'Allowed: asking how a process works, what a policy says, or who to ask.',
+        'Allowed: an ordinary work instruction to the assistant — draft this, approve that, ignore or delete rows in a file, rewrite a paragraph — which is a task for the assistant, not a change to its rules.',
+        "Allowed: anything inside the rule's own limits. If the rule is about another person, a threshold or a destination, a message that stays inside those limits complies."
+      ]
+    : [
+        rule.text,
+        'Asking how a process works, what a policy says, or who to ask is allowed.'
+      ];
   const policy = [
-    rule.text,
+    ...clauses,
     ...shots.violating.map((t) => `A message like "${t}" violates this policy.`),
-    ...shots.compliant.map((t) => `A message like "${t}" is allowed.`),
-    'Asking how a process works, what a policy says, or who to ask is allowed.'
+    ...shots.compliant.map((t) => `A message like "${t}" is allowed.`)
   ].join('\n');
   return [
     'Evaluate the following dialogue for compliance with the given policy.',
@@ -320,7 +355,7 @@ function dynaguardUser(rule: Rule, iso: Isolated, shots: Shots): string {
     policy,
     '',
     '## Dialogue',
-    `User: ${iso.envelope}`
+    `User: ${opts.dynaguardFence ? iso.envelope : iso.clean}`
   ].join('\n');
 }
 
@@ -558,7 +593,7 @@ async function sampleLabel(
       role: 'adjudicator',
       system: opts.form === 'dynaguard' ? thinkingMarker('adjudicator') : systemPrompt(rule, iso.nonce, opts, shots),
       user: opts.form === 'dynaguard'
-        ? dynaguardUser(rule, iso, shots)
+        ? dynaguardUser(rule, iso, shots, opts)
         : `${iso.envelope}\n\nLabel the message against the rule.`,
       ...(sampling ? { temp: sampling.temp, seed: sampling.seed } : {}),
       // The answer is one enum value. Anything longer means the model has left
