@@ -13,9 +13,32 @@
  * second copy of everything employees typed; the decision, the rules that fired
  * and the timing are what an auditor needs, and keeping the raw text would make
  * the log itself the largest data-exposure risk in the system.
+ *
+ * On disk I/O, because this file used to be where all of it went. Every reader
+ * here — the console's list, the escalation queue, an appeal looking up its
+ * decision — read and parsed the whole file from the first byte, and the
+ * console asks for the head of the log and a chain verification after every
+ * single decision. So each decision cost one line appended and the entire log
+ * read twice, per open console: the read traffic grew with the square of the
+ * log's length, and a gateway that had been running for a few weeks spent more
+ * of its disk budget re-reading its own history than judging prompts. The log
+ * is now parsed once and kept in memory, the writer keeps that copy current
+ * because it is the only writer, and verification re-reads only what was
+ * appended since it last looked — see `verifyChain` for the one window that
+ * opens and how it is closed.
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync
+} from 'node:fs';
 import { dirname } from 'node:path';
 import type { Decision } from '../guard/types.js';
 import type { AdminAuditEntry, AuditedDecision, AuditEntry } from '../guard/types-audit.js';
@@ -40,10 +63,61 @@ const AUDIT_PATH = process.env['WARDEN_AUDIT_PATH'] ?? 'data/audit.jsonl';
 const WITNESS_PATH = `${AUDIT_PATH.replace(/\.jsonl$/, '')}.witness.json`;
 
 type Witness = { entries: number; head: string };
+type Entry = AuditEntry | AdminAuditEntry;
 
 const GENESIS = '0'.repeat(64);
-let lastHash: string | null = null;
-let entryCount: number | null = null;
+
+/**
+ * The log as this process last saw it, keyed to the file's size.
+ *
+ * `bytes` is the size the cache corresponds to. Every reader compares it to a
+ * `stat` before trusting the cache — one inode read rather than the file — so
+ * a log that changed underneath the process (a script pointed at the same path,
+ * a restore from backup, a test that writes the file directly) is re-read
+ * rather than served stale. The writer keeps the number current by adding the
+ * length of what it appended, which is the same size the next `stat` returns.
+ *
+ * `lines` counts what is on disk, damaged lines included, because that is what
+ * the witness records and what `verifyChain` will find; `entries` holds only
+ * what parsed. `head` is the hash of the final line, or null when that line
+ * could not be parsed — the state in which appending must refuse rather than
+ * quietly fork a second chain on top of the corruption.
+ */
+type Cache = { bytes: number; entries: Entry[]; lines: number; head: string | null };
+
+let cache: Cache | null = null;
+
+function fileSize(path: string): number {
+  try {
+    return statSync(path).size;
+  } catch {
+    return 0;
+  }
+}
+
+function load(): Cache {
+  const size = fileSize(AUDIT_PATH);
+  if (cache && cache.bytes === size) return cache;
+
+  const raw = size > 0 ? readFileSync(AUDIT_PATH, 'utf8') : '';
+  const rows = raw.trimEnd().split('\n').filter(Boolean);
+  const entries: Entry[] = [];
+  let head: string | null = rows.length ? null : GENESIS;
+  for (let i = 0; i < rows.length; i++) {
+    try {
+      const entry = JSON.parse(rows[i]!) as Entry;
+      entries.push(entry);
+      // Only the final line decides whether the chain can be extended. A
+      // damaged line in the middle is a verification finding and is skipped
+      // here the way `findDecision` always skipped it.
+      if (i === rows.length - 1) head = entry.entryHash;
+    } catch {
+      if (i === rows.length - 1) head = null;
+    }
+  }
+  cache = { bytes: size, entries, lines: rows.length, head };
+  return cache;
+}
 
 function readWitness(): Witness | null {
   if (!existsSync(WITNESS_PATH)) return null;
@@ -55,24 +129,9 @@ function readWitness(): Witness | null {
   }
 }
 
-/** How many entries the log currently holds, counted once and then tracked. */
-function currentCount(): number {
-  if (entryCount !== null) return entryCount;
-  if (!existsSync(AUDIT_PATH)) return (entryCount = 0);
-  entryCount = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean).length;
-  return entryCount;
-}
-
 function tailHash(): string {
-  if (lastHash) return lastHash;
-  if (!existsSync(AUDIT_PATH)) return (lastHash = GENESIS);
-
-  const lines = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean);
-  const last = lines.at(-1);
-  if (!last) return (lastHash = GENESIS);
-  try {
-    lastHash = (JSON.parse(last) as AuditEntry).entryHash;
-  } catch {
+  const head = load().head;
+  if (head === null) {
     // Restarting from GENESIS here would quietly fork a second chain on top of
     // a corrupt one — the writer would be papering over exactly the state the
     // verifier exists to catch. Refuse to append instead.
@@ -80,7 +139,28 @@ function tailHash(): string {
       `audit log at ${AUDIT_PATH} has an unparseable final entry — run \`pnpm run verify-audit\` and repair it before recording new decisions`
     );
   }
-  return lastHash ?? GENESIS;
+  return head;
+}
+
+/**
+ * Append one entry and bring the cache and the witness along with it.
+ *
+ * The witness is written after the entry, never before: a witness claiming an
+ * entry that was not appended would report tampering on a log that is merely
+ * mid-write. The cache is updated from what was written rather than re-read,
+ * which is the whole point — and if the append only half landed, the size it
+ * predicts will not match the next `stat` and the next reader reloads.
+ */
+function append(entry: Entry): void {
+  const current = load();
+  const line = JSON.stringify(entry) + '\n';
+  mkdirSync(dirname(AUDIT_PATH), { recursive: true });
+  appendFileSync(AUDIT_PATH, line);
+  current.entries.push(entry);
+  current.lines += 1;
+  current.head = entry.entryHash;
+  current.bytes += Buffer.byteLength(line);
+  writeFileSync(WITNESS_PATH, JSON.stringify({ entries: current.lines, head: entry.entryHash }) + '\n');
 }
 
 /** Record a decision. Returns the audit id quoted back to the employee. */
@@ -112,17 +192,7 @@ export function recordDecision(
     entryHash: createHash('sha256').update(prevHash + JSON.stringify(body)).digest('hex')
   };
 
-  // Counted before the append, or the new line gets counted twice: the read
-  // inside `currentCount()` would already see it.
-  const nextCount = currentCount() + 1;
-
-  mkdirSync(dirname(AUDIT_PATH), { recursive: true });
-  appendFileSync(AUDIT_PATH, JSON.stringify(entry) + '\n');
-  lastHash = entry.entryHash;
-  entryCount = nextCount;
-  // Written after the entry, never before: a witness claiming an entry that was
-  // not appended would report tampering on a log that is merely mid-write.
-  writeFileSync(WITNESS_PATH, JSON.stringify({ entries: nextCount, head: entry.entryHash }) + '\n');
+  append(entry);
   return entry;
 }
 
@@ -152,42 +222,39 @@ export function recordAdminAction(
     ...body,
     entryHash: createHash('sha256').update(prevHash + JSON.stringify(body)).digest('hex')
   };
-  const nextCount = currentCount() + 1;
-  mkdirSync(dirname(AUDIT_PATH), { recursive: true });
-  appendFileSync(AUDIT_PATH, JSON.stringify(entry) + '\n');
-  lastHash = entry.entryHash;
-  entryCount = nextCount;
-  writeFileSync(WITNESS_PATH, JSON.stringify({ entries: nextCount, head: entry.entryHash }) + '\n');
+  append(entry);
   return entry;
 }
 
-/**
- * Every line in the file, newest first, whichever kind it is.
- *
- * Both readers below filter this rather than slicing the tail first: the two
- * kinds are interleaved, so "the last 50 lines" is not "the last 50 decisions"
- * and a busy afternoon of policy edits would push real decisions out of the
- * console's list without anybody noticing they had gone.
- */
-function chain(): Array<AuditEntry | AdminAuditEntry> {
-  if (!existsSync(AUDIT_PATH)) return [];
-  return readFileSync(AUDIT_PATH, 'utf8')
-    .trimEnd().split('\n').filter(Boolean)
-    .map((l) => JSON.parse(l) as AuditEntry | AdminAuditEntry)
-    .reverse();
-}
+const isAdmin = (e: Entry): e is AdminAuditEntry => 'kind' in e && e.kind === 'admin';
 
-const isAdmin = (e: AuditEntry | AdminAuditEntry): e is AdminAuditEntry =>
-  'kind' in e && e.kind === 'admin';
+/**
+ * The newest entries of one kind, newest first.
+ *
+ * Filtered while walking back from the tail rather than by slicing the tail
+ * first: the two kinds are interleaved, so "the last 50 lines" is not "the last
+ * 50 decisions" and a busy afternoon of policy edits would push real decisions
+ * out of the console's list without anybody noticing they had gone. Walking
+ * back also means the cost is the answer's size, not the log's.
+ */
+function newest<T extends Entry>(limit: number, keep: (e: Entry) => e is T): T[] {
+  const { entries } = load();
+  const out: T[] = [];
+  for (let i = entries.length - 1; i >= 0 && out.length < limit; i--) {
+    const entry = entries[i]!;
+    if (keep(entry)) out.push(entry);
+  }
+  return out;
+}
 
 /** Administrative changes, newest first. */
 export async function readAdminActions(limit = 50): Promise<AdminAuditEntry[]> {
-  return chain().filter(isAdmin).slice(0, limit);
+  return newest(limit, isAdmin);
 }
 
 /** Most recent entries, newest first. */
 export async function readAudit(limit = 50): Promise<AuditEntry[]> {
-  return chain().filter((e): e is AuditEntry => !isAdmin(e)).slice(0, limit);
+  return newest(limit, (e): e is AuditEntry => !isAdmin(e));
 }
 
 /**
@@ -195,27 +262,69 @@ export async function readAudit(limit = 50): Promise<AuditEntry[]> {
  *
  * The id is the only handle an employee is given — it is printed on every
  * refusal — so anything that answers a question about a past decision (an
- * appeal, a rewrite request) has to start by finding it. Scans the file rather
- * than reading a tail: a decision from last week is exactly the one somebody is
+ * appeal, a rewrite request) has to start by finding it. Walks the whole log
+ * rather than a tail: a decision from last week is exactly the one somebody is
  * still arguing about, and a silent "only the last N" window would refuse it
  * while looking like the id was invalid.
  */
 export function findDecision(auditId: string): AuditEntry | null {
-  if (!auditId || !existsSync(AUDIT_PATH)) return null;
-  const lines = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    try {
-      const entry = JSON.parse(lines[i]!) as AuditEntry | AdminAuditEntry;
-      // Administrative entries carry ids from the same generator, and every
-      // caller here is answering a question about a decision — an appeal, a
-      // rewrite. Handing one an admin entry would give it an object with no
-      // verdict and no rules, which fails somewhere further away than here.
-      if (entry.auditId === auditId && !isAdmin(entry)) return entry;
-    } catch {
-      // A damaged line is a verification finding, not a reason to stop looking.
-    }
+  if (!auditId) return null;
+  const { entries } = load();
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]!;
+    // Administrative entries carry ids from the same generator, and every
+    // caller here is answering a question about a decision — an appeal, a
+    // rewrite. Handing one an admin entry would give it an object with no
+    // verdict and no rules, which fails somewhere further away than here.
+    if (entry.auditId === auditId && !isAdmin(entry)) return entry;
   }
   return null;
+}
+
+/**
+ * How far verification has walked, so the next call can start there.
+ *
+ * `bytes` always ends on a newline: a trailing partial line is checked for the
+ * result but never checkpointed, so the full walk and the incremental one read
+ * the same line boundaries and cannot disagree about where an entry starts.
+ * `at` is when the last *full* walk happened — an incremental pass does not
+ * move it, which is what makes the full walk recur on schedule.
+ */
+type Verified = { bytes: number; count: number; head: string; at: number };
+
+let verified: Verified | null = null;
+
+/**
+ * How long the verifier trusts a prefix it has already walked.
+ *
+ * Walking the tail only is exact for everything the chain is built to catch —
+ * an appended line that does not follow from the last, a line removed from
+ * the end — because both change the file's length, and a shorter file always
+ * forces a full walk. What it cannot see is an edit inside the already-walked
+ * prefix that keeps the byte length identical. That edit is caught by the
+ * next full walk, which this bounds to a minute; `pnpm run verify-audit`
+ * always walks everything, and that command, not the console badge, is the
+ * evidence claim. A minute rather than never because the badge would
+ * otherwise be a statement about the past; a minute rather than seconds
+ * because a full walk of a long log after every decision is precisely the
+ * cost this exists to remove.
+ */
+const FULL_WALK_MS = 60_000;
+
+function readRange(path: string, start: number, end: number): Buffer {
+  const fd = openSync(path, 'r');
+  try {
+    const buf = Buffer.allocUnsafe(Math.max(end - start, 0));
+    let offset = 0;
+    while (offset < buf.length) {
+      const n = readSync(fd, buf, offset, buf.length - offset, start + offset);
+      if (n === 0) break;
+      offset += n;
+    }
+    return buf.subarray(0, offset);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**
@@ -230,9 +339,12 @@ export function findDecision(auditId: string): AuditEntry | null {
  * entries". The witness file is what makes the missing two visible.
  *
  * Exposed because a tamper-evident log is only evidence if someone can check
- * it; `pnpm run verify-audit` runs this.
+ * it; `pnpm run verify-audit` runs this with `full`, which walks from the
+ * first byte regardless of what was walked before. Without it, a prefix walked
+ * inside the last minute is trusted and only the bytes appended since are
+ * read — see `FULL_WALK_MS` for what that trades.
  */
-export function verifyChain(): {
+export function verifyChain(options: { full?: boolean } = {}): {
   ok: boolean;
   entries: number;
   brokenAt?: number;
@@ -244,6 +356,7 @@ export function verifyChain(): {
   const witness = readWitness();
 
   if (!existsSync(AUDIT_PATH)) {
+    verified = null;
     // A missing log with a witness that counted entries is a deleted log, not
     // an empty one. Reporting "intact — 0 entries" for that was the loudest
     // version of the same blind spot.
@@ -253,41 +366,77 @@ export function verifyChain(): {
     return { ok: true, entries: 0, ...(witness ? {} : { unwitnessed: true }) };
   }
 
-  const lines = readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').filter(Boolean);
-  let prev = GENESIS;
+  const size = fileSize(AUDIT_PATH);
+  const resume =
+    !options.full &&
+    verified !== null &&
+    size >= verified.bytes &&
+    Date.now() - verified.at < FULL_WALK_MS
+      ? verified
+      : null;
 
-  for (let i = 0; i < lines.length; i++) {
+  let prev = resume?.head ?? GENESIS;
+  let count = resume?.count ?? 0;
+  const start = resume?.bytes ?? 0;
+  const chunk = readRange(AUDIT_PATH, start, size);
+
+  // Checkpoint only whole lines. Whatever follows the last newline is verified
+  // below as part of this answer, and read again next time together with
+  // whatever gets appended after it.
+  const lastNewline = chunk.lastIndexOf(10);
+  const whole = chunk.subarray(0, lastNewline + 1).toString('utf8');
+  const partial = chunk.subarray(lastNewline + 1).toString('utf8').trim();
+
+  const check = (line: string): boolean => {
     // A line that no longer parses is the most ordinary way to tamper with a
     // JSONL file, so it is a verification finding, not a crash.
     let entry: AuditEntry;
     try {
-      entry = JSON.parse(lines[i]!) as AuditEntry;
+      entry = JSON.parse(line) as AuditEntry;
     } catch {
-      return { ok: false, entries: lines.length, brokenAt: i };
+      return false;
     }
     const { entryHash, ...body } = entry;
     const expected = createHash('sha256').update(prev + JSON.stringify(body)).digest('hex');
-    if (entry.prevHash !== prev || entryHash !== expected) {
-      return { ok: false, entries: lines.length, brokenAt: i };
-    }
+    if (entry.prevHash !== prev || entryHash !== expected) return false;
     prev = entryHash;
+    return true;
+  };
+
+  const lines = whole.split('\n').filter((l) => l.trim());
+  const total = count + lines.length + (partial ? 1 : 0);
+  for (const line of lines) {
+    if (!check(line)) {
+      verified = null;
+      return { ok: false, entries: total, brokenAt: count };
+    }
+    count += 1;
+  }
+  verified = {
+    bytes: start + lastNewline + 1,
+    count,
+    head: prev,
+    at: resume ? resume.at : Date.now()
+  };
+  if (partial && !check(partial)) {
+    return { ok: false, entries: total, brokenAt: count };
   }
 
   // The chain is internally sound. Is all of it still here?
-  if (!witness) return { ok: true, entries: lines.length, unwitnessed: true };
-  if (lines.length < witness.entries || prev !== witness.head) {
+  if (!witness) return { ok: true, entries: total, unwitnessed: true };
+  if (total < witness.entries || prev !== witness.head) {
     return {
       ok: false,
-      entries: lines.length,
-      missing: Math.max(witness.entries - lines.length, 0)
+      entries: total,
+      missing: Math.max(witness.entries - total, 0)
     };
   }
 
-  return { ok: true, entries: lines.length };
+  return { ok: true, entries: total };
 }
 
-/** Drop the cached tail hash and count. Tests write the file directly. */
+/** Drop everything cached about the file. Tests write it directly. */
 export function invalidateAudit(): void {
-  lastHash = null;
-  entryCount = null;
+  cache = null;
+  verified = null;
 }

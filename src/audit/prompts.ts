@@ -127,6 +127,9 @@ function load(): Map<string, Held> {
   if (!promptsEnabled()) return held;
 
   const since = cutoff();
+  // Lines on disk that will not be in the live set once loading is done —
+  // expired, unparseable, or superseded by a later line with the same id.
+  let stale = 0;
   try {
     for (const line of readFileSync(STORE_PATH, 'utf8').split('\n')) {
       if (!line.trim()) continue;
@@ -137,22 +140,35 @@ function load(): Map<string, Held> {
         // One unreadable line loses one prompt, not the store. This file is
         // a convenience; refusing to start over a torn append would make it
         // an availability risk, which it is emphatically not worth being.
+        stale++;
         continue;
       }
       const entry = row as Partial<Held>;
-      if (typeof entry.auditId !== 'string' || typeof entry.text !== 'string') continue;
+      if (typeof entry.auditId !== 'string' || typeof entry.text !== 'string') {
+        stale++;
+        continue;
+      }
       const at = typeof entry.at === 'number' ? entry.at : 0;
-      if (at < since) continue;
+      if (at < since) {
+        stale++;
+        continue;
+      }
+      if (held.has(entry.auditId)) stale++;
       held.set(entry.auditId, { auditId: entry.auditId, at, text: entry.text });
     }
   } catch {
     /* no file yet, which is the normal first-boot case */
   }
 
+  const before = held.size;
   trim();
-  // Rewritten on load, so an expired entry is gone from disk within one
-  // restart even if the process is never asked for anything.
-  compact();
+  stale += before - held.size;
+  // Rewritten on load when anything was dropped, so an expired entry is gone
+  // from disk within one restart even if the process is never asked for
+  // anything. Not otherwise: this used to rewrite the whole file on every
+  // boot regardless, which under `tsx watch` meant every saved edit copied a
+  // week of prompts back onto the disk to change nothing.
+  if (stale > 0) compact();
   return held;
 }
 

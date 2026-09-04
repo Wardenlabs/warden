@@ -6,7 +6,9 @@
  */
 import { verifyChain } from '../src/audit/log.js';
 
-const result = verifyChain();
+// Always from the first byte: this command is the evidence claim, and the
+// incremental walk the console uses is a convenience layered on top of it.
+const result = verifyChain({ full: true });
 
 if (result.ok) {
   console.log(`\n✓ audit chain intact — ${result.entries} entries`);

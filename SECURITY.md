@@ -51,7 +51,13 @@ text.
 
 **Tampering with the record.** The audit log is append-only JSONL, hash-chained,
 with a witness file holding the count so truncation is visible as well as
-alteration. `pnpm run verify-audit` walks it.
+alteration. `pnpm run verify-audit` walks all of it, from the first byte, and
+is the check to rely on. The badge in the console re-verifies after every
+decision and walks only what was appended since it last looked, trusting a
+prefix it walked inside the last minute; a change that keeps the file's length
+identical is therefore caught by the next full walk, up to a minute later,
+rather than instantly. Anything that changes the length — a line removed, a
+line that does not chain — is caught at once.
 
 **Sending prompts to a model you do not run.** Judging is local under every
 configuration this repo can produce. Rule *compilation* is the one thing that
