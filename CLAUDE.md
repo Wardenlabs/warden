@@ -39,7 +39,12 @@ src/guard/       the pipeline: one prompt in, one decision out
   quota.ts         pass -2 — per-role daily counters
 src/policy/      rules, roles, people, retrieval, the compiler
 src/qvac/        the only boundary to @qvac/sdk. Everything else uses an adapter
-src/server/      HTTP: the console API, the OpenAI-shaped proxy, onboarding
+src/server/      HTTP. index.ts only boots; app.ts fixes the middleware order
+  routes/          one router per surface: policy, people, guard, solo, system…
+  middleware.ts    CORS, headers, rate limit, admin audit, admin gate
+  identity.ts      API key -> actor, and running the guard for a request
+web/             the console: app.js is the entry, web/js/ has one module per
+                 screen over core/format/router/data/render. No build step
 src/redteam/     the corpus and the runner that writes REPORT.md
 scripts/         setup, benchmarks, and the adjudicator bench
 integrations/    the UserPromptSubmit hooks for Claude Code, Codex, opencode

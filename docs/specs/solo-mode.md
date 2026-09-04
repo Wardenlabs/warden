@@ -194,7 +194,7 @@ golpe las reglas personales de quien la instaló.
 implementación, no estaba resuelto acá):** la consola no tiene sesión ni
 login — confía en loopback y nunca supo, para ninguna otra acción de admin,
 qué humano puntual está del otro lado. `resolveSoloIdentity()`
-(`src/server/index.ts`) no intenta resolverlo tampoco: busca en el
+(`src/server/routes/solo.ts`) no intenta resolverlo tampoco: busca en el
 directorio a quién sea exento (`isExempt`); si hay exactamente uno, es el
 caso A y esa es la identidad. Si no hay ninguno, es el caso B — usa o crea
 la identidad de rol `solo`. Si hay más de un exento (multi-admin), toma el
@@ -206,7 +206,7 @@ La `apiKey` generada (en cualquiera de los dos casos, si hace falta
 generarla) se guarda solo en:
 - `data/company.json` (como cualquier `Employee`), y
 - el shell profile del usuario, vía el mismo mecanismo de
-  `/install/:credential` (`src/server/index.ts:1576-1652`) — pero invocado
+  `/install/:credential` (`buildInstallScript` en `src/server/routes/install.ts`) — pero invocado
   internamente por la app, no por un link que el usuario pega a mano
   (ver §6).
 
@@ -273,7 +273,7 @@ en ningún punto de este camino. No hay archivo ni store separado — es el
 resultado directo de la decisión de §2: una sola política, reglas que se
 diferencian por a quién apuntan. Desactivar el switch borra esa entrada con
 el mismo endpoint que ya existe hoy, `DELETE /api/policy/rules/:id`
-(`src/server/index.ts:1163`).
+(`src/server/routes/policy.ts`).
 
 El campo de texto libre que el PRD deja disponible (§3.2, "para quien quiera
 agregar una propia") sí pasa por `compileRule` — hereda el riesgo ya
@@ -300,7 +300,7 @@ debería tener que reconstruir contra la API genérica de equipo.
 | `POST` | `/api/solo/test` | Corre un prompt de prueba real contra los presets activos y devuelve el bloqueo — respalda el paso de "confirmación con evidencia" del PRD (§3.4). |
 
 `/api/solo/protect` reusa `/install/:credential` tal cual existe
-(`src/server/index.ts:1576-1652`) en vez de reimplementar el auto-wiring:
+(`buildInstallScript`, `src/server/routes/install.ts`) en vez de reimplementar el auto-wiring:
 la única diferencia con el flujo de equipo es que nadie copia/pega un
 link — la app conoce la credencial porque la generó ella misma un paso
 antes, en `/api/solo/setup`.
