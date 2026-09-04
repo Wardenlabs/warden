@@ -1,6 +1,6 @@
 {
   "name": "warden",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "private": true,
   "type": "module",
   "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
@@ -30,6 +30,7 @@
     "test:vote": "tsx scripts/test-vote.ts",
     "test:hook": "tsx scripts/test-hook.ts",
     "test:auth": "tsx scripts/test-auth.ts",
+    "test:rules": "tsx scripts/test-rules-for-actor.ts",
     "eval": "tsx scripts/eval.ts",
     "eval:lint": "tsx scripts/eval-lint.ts",
     "compare": "tsx scripts/compare.ts",

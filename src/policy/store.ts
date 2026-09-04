@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { bindsActor } from './audience.js';
+import { bindsActor, EVERYONE } from './audience.js';
 import { policySpecSchema, quotaSchema, ruleSchema, type PolicySpec, type Rule, type Quota } from './types.js';
 
 const POLICY_PATH = process.env['WARDEN_POLICY_PATH'] ?? 'data/policies.json';
@@ -283,10 +283,16 @@ export function rulesForActor(
   actor: { id: string; role: string },
   side: JudgedSide = 'input'
 ): Rule[] {
-  // An exempt role is measured against nothing: the person who ratifies the
-  // policy is not governed by it. Checked before `appliesTo` so that a rule
-  // written for everyone — including the pinned injection rule — does not
-  // quietly re-capture them.
+  // Exemption is per-rule, not per-actor: it only ever excuses someone from a
+  // rule that did not name them. A rule written for everyone (`appliesTo`
+  // includes `*`) — including the pinned injection rule — does not quietly
+  // re-capture an exempt role; that half of the old behaviour is unchanged.
+  // But a rule that names an exempt role or a specific `@id` on purpose does
+  // bind them, because writing that rule was itself an act only an
+  // administrator can perform — the same permission that already lets them
+  // ratify any rule at all. Nobody gains the power to widen or narrow who a
+  // rule binds by anything other than the permission they already had; this
+  // just stops the wildcard case from being the only case `isExempt` can see.
   //
   // This is only ever as strong as the identity behind `actor.role`, which is
   // why it is safe now and was not when it was written: the role no longer
@@ -294,8 +300,11 @@ export function rulesForActor(
   // behind an API key the gateway issued, so exemption is something an admin
   // grants rather than something a caller claims. If a header path is ever
   // reintroduced, this line becomes a bypass again.
-  if (isExempt(spec, actor.role)) return [];
-  return spec.rules.filter((r) => bindsActor(r.appliesTo, actor) && governsSide(r, side));
+  const exempt = isExempt(spec, actor.role);
+  return spec.rules.filter((r) => {
+    if (exempt && r.appliesTo.includes(EVERYONE)) return false;
+    return bindsActor(r.appliesTo, actor) && governsSide(r, side);
+  });
 }
 
 /** Whether the policy declines to govern this role at all. */

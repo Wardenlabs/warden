@@ -28,6 +28,7 @@ type CatalogLib = { MODEL_CATALOG: DownloadSpec[] };
 export type ModelProgress = { role: string; totalMB: number; receivedMB: number; done: boolean; failed?: string };
 
 export type SetupState =
+  | { phase: 'mode' }
   | { phase: 'welcome'; totalMB: number; freeGB: number | null }
   | { phase: 'downloading'; models: ModelProgress[] }
   | { phase: 'starting'; detail: 'boot' | 'warming' }
@@ -44,6 +45,32 @@ function nextChoice(): Promise<'download' | 'mock' | 'retry'> {
       resolveChoice(choice === 'mock' ? 'mock' : choice === 'retry' ? 'retry' : 'download');
     });
   });
+}
+
+/** One user gesture from the splash's very first screen: solo or team. */
+function nextMode(): Promise<'solo' | 'team'> {
+  return new Promise((resolveMode) => {
+    ipcMain.once('setup:mode', (_event, choice: unknown) => {
+      resolveMode(choice === 'solo' ? 'solo' : 'team');
+    });
+  });
+}
+
+/**
+ * Ask, once, before the model-download screen: is this installation being
+ * set up for one person, or for an administrator who will invite a team?
+ *
+ * Shown ahead of `welcome` rather than folded into it or asked afterward —
+ * see docs/specs/solo-mode.md §8 — so the choice is available for the rest
+ * of first-run to react to from the start, not bolted on once models are
+ * already down. The caller (`main.ts`) is what makes this ask only once per
+ * installation: it skips calling this entirely once the company directory
+ * already has someone in it, the same directory `resolveSoloIdentity` on the
+ * gateway adds a person to, on either path, the first time either is taken.
+ */
+export async function askMode(splash: BrowserWindow): Promise<'solo' | 'team'> {
+  sendState(splash, { phase: 'mode' });
+  return nextMode();
 }
 
 /**

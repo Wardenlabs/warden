@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureModels, modelsPresent, sendState } from './first-run.js';
+import { askMode, ensureModels, modelsPresent, sendState } from './first-run.js';
 import {
   fetchHealth,
   pickPort,
@@ -46,10 +46,46 @@ let gateway: RunningServer | null = null;
 let activePort = 8080;
 let quitting = false;
 let portRetried = false;
+/**
+ * Set once in `main()` when the solo-vs-team question was asked and answered
+ * "just me". Read and cleared by the very next `launchGateway` — the one
+ * that boots this run — so a later restart from this same process (the LAN
+ * checkbox, the internet toggle, a crash recovery) reopens the console where
+ * it already was instead of snapping back to onboarding every time.
+ */
+let soloOnboarding = false;
 
 const modelsDir = (): string => join(userData, 'models');
 const logPath = (): string => join(userData, 'logs', 'warden-gateway.log');
+const companyPath = (): string => join(userData, 'data', 'company.json');
 const consoleUrl = (): string => `http://127.0.0.1:${activePort}/`;
+
+/**
+ * Has this installation already answered the solo-vs-team question, on its
+ * own, by having somebody in the directory?
+ *
+ * There is no dedicated "have we asked before" flag — see
+ * docs/implements/solo-mode.md Fase 6 point 4: the directory itself is the
+ * record. Solo and team both end up adding a person to it (Warden Solo's
+ * `resolveSoloIdentity` on the "just me" path; an administrator populating
+ * their roster on the other), so once either has happened once, this stops
+ * asking. Read directly off disk, the same way `ensureModels` reads the
+ * gateway's `data/settings.json` (`gatewaySettingsPath` below): the gateway
+ * has not started yet when this is checked, and this process does not
+ * import src/. `data/company.json` under the gateway's cwd (`userData`) is
+ * the exact file `src/policy/people.ts`'s `loadDirectory` reads and writes.
+ */
+function hasCompanyPeople(): boolean {
+  try {
+    const raw = JSON.parse(readFileSync(companyPath(), 'utf8')) as { employees?: unknown[] };
+    return Array.isArray(raw.employees) && raw.employees.length > 0;
+  } catch {
+    // No directory on disk yet, or an unreadable one: both read as "nobody
+    // has answered this yet", which is the direction that asks rather than
+    // silently assuming team mode for an install that never got the chance.
+    return false;
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.exit(0);
@@ -130,6 +166,15 @@ async function main(): Promise<void> {
   });
   await splash.loadFile(SPLASH_HTML);
   splash.show();
+
+  // Asked once per installation, ahead of the models screen — see
+  // docs/specs/solo-mode.md §8. Skipped for a smoke run: nothing answers the
+  // IPC message in CI, and this would otherwise hang until the 120s
+  // WARDEN_SMOKE_TIMEOUT above and fail a boot the run never asked about.
+  if (!SMOKE && !hasCompanyPeople()) {
+    const mode = await askMode(splash);
+    soloOnboarding = mode === 'solo';
+  }
 
   if (settings.adapter === 'real') {
     const adapter = await ensureModels({
@@ -217,7 +262,26 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
     current = (await fetchHealth(port)) ?? current;
   }
 
-  openConsole(port);
+  // The one-shot half of "This device, for me": create (or recover) the solo identity
+  // and land the console on "Mis reglas" instead of the normal view.
+  // One-shot because `launchGateway` also runs on every restart this same
+  // process makes afterward — the LAN checkbox, the internet toggle, crash
+  // recovery — and those should reopen wherever the console already was,
+  // not snap back to onboarding every time somebody flips a menu item.
+  if (soloOnboarding) {
+    soloOnboarding = false;
+    try {
+      await fetch(`http://127.0.0.1:${port}/api/solo/setup`, { method: 'POST' });
+    } catch {
+      // Not fatal: every /api/solo/* route resolves — and, if needed,
+      // creates — the same identity on demand (`resolveSoloIdentity`), so
+      // the console's own "Mis reglas" screen ends up with it anyway on its
+      // first request. This call only saves that screen its own round trip.
+    }
+    openConsole(port, '#soloRules');
+  } else {
+    openConsole(port);
+  }
   Menu.setApplicationMenu(buildMenu());
 
   /*
@@ -239,10 +303,16 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
   }
 }
 
-function openConsole(port: number): void {
+/**
+ * @param hash Where in the console to land, e.g. `#soloRules` — appended
+ *   as-is, client-side routing, no round trip to the gateway. Omitted for
+ *   the normal path, which is every path except the "just me" cold start.
+ */
+function openConsole(port: number, hash?: string): void {
   activePort = port;
+  const url = hash ? `${consoleUrl()}${hash}` : consoleUrl();
   if (consoleWindow && !consoleWindow.isDestroyed()) {
-    void consoleWindow.loadURL(consoleUrl());
+    void consoleWindow.loadURL(url);
     return;
   }
   consoleWindow = new BrowserWindow({
@@ -279,7 +349,7 @@ function openConsole(port: number): void {
       void smokeVerify();
     });
   }
-  void consoleWindow.loadURL(consoleUrl());
+  void consoleWindow.loadURL(url);
 }
 
 async function smokeVerify(): Promise<void> {

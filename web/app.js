@@ -193,6 +193,16 @@ const state = {
   /** The audience editor is a control, not information: it stays shut until
    *  you say you want to change who a rule binds. */
   audienceOpen: false,
+  /** Whether a human has actually looked at who this draft binds, rather than
+   *  `sanitiseAudience`'s `['*']` fallback reaching Activate unseen. Every new
+   *  draft starts `false`; touching any chip — including re-confirming what
+   *  the model already proposed — sets it `true`. A draft locked to one
+   *  person's page (`draftFor`) has nothing to confirm, so it starts `true`. */
+  audienceConfirmed: false,
+  /** Set when Activate was pressed before the audience was confirmed, so the
+   *  draft card shows why it opened the editor instead of ratifying. Cleared
+   *  the moment a chip is touched. */
+  audienceWarning: false,
 
   filter: 'all',
   actorFilter: '',
@@ -204,7 +214,33 @@ const state = {
 
   /** Which disclosures are expanded, by key. Kept in state rather than the DOM
    *  so it survives a re-render and follows you from one row to the next. */
-  open: new Set()
+  open: new Set(),
+
+  /**
+   * "This device" (`VIEWS.soloRules`, docs/specs/solo-mode.md §7) — a second,
+   * narrower console for someone protecting their own machine rather than
+   * administering anyone else's. Kept on its own keys rather than reusing
+   * `draft`/`ruleChat`/etc. so the two flows never bleed into each other.
+   */
+  soloIdentity: null,
+  soloPresets: [],
+  soloRules: [],
+  /** Set when a `/api/solo/presets` or `/api/solo/rules` fetch failed, so the
+   *  screen can say so instead of showing "Loading…" forever — both lists
+   *  start empty, which is indistinguishable from "still loading" unless
+   *  something else marks the difference. Cleared the moment either call
+   *  next succeeds. */
+  soloLoadError: '',
+  /** The preset id currently mid-toggle, so its switch can disable itself. */
+  soloToggling: null,
+  soloBusy: false,
+  /** Rendered HTML for the last thing the free-text field said back, or ''. */
+  soloRuleNote: '',
+  soloProtecting: false,
+  soloProtectError: '',
+  /** The decision `/api/solo/test` returned after the last successful
+   *  protect run — the "confirmation with evidence" the PRD asks for. */
+  soloTestResult: null
 };
 
 const AUDIT_LIMIT = 400;
@@ -321,7 +357,12 @@ function parseHash() {
   const query = {};
   for (const [k, v] of new URLSearchParams(qs ?? '')) query[k] = v;
   return {
-    view: VIEWS[view] ? view : 'activity',
+    // A pure solo install (see `soloIsPureInstall` below) has nothing at
+    // `#/activity` worth landing on — every other tab opens onto a directory
+    // with nobody in it — so an empty or unrecognised hash opens "This
+    // device" instead. A directly-typed hash to a team view still works;
+    // this only decides where "nothing said yet" goes.
+    view: VIEWS[view] ? view : (soloIsPureInstall() ? 'soloRules' : 'activity'),
     sel: rest.length ? decodeURIComponent(rest.join('/')) : null,
     query
   };
@@ -504,7 +545,13 @@ function render() {
   // today card, which does not render until something has happened — so the
   // person it is written for, somebody who has just installed the app and is
   // wondering why nothing works, was the one person who never saw it.
-  $('pane').innerHTML = (state.mock ? mockBanner() : '') + firstRunBanner() + view.body();
+  // "This device" is its own onboarding, not a company's — the team's
+  // first-run nudge ("write a rule", "put your team in") would be talking
+  // about a directory this view never shows. The mock banner still applies:
+  // someone in demo mode needs to know nothing here is real no matter which
+  // product surface they are looking at.
+  const isSoloView = state.view === 'soloRules' || state.view === 'soloSettings';
+  $('pane').innerHTML = (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner()) + view.body();
 
   restoreFields(fields);
   bindDisclosures();
@@ -566,7 +613,7 @@ function disclosure(key, label, body) {
  */
 // Rules leads with the composer rather than the list: `sel: 'new'` makes the
 // nav item land on the tab you are most likely to have come for.
-const NAV = [
+const TEAM_NAV = [
   { view: 'activity', label: 'Activity' },
   { view: 'inbox', label: 'Inbox', count: () => pendingEscalations().length + state.appeals.length },
   { sep: true },
@@ -579,9 +626,50 @@ const NAV = [
   { view: 'engine', label: 'Engine' }
 ];
 
+const SOLO_NAV_ITEM = { view: 'soloRules', label: 'This device' };
+const SOLO_SETTINGS_NAV_ITEM = { view: 'soloSettings', label: 'Settings' };
+
+/**
+ * A directory nobody has put a second person into yet, or one where the only
+ * entries are the "protect this device" identity itself, is a pure solo
+ * install (docs/specs/solo-mode.md §7) — every other tab would open onto an
+ * empty team console, so it does not show. `employees.length === 0` covers
+ * the instant before anyone has pressed anything here: nobody has called
+ * `/api/solo/setup` yet either, and this still counts as pure rather than as
+ * "wait and find out", because the view itself triggers that setup on entry.
+ *
+ * The moment a second, non-`solo` role shows up, this machine also has a
+ * directory worth administering — coexistence (PRD §4) — and "This device"
+ * becomes one tab among the rest rather than the only one. In practice that
+ * second role is always an exempt admin (only an admin can add people at
+ * all), which is the framing spec §7 uses; the two describe the same
+ * boundary and this is the one `state.company` can answer without an extra
+ * round trip to learn which employee `/api/solo/*` resolved as the identity.
+ */
+function soloIsPureInstall() {
+  const emps = state.company.employees;
+  return emps.length === 0 || emps.every((e) => e.role === 'solo');
+}
+
+/**
+ * "Settings" exists only on the solo side of this line, on purpose. A
+ * coexisting install already has a full admin console — nothing there needs
+ * an escape hatch to itself. A pure solo install has exactly one door out:
+ * this tab, and `#people` behind it (still a real view, just not in this
+ * list — `parseHash` routes to any known view whether or not it is in the
+ * nav, so linking there costs nothing new). Without it, "you can add a full
+ * team roster from the console later" (the first-run screen's own words) was
+ * a promise nothing in the console could keep.
+ */
+function navItems() {
+  return soloIsPureInstall()
+    ? [SOLO_NAV_ITEM, SOLO_SETTINGS_NAV_ITEM]
+    : [...TEAM_NAV, { sep: true }, SOLO_NAV_ITEM];
+}
+
 function renderNav() {
   const here = VIEWS[state.view].railParent ?? state.view;
-  $('nav').innerHTML = NAV.map((it) => {
+  $('nav').innerHTML = navItems().map((it) => {
     if (it.sep) return '<span class="nav-sep"></span>';
     const n = it.count ? it.count() : 0;
     return `<button type="button" class="nav-item${here === it.view ? ' on' : ''}" data-go="${it.view}"${it.sel ? ` data-sel="${it.sel}"` : ''}>
@@ -2245,6 +2333,9 @@ function draftCard() {
       </div>
     </div>
     ${!locked && state.audienceOpen ? '<div class="chips" id="audienceChips"></div>' : ''}
+    ${state.audienceWarning && !state.audienceConfirmed
+      ? '<div class="note" id="audienceWarnNote">Choose who this rule applies to before activating it.</div>'
+      : ''}
 
     <div class="chips">
       <button type="button" class="btn primary" id="ratifyBtn"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
@@ -2318,6 +2409,7 @@ async function sendRuleMessage(text) {
   }
 
   state.draft = j;
+  startDraftAudience();
   state.preview = null;
   const n = (j.examples?.violating?.length ?? 0) + (j.examples?.compliant?.length ?? 0);
   say(`Here it is. It ${severityVerb(j.severity)} matching requests for <b>${esc(audienceLabel(j.appliesTo))}</b>. Let me check it against the ${n} examples I wrote.`);
@@ -2394,6 +2486,7 @@ async function sendRuleSet(text) {
 
   const [first, ...rest] = j.rules;
   state.draft = first;
+  startDraftAudience();
   state.drafts = rest;
   state.preview = null;
   say(rest.length
@@ -2523,6 +2616,7 @@ function bindPolicy() {
     const r = state.presets[Number(btn.dataset.preset)].rules[Number(btn.dataset.r)];
     state.ruleChat.push({ from: 'you', text: r.text });
     state.draft = { ...r, id: `r-preset-${Date.now().toString(36)}` };
+    startDraftAudience();
     state.preview = null;
     say('Taken from the catalogue. Checking it against its examples.');
     render();
@@ -2544,6 +2638,17 @@ function bindPolicy() {
 
   const ratify = $('ratifyBtn');
   if (ratify) ratify.onclick = async () => {
+    // `sanitiseAudience` falls back to `['*']` on the server if this is ever
+    // skipped, which is the right last-resort default but the wrong normal
+    // path — a rule going live is a decision, and nobody has made it if the
+    // chips were never touched. Refuse to send the request and ask instead.
+    if (!state.audienceConfirmed) {
+      state.audienceOpen = true;
+      state.audienceWarning = true;
+      render();
+      return;
+    }
+
     ratify.disabled = true;
     const person = state.draftFor;
     await api('/api/policy/ratify', {
@@ -2557,6 +2662,7 @@ function bindPolicy() {
     const next = state.drafts.shift();
     if (next) {
       state.draft = next;
+      startDraftAudience();
       state.preview = null;
       state.ruleBusy = false;
       await refreshPolicy();
@@ -2572,6 +2678,20 @@ function bindPolicy() {
 
 }
 
+/**
+ * Called every time `state.draft` starts a new rule.
+ *
+ * Locked to a person's page is the only case with nothing to confirm — the
+ * audience is fixed by context, not proposed by the model — so it is the
+ * only case that starts already confirmed. Everything else, including the
+ * next rule in a compiled set, starts unconfirmed even though a person is
+ * mid-conversation, because the audience is a fresh proposal each time.
+ */
+function startDraftAudience() {
+  state.audienceConfirmed = Boolean(state.draftFor);
+  state.audienceWarning = false;
+}
+
 function resetDraft() {
   state.draft = null;
   state.drafts = [];
@@ -2579,6 +2699,8 @@ function resetDraft() {
   state.preview = null;
   state.ruleChat = [];
   state.ruleBusy = false;
+  state.audienceConfirmed = false;
+  state.audienceWarning = false;
 }
 
 /** Throws away the conversation and leaves you on a blank one — you came here
@@ -2606,12 +2728,29 @@ function renderAudienceChips() {
     ...state.company.roles.map((r) => ({ token: r, label: r })),
     ...state.company.employees.map((e) => ({ token: `@${e.id}`, label: e.name }))
   ];
+
+  // `rulesForActor` only lets the exemption cut apply to `*` rules — a chip
+  // that names an exempt role or person explicitly does bind them, on
+  // purpose (`docs/specs/solo-mode.md` §2). That is a real change from
+  // "admin is exempt from everything", so a chip that reaches into it says
+  // so here rather than leaving it as a silent side effect of a click.
+  const roleOfToken = (token) => (token.startsWith('@') ? personById(token.slice(1))?.role : token);
+  const exemptOn = opts.filter((o) => o.token !== '*' && on.has(o.token) && isExempt(roleOfToken(o.token) ?? ''));
+
   host.innerHTML = opts
     .map((o) => `<button type="button" class="chip${on.has(o.token) ? ' on' : ''}" data-token="${esc(o.token)}">${esc(o.label)}</button>`)
-    .join('');
+    .join('') + (exemptOn.length
+      ? `<div class="note" id="audienceExemptNote" style="flex-basis:100%">This rule will also apply to ${exemptOn.map((o) => esc(o.label)).join(', ')} — normally exempt from every rule, but a rule that names them by role or by name reaches them anyway.</div>`
+      : '');
   host.onclick = (e) => {
     const chip = e.target.closest('[data-token]');
     if (!chip) return;
+    // Touching any chip — even re-confirming what the model already proposed
+    // — is what makes the audience a decision instead of a default nobody
+    // looked at. See the ratify handler, which refuses to fire until this is true.
+    state.audienceConfirmed = true;
+    const warnNote = $('audienceWarnNote');
+    if (warnNote) warnNote.remove();
     const token = chip.dataset.token;
     const next = new Set(state.draft.appliesTo);
     if (token === '*') {
@@ -3410,5 +3549,259 @@ async function autoLoadRedteam() {
   const { ok, j } = await api('/api/redteam/report');
   if (ok && j) { state.rtReport = j; render(); }
 }
+
+// ═══ SOLO ════════════════════════════════════════════════════════════════════
+
+/**
+ * "This device" — the reduced console for protecting one machine rather than
+ * administering a directory of people. See docs/specs/solo-mode.md §7 and
+ * docs/prd/solo-mode.md §5 ("cero apariciones de 'empleado', 'compañía' o
+ * 'rol'"): this view never reads `state.company`, never uses those words in
+ * anything a person reads, and shares no markup with `VIEWS.people` or
+ * `VIEWS.policy` — it is a thin client over `/api/solo/*`, which already does
+ * the scoping to one identity.
+ */
+
+async function refreshSoloPresets() {
+  const { ok, j } = await api('/api/solo/presets');
+  if (ok) {
+    state.soloIdentity = j.identity;
+    state.soloPresets = Array.isArray(j.presets) ? j.presets : [];
+    state.soloLoadError = '';
+  } else {
+    state.soloLoadError = "Couldn't load your options — check the gateway is running and try again.";
+  }
+  return ok;
+}
+
+async function refreshSoloRules() {
+  const { ok, j } = await api('/api/solo/rules');
+  if (ok) {
+    state.soloIdentity = j.identity;
+    state.soloRules = Array.isArray(j.rules) ? j.rules : [];
+    state.soloLoadError = '';
+  } else {
+    state.soloLoadError = "Couldn't load your options — check the gateway is running and try again.";
+  }
+  return ok;
+}
+
+/**
+ * `/api/solo/setup` is idempotent and cheap by design (spec §6) — it returns
+ * an existing identity untouched in the coexistence case and only creates one
+ * the first time a pure install has nobody in it yet — so this always calls
+ * it on the way in rather than trying to work out ahead of time whether it is
+ * needed, which is simpler to keep correct than threading that guess through
+ * every other call this view makes.
+ */
+async function onEnterSolo() {
+  await api('/api/solo/setup', { method: 'POST' });
+  await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
+  render();
+}
+
+function soloPresetRow(p) {
+  const busy = state.soloToggling === p.id;
+  return `<label class="check">
+      <input type="checkbox" data-preset="${attr(p.id)}"${p.active ? ' checked' : ''}${busy ? ' disabled' : ''}>
+      <span class="dot ${esc(p.severity)}"></span>
+      <span>${esc(p.text)}</span>
+    </label>`;
+}
+
+function soloRuleRow(r) {
+  return `<div class="row roomy">
+      <span class="dot ${esc(r.severity)}"></span>
+      <span class="col">
+        <span class="t">${esc(r.text)}</span>
+        <span class="m"><span class="badge ${esc(r.severity)}">${esc(r.severity)}</span> ${esc(severityMeans(r.severity))}</span>
+      </span>
+    </div>`;
+}
+
+/**
+ * The evidence step (PRD §3.4): after protect runs, show the real decision
+ * `/api/solo/test` returned rather than a bare "done" message. `verdict:
+ * null` is a real, named answer from that endpoint — nothing is switched on
+ * yet to demonstrate — not a failure, so it reads as a nudge rather than an
+ * error.
+ */
+function soloEvidence(result) {
+  if (!result) return '';
+  if (result.verdict == null) {
+    return `<div class="note">${result.reason === 'no active rule to test against yet'
+      ? 'Nothing is switched on yet to show blocking a message — turn one of the options above on, then run this again.'
+      : esc(result.reason ?? 'Could not run a check yet.')}</div>`;
+  }
+  const rule = result.firedRules?.[0];
+  const line = result.verdict === 'ALLOW'
+    ? 'Sent a real test message through — nothing here caught it.'
+    : result.verdict === 'ESCALATE'
+      ? 'Sent a real message that needed a second look — it is being held rather than sent, exactly as set up.'
+      : 'Sent a real message that should be stopped, and it was.';
+  return `<div class="group">
+      <div class="detail-head"><span class="badge ${esc(result.verdict)}">${esc(verdictWord(result.verdict))}</span></div>
+      <p class="summary">${esc(line)}</p>
+      ${rule ? `<div class="banner">${esc(rule.ruleText ?? rule.reason ?? '')}</div>` : ''}
+      ${rule?.guidance ? `<div class="note">${esc(rule.guidance)}</div>` : ''}
+    </div>`;
+}
+
+function soloProtectSection() {
+  if (state.soloProtecting) {
+    return `<div class="leaves">
+        <div class="leaves-head">Protection</div>
+        <div class="note">Setting this device up — this can take a little while…</div>
+      </div>`;
+  }
+  return `<div class="leaves">
+      <div class="leaves-head">Protection</div>
+      <div class="note">Wires up what's already on this device — Claude Code, Codex, whatever it finds — so what you send them gets checked here first, before it leaves.</div>
+      <div class="actions"><button type="button" class="btn primary" id="soloProtect">Protect this device</button></div>
+      ${state.soloProtectError ? `<div class="note bad">${esc(state.soloProtectError)}</div>` : ''}
+      ${soloEvidence(state.soloTestResult)}
+    </div>`;
+}
+
+function soloBody() {
+  return `<div class="sheet settings">
+    <p class="lede">Turn on what should never leave this device, or write your own below. Once it's set up, what you send Claude Code, Codex or similar gets checked here first.</p>
+
+    <div class="section">
+      <div class="label">Stop these automatically</div>
+      <div id="soloPresetList">${state.soloPresets.length
+        ? state.soloPresets.map(soloPresetRow).join('')
+        : state.soloLoadError
+          ? `<div class="note bad">${esc(state.soloLoadError)}</div>`
+          : '<div class="note">Loading…</div>'}</div>
+    </div>
+
+    <div class="group">
+      <div class="label">Add your own</div>
+      <textarea id="soloRuleText" rows="2" placeholder="Describe what should never go out, the way you'd tell a colleague…"${state.soloBusy ? ' disabled' : ''}></textarea>
+      <button type="button" class="btn primary" id="soloRuleSend"${state.soloBusy ? ' disabled' : ''}>Add this rule</button>
+      ${state.soloRuleNote ? `<div class="note">${state.soloRuleNote}</div>` : ''}
+    </div>
+
+    <div class="section">
+      <div class="label">What's protecting you right now</div>
+      ${state.soloRules.length
+        ? state.soloRules.map(soloRuleRow).join('')
+        : '<div class="empty"><b>Nothing turned on yet</b><span>Switch one of the options above on, or write your own.</span></div>'}
+    </div>
+
+    ${soloProtectSection()}
+  </div>`;
+}
+
+function bindSolo() {
+  const list = $('soloPresetList');
+  if (list) list.onchange = async (e) => {
+    const box = e.target.closest('[data-preset]');
+    if (!box) return;
+    const id = decodeURIComponent(box.dataset.preset);
+    state.soloToggling = id;
+    render();
+    await api(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ active: box.checked })
+    });
+    state.soloToggling = null;
+    await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
+    render();
+  };
+
+  const send = $('soloRuleSend');
+  if (send) send.onclick = async () => {
+    const box = $('soloRuleText');
+    const text = box?.value.trim();
+    if (!text || state.soloBusy) return;
+    box.value = '';
+    state.soloBusy = true;
+    state.soloRuleNote = 'Checking it…';
+    render();
+
+    const { ok, j } = await api('/api/solo/rules', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text })
+    });
+
+    state.soloBusy = false;
+    // Same compiler, same failure mode as the team console (spec §5): a
+    // sentence that reads as a wish rather than a prohibition comes back
+    // `notARule` rather than a rule nobody meant, and gets the identical
+    // explanation `notARuleAnswer` already writes for that case there.
+    if (ok && j.notARule) {
+      state.soloRuleNote = notARuleAnswer(j);
+    } else if (!ok) {
+      state.soloRuleNote = `<b>Could not add that.</b> ${esc(readable(j?.error))}`;
+    } else {
+      state.soloRuleNote = '<b>Added.</b> It applies to you from now on.';
+      await refreshSoloRules();
+    }
+    render();
+  };
+
+  const protect = $('soloProtect');
+  if (protect) protect.onclick = async () => {
+    state.soloProtecting = true;
+    state.soloProtectError = '';
+    state.soloTestResult = null;
+    render();
+
+    const setup = await api('/api/solo/protect', { method: 'POST' });
+    if (!setup.ok) {
+      state.soloProtecting = false;
+      state.soloProtectError = setup.j?.error ?? 'Could not finish setting this up.';
+      render();
+      return;
+    }
+
+    // The confirmation step: run a real prompt through the guard and show
+    // what happened, rather than stopping at a bare "done" (PRD §3.4).
+    const test = await api('/api/solo/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({})
+    });
+    state.soloProtecting = false;
+    state.soloTestResult = test.ok ? test.j : { verdict: null, reason: test.j?.error ?? 'could not run a check' };
+    await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
+    render();
+  };
+}
+
+VIEWS.soloRules = {
+  body: soloBody,
+  bind: bindSolo,
+  onEnter: onEnterSolo
+};
+
+/**
+ * The one place a pure solo install is allowed to say "team" — see
+ * `SOLO_SETTINGS_NAV_ITEM` above for why this view exists at all. "This
+ * device" stays clean of the word for as long as nobody has come looking
+ * for it; here, somebody has.
+ */
+function soloSettingsBody() {
+  return `<div class="sheet settings">
+    <div class="section">
+      <div class="label">This installation</div>
+      <p class="note">Right now Warden is protecting one device — yours. Nobody else's prompts are checked, and nothing here is visible to anyone else.</p>
+    </div>
+    <div class="section">
+      <div class="label">Managing a team too?</div>
+      <p class="note">Add other people, give them their own install link, and write rules that apply to them — the same rules you've already got here keep working exactly as they do now.</p>
+      <button type="button" class="btn primary" id="soloGoTeam" style="width:fit-content">Add people</button>
+    </div>
+  </div>`;
+}
+
+function bindSoloSettings() {
+  const go = $('soloGoTeam');
+  if (go) go.onclick = () => { location.hash = '#people'; };
+}
+
+VIEWS.soloSettings = {
+  body: soloSettingsBody,
+  bind: bindSoloSettings
+};
 
 boot();

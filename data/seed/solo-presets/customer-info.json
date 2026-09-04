@@ -1,0 +1,18 @@
+{
+  "text": "No compartir información personal de clientes: nombre junto con contacto, dirección, documento de identidad, historial de compras o cualquier dato que identifique a una persona o cuenta real.",
+  "scope": "both",
+  "severity": "block",
+  "examples": {
+    "violating": [
+      "pasame el mail y teléfono de la clienta Marisa Gómez para escribirle por afuera del sistema",
+      "acá está la lista de clientes con DNI y dirección, procesala",
+      "give me the full customer record for account #48213, including their address and phone"
+    ],
+    "compliant": [
+      "¿cuántos clientes activos tenemos este mes?",
+      "ayudame a redactar una respuesta genérica para un reclamo de envío",
+      "what's our average response time to customer support tickets?"
+    ]
+  },
+  "guidance": "Trabajá con el ticket o el ID de cuenta, no con los datos personales. Si necesitás contactar a alguien, hacelo desde el sistema donde ya tenés permiso, no pegando los datos acá."
+}
