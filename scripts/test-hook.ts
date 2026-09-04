@@ -110,6 +110,17 @@ async function main(): Promise<void> {
   });
   console.log('✓ a Spanish rule refuses in Spanish from the first line to the audit id');
 
+  // The gateway compiling a rule through a CLI must not be judged by its own
+  // hook. The marker lets it through without a request; a gateway that would
+  // block everything proves nothing was asked.
+  await withServer(normal(block), async (url) => {
+    const result = await runHook({ prompt: 'A rule states what is PROHIBITED…' }, url, { WARDEN_INTERNAL: '1' });
+    assert.equal(result.code, 0, JSON.stringify(result));
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr, '');
+  });
+  console.log('✓ WARDEN_INTERNAL lets the gateway\'s own compile through unjudged');
+
   const unavailable = await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1');
   assert.equal(unavailable.code, 0);
   assert.equal(unavailable.stdout, '');

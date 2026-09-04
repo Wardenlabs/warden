@@ -157,6 +157,11 @@ function draftCard() {
 }
 
 export function say(html, pending = false) {
+  // The same sentence twice in a row is never two answers. A compile failure
+  // was seen printed as two identical WARDEN turns; whatever path produced the
+  // second, the reader gains nothing from it.
+  const last = state.ruleChat.at(-1);
+  if (!pending && last?.from === 'warden' && !last.pending && last.html === html) return;
   state.ruleChat.push({ from: 'warden', html, pending });
 }
 

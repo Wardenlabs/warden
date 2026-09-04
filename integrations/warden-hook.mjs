@@ -878,6 +878,14 @@ function rememberGateway(url, failClosed) {
 }
 
 async function main() {
+  // The gateway itself, compiling a rule through a CLI on this machine. That
+  // CLI runs this hook like any other prompt, and judging the compiler's own
+  // prompt refused it: it is a paragraph about prohibitions and overriding
+  // instructions. Nothing to check here — the text came from the
+  // administrator's console, not from a person typing at a tool — so it
+  // passes, silently, and the compile gets its JSON back.
+  if (process.env.WARDEN_INTERNAL === '1') return;
+
   const healthTimeoutMs = timeoutFromEnv('WARDEN_HEALTH_TIMEOUT_MS', DEFAULT_HEALTH_TIMEOUT_MS);
   let decisionTimeoutMs = timeoutFromEnv('WARDEN_TIMEOUT_MS', DEFAULT_DECISION_TIMEOUT_MS);
   // Whether an unreachable gateway refuses. Stated by the gateway on /health

@@ -116,6 +116,14 @@ const TOOLS: Record<CliTool, {
     verified: true,
     args: (model) => [
       '-p',
+      // Minimal mode: no hooks, no plugins. The administrator's own machine
+      // runs Warden's UserPromptSubmit hook inside Claude Code, so without this
+      // the compile prompt — a paragraph about prohibitions and overriding
+      // instructions — went through the guard, the guard blocked it, and the
+      // CLI's stdout was "Operation stopped by hook: Blocked by Warden" where
+      // the JSON should have been. Two refusals of the administrator's own
+      // sentence, by their own product, reported as "not valid JSON".
+      '--bare',
       '--output-format', 'text',
       ...(model ? ['--model', model] : []),
       // A compile is a text transform. Nothing here needs to touch the disk,
@@ -251,7 +259,11 @@ function searchPath(): string {
 
 /** `process.env` with that PATH, for anything that has to find one of these. */
 function cliEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, PATH: searchPath() };
+  // `WARDEN_INTERNAL` tells Warden's own hook, wherever a CLI runs it, that
+  // this invocation is the gateway compiling a rule and not an employee
+  // prompting — the hook exits clean on it. Claude Code also gets `--bare`,
+  // because the hook already installed on a machine may predate the marker.
+  return { ...process.env, PATH: searchPath(), WARDEN_INTERNAL: '1' };
 }
 
 /**
@@ -421,7 +433,20 @@ export class CliCompilerAdapter implements QvacAdapter {
               )
             );
           }
-          resolve(String(stdout));
+          const out = String(stdout);
+          // A hook answered instead of the model. The text is not malformed
+          // JSON, it is Warden refusing its own compile prompt through a hook
+          // this process could not switch off, and the person needs to know
+          // which hook to update rather than to "say it more plainly".
+          if (/^\s*Operation stopped by hook/i.test(out)) {
+            return reject(
+              new FailClosedError(
+                `${spec.label} ran a prompt hook that blocked the compile. If it is Warden's own hook, update it: curl -fsSL <gateway>/warden-hook.mjs -o ~/.warden-hook.mjs`,
+                { role: req.role, attempts: 1, lastRaw: out.slice(0, 200) }
+              )
+            );
+          }
+          resolve(out);
         }
       );
       child.stdin?.end(prompt);
