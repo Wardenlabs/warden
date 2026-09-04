@@ -52,12 +52,25 @@ export type CompileOptions = {
   lockTo?: string[];
 };
 
+/**
+ * The compiler saying no.
+ *
+ * A sentence with no prohibition in it, or a spending target, is not a rule and
+ * must not leave here shaped like one. This is the shape it leaves in instead,
+ * and `isDeclined` is how every caller tells the two apart without a cast.
+ */
+export type Declined = { notARule: true; notARuleReason: string; usageFactor?: number };
+
+export function isDeclined(compiled: Rule | Declined): compiled is Declined {
+  return 'notARule' in compiled && compiled.notARule === true;
+}
+
 export async function compileRule(
   qvac: QvacAdapter,
   text: string,
   policy: PolicySpec,
   options: CompileOptions = {}
-): Promise<Rule> {
+): Promise<Rule | Declined> {
   const directory = safeDirectory();
   const roles = options.roles ?? directory.roles;
   const people = options.people ?? directory.employees;
@@ -207,7 +220,7 @@ export async function compileRule(
       notARule: true,
       notARuleReason: draft.notARuleReason ?? '',
       ...(draft.usageFactor !== undefined ? { usageFactor: draft.usageFactor } : {})
-    } as unknown as Rule;
+    };
   }
 
   // Past the refusal branch every field is present; `superRefine` on the draft
@@ -373,12 +386,8 @@ export async function compilePolicy(
   const declined: string[] = [];
   const declinedFactors: (number | undefined)[] = [];
   for (const statement of statements) {
-    const compiled = (await compileRule(qvac, statement, policy, options)) as Rule & {
-      notARule?: boolean;
-      notARuleReason?: string;
-      usageFactor?: number;
-    };
-    if (compiled.notARule) {
+    const compiled = await compileRule(qvac, statement, policy, options);
+    if (isDeclined(compiled)) {
       declined.push(compiled.notARuleReason || 'It contains no prohibition.');
       declinedFactors.push(compiled.usageFactor);
     } else rules.push(compiled);

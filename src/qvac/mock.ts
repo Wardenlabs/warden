@@ -89,8 +89,17 @@ export class MockQvacAdapter implements QvacAdapter {
     const violation = hits(subject, VIOLATION_SIGNALS);
     const flagged = injection.length > 0 || violation.length > 0;
 
+    // Only the fields the schema insists on. An optional field is the schema
+    // giving a model room to say something extra — a refusal, a spending
+    // fraction — and the mock has no opinion to add there. When it filled them
+    // anyway it wrote `usageFactor: 0` into every rule draft, the zod schema
+    // refused it on `gt(0)`, and the console could not compile a single rule
+    // in demo mode: the one flow somebody with no models downloaded is there
+    // to try, broken by the stand-in that exists so they can try it.
+    const required = new Set((jsonSchema['required'] as string[] | undefined) ?? Object.keys(props));
     const out: Record<string, unknown> = {};
     for (const [key, spec] of Object.entries(props)) {
+      if (!required.has(key)) continue;
       out[key] = mockValue(key, spec.type, spec.enum, { req, subject, flagged, injection, violation });
     }
 
