@@ -121,6 +121,7 @@ function draftCard() {
     </div>
 
     <p class="summary">${esc(d.text)}</p>
+    ${d.textLocal ? `<p class="note"><b>Employees will read:</b> ${esc(d.textLocal)}</p>` : ''}
     ${d.boundary ? `<p class="note"><b>Not about:</b> ${esc(d.boundary)}</p>` : ''}
 
     ${verdict}

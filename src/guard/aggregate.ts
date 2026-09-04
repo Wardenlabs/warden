@@ -192,6 +192,7 @@ export function aggregate(input: AggregateInput): AggregateResult {
     fired.push({
       ruleId: id,
       ruleText: rule?.text ?? id,
+      ...(rule?.textLocal ? { ruleTextLocal: rule.textLocal } : {}),
       reason: 'the injection pass could not be evaluated — escalated rather than assumed clean',
       confidence: 0
     });
@@ -209,6 +210,8 @@ export function aggregate(input: AggregateInput): AggregateResult {
       fired.push({
         ruleId: id,
         ruleText: rule?.text ?? id,
+        ...(rule?.textLocal ? { ruleTextLocal: rule.textLocal } : {}),
+      ...(rule?.textLocal ? { ruleTextLocal: rule.textLocal } : {}),
         reason: 'rule could not be evaluated — escalated rather than assumed clean',
         confidence: 0
       });
@@ -254,6 +257,7 @@ function firedFrom(rule: Rule, reason: string, confidence: number): FiredRule {
   return {
     ruleId: rule.id,
     ruleText: rule.text,
+    ...(rule.textLocal ? { ruleTextLocal: rule.textLocal } : {}),
     reason,
     confidence,
     severity: rule.severity,

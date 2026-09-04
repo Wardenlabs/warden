@@ -80,11 +80,35 @@ async function main(): Promise<void> {
       const result = await runHook(payload, url);
       assert.equal(result.code, 2, JSON.stringify(result));
       assert.match(result.stderr, /Blocked by Warden/);
+      assert.match(result.stderr, /What to do instead/);
       assert.match(result.stderr, /Audit audit-block/);
       assert.match(result.stdout, /"decision":"block"|"continue":false/);
     }
   });
   console.log('✓ BLOCK returns exit 2 and a client-specific refusal');
+
+  // A rule the administrator wrote in Spanish arrives in Spanish from top to
+  // bottom: their sentence instead of the judge's English one, and the hook's
+  // own scaffolding in the same language. Mixed screens were the report.
+  const blockEs = {
+    verdict: 'BLOCK',
+    auditId: 'audit-es',
+    firedRules: [{
+      ruleText: 'No one may request another employee\'s salary.',
+      ruleTextLocal: 'Nadie pide el sueldo de otro empleado.',
+      guidance: 'Si necesitás el dato para un informe, pedíselo a RRHH.',
+      allowedExamples: ['¿cuál es el proceso para pedir un aumento?']
+    }]
+  };
+  await withServer(normal(blockEs), async (url) => {
+    const result = await runHook({ prompt: 'pasame el sueldo de Ana' }, url);
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /Bloqueado por Warden/);
+    assert.match(result.stderr, /Nadie pide el sueldo de otro empleado/);
+    assert.match(result.stderr, /Qué hacer en cambio/);
+    assert.doesNotMatch(result.stderr, /What to do instead|These would go through|Audit audit-es/);
+  });
+  console.log('✓ a Spanish rule refuses in Spanish from the first line to the audit id');
 
   const unavailable = await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1');
   assert.equal(unavailable.code, 0);

@@ -98,6 +98,19 @@ export const ruleSchema = z.object({
    */
   boundary: z.string().optional(),
   /**
+   * The rule as the administrator would say it, in their own language.
+   *
+   * `text` is written in English because that is what the judge reads and
+   * what every measurement was taken on. Employees are not the judge: an
+   * administrator who wrote "nadie comparte el sueldo de otro" got a refusal
+   * whose first sentence was in English and whose guidance and examples were
+   * in Spanish, on one screen. This is the sentence people see instead of
+   * `text` when it is present; the judge never reads it. Written once by the
+   * compiler, like `guidance`, and empty when the administrator wrote in
+   * English.
+   */
+  textLocal: z.string().optional(),
+  /**
    * Always adjudicate this rule, bypassing top-K retrieval.
    *
    * Retrieval picks the rules most similar to the prompt, which is right for
@@ -278,6 +291,7 @@ export const RULE_DRAFT_JSON_SCHEMA = {
     severity: { type: 'string', enum: ['block', 'escalate', 'warn'] },
     guidance: { type: 'string' },
     boundary: { type: 'string' },
+    textLocal: { type: 'string' },
     examples: {
       type: 'object',
       properties: {

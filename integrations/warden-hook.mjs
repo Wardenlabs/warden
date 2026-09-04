@@ -233,16 +233,19 @@ function render(res) {
     ].join('\n');
   }
 
-  const lines = [res.verdict === 'BLOCK' ? '⛔ Blocked by Warden' : '⏸ Held for review by Warden'];
   const rule = res.firedRules?.[0];
+  const t = STRINGS[refusalLanguage(rule)];
+  const lines = [res.verdict === 'BLOCK' ? t.blocked : t.held];
 
   if (rule) {
     lines.push('');
-    lines.push(...wrap(rule.ruleText));
+    // The administrator's own sentence when they did not write in English; the
+    // judge's English otherwise. One language per screen, whichever it is.
+    lines.push(...wrap(rule.ruleTextLocal || rule.ruleText));
 
     if (rule.guidance) {
       lines.push('');
-      lines.push('   What to do instead');
+      lines.push(`   ${t.instead}`);
       lines.push(...wrap(rule.guidance));
     } else if (rule.reason) {
       lines.push(...wrap(rule.reason));
@@ -250,14 +253,14 @@ function render(res) {
 
     if (rule.allowedExamples?.length) {
       lines.push('');
-      lines.push('   These would go through');
+      lines.push(`   ${t.wouldPass}`);
       for (const example of rule.allowedExamples) lines.push(`     · ${example}`);
     }
 
     const others = (res.firedRules?.length ?? 1) - 1;
     if (others > 0) {
       lines.push('');
-      lines.push(`   ${others} other rule${others > 1 ? 's' : ''} also matched.`);
+      lines.push(`   ${t.others(others)}`);
     }
 
     /**
@@ -280,14 +283,14 @@ function render(res) {
         // A held prompt has no rewrite to offer — nobody has refused it, so
         // there is nothing to route around. What the reviewer lacks is context:
         // the audit log kept this prompt's hash, not its text.
-        lines.push('   The reviewer cannot see what you asked. Tell them why:');
+        lines.push(`   ${t.tellReviewer}`);
         lines.push(`     warden-hook --note ${res.auditId}`);
       } else {
-        lines.push('   Warden can try to rewrite this so it goes through:');
+        lines.push(`   ${t.rewrite}`);
         lines.push(`     warden-hook --rewrite ${res.auditId}`);
-        lines.push('     (paste the same prompt, then Ctrl-D)');
+        lines.push(`     ${t.pasteAgain}`);
         lines.push('');
-        lines.push('   Think it was wrong? Say so:');
+        lines.push(`   ${t.wrong}`);
         lines.push(`     warden-hook --note ${res.auditId}`);
       }
     }
@@ -298,18 +301,66 @@ function render(res) {
 
   if (res.verdict === 'ESCALATE') {
     lines.push('');
-    lines.push('   Queued for an administrator. You have not been refused,');
-    lines.push('   when they answer, ask again and it is judged on its merits.');
+    for (const line of t.queued) lines.push(`   ${line}`);
   }
   if (res.maskedSpans?.length) {
     lines.push('');
-    lines.push(`   Note: Warden masked ${res.maskedSpans.length} secret(s) before checking.`);
+    lines.push(`   ${t.masked(res.maskedSpans.length)}`);
   }
 
   lines.push('');
-  lines.push(`   Audit ${res.auditId} · quote this if you think it is wrong`);
+  lines.push(`   ${t.audit(res.auditId)}`);
   return lines.join('\n');
 }
+
+/**
+ * One language per refusal.
+ *
+ * The rule's text is English for the judge, and its guidance and examples are
+ * in whatever language the administrator wrote — so a Spanish rule used to
+ * arrive as an English sentence, Spanish advice and English scaffolding on
+ * one screen. The scaffolding now follows the rule: the language is read off
+ * the guidance, which is the part the administrator wrote for people. A rule
+ * with no guidance and no local text is English, and so is everything else.
+ */
+function refusalLanguage(rule) {
+  const sample = `${rule?.guidance ?? ''} ${rule?.ruleTextLocal ?? ''} ${(rule?.allowedExamples ?? []).join(' ')}`;
+  if (!sample.trim()) return 'en';
+  const spanish = (sample.match(/[áéíóúñ¿¡]|\b(el|la|los|las|de|del|que|para|con|una|un|no|es|si|pod[eé]s|necesit[aá]s)\b/gi) ?? []).length;
+  const words = sample.split(/\s+/).length;
+  return spanish / words > 0.08 ? 'es' : 'en';
+}
+
+const STRINGS = {
+  en: {
+    blocked: '⛔ Blocked by Warden',
+    held: '⏸ Held for review by Warden',
+    instead: 'What to do instead',
+    wouldPass: 'These would go through',
+    others: (n) => `${n} other rule${n > 1 ? 's' : ''} also matched.`,
+    tellReviewer: 'The reviewer cannot see what you asked. Tell them why:',
+    rewrite: 'Warden can try to rewrite this so it goes through:',
+    pasteAgain: '(paste the same prompt, then Ctrl-D)',
+    wrong: 'Think it was wrong? Say so:',
+    queued: ['Queued for an administrator. You have not been refused,', 'when they answer, ask again and it is judged on its merits.'],
+    masked: (n) => `Note: Warden masked ${n} secret(s) before checking.`,
+    audit: (id) => `Audit ${id} · quote this if you think it is wrong`
+  },
+  es: {
+    blocked: '⛔ Bloqueado por Warden',
+    held: '⏸ Retenido para revisión por Warden',
+    instead: 'Qué hacer en cambio',
+    wouldPass: 'Esto sí pasaría',
+    others: (n) => `${n} regla${n > 1 ? 's' : ''} más también coincidió.`,
+    tellReviewer: 'Quien revisa no ve lo que pediste. Contale por qué:',
+    rewrite: 'Warden puede intentar reescribirlo para que pase:',
+    pasteAgain: '(pegá el mismo prompt y después Ctrl-D)',
+    wrong: '¿Te parece que estuvo mal? Decilo:',
+    queued: ['En la cola de un administrador. No te lo rechazaron:', 'cuando respondan, volvé a pedirlo y se juzga por sí mismo.'],
+    masked: (n) => `Nota: Warden enmascaró ${n} secreto(s) antes de revisar.`,
+    audit: (id) => `Auditoría ${id} · citá esto si te parece que estuvo mal`
+  }
+};
 
 async function requestJson(url, init, timeoutMs, validate, recoverHttpError) {
   const controller = new AbortController();

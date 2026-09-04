@@ -42,6 +42,8 @@ export type PassTrace = {
 export type FiredRule = {
   ruleId: string;
   ruleText: string;
+  /** The rule in the administrator's language, when that is not English. Shown to people; never judged. */
+  ruleTextLocal?: string;
   reason: string;
   confidence: number;
   /** `block` refuses outright; `escalate` routes to a human. */

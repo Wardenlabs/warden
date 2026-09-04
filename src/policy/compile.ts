@@ -165,6 +165,12 @@ export async function compileRule(
     // One sentence per rule saying what it is NOT about took the shipped judge
     // from 72% to 52% of honest requests refused (docs/MEASUREMENTS.md,
     // 2026-09-04). The administrator sees it beside the prohibition at Activate.
+    // People read the refusal, the judge reads the rule, and they are not the
+    // same language when the administrator is not writing in English. The
+    // English `text` stays for the judge, which is what was measured.
+    '- textLocal: the same sentence as text, in the language the administrator',
+    '  wrote in, for the people who will read the refusal. Leave it out when the',
+    '  administrator wrote in English.',
     '- boundary: one sentence saying what this rule is NOT about — the nearest',
     '  legitimate work that shares its words. Usually the employee\'s own code,',
     '  tests, fixtures and fake data; sandbox or simulated versions of the thing;',
