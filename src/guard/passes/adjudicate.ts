@@ -111,7 +111,23 @@ export type AdjudicateOptions = {
    *
    * Unmeasured. It exists to be measured.
    */
-  form?: 'compliance' | 'choice';
+  form?: 'compliance' | 'choice' | 'dynaguard';
+  /**
+   * Which of a rule's examples go into the prompt.
+   *
+   * `first` is the shipped form: the first two per side, in the order the
+   * compiler wrote them. `nearest` embeds the message and picks, per side, the
+   * examples closest to it — the retrieval Warden already does between rules,
+   * done once more inside the rule. The bet is that a shot which shares the
+   * message's vocabulary teaches the boundary better than one that does not,
+   * and it costs one embedding call per rule on a model that is already
+   * loaded, not a second generation.
+   *
+   * Nothing here can clear a request: the shots change what the model reads,
+   * the model still answers, and the answer still only tightens. Unmeasured;
+   * it exists to be measured (`pnpm run bench -- --a base --b nearest-shots`).
+   */
+  shotSelection?: 'first' | 'nearest';
   shotsPerSide?: number;
   windowChars?: number;
   windowOverlap?: number;
@@ -121,9 +137,15 @@ export type AdjudicateOptions = {
 
 type Resolved = Required<AdjudicateOptions>;
 
+function formFromEnv(): Resolved['form'] {
+  const raw = process.env['WARDEN_ADJUDICATOR_FORM'];
+  return raw === 'choice' || raw === 'dynaguard' ? raw : 'compliance';
+}
+
 function resolve(options: AdjudicateOptions | undefined): Resolved {
   return {
-    form: options?.form ?? (process.env['WARDEN_ADJUDICATOR_FORM'] === 'choice' ? 'choice' : 'compliance'),
+    form: options?.form ?? formFromEnv(),
+    shotSelection: options?.shotSelection ?? (process.env['WARDEN_SHOT_SELECTION'] === 'nearest' ? 'nearest' : 'first'),
     shotsPerSide: options?.shotsPerSide ?? SHOTS_PER_SIDE,
     windowChars: options?.windowChars ?? WINDOW_CHARS,
     windowOverlap: options?.windowOverlap ?? WINDOW_OVERLAP,
@@ -140,7 +162,37 @@ function resolve(options: AdjudicateOptions | undefined): Resolved {
  * form changes what the model is asked to say and nothing else, and the mapping
  * back happens here.
  */
-const BENIGN_LABEL = { compliance: 'COMPLIES', choice: 'ORDINARY_REQUEST' } as const;
+const BENIGN_LABEL = { compliance: 'COMPLIES', choice: 'ORDINARY_REQUEST', dynaguard: 'PASS' } as const;
+
+/**
+ * `dynaguard` is the form for weights that were trained to answer this
+ * question, not prompted into it.
+ *
+ * DynaGuard (tomg-group-umd, Apache-2.0) is Qwen3-1.7B/4B/8B fine-tuned on
+ * 40,000 user-written policies to answer PASS or FAIL about a dialogue — the
+ * exact shape of this pass, on the exact base model Warden ships. Its prompt
+ * is a policy block and a dialogue block, and it has no UNCLEAR: FAIL is
+ * VIOLATES and PASS is COMPLIES, and an answer that is neither throws, which
+ * `adjudicateAll` turns into a fail-closed ESCALATE like any other pass error.
+ *
+ * The isolation envelope still wraps the message inside the dialogue. It is
+ * text to the model either way, and the reasons it exists — nonce fencing,
+ * tamper flags computed in code — do not depend on which model reads it.
+ *
+ * The answer is grammar-constrained to the same one-field JSON every other
+ * form uses, which is not the free-text `<answer>` the model was trained to
+ * emit. That is a deliberate first cut: it keeps the parser, the mock and the
+ * fail-closed path identical across forms. If this form underperforms the base
+ * on the bench, a free-text variant that parses `<answer>PASS</answer>` is the
+ * next thing to measure, not a reason to conclude the model is worse.
+ *
+ * Unmeasured, and it only means anything with the matching weights in the
+ * seat:
+ *
+ *   WARDEN_MODEL_ADJUDICATOR=models/DynaGuard-1.7B.Q8_0.gguf \
+ *     pnpm run bench -- --a dynaguard --against data/bench-base.json
+ */
+const DYNAGUARD_VALUES = ['FAIL', 'PASS'] as const;
 
 function schemaFor(form: Resolved['form']): {
   zod: z.ZodType<{ verdict: string }>;
@@ -148,6 +200,17 @@ function schemaFor(form: Resolved['form']): {
 } {
   if (form === 'compliance') {
     return { zod: ADJUDICATION, json: ADJUDICATION_JSON_SCHEMA };
+  }
+  if (form === 'dynaguard') {
+    return {
+      zod: z.object({ verdict: z.enum(DYNAGUARD_VALUES) }),
+      json: {
+        type: 'object',
+        properties: { verdict: { type: 'string', enum: [...DYNAGUARD_VALUES] } },
+        required: ['verdict'],
+        additionalProperties: false
+      }
+    };
   }
   const values = ['VIOLATES', BENIGN_LABEL.choice, 'UNCLEAR'] as const;
   return {
@@ -161,11 +224,100 @@ function schemaFor(form: Resolved['form']): {
   };
 }
 
-function systemPrompt(rule: Rule, nonce: string, opts: Resolved): string {
+type Shots = { violating: string[]; compliant: string[] };
+
+/** Cosine similarity over two vectors of the same embedder. */
+function cosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const x = a[i]!, y = b[i]!;
+    dot += x * y; na += x * x; nb += y * y;
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+/**
+ * Example embeddings, once per rule text.
+ *
+ * Keyed on the rule's id and its examples rather than the policy version, so a
+ * ratified change to an unrelated rule does not throw away every rule's
+ * vectors. In memory and unbounded, like the retrieval cache: a policy has tens
+ * of rules and each has a handful of examples.
+ */
+const shotVectors = new Map<string, Promise<{ violating: number[][]; compliant: number[][] }>>();
+
+async function pickShots(qvac: QvacAdapter, rule: Rule, iso: Isolated, opts: Resolved): Promise<Shots> {
+  const first: Shots = {
+    violating: rule.examples.violating.slice(0, opts.shotsPerSide),
+    compliant: rule.examples.compliant.slice(0, opts.shotsPerSide)
+  };
+  if (opts.shotSelection !== 'nearest') return first;
+
+  const key = `${rule.id}\u0000${rule.examples.violating.join('\u0001')}\u0000${rule.examples.compliant.join('\u0001')}`;
+  let cached = shotVectors.get(key);
+  if (!cached) {
+    cached = (async () => {
+      const all = await qvac.embed([...rule.examples.violating, ...rule.examples.compliant]);
+      return {
+        violating: all.slice(0, rule.examples.violating.length),
+        compliant: all.slice(rule.examples.violating.length)
+      };
+    })();
+    shotVectors.set(key, cached);
+    // A failed embedding is not a reason to fail the adjudication: the first
+    // examples are what ships, so that is what a broken embedder falls back to.
+    cached.catch(() => shotVectors.delete(key));
+  }
+
+  try {
+    const [{ violating, compliant }, [messageVec]] = await Promise.all([cached, qvac.embed([iso.clean])]);
+    if (!messageVec) return first;
+    const nearest = (texts: string[], vectors: number[][]): string[] =>
+      texts
+        .map((text, i) => ({ text, score: vectors[i] ? cosine(messageVec, vectors[i]!) : -1 }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, opts.shotsPerSide)
+        .map((x) => x.text);
+    return { violating: nearest(rule.examples.violating, violating), compliant: nearest(rule.examples.compliant, compliant) };
+  } catch {
+    return first;
+  }
+}
+
+/**
+ * The prompt DynaGuard was trained on: a policy block and a dialogue block.
+ *
+ * The rule's examples travel inside the policy as plain sentences, because that
+ * is how a policy author would write them and how the model saw them. The
+ * whole thing is the user turn — the model card's template has no separate
+ * system role — so the system slot carries only the thinking marker, and only
+ * when the resolved weights are a Qwen3 that understands it.
+ */
+function dynaguardUser(rule: Rule, iso: Isolated, shots: Shots): string {
+  const policy = [
+    rule.text,
+    ...shots.violating.map((t) => `A message like "${t}" violates this policy.`),
+    ...shots.compliant.map((t) => `A message like "${t}" is allowed.`),
+    'Asking how a process works, what a policy says, or who to ask is allowed.'
+  ].join('\n');
+  return [
+    'Evaluate the following dialogue for compliance with the given policy.',
+    '',
+    '## Policy',
+    policy,
+    '',
+    '## Dialogue',
+    `User: ${iso.envelope}`
+  ].join('\n');
+}
+
+function systemPrompt(rule: Rule, nonce: string, opts: Resolved, shotsFor: Shots): string {
   const benign = BENIGN_LABEL[opts.form];
   const shots = [
-    ...rule.examples.violating.slice(0, opts.shotsPerSide).map((t) => `VIOLATES: ${t}`),
-    ...rule.examples.compliant.slice(0, opts.shotsPerSide).map((t) => `${benign}: ${t}`)
+    ...shotsFor.violating.map((t) => `VIOLATES: ${t}`),
+    ...shotsFor.compliant.map((t) => `${benign}: ${t}`)
   ].join('\n');
 
   /**
@@ -389,11 +541,14 @@ async function sampleLabel(
   sampling?: { temp: number; seed: number }
 ): Promise<Label> {
   const schema = schemaFor(opts.form);
+  const shots = await pickShots(qvac, rule, iso, opts);
   const res = await qvac.completeJSON(
     {
       role: 'adjudicator',
-      system: systemPrompt(rule, iso.nonce, opts),
-      user: `${iso.envelope}\n\nLabel the message against the rule.`,
+      system: opts.form === 'dynaguard' ? thinkingMarker('adjudicator') : systemPrompt(rule, iso.nonce, opts, shots),
+      user: opts.form === 'dynaguard'
+        ? dynaguardUser(rule, iso, shots)
+        : `${iso.envelope}\n\nLabel the message against the rule.`,
       ...(sampling ? { temp: sampling.temp, seed: sampling.seed } : {}),
       // The answer is one enum value. Anything longer means the model has left
       // the schema, and cutting it off beats waiting for it to wander back.
@@ -421,7 +576,10 @@ async function sampleLabel(
   );
   // A form only changes the word the model says for "no". Everything after this
   // line works in the three labels the aggregator and the audit log know.
-  return res.value.verdict === BENIGN_LABEL.choice ? 'COMPLIES' : (res.value.verdict as Label);
+  const said = res.value.verdict;
+  if (said === BENIGN_LABEL.choice || said === BENIGN_LABEL.dynaguard) return 'COMPLIES';
+  if (said === 'FAIL') return 'VIOLATES';
+  return said as Label;
 }
 
 /**

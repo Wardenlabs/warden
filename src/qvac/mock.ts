@@ -185,10 +185,10 @@ function mockValue(
     // vocabulary is worse than no double at all — add the label here when you
     // add a pass.
     const negative = choices.find((c) =>
-      /^(COMPLIES|ORDINARY(_REQUEST)?|WORK_REQUEST|ALLOW|NONE|false)$/i.test(c)
+      /^(COMPLIES|ORDINARY(_REQUEST)?|WORK_REQUEST|PASS|ALLOW|NONE|false)$/i.test(c)
     );
     const positive = choices.find((c) =>
-      /^(VIOLATES|RULE_ATTACK|MANIPULATION|BLOCK|true)$/i.test(c)
+      /^(VIOLATES|RULE_ATTACK|MANIPULATION|FAIL|BLOCK|true)$/i.test(c)
     );
     if (ctx.flagged && positive) return positive;
     if (!ctx.flagged && negative) return negative;

@@ -86,6 +86,14 @@ const VARIANTS: Record<string, { options: AdjudicateOptions; injection?: boolean
     options: { confirmVotes: 2 },
     why: 'Majority of three on a VIOLATES. Measured and rejected once; kept so it can be re-measured properly.'
   },
+  'nearest-shots': {
+    options: { shotSelection: 'nearest' },
+    why: 'The few-shot examples closest to the message, chosen with the embedder, instead of the first two per side. Retrieval inside the rule.'
+  },
+  dynaguard: {
+    options: { form: 'dynaguard' },
+    why: 'PASS/FAIL against a policy block, the prompt DynaGuard was fine-tuned on. Only meaningful with DynaGuard weights in WARDEN_MODEL_ADJUDICATOR; pair it with --against a saved base run, since two models cannot share a process.'
+  },
   injection: {
     options: {},
     injection: true,
