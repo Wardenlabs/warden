@@ -292,7 +292,7 @@ debería tener que reconstruir contra la API genérica de equipo.
 | Método | Ruta | Qué hace |
 |---|---|---|
 | `POST` | `/api/solo/setup` | Idempotente, se llama siempre — la UI no necesita saber de antemano si es caso A o B. Si ya existe una identidad para el actor actual (caso A, coexistencia), la devuelve sin tocar nada; si no existe ninguna (caso B), crea rol `solo` + `Employee`. |
-| `GET` | `/api/solo/presets` | Lista los 4 presets de `data/seed/solo-presets/` con su estado (activo/inactivo) para el actor actual — activo si ya existe en `data/policies.json` una regla derivada de ese preset con `appliesTo` incluyendo `@<id del actor>`. |
+| `GET` | `/api/solo/presets` | Lista el catálogo compartido `data/seed/presets.json` agrupado por categoría (desde 2026-09-04; antes eran 4 archivos propios en `solo-presets/`) con su estado (activo/inactivo) para el actor actual — activo si ya existe en `data/policies.json` una regla derivada de ese preset con `appliesTo` incluyendo `@<id del actor>`. |
 | `POST` | `/api/solo/presets/:id/toggle` | Activa/desactiva un preset contra la política de equipo — mecanismo en §5. |
 | `POST` | `/api/solo/rules` | Variante de `/api/policy/draft` + `/api/policy/ratify` con `appliesTo` fijo a `["@<id del actor>"]` — para el campo de texto libre. |
 | `GET` | `/api/solo/rules` | Reglas con `appliesTo` incluyendo al actor actual + qué bloquearon y cuándo (para la vista "Mis reglas", §7). |

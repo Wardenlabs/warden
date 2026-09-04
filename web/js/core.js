@@ -208,6 +208,7 @@ export const state = {
    */
   soloIdentity: null,
   soloPresets: [],
+  soloGroups: [],
   soloRules: [],
   /** Set when a `/api/solo/presets` or `/api/solo/rules` fetch failed, so the
    *  screen can say so instead of showing "Loading…" forever — both lists

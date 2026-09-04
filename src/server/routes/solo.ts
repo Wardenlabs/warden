@@ -20,18 +20,29 @@ import { buildInstallScript } from './install.js';
 
 export const soloRoutes = Router();
 
-/** Where the four hand-written presets live. `id` is also the ratified rule's id. */
-const SOLO_PRESETS: { id: string; file: string }[] = [
-  { id: 'solo-credentials', file: 'credentials.json' },
-  { id: 'solo-payment-data', file: 'payment-data.json' },
-  { id: 'solo-customer-info', file: 'customer-info.json' },
-  { id: 'solo-proprietary-code', file: 'proprietary-code.json' }
-];
+/**
+ * What "Stop these automatically" offers: the same catalogue the team console
+ * draws its presets from, `data/seed/presets.json`, grouped by category.
+ *
+ * It used to be four hand-written files of its own under `solo-presets/`, in
+ * Spanish under an English interface, and adding a fifth meant a file and a
+ * code change. One catalogue, one language, one place to edit: a preset's id is
+ * its category and position, so a rule ratified from it can be recognised as
+ * "on" later, and the two surfaces cannot drift apart.
+ */
+type CatalogueRule = Omit<Rule, 'id' | 'embedding'>;
+type Catalogue = { category: string; label?: string; rules: CatalogueRule[] }[];
 
-type SoloPreset = Omit<Rule, 'id' | 'appliesTo' | 'embedding'>;
-
-function readPreset(file: string): SoloPreset | null {
-  return readJsonFile<SoloPreset | null>(seedPath('solo-presets', file), null);
+function catalogue(): { id: string; category: string; label: string; rule: CatalogueRule }[] {
+  const cats = readJsonFile<Catalogue>(seedPath('presets.json'), []);
+  return cats.flatMap((cat) =>
+    (cat.rules ?? []).map((rule, i) => ({
+      id: `solo-${cat.category}-${i + 1}`,
+      category: cat.category,
+      label: cat.label ?? cat.category,
+      rule
+    }))
+  );
 }
 
 /**
@@ -72,27 +83,35 @@ soloRoutes.get('/api/solo/presets', (_req, res) => {
       .rules.filter((r) => r.appliesTo.includes(`@${identity.id}`))
       .map((r) => r.id)
   );
-  const presets = SOLO_PRESETS.map(({ id, file }) => {
-    const preset = readPreset(file);
-    if (!preset) return null;
-    return { id, text: preset.text, severity: preset.severity, active: active.has(id) };
-  }).filter((p): p is NonNullable<typeof p> => p !== null);
-  res.json({ identity, presets });
+  const presets = catalogue().map(({ id, category, label, rule }) => ({
+    id,
+    category,
+    label,
+    text: rule.text,
+    severity: rule.severity,
+    active: active.has(id)
+  }));
+  // Grouped for the screen and flat for anything older that reads `presets`.
+  const groups = [...new Map(presets.map((p) => [p.category, p.label])).entries()].map(([category, label]) => ({
+    category,
+    label,
+    presets: presets.filter((p) => p.category === category)
+  }));
+  res.json({ identity, presets, groups });
 });
 
 soloRoutes.post('/api/solo/presets/:id/toggle', asyncRoute(async (req, res) => {
   const presetId = String(req.params['id']);
-  const entry = SOLO_PRESETS.find((p) => p.id === presetId);
+  const entry = catalogue().find((p) => p.id === presetId);
   if (!entry) return res.status(404).json({ error: 'no such preset' });
 
   const wantActive = Boolean(req.body?.active);
   if (!wantActive) return res.json(await removeRule(presetId));
 
-  const preset = readPreset(entry.file);
-  if (!preset) return res.status(404).json({ error: 'preset file missing' });
-
   const identity = resolveSoloIdentity();
-  res.json(await ratifyRule({ ...preset, id: presetId, appliesTo: [`@${identity.id}`] } as Rule));
+  // The catalogue's own audience is replaced: on this screen a rule binds the
+  // person at the keyboard and nobody else, which is the whole point of it.
+  res.json(await ratifyRule({ ...entry.rule, id: presetId, appliesTo: [`@${identity.id}`] } as Rule));
 }));
 
 soloRoutes.get('/api/solo/rules', asyncRoute(async (_req, res) => {

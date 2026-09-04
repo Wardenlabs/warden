@@ -25,6 +25,7 @@ async function refreshSoloPresets() {
   if (ok) {
     state.soloIdentity = j.identity;
     state.soloPresets = Array.isArray(j.presets) ? j.presets : [];
+    state.soloGroups = Array.isArray(j.groups) ? j.groups : [];
     state.soloLoadError = '';
   } else {
     state.soloLoadError = "Couldn't load your options — check the gateway is running and try again.";
@@ -127,8 +128,12 @@ function soloBody() {
 
     <div class="section">
       <div class="label">Stop these automatically</div>
-      <div id="soloPresetList">${state.soloPresets.length
-        ? state.soloPresets.map(soloPresetRow).join('')
+      <div id="soloPresetList">${state.soloGroups.length
+        ? state.soloGroups.map((g) => `
+            <div class="group">
+              <div class="label">${esc(g.label)}</div>
+              ${g.presets.map(soloPresetRow).join('')}
+            </div>`).join('')
         : state.soloLoadError
           ? `<div class="note bad">${esc(state.soloLoadError)}</div>`
           : '<div class="note">Loading…</div>'}</div>
@@ -145,7 +150,7 @@ function soloBody() {
       <div class="label">What's protecting you right now</div>
       ${state.soloRules.length
         ? state.soloRules.map(soloRuleRow).join('')
-        : '<div class="empty"><b>Nothing turned on yet</b><span>Switch one of the options above on, or write your own.</span></div>'}
+        : '<div class="note">Nothing turned on yet. Switch one of the options above on, or write your own.</div>'}
     </div>
 
     ${soloProtectSection()}
