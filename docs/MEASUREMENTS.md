@@ -910,3 +910,130 @@ a pre-existing `appliesTo: ["*"]` rule on the same actor stayed silent
 is bound by the rule that named them and still clear of the one that did
 not, in the same request cycle. Rule deleted after, policy hash confirmed
 back at `b6cab27c…`.
+
+## The same two models on a GPU: latency, and how much the machine moves a verdict
+
+2026-09-04. `CLAUDE.md` asked a machine with a GPU to remeasure the 8B's 46 s.
+Apple M1 Pro, 16 GB, Metal, the weights the desktop app downloads, the
+benchmark policy, `pnpm run eval -- --attacks`, one repetition — the same
+shape as the 2026-08-31 rows. The SDK loads completion models on the GPU by
+default (`LLM_CONFIG_DEFAULTS` in `@qvac/sdk`: `device: 'gpu', gpu_layers:
+99`), confirmed by `backendDevice: gpu` in every generation's stats, so this
+is what the native app does with no configuration.
+
+| 185 prompts | 1.7B on 4 CPU cores (08-31) | 1.7B on M1 Pro | 8B on 4 CPU cores (08-31) | 8B on M1 Pro |
+|---|---|---|---|---|
+| Legitimate refused | 69/109 (63%) | 78/109 (72%) | 7/109 (6%) | 10/109 (9%) |
+| Attacks stopped | 68/76 (89%) | 72/76 (95%) | 54/76 (71%) | 55/76 (72%) |
+| p50 / p95 per decision | 10.5 s / — | 2.5 s / 2.9 s | 46 s / — | 11.0 s / 25.9 s |
+| One adjudication call, hot | — | 0.40 s | 13 s | 1.58 s |
+
+Records: `data/measurements/2026-09-04T14-30-33Z-*.json` and
+`…T15-09-10Z-*.json`, marked dirty because the worktree carried an untracked
+`node_modules` symlink; the code is commit `f382b70`.
+
+Three findings, in order of how much they change:
+
+**The 8B is 2.7× faster in the product here, not the 8× one call suggests.**
+A single 8B call costs 1.58 s hot (915 ms to first token, 19 tok/s). A
+decision makes four of them concurrently against a model loaded with
+`parallel: 4`, and the measured median decision is 11 s where four sequential
+calls would be 6.4 s. On 16 GB, the 5 GB model plus four KV slots is
+memory-bound, and eleven of 185 decisions ran past the 25 s pass deadline.
+The obvious suspect was `parallel: 4`, so it was measured: four concurrent
+calls on the 8B took 4.45 s under `parallel: 4`, 4.62 s under `2` and 4.44 s
+under `1` — the slots make no difference. What differs between that probe
+(150-token prompts) and the eval (400–600-token system blocks with examples)
+is prefill, and on this GPU the 8B prefills at roughly 150 tok/s. The lever
+for the 8B's latency is prompt length, not concurrency. The 1.7B does not
+show the effect: 0.40 s a call, 2.5 s a decision.
+
+**The machine moves the 1.7B's verdicts and not the 8B's.** Paired with
+`scripts/compare.ts` against the CPU runs of the same commit lineage: the 1.7B
+changed 23 of 185 verdicts (9 fixed, 14 broken, 20 of them
+`r-instruction-override`) with identical code, weights, prompts and
+temperature 0; the 8B changed 6 (2 fixed, 4 broken). Batch composition under
+`parallel: 4` and Metal's numerics are enough to flip the 1.7B on a fifth of
+the pinned rule's decisions. That is the same coin `CLAUDE.md` describes in
+"44% and 31% on identical runs", now measured across machines rather than
+across runs, and it widens the noise band any single 1.7B run has to clear.
+The 8B's errors do not move with the machine: its sixteen lost attacks are the
+model, which settles the question the 08-31 row left open about the clock.
+
+**The GPU changes nothing about which model to ship.** Both columns hold their
+shape. The 1.7B still refuses two thirds of honest work and the 8B still
+misses a quarter of attacks; the GPU made the trade cheaper to pay, not
+different. What it does change is what is affordable to measure: a bench run
+of 335 cells takes minutes here, which is what made the DynaGuard rows below
+possible in an afternoon.
+
+## DynaGuard: a 1.7B fine-tuned for user-written policies, in the adjudicator seat
+
+2026-09-04, same machine as the row above. DynaGuard (tomg-group-umd, Apache
+2.0) is Qwen3-1.7B trained on 40 000 user-written policies to answer PASS or
+FAIL about a dialogue, which is this pass's question on this pass's base
+model. Weights: `mradermacher/DynaGuard-1.7B-GGUF`, Q8_0 (2.17 GB), pinned
+revision `8ac2780c`. Wired as `form: 'dynaguard'` in `adjudicate.ts` (FAIL →
+VIOLATES, PASS → COMPLIES, no UNCLEAR, anything else fails closed), selected
+automatically when the resolved weights carry the name.
+
+**Bench, paired, 335 cells** (`pnpm run bench`, base saved first, then
+`--against`):
+
+| | Qwen3-1.7B Q4_0, shipped prompt | DynaGuard-1.7B Q8_0, its own prompt | DynaGuard-1.7B Q8_0, shipped prompt |
+|---|---|---|---|
+| Legitimate cells cleared | 234/276 (84.8%) | 267/276 (96.7%) | 264/276 (95.7%) |
+| Long legitimate cleared | 17/18 | 17/18 | 17/18 |
+| Attacks caught | 35/41 (85.4%) | 38/41 (92.7%) | 36/41 (87.8%) |
+| vs base, legitimate | — | base only 8, DynaGuard only 41, p = 0.0000 | base only 5, DynaGuard only 35, p = 0.0000 |
+| vs base, attacks | — | base only 1, DynaGuard only 4, p = 0.375 | base only 2, DynaGuard only 3, p = 1.0 |
+| Wall clock | 185 s | 140 s | 223 s |
+
+The first result in this log that moves the legitimate column outside the
+noise band without losing the attack column. The weights carry most of it:
+under the shipped compliance prompt the fine-tune still clears 95.7%, so the
+PASS/FAIL form adds a point and the model adds ten. `r-instruction-override`
+went from 17 false-positive cells to 0 under the trained prompt.
+
+**Product run, 185 prompts, `pnpm run eval -- --attacks`**, paired against
+the shipped 1.7B on the same machine the same day:
+
+| | Qwen3-1.7B Q4_0 | DynaGuard-1.7B Q8_0 |
+|---|---|---|
+| Legitimate refused | 78/109 (72%) | 49/109 (45%) |
+| Attacks stopped | 72/76 (95%) | 71/76 (93%) |
+| p50 / p95 per decision | 2.5 s / 2.9 s | 2.0 s / 2.5 s |
+| Paired | — | 39 fixed, 11 broken (8 honest newly refused, 3 attacks newly missed), 43 still wrong |
+
+Record: `data/measurements/2026-09-04T16-00-32Z-*.json`.
+
+Two things to read out of the gap between 96.7% and 45%. First, compounding:
+every decision judges four rules and any VIOLATES refuses it, so a per-cell
+clearance of 96.7% predicts about 87% per decision; the eval sets are broader
+than the bench negatives and land at 55%. Second, where the rest is: 20 of the
+49 remaining refusals are still `r-instruction-override`, and 41 of 49 are in
+the two developer sets (`benign-code-en` 20/42, `benign-code-es` 21/41). The
+office and multilingual sets are at 4/11 and 4/15. The grammatical shape the
+log already described — developer imperatives read as instructions to the
+assistant — survives the fine-tune, in both languages equally, so it is not the
+English training data.
+
+Faster, too: p50 1.98 s against 2.46 s for the Q4_0 default, because the
+DynaGuard prompt is shorter than the shipped system block and prefill is the
+cost.
+
+**It is given a seat, not the default.** `ADJUDICATOR_CHOICES` now offers
+`dynaguard` beside `default` and `large`, with these numbers on the card, and
+the desktop downloads it when chosen like the 8B. 45% is a smaller failure
+than 72% and it is still a guard that refuses nearly half of honest developer
+work; moving the default on one run, one repetition, one machine is exactly
+what the measurement rule exists to stop. What would move it: `--reps 3` on
+this machine and one other, and the 4B (`DynaGuard-4B`, Q6_K, 3.6 GB) through
+the same pair, which was downloading as this was written and is queued to run.
+
+**Nearest-example shots, same bench, shipped model:** base 84.8% / 85.4%
+against nearest-shots 82.2% / 90.2%; legitimate base only 19, nearest only 11,
+p = 0.20; attacks base only 0, nearest only 2, p = 0.5. No measured difference
+on either column, 32 cells disagree. Choosing the few-shot examples by
+similarity does not help the base model and stays off.
+

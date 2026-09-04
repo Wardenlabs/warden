@@ -53,6 +53,13 @@ export const MODEL_CATALOG: DownloadSpec[] = [
     required: false
   },
   {
+    role: 'adjudicator-dynaguard',
+    filename: 'DynaGuard-1.7B.Q8_0.gguf',
+    url: 'https://huggingface.co/mradermacher/DynaGuard-1.7B-GGUF/resolve/8ac2780c26c909110f97bdc55a06bc96d6bdc5b7/DynaGuard-1.7B.Q8_0.gguf',
+    approxMB: 2170,
+    required: false
+  },
+  {
     role: 'ocr',
     filename: 'latin_g2.gguf',
     url: null,

@@ -74,7 +74,7 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
 settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => {
   const parsed = adjudicatorSettingsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'model must be "default" or "large"' });
+    res.status(400).json({ error: 'model must be "default", "large" or "dynaguard"' });
     return;
   }
   const choice = ADJUDICATOR_CHOICES.find((c) => c.id === parsed.data.model);

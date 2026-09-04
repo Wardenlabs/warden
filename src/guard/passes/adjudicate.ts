@@ -12,7 +12,7 @@
  */
 import { z } from 'zod';
 import type { QvacAdapter } from '../../qvac/types.js';
-import { thinkingMarker } from '../../qvac/client.js';
+import { resolvedModel, thinkingMarker } from '../../qvac/client.js';
 import type { Rule } from '../../policy/types.js';
 import { isolationPreamble, windows, type Isolated } from '../isolate.js';
 import type { PassTrace } from '../types.js';
@@ -137,9 +137,20 @@ export type AdjudicateOptions = {
 
 type Resolved = Required<AdjudicateOptions>;
 
+/**
+ * Which form, when nothing asked for one.
+ *
+ * The environment wins, so a bench can hold the form fixed while it swaps the
+ * weights. Otherwise the form follows the weights: DynaGuard answers the
+ * question it was trained on or it answers badly, and an administrator who
+ * picks that seat in the console has not been asked to also know about prompt
+ * forms. Recognised by the resolved filename, the same way `thinkingMarker`
+ * decides whether `/no_think` means anything to the model in the seat.
+ */
 function formFromEnv(): Resolved['form'] {
   const raw = process.env['WARDEN_ADJUDICATOR_FORM'];
-  return raw === 'choice' || raw === 'dynaguard' ? raw : 'compliance';
+  if (raw === 'choice' || raw === 'dynaguard' || raw === 'compliance') return raw;
+  return /dynaguard/i.test(resolvedModel('adjudicator')) ? 'dynaguard' : 'compliance';
 }
 
 function resolve(options: AdjudicateOptions | undefined): Resolved {

@@ -109,11 +109,16 @@ export async function modelsPresent(appRoot: string, modelsDir: string): Promise
  * The optional weights this installation has asked for on top of the required
  * ones.
  *
- * Only the larger adjudicator today. It is read out of the gateway's own
- * settings file rather than passed down from a menu, because the choice is
- * made in the console — the gateway's half of the app — and this process must
- * not import the gateway to find out. A missing or unparseable file means no
- * extras, which is the same answer as not having chosen.
+ * The adjudicator seat, when it is not the default. It is read out of the
+ * gateway's own settings file rather than passed down from a menu, because the
+ * choice is made in the console — the gateway's half of the app — and this
+ * process must not import the gateway to find out. A missing or unparseable
+ * file means no extras, which is the same answer as not having chosen.
+ *
+ * The seat's id is the catalog id minus the `adjudicator-` prefix (`large`,
+ * `dynaguard`), so a new seat is a catalog entry and nothing here. An id the
+ * catalog does not know yields nothing, which the gateway reports as "not on
+ * disk" rather than this process guessing at a file.
  */
 function chosenExtras(settingsPath: string | undefined, catalog: DownloadSpec[]): DownloadSpec[] {
   if (!settingsPath || !existsSync(settingsPath)) return [];
@@ -121,8 +126,9 @@ function chosenExtras(settingsPath: string | undefined, catalog: DownloadSpec[])
     const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
       adjudicator?: { model?: unknown };
     };
-    if (raw.adjudicator?.model !== 'large') return [];
-    return catalog.filter((spec) => spec.role === 'adjudicator-large' && spec.url);
+    const seat = raw.adjudicator?.model;
+    if (typeof seat !== 'string' || seat === 'default') return [];
+    return catalog.filter((spec) => spec.role === `adjudicator-${seat}` && spec.url);
   } catch {
     return [];
   }

@@ -104,6 +104,34 @@ export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
     approxMB: 5030,
     required: false,
     why: 'Optional larger adjudicator, for measuring accuracy against model size on a given machine.'
+  },
+  /**
+   * The same 1.7B, fine-tuned for this job.
+   *
+   * DynaGuard (tomg-group-umd, Apache 2.0) is Qwen3-1.7B trained on forty
+   * thousand user-written policies to answer whether a dialogue complies with
+   * one — the adjudicator's question, on the adjudicator's base model. The SDK
+   * has no registry constant for it, so the entry is written out by hand in
+   * the same `registry://hf/...` shape `toHttpsUrl` reads, pinned to a revision
+   * like every other download here. Q8_0 rather than the Q4_0 the default
+   * ships as: the brief that brought it in was not to lose model quality, and
+   * at this size the difference is a gigabyte on disk, not a second a decision.
+   *
+   * Measured before it was given a seat — see `ADJUDICATOR_CHOICES` and the
+   * 2026-09-04 rows in `docs/MEASUREMENTS.md`. `adjudicate.ts` switches to the
+   * PASS/FAIL prompt it was trained on whenever the resolved weights carry this
+   * name, so choosing the seat is the whole configuration.
+   */
+  'adjudicator-dynaguard': {
+    role: 'adjudicator',
+    entry: {
+      name: 'DynaGuard-1.7B.Q8_0',
+      src: 'registry://hf/mradermacher/DynaGuard-1.7B-GGUF/resolve/8ac2780c26c909110f97bdc55a06bc96d6bdc5b7/DynaGuard-1.7B.Q8_0.gguf'
+    } as unknown as RegistryEntry,
+    filename: 'DynaGuard-1.7B.Q8_0.gguf',
+    approxMB: 2170,
+    required: false,
+    why: 'Qwen3-1.7B fine-tuned on user-written policies; the measured alternative to the default seat.'
   }
 };
 
@@ -143,12 +171,14 @@ export function modelsDir(): string {
  * has been misled by the interface.
  *
  * `perDecision` is the one number that is not about accuracy and is the reason
- * the default did not simply move. It was taken on four CPU cores; the note in
- * `docs/MEASUREMENTS.md` says a machine with a GPU should measure it again,
- * and nobody has.
+ * the default did not simply move. It was taken on four CPU cores first, and
+ * on 2026-09-04 again on an M1 Pro with 16 GB and Metal: 2.5 s a decision for
+ * the 1.7B and 11 s for the 8B, whose single call costs 1.6 s there but whose
+ * four concurrent calls per decision are memory-bound on 16 GB. Both numbers
+ * are in the sentence, because the machine decides which one applies.
  */
 export type AdjudicatorChoice = {
-  id: 'default' | 'large';
+  id: 'default' | 'large' | 'dynaguard';
   label: string;
   filename: string;
   approxMB: number;
@@ -170,7 +200,7 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     approxMB: 1100,
     attacksCaught: '89%',
     falsePositives: '63%',
-    perDecision: 'A few seconds a decision.',
+    perDecision: 'About 2.5 s a decision on an Apple GPU; a few more on CPU.',
     trade: 'Strict. It stops more of what it should, and it turns away plenty that was fine.',
     note: 'The measured default. Catches the most attacks and fits inside the hook deadline, and refuses two of every three honest requests.'
   },
@@ -181,20 +211,31 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     approxMB: 5030,
     attacksCaught: '71%',
     falsePositives: '6%',
-    perDecision: '46 s a decision on four CPU cores.',
+    perDecision: 'About 11 s a decision on an Apple GPU with 16 GB; 46 s on four CPU cores.',
     trade: 'Easier to live with. It waves through more, including some it should not.',
     // The console printed this note's substance in a banner the moment somebody
     // picked this seat. Removed on the owner's instruction. It stays written
     // down here because it is still true, and because whoever wires the next
     // surface to these choices should read it before deciding what to show.
     note: 'Usable for people, weaker as a guard. At 46 s it fits inside the 90 s hook deadline, but not by much: raise WARDEN_HOOK_TIMEOUT_MS on the gateway if decisions here run slower, since a hook that gives up fails open.'
+  },
+  {
+    id: 'dynaguard',
+    label: 'DynaGuard 1.7B',
+    filename: 'DynaGuard-1.7B.Q8_0.gguf',
+    approxMB: 2170,
+    attacksCaught: '93%',
+    falsePositives: '45%',
+    perDecision: 'About 2 s a decision on an Apple GPU.',
+    trade: 'Same size as the default, trained for this. Stops as many attacks and turns away fewer honest requests — still too many.',
+    note: 'Measured 2026-09-04 on an M1 Pro, paired against the shipped 1.7B on the same machine and run: 39 prompts fixed, 11 broken (8 honest requests newly refused, 3 attacks newly missed), false positives 72% to 45%, attacks 95% to 93%. The bench said 96.7% of legitimate cells against 84.8% at p = 0.0000; four rules per decision compound that to 45%. Trained on English policies; half the measured traffic is Spanish. Both records are in docs/MEASUREMENTS.md.'
   }
 ];
 
 /** The filename a chosen seat resolves to, for `sourceFor` and the console. */
-export function adjudicatorFilename(choice: 'default' | 'large'): string {
+export function adjudicatorFilename(choice: AdjudicatorChoice['id']): string {
   const found = ADJUDICATOR_CHOICES.find((c) => c.id === choice);
-  // Unreachable through the schema, which is an enum of exactly these two.
+  // Unreachable through the schema, which is an enum of exactly these ids.
   if (!found) throw new Error(`no adjudicator choice "${choice}"`);
   return found.filename;
 }
