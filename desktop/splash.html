@@ -90,6 +90,20 @@
       </div>
     </div>
 
+    <div id="mode" class="section">
+      <h1>Where should this open first?</h1>
+      <p class="sub">
+        You'll end up with both either way — protecting this device, and the
+        tools to manage a team, one click apart in the console. This just
+        picks what you see first.
+      </p>
+      <div class="row">
+        <button id="btn-solo" class="primary">This device, for me</button>
+        <button id="btn-team">The team console</button>
+      </div>
+      <p class="fine">Installations that already have people in their directory skip straight past this.</p>
+    </div>
+
     <div id="welcome" class="section">
       <h1>Download the on-device models</h1>
       <p class="sub">
@@ -128,7 +142,7 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const sections = ['welcome', 'downloading', 'starting', 'error'];
+    const sections = ['mode', 'welcome', 'downloading', 'starting', 'error'];
     const show = (id) => sections.forEach((s) => $(s).classList.toggle('active', s === id));
 
     const choose = (choice) => {
@@ -141,12 +155,21 @@
     $('btn-mock-2').addEventListener('click', () => choose('mock'));
     $('btn-retry').addEventListener('click', () => choose('retry'));
 
+    const chooseMode = (choice) => {
+      for (const b of document.querySelectorAll('button')) b.disabled = true;
+      window.warden?.chooseMode?.(choice);
+    };
+    $('btn-solo').addEventListener('click', () => chooseMode('solo'));
+    $('btn-team').addEventListener('click', () => chooseMode('team'));
+
     const enableButtons = () => {
       for (const b of document.querySelectorAll('button')) b.disabled = false;
     };
 
     function render(state) {
-      if (state.phase === 'welcome') {
+      if (state.phase === 'mode') {
+        show('mode');
+      } else if (state.phase === 'welcome') {
         enableButtons();
         $('total-mb').textContent = `~${(state.totalMB / 1000).toFixed(1)} GB`;
         const needGB = Math.ceil(state.totalMB / 1000) + 2;

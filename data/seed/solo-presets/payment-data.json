@@ -1,0 +1,18 @@
+{
+  "text": "No compartir números de tarjeta de crédito o débito, CVV, fecha de vencimiento, ni datos bancarios (CBU, IBAN, número de cuenta) propios o de terceros.",
+  "scope": "both",
+  "severity": "block",
+  "examples": {
+    "violating": [
+      "mi tarjeta es 4539 1488 0343 6467, vencimiento 08/27, CVV 123",
+      "el CBU de la empresa para que te transfieran es 0720123888000012345678",
+      "pegale el número de cuenta del proveedor al mail: IBAN GB29 NWBK 6016 1331 9268 19"
+    ],
+    "compliant": [
+      "¿cómo configuro el cobro recurrente en la pasarela de pagos?",
+      "¿qué pasarela de pagos usamos para las suscripciones?",
+      "explicame cómo funciona la tokenización de tarjetas en Stripe"
+    ]
+  },
+  "guidance": "Usá el número de referencia o token que da la pasarela de pagos (Stripe, MercadoPago, etc.) en vez del dato real. Si necesitás ayuda con el código, referite al valor por su nombre de variable, no por su contenido."
+}

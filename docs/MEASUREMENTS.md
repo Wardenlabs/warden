@@ -860,3 +860,53 @@ The prompt asks for narrower rules and harder compliant examples, and both are
 things a 1.7B is worse at than a large model. The bench (`pnpm run bench`)
 measures adjudication, not compilation, so there is no paired instrument for
 this yet — which is the same gap the splitter row records.
+
+## `rulesForActor`: exemption made per-rule instead of per-actor (Warden Solo)
+
+2026-09-03. Part of `docs/specs/solo-mode.md` §2 — the change that lets a rule
+name an exempt role or person on purpose and actually bind them, instead of
+`isExempt` cutting every rule for that role before `appliesTo` is ever read.
+The claim being checked: against the policy shipped today, this is a no-op,
+because nothing in it currently names an exempt role or `@id`.
+
+Two `pnpm run redteam` runs, `reps 1` each, same corpus, same benchmark
+policy (`data/seed/benchmark-policy.json`), one before the change and one
+after:
+
+| | Attacks stopped | False positives | roleplay-fiction |
+|---|---|---|---|
+| Before | 73/80 (91%) | 10/18 (56%) | 88% |
+| After | 74/80 (93%) | 13/18 (72%) | 100% |
+
+Not identical, and by the letter of the plan that is a stop-and-look result,
+not a pass. But this is exactly the shape of noise `CLAUDE.md` already
+documents for this corpus — two identical runs of `benign-controls` at
+temperature 0 have given 44% and 31%, a wider swing than the 56%→72% seen
+here, with the same code both times. A single `reps 1` run either side of a
+change cannot tell a real regression from a batch-composition shuffle at this
+n, so the redteam numbers alone do not answer the question they were run to
+answer.
+
+What does: the change is a pure filter over `spec.rules`, with no model in
+it, so whether it altered anything for the redteam's test actor
+(`{ id: 'redteam', role: 'analyst' }`) is decidable exactly rather than
+statistically. Reimplementing the pre-change filter next to the current one
+and diffing their output against the real benchmark policy, for every role
+that policy mentions plus `admin` itself, gives the same set of rule ids
+before and after in every case — `analyst` included, which is the role the
+corpus actually runs as. The retrieval step feeding the adjudicator never
+changed for anything this corpus exercises; the two-point and three-prompt
+moves above are the model, not the code. `pnpm run test:rules` covers the
+cases that do change behaviour (a rule naming an exempt role or `@id`
+directly), which no policy shipped today contains and so no corpus run can
+exercise.
+
+That last case was also run for real, once, against the live store and the
+real adapter rather than the pinned benchmark policy: a rule ratified with
+`appliesTo: ["@operator"]` — `operator` holding the `admin` role, exempt by
+default — fired `BLOCK` on a prompt matching it from that same identity, and
+a pre-existing `appliesTo: ["*"]` rule on the same actor stayed silent
+(`ALLOW`, `firedRules: []`) on a prompt matching its topic. The exempt actor
+is bound by the rule that named them and still clear of the one that did
+not, in the same request cycle. Rule deleted after, policy hash confirmed
+back at `b6cab27c…`.

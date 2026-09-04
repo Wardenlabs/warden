@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('warden', {
   choose: (choice: 'download' | 'mock' | 'retry') => {
     ipcRenderer.send('setup:choice', choice);
   },
+  chooseMode: (choice: 'solo' | 'team') => {
+    ipcRenderer.send('setup:mode', choice);
+  },
   onState: (callback: (state: unknown) => void) => {
     ipcRenderer.on('setup:state', (_event, state: unknown) => callback(state));
   }

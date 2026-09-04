@@ -51,10 +51,11 @@ import {
   upsertEmployee,
   findByInstallToken,
   findEmployee,
-  actorForCredential
+  actorForCredential,
+  type Employee
 } from '../policy/people.js';
-import { discardSeededRules, loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
-import { quotaSchema } from '../policy/types.js';
+import { discardSeededRules, isExempt, loadPolicy, rulesForActor, savePolicy, seedIfEmpty } from '../policy/store.js';
+import { quotaSchema, type Rule } from '../policy/types.js';
 import { bindsActor, describeAudience } from '../policy/audience.js';
 import { activityFor, connectedCount, recordActivity } from '../policy/activity.js';
 import { readAppeals, recordAppeal } from '../policy/appeals.js';
@@ -1595,7 +1596,17 @@ app.get('/install/:credential', (req, res) => {
       .send('# No such employee in the directory. Ask your admin for the right link.\nexit 1\n');
   }
 
-  const url = gatewayUrl(req);
+  res.type('text/plain').send(buildInstallScript(person, gatewayUrl(req)));
+});
+
+/**
+ * The install script as a string, factored out of the `/install/:credential`
+ * route so `/api/solo/protect` can run the exact same thing in-process
+ * instead of reimplementing it — see docs/specs/solo-mode.md §6. Nothing
+ * about the script changes depending on who calls this; only how the result
+ * reaches a shell does.
+ */
+function buildInstallScript(person: Employee, url: string): string {
   // The key is the identity, so it has to be here. That makes this URL a
   // credential: it is only ever shown to the admin, inside the console, for a
   // person who already exists. The alternative — the employee pasting a key by
@@ -1606,7 +1617,7 @@ app.get('/install/:credential', (req, res) => {
   // through an API, so anything that could close the comment or open a command
   // substitution is stripped rather than trusted.
   const safeName = person.name.replace(/[^\p{L}\p{N} .,()-]/gu, '');
-  res.type('text/plain').send(`#!/bin/sh
+  return `#!/bin/sh
 # Warden setup for ${safeName} (${person.role})
 set -e
 
@@ -1648,8 +1659,178 @@ echo "Open a new terminal (or: source $PROFILE)."
 node "$HOOK" --fix || true
 
 echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
-`);
+`;
+}
+
+// ── Warden Solo API ───────────────────────────────────────────────────────────
+// A second, minimal surface over the same directory and the same policy the
+// routes above already use — see docs/specs/solo-mode.md. No separate store,
+// no separate guard path: "Mis reglas" is a filtered view of the same rules,
+// scoped by `appliesTo` rather than kept in a file of their own (spec §2).
+// Administrative by default, like every route not in `EMPLOYEE_PATHS`.
+
+/** Where the four hand-written presets live. `id` is also the ratified rule's id. */
+const SOLO_PRESETS: { id: string; file: string }[] = [
+  { id: 'solo-credentials', file: 'credentials.json' },
+  { id: 'solo-payment-data', file: 'payment-data.json' },
+  { id: 'solo-customer-info', file: 'customer-info.json' },
+  { id: 'solo-proprietary-code', file: 'proprietary-code.json' }
+];
+
+/**
+ * Who "Mis reglas" belongs to on this machine, resolved without a login.
+ *
+ * There is no session here, on purpose — the console is loopback-trusted and
+ * has never needed to know which human is at the keyboard, and this does not
+ * start needing one. So it asks a narrower question instead: is there already
+ * exactly one exempt person in the directory — an admin who also wants
+ * personal rules, coexistence, spec §3 Caso A — or is there nobody exempt yet,
+ * a fresh solo install, Caso B? More than one exempt person is a real gap this
+ * does not resolve; it picks the first, deterministically, rather than refuse
+ * the whole feature over an edge case nothing here creates on its own.
+ */
+function resolveSoloIdentity(): Employee {
+  const dir = loadDirectory();
+  const policy = loadPolicy();
+  const exempt = dir.employees
+    .filter((e) => isExempt(policy, e.role))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  if (exempt.length > 0) return exempt[0]!;
+
+  const existing = dir.employees.find((e) => e.role === 'solo');
+  if (existing) return existing;
+
+  addRole('solo');
+  return upsertEmployee({ name: 'You', role: 'solo' });
+}
+
+app.post('/api/solo/setup', (_req, res) => {
+  res.json(resolveSoloIdentity());
 });
+
+app.get('/api/solo/presets', (_req, res) => {
+  const identity = resolveSoloIdentity();
+  const active = new Set(
+    loadPolicy()
+      .rules.filter((r) => r.appliesTo.includes(`@${identity.id}`))
+      .map((r) => r.id)
+  );
+  const presets = SOLO_PRESETS.map(({ id, file }) => {
+    const preset = readSeedJson<Partial<Rule> | null>(
+      join(ASSETS, 'data', 'seed', 'solo-presets', file),
+      null
+    );
+    if (!preset) return null;
+    return { id, text: preset.text, severity: preset.severity, active: active.has(id) };
+  }).filter((p): p is NonNullable<typeof p> => p !== null);
+  res.json({ identity, presets });
+});
+
+app.post('/api/solo/presets/:id/toggle', asyncRoute(async (req, res) => {
+  const presetId = String(req.params['id']);
+  const entry = SOLO_PRESETS.find((p) => p.id === presetId);
+  if (!entry) return res.status(404).json({ error: 'no such preset' });
+
+  const wantActive = Boolean(req.body?.active);
+  if (!wantActive) {
+    const mod = await optional<{ removeRule: (id: string) => Promise<unknown> }>('../policy/compile.js');
+    if (!mod?.removeRule) return res.status(503).json({ error: 'policy editing not wired yet' });
+    return res.json(await mod.removeRule(presetId));
+  }
+
+  const preset = readSeedJson<Omit<Rule, 'id' | 'appliesTo' | 'embedding'> | null>(
+    join(ASSETS, 'data', 'seed', 'solo-presets', entry.file),
+    null
+  );
+  if (!preset) return res.status(404).json({ error: 'preset file missing' });
+
+  const identity = resolveSoloIdentity();
+  const mod = await optional<{ ratifyRule: (r: unknown) => Promise<unknown> }>('../policy/compile.js');
+  if (!mod?.ratifyRule) return res.status(503).json({ error: 'ratify not available' });
+  res.json(await mod.ratifyRule({ ...preset, id: presetId, appliesTo: [`@${identity.id}`] }));
+}));
+
+app.get('/api/solo/rules', asyncRoute(async (_req, res) => {
+  const identity = resolveSoloIdentity();
+  const rules = rulesForActor(loadPolicy(), { id: identity.id, role: identity.role }, 'any');
+
+  // "Qué bloqueó y cuándo" (PRD §3.5) — the audit chain already has this per
+  // actor, so this reads it rather than keeping a second history nobody else
+  // needs. Never the prompt itself: the chain stores a hash, not the text
+  // (CLAUDE.md — "the governance record" — this is that record, read, not a
+  // new one), so `recentBlocks` says which rule fired and when, not what was
+  // sent. Capped small: this is a glance, not the audit view.
+  const mod = await optional<{ readAudit: (n: number) => Promise<{
+    ts: string;
+    actor: { id: string; role: string };
+    decision: { verdict: string; firedRules: { ruleId: string; ruleText: string }[] };
+  }[]> }>('../audit/log.js');
+  // `readAudit` already returns newest-first (`chain()` reverses the file),
+  // so the first 10 matches are the 10 most recent — not the last 10, which
+  // would be the oldest matches inside the 200-entry window.
+  const recent = mod?.readAudit ? await mod.readAudit(200) : [];
+  const recentBlocks = recent
+    .filter((e) => e.actor.id === identity.id && e.decision.verdict !== 'ALLOW')
+    .slice(0, 10)
+    .map((e) => ({ ts: e.ts, verdict: e.decision.verdict, firedRules: e.decision.firedRules }));
+
+  res.json({ identity, rules, recentBlocks });
+}));
+
+app.post('/api/solo/rules', asyncRoute(async (req, res) => {
+  const text = String(req.body?.text ?? '').trim();
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  const identity = resolveSoloIdentity();
+  const lockTo = [`@${identity.id}`];
+
+  const compileMod = await optional<{
+    compileRule: (a: unknown, t: string, p: unknown, o?: unknown) => Promise<unknown>;
+  }>('../policy/compile.js');
+  if (!compileMod?.compileRule) return res.status(503).json({ error: 'compiler not available' });
+  const rule = (await compileMod.compileRule(adapter(), text, loadPolicy(), { lockTo })) as {
+    notARule?: boolean;
+    notARuleReason?: string;
+  };
+  if (rule.notARule) return res.json({ notARule: true, reason: rule.notARuleReason ?? '' });
+
+  const ratifyMod = await optional<{ ratifyRule: (r: unknown) => Promise<unknown> }>('../policy/compile.js');
+  if (!ratifyMod?.ratifyRule) return res.status(503).json({ error: 'ratify not available' });
+  res.json(await ratifyMod.ratifyRule(rule));
+}));
+
+app.post('/api/solo/protect', asyncRoute(async (_req, res) => {
+  const identity = resolveSoloIdentity();
+  // Always `localhost`, never `gatewayUrl(req)` — that prefers a LAN address
+  // so a link shown to a teammate resolves off-machine, which is exactly the
+  // exposure Warden Solo does not have (PRD §2: nothing leaves 127.0.0.1).
+  // This script also runs from this same process rather than a browser, so
+  // there is no `Host` header to read it from in the first place.
+  const script = buildInstallScript(identity, `http://localhost:${PORT}`);
+  const { execFile } = await import('node:child_process');
+  await new Promise<void>((resolve, reject) => {
+    const child = execFile('/bin/sh', [], (err) => (err ? reject(err) : resolve()));
+    child.stdin?.end(script);
+  });
+  res.json({ identity, ok: true });
+}));
+
+app.post('/api/solo/test', asyncRoute(async (req, res) => {
+  const identity = resolveSoloIdentity();
+  const policy = loadPolicy();
+  const rules = rulesForActor(policy, { id: identity.id, role: identity.role });
+  // No rule to demonstrate yet is a real state, not an error — a fresh solo
+  // install with nothing switched on has nothing to show blocking.
+  const sample = rules[0]?.examples.violating[0];
+  const prompt = String(req.body?.prompt ?? sample ?? '');
+  if (!prompt) return res.json({ verdict: null, reason: 'no active rule to test against yet' });
+
+  const mod = await optional<{ evaluate: (a: unknown, i: unknown, p: unknown) => Promise<unknown> }>(
+    '../guard/pipeline.js'
+  );
+  if (!mod?.evaluate) return res.status(503).json({ error: 'guard not available' });
+  const decision = await mod.evaluate(adapter(), { actor: { id: identity.id, role: identity.role }, prompt }, policy);
+  res.json(decision);
+}));
 
 // ── static console ───────────────────────────────────────────────────────────
 app.use(express.static(join(ASSETS, 'web')));
