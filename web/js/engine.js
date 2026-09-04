@@ -101,7 +101,6 @@ ${esc(m.runtime.detail)}</pre>
             <span class="${c.onDisk ? 'have' : 'want'}">${c.onDisk ? 'on disk' : 'not downloaded'} · ${(c.approxMB / 1000).toFixed(1)} GB</span>
           </span>
           <span class="trade">${esc(c.trade)}</span>
-          <span class="speed">${esc(c.perDecision)}</span>
         </button>`).join('')}
       </div>` : '<div class="note">Could not read which model is in the seat.</div>'}
 
