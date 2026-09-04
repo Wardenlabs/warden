@@ -249,14 +249,19 @@ if (reduced || !hasIO) {
  * the other one. Windows is the only case worth branching for; everything
  * else keeps the macOS default.
  *
- * Both links go to `releases/latest`, so a new tag reaches the page without
- * anybody remembering to edit it. This page shipped pointing at v0.1.5 while
- * v0.1.6 was out, which is the whole argument. Windows can be a direct
- * download because Squirrel's installer has a fixed name, set in
- * forge.config.cjs; the dmg still carries its version in the filename, so
- * macOS lands on the release itself. When a tag ships with the version-free
- * dmg name that config now asks for, this becomes
- * `${LATEST}/download/Warden-arm64.dmg` and the last click goes away.
+ * Both links go through `releases/latest`, so a new tag reaches the page
+ * without anybody remembering to edit it. This page shipped pointing at
+ * v0.1.5 while v0.1.6 was out, which is the whole argument. Both installers
+ * are direct downloads for the same reason: Windows because Squirrel's
+ * installer has a fixed name, set in forge.config.cjs; macOS because
+ * `forge.config.cjs`'s dmg maker was fixed to the same kind of fixed name
+ * (`Warden-${arch}.dmg`, no version) before this shipped — v0.1.27 already
+ * publishes `Warden-arm64.dmg` and `Warden-x64.dmg` under that name. This
+ * page pointed macOS at the bare release page for two more versions after
+ * that config landed, because nobody came back to read the comment that
+ * already said what to change it to. Apple Silicon is the default; Intel
+ * still only reaches its dmg from the release page itself, which is a real
+ * gap and not one this pass closes.
  *
  * No size is quoted anywhere. Nothing in this repo reads one off the release,
  * so every number was a promise to come back and correct it, and the two that
@@ -264,7 +269,7 @@ if (reduced || !hasIO) {
  */
 
 const LATEST = 'https://github.com/Wardenlabs/warden/releases/latest';
-const MAC = { label: 'Download for macOS', href: LATEST, other: 'Also on macOS' };
+const MAC = { label: 'Download for macOS', href: `${LATEST}/download/Warden-arm64.dmg`, other: 'Also on macOS' };
 const WIN = { label: 'Download for Windows', href: `${LATEST}/download/Warden-Setup.exe`, other: 'Also on Windows' };
 
 const primary = document.querySelector('.hero .btn-primary');
