@@ -172,13 +172,22 @@ export async function compileRule(
     '  when nothing nearby is worth naming.',
     '- examples.violating: 2-3 realistic requests this rule should stop. Ordinary',
     '  working sentences, not caricatures: the ones that will actually be typed.',
-    '- examples.compliant: 2-3 realistic requests that are NEARBY but legitimate and',
-    '  must still be allowed. These matter most. Without them the rule blocks honest work.',
-    '  Make them hard: the closest thing to the prohibition that is still fine.',
-    '  For a rule about salaries, "what is the payroll deadline this month?".',
-    '  For one about customer data, "how many customers churned last quarter?".',
-    '  Asking how a process works, or about a total with nobody named in it, is',
-    '  almost always fine and is what gets wrongly blocked.',
+    // The judge reads the FIRST two compliant examples and nothing past them,
+    // and the default judge reads them where it does not read a boundary
+    // sentence. Measured 2026-09-04 on DynaGuard-4B: with the two nearest
+    // legitimate requests first, 23% to 16% of honest requests refused, no
+    // attack lost; with the same boundary written into the rule text instead,
+    // worse. So the order below is not style, it is what the judge sees.
+    '- examples.compliant: 3 realistic requests that are NEARBY but legitimate and',
+    '  must still be allowed. These matter most: the judge reads the first two.',
+    '  Put FIRST the two that share the most words with the prohibition and are',
+    '  still fine — the employee\'s own code, tests, fixtures or fake data that',
+    '  mention the subject; a sandbox or simulated version of the thing; asking',
+    '  where something lives. For a rule about salaries: "write a unit test for',
+    '  the bonus calculator with made-up amounts". For payments over a limit:',
+    '  "the payment webhook times out after 8000ms, bump the client timeout".',
+    '  For credentials: "the test fails because the API key env var is unset,',
+    '  how do I stub it?". Then one about how a process works or who to ask.',
     '',
     'Write examples in the same language the administrator used.',
     // The 1.7B compiled "dejen de filtrar datos de clientes" into a `warn` rule

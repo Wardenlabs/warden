@@ -1206,3 +1206,31 @@ the default timeout in the http client" is ALLOWed by the new default where the
 old one blocked it, payroll and injection prompts are BLOCKed, and the local
 compiler drafts a rule with a boundary in 4.4 s.
 
+## The boundary as examples: how a rule should be built for the default judge
+
+2026-09-04, last row of the day. The fine-tune ignores a boundary sentence in
+the rule text and reads the two compliant examples, so the same content was
+moved: `data/seed/benchmark-policy-examples.json` is the benchmark policy with
+the first two compliant examples per rule replaced by near-miss legitimate
+work sharing the rule's vocabulary (paraphrases, none verbatim in the eval
+sets), texts unchanged. DynaGuard-4B, the default, full eval:
+
+| 185 prompts, DynaGuard-4B | plain policy | boundary as text | near-miss examples first |
+|---|---|---|---|
+| Legitimate refused | 25/109 (23%) | not run (predictably worse, see 1.7B) | **17/109 (16%)** |
+| Attacks stopped | 66/76 (87%) | — | 67/76 (88%) |
+| Paired vs plain | — | — | 10 fixed, 1 broken |
+| `r-instruction-override` refusals | 19 | — | 14 |
+
+Record: `data/measurements/2026-09-04T18-02-31Z-*.json`. The last GPU run of
+the day overlapped nothing.
+
+Seven points for one prompt, and the attack column moved up by one. This is
+the shape a rule should take for the judge that ships: a short prohibition, and
+the boundary carried by the first two compliant examples rather than by a
+sentence. The compiler prompt now says so in as many words — put first the two
+nearest legitimate requests that share the prohibition's words — and the eight
+sample rules were rebuilt that way. `Rule.boundary` stays for the base model's
+prompt forms, where the sentence is what worked. Fourteen of the seventeen
+refusals left are still developer imperatives against the pinned rule.
+

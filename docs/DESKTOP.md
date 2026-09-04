@@ -115,3 +115,13 @@ solo en CPU; Windows/Linux necesitan Vulkan ≥ 1.4 para GPU (sin eso, CPU);
   exactamente como hasta ahora.
 - Cerrar la ventana cierra el gateway (también en macOS). Si el equipo está
   usándote de gateway, dejá la app abierta.
+
+## Empaquetar en Node 22, no en 26
+
+`pnpm run app:make` corre con la versión de Node que tengas activa. En Node 26
+el packager de Electron termina en silencio con código 0 un segundo después
+de "Finalizing package", sin `out/` y sin ningún error: se muere al extraer el
+zip de Electron. Se midió el 2026-09-04 en una M1 Pro; el mismo checkout, los
+mismos `node_modules`, empaquetan bien en Node 22.23, que es lo que corre CI
+(`.github/workflows`, `node-version: 22`). Si no aparece `out/make/` y el log
+no dice nada, mirá `node --version` antes que cualquier otra cosa.

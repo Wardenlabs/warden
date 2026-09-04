@@ -9,7 +9,7 @@ Un falso positivo cuenta si el prompt se bloqueó mal en **cualquier** repetici�
 un guard que frena trabajo legítimo una vez de cada tres sigue roto, y promediarlo
 es como se esconde el no-determinismo.
 
-20 corrida(s).
+21 corrida(s).
 
 | Fecha | Qué se probó | Falsos positivos | Ataques frenados | p50 | Reps |
 |---|---|---|---|---|---|
@@ -33,6 +33,7 @@ es como se esconde el no-determinismo.
 | 2026-09-04 16:32 | M1 Pro 16GB, Metal, DynaGuard-4B Q6_K in the adjudicator seat, dynaguard form | 25/109 (23%) | 66/76 (87%) | 4380ms | 1 |
 | 2026-09-04 16:46 | M1 Pro, DynaGuard-1.7B Q8_0, BOUNDED benchmark policy (one boundary sentence per rule) | 74/109 (68%) | 75/76 (99%) | 2062ms | 1 |
 | 2026-09-04 16:55 | M1 Pro, Qwen3-1.7B (shipped), BOUNDED benchmark policy (one boundary sentence per rule) | 57/109 (52%) | 70/76 (92%) | 2704ms | 1 |
+| 2026-09-04 18:02 | M1 Pro, DynaGuard-4B (default), benchmark policy with near-miss compliant examples first | 17/109 (16%) | 67/76 (88%) | 4408ms | 1 |
 
 ## Detalle por corrida
 
@@ -259,6 +260,18 @@ es como se esconde el no-determinismo.
 - config: `models=[object Object]`
 - falsos positivos **57/109 (52%)** · ataques **70/76 (92%)** · veredicto inestable en 0
 - por regla: `r-instruction-override` [object Object] · `r-credentials` [object Object] · `r-payment-approval` [object Object] · `r-unreleased-financials` [object Object] · `r-payroll` [object Object] · `r-customer-pii` [object Object]
+- ⚠ el árbol de trabajo estaba sucio: esta corrida no se reproduce sólo con el commit
+
+### 2026-09-04 18:02 — M1 Pro, DynaGuard-4B (default), benchmark policy with near-miss compliant examples first
+
+`2026-09-04T18-02-31Z-1135384-dirty.json`
+
+- commit `1135384` **+cambios sin commitear** · política `ed272f71c148`
+- adaptador **qvac** · 1 repetición(es) · 185 prompts
+- Apple M1 Pro (10 núcleos)
+- config: `models=[object Object]`
+- falsos positivos **17/109 (16%)** · ataques **67/76 (88%)** · veredicto inestable en 0
+- por regla: `r-instruction-override` [object Object] · `r-credentials` [object Object] · `r-payment-approval` [object Object] · `r-unreleased-financials` [object Object]
 - ⚠ el árbol de trabajo estaba sucio: esta corrida no se reproduce sólo con el commit
 
 ---

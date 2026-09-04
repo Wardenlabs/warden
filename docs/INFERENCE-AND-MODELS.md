@@ -176,7 +176,9 @@ change on that model had ever left the noise before. The rule schema has no
 field for a boundary and the compiler is never asked for one; that is where the
 next change belongs. The same sentences made DynaGuard worse (45% to 68%), so
 the fix is coupled to the seat: a boundary clause for the base model, short
-rules with good compliant examples for the fine-tune. Rows and per-rule
+rules with the boundary as the first two compliant examples for the fine-tune
+— measured on the 4B at 23% to 16% refused, no attack lost, and now what the
+compiler is told to write. Rows and per-rule
 attribution in `docs/MEASUREMENTS.md`.
 
 ## RAG, honestly

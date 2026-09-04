@@ -107,9 +107,16 @@ acoplados**. Para el base, regla con límite explícito e ítems concretos (tu
 "nombre, email, teléfono, contrato, billing"); para DynaGuard, una prohibición
 corta y ejemplos permitidos duros.
 
+Y el mismo límite, puesto donde el fine-tune sí lo lee — como los dos primeros
+ejemplos permitidos de cada regla, en vez de como oración — llevó al 4B de 23%
+a **16%** de rechazos legítimos sin perder ataques (88%). Esa es la forma en la
+que se arman las reglas para nuestro juez desde hoy: prohibición corta, y el
+límite en los ejemplos.
+
 Lo que cambió en el producto hoy: el esquema de regla tiene un campo
 `boundary`, el compilador lo pide (y pide ítems concretos en vez de
-categorías), el juez lo lee solo en los formatos donde ayudó, y el
+categorías) y pone primero los dos ejemplos permitidos más cercanos a la
+prohibición, el juez lee el límite solo en los formatos donde ayudó, y el
 administrador lo ve al ratificar.
 
 ## Lo que sigue
