@@ -74,6 +74,9 @@ import {
 /** The one role this file will answer for. Everything else is the guard. */
 const CLI_ROLE: ModelRole = 'compiler';
 
+/** Claude Code's "no customisations" flag. Dropped on a CLI that predates it. */
+const SAFE_MODE = '--safe-mode';
+
 export type CliTool = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor-agent' | 'copilot';
 
 export type CliCompilerConfig = {
@@ -116,14 +119,27 @@ const TOOLS: Record<CliTool, {
     verified: true,
     args: (model) => [
       '-p',
-      // Minimal mode: no hooks, no plugins. The administrator's own machine
+      // Customisations off, authentication on. The administrator's own machine
       // runs Warden's UserPromptSubmit hook inside Claude Code, so without this
       // the compile prompt — a paragraph about prohibitions and overriding
       // instructions — went through the guard, the guard blocked it, and the
       // CLI's stdout was "Operation stopped by hook: Blocked by Warden" where
       // the JSON should have been. Two refusals of the administrator's own
       // sentence, by their own product, reported as "not valid JSON".
-      '--bare',
+      //
+      // 0.1.33 answered that with `--bare`, and it broke the feature outright:
+      // `--bare` reads only ANTHROPIC_API_KEY and never the OAuth login or the
+      // keychain, so on the machine this file exists for — Claude Code signed
+      // in on a subscription, no API key anywhere — every compile came back
+      // "Authentication error". `--safe-mode` is the flag that means what was
+      // wanted: hooks, plugins, CLAUDE.md and MCP servers disabled, auth and
+      // model selection untouched. Measured 2026-09-05 on 2.1.261: a project
+      // hook that refuses everything stops `claude -p` with "operation blocked
+      // by hook", and the same prompt under `--safe-mode` answers. A CLI too
+      // old to know the flag says "unknown option"; `#run` drops it and tries
+      // once more, with `WARDEN_INTERNAL` still telling the hook to stand
+      // aside.
+      SAFE_MODE,
       '--output-format', 'text',
       ...(model ? ['--model', model] : []),
       // A compile is a text transform. Nothing here needs to touch the disk,
@@ -261,8 +277,9 @@ function searchPath(): string {
 function cliEnv(): NodeJS.ProcessEnv {
   // `WARDEN_INTERNAL` tells Warden's own hook, wherever a CLI runs it, that
   // this invocation is the gateway compiling a rule and not an employee
-  // prompting — the hook exits clean on it. Claude Code also gets `--bare`,
-  // because the hook already installed on a machine may predate the marker.
+  // prompting — the hook exits clean on it. Claude Code also gets
+  // `--safe-mode`, because the hook already installed on a machine may
+  // predate the marker.
   return { ...process.env, PATH: searchPath(), WARDEN_INTERNAL: '1' };
 }
 
@@ -297,6 +314,8 @@ export async function detectCliTools(): Promise<{ tool: CliTool; label: string; 
  */
 export class CliCompilerAdapter implements QvacAdapter {
   #calls = 0;
+  /** Whether this CLI accepts `--safe-mode`. Assumed until it says otherwise. */
+  #safeMode = true;
 
   constructor(
     private readonly local: QvacAdapter,
@@ -390,6 +409,14 @@ export class CliCompilerAdapter implements QvacAdapter {
     const spec = TOOLS[this.config.tool];
     const started = Date.now();
     this.#calls++;
+    // A CLI old enough not to know `--safe-mode` refuses the whole command
+    // line with "unknown option". That is not a failed compile, it is a flag
+    // to drop: the run is repeated once without it, and the answer is
+    // remembered so every later compile in this process skips the wasted
+    // attempt. The hook marker in the environment still covers the case the
+    // flag was for.
+    let args = spec.args(this.config.model);
+    if (!this.#safeMode) args = args.filter((a) => a !== SAFE_MODE);
 
     // System and user in one stream, because a CLI takes a prompt and not a
     // message list. The schema goes in as an instruction rather than as a
@@ -411,10 +438,10 @@ export class CliCompilerAdapter implements QvacAdapter {
       .filter(Boolean)
       .join('\n');
 
-    const text = await new Promise<string>((resolve, reject) => {
+    const run = (argv: string[]): Promise<string> => new Promise<string>((resolve, reject) => {
       const child = execFile(
         this.config.tool,
-        spec.args(this.config.model),
+        argv,
         {
           // No repository underneath it. Combined with the denied tools this
           // is two independent reasons the compile cannot touch a project.
@@ -426,6 +453,9 @@ export class CliCompilerAdapter implements QvacAdapter {
         (err, stdout, stderr) => {
           if (err) {
             const detail = String(stderr || err.message).trim().slice(0, 300);
+            if (this.#safeMode && argv.includes(SAFE_MODE) && UNKNOWN_SAFE_MODE.test(detail)) {
+              return reject(new UnknownSafeModeError());
+            }
             return reject(
               new FailClosedError(
                 `${spec.label} could not compile this rule: ${detail || 'no output'}`,
@@ -437,8 +467,11 @@ export class CliCompilerAdapter implements QvacAdapter {
           // A hook answered instead of the model. The text is not malformed
           // JSON, it is Warden refusing its own compile prompt through a hook
           // this process could not switch off, and the person needs to know
-          // which hook to update rather than to "say it more plainly".
-          if (/^\s*Operation stopped by hook/i.test(out)) {
+          // which hook to update rather than to "say it more plainly". The
+          // wording is the CLI's and has moved: "Operation stopped by hook"
+          // on the version that was first seen, "UserPromptSubmit operation
+          // blocked by hook" on 2.1.261, with exit code 0 either way.
+          if (HOOK_ANSWERED.test(out)) {
             return reject(
               new FailClosedError(
                 `${spec.label} ran a prompt hook that blocked the compile. If it is Warden's own hook, update it: curl -fsSL <gateway>/warden-hook.mjs -o ~/.warden-hook.mjs`,
@@ -449,8 +482,24 @@ export class CliCompilerAdapter implements QvacAdapter {
           resolve(out);
         }
       );
+      // A CLI that refuses its command line exits before it reads a byte of
+      // stdin, and writing the prompt into that closed pipe raises EPIPE on
+      // the stream — as an 'error' event, which with nobody listening is an
+      // uncaught exception that takes the gateway down. The exit callback
+      // above already carries the real reason, so the pipe error is swallowed
+      // here and the rejection comes from the exit, where it belongs.
+      child.stdin?.on('error', () => {});
       child.stdin?.end(prompt);
     });
+
+    let text: string;
+    try {
+      text = await run(args);
+    } catch (err) {
+      if (!(err instanceof UnknownSafeModeError)) throw err;
+      this.#safeMode = false;
+      text = await run(args.filter((a) => a !== SAFE_MODE));
+    }
 
     const ms = Date.now() - started;
     return {
@@ -464,6 +513,14 @@ export class CliCompilerAdapter implements QvacAdapter {
     };
   }
 }
+
+/** The CLI refusing the command line because the flag postdates it. */
+const UNKNOWN_SAFE_MODE = /unknown option '--safe-mode'/i;
+
+/** A prompt hook, not the model, wrote stdout. Both wordings the CLI has used. */
+const HOOK_ANSWERED = /^\s*(?:\w+\s+)?operation (?:stopped|blocked) by hook/i;
+
+class UnknownSafeModeError extends Error {}
 
 /**
  * Pull one JSON object out of whatever the CLI printed.
