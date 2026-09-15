@@ -1,6 +1,6 @@
-/* Official Warden geometry and studio, adapted directly from the approved film.
- * Mesh curves, bevels, physical materials and studio lighting remain identical.
- * Cropping the film camera preserves its approved reflection/view relationship. */
+/* Official Warden geometry, adapted directly from the approved film.
+ * Original curves, bevels and camera are preserved in a neutral metal studio.
+ * White faces, chrome reflections and graphite edges carry the white brand. */
 import { WARDEN_SYMBOL_PATHS } from './brand-paths.js';
 
 export function createShield({ THREE: T, canvas }) {
@@ -49,15 +49,15 @@ export function createShield({ THREE: T, canvas }) {
     ringShape.holes.push(ringContours[1]);
 
     const silverFace = new T.MeshPhysicalMaterial({
-      color: 0xd9e9e0, metalness: .91, roughness: .22,
-      clearcoat: .38, clearcoatRoughness: .16, envMapIntensity: 1.22
+      color: 0xe8e8e8, metalness: .87, roughness: .24,
+      clearcoat: .44, clearcoatRoughness: .16, envMapIntensity: 1.22
     });
-    const mintEdge = new T.MeshPhysicalMaterial({
-      color: 0x477b6e, metalness: .86, roughness: .25,
-      clearcoat: .24, clearcoatRoughness: .15, envMapIntensity: 1.1
+    const graphiteEdge = new T.MeshPhysicalMaterial({
+      color: 0x494949, metalness: .95, roughness: .20,
+      clearcoat: .30, clearcoatRoughness: .15, envMapIntensity: 1.1
     });
     const letterFace = new T.MeshPhysicalMaterial({
-      color: 0xc1eed6, metalness: .87, roughness: .20,
+      color: 0xf7f7f7, metalness: .65, roughness: .23,
       clearcoat: .42, clearcoatRoughness: .13, envMapIntensity: 1.24
     });
     function extrude(shape, depth, bevelSize, bevelThickness, faceMaterial, z) {
@@ -68,7 +68,7 @@ export function createShield({ THREE: T, canvas }) {
       });
       geometry.translate(0, 0, z);
       geometry.computeBoundingBox();
-      const mesh = new T.Mesh(geometry, [faceMaterial, mintEdge]);
+      const mesh = new T.Mesh(geometry, [faceMaterial, graphiteEdge]);
       hero.add(mesh);
       return mesh;
     }
@@ -78,7 +78,7 @@ export function createShield({ THREE: T, canvas }) {
     // A local HDR studio gives the bevels actual reflected light. The environment
     // is generated once; neither network assets nor new PMREMs are needed per frame.
     const studio = new T.Scene();
-    studio.background = new T.Color(0x0d1821);
+    studio.background = new T.Color(0x141414);
     function softbox(position, boxWidth, boxHeight, color, intensity) {
       const material = new T.MeshBasicMaterial({ color, side: T.DoubleSide });
       material.color.multiplyScalar(intensity);
@@ -86,22 +86,22 @@ export function createShield({ THREE: T, canvas }) {
       light.position.set(...position); light.lookAt(0, 0, 0); studio.add(light);
     }
     softbox([-5, 4, 7], 3.1, 10, 0xffffff, 4.0);
-    softbox([5, 1, 4], 1.35, 9, 0xc9ffe0, 3.0);
-    softbox([0, 7, 2], 10, 1.8, 0xe4edff, 4.4);
-    softbox([-2, -5, 3], 6, 1.0, 0xb6dbc7, 1.4);
-    softbox([3, 3, -5], 2.0, 9, 0xbdceec, 2.5);
+    softbox([5, 1, 4], 1.35, 9, 0xffffff, 3.0);
+    softbox([0, 7, 2], 10, 1.8, 0xffffff, 4.4);
+    softbox([-2, -5, 3], 6, 1.0, 0xffffff, 1.4);
+    softbox([3, 3, -5], 2.0, 9, 0xffffff, 2.5);
     const pmrem = new T.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(studio, .02, .1, 60);
     scene.environment = environment.texture;
     pmrem.dispose();
     studio.traverse(node => { if (node.isMesh) { node.geometry.dispose(); node.material.dispose(); } });
 
-    scene.add(new T.HemisphereLight(0xf1f8f5, 0x0b1820, .58));
+    scene.add(new T.HemisphereLight(0xf5f5f5, 0x151515, .58));
     const key = new T.DirectionalLight(0xffffff, 2.4);
     key.position.set(-600, 850, 1200); scene.add(key);
-    const rim = new T.DirectionalLight(0xa7d6c8, 2.0);
+    const rim = new T.DirectionalLight(0xffffff, 2.0);
     rim.position.set(1100, 250, -700); scene.add(rim);
-    const sweepLight = new T.PointLight(0xe1fff0, 0, 0, 2);
+    const sweepLight = new T.PointLight(0xffffff, 0, 0, 2);
     scene.add(sweepLight);
 
     function resize(nextWidth = 960, nextHeight = nextWidth, pixelRatio = 1) {
@@ -147,7 +147,7 @@ export function createShield({ THREE: T, canvas }) {
 
     function dispose() {
       ring.geometry.dispose(); letter.geometry.dispose();
-      silverFace.dispose(); letterFace.dispose(); mintEdge.dispose();
+      silverFace.dispose(); letterFace.dispose(); graphiteEdge.dispose();
       environment.dispose(); renderer.dispose();
     }
     resize();

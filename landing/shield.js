@@ -8,7 +8,7 @@ export function mountShield(container) {
   const fallback = container?.querySelector('img');
   if (!canvas || !fallback) throw new TypeError('The Warden shield needs a canvas and fallback image.');
 
-  const surface = container.closest('.closing-body') || container;
+  const surface = container.closest('.hero-art') || container.closest('.closing-body') || container;
   const originalCanvasVisibility = canvas.style.visibility;
   const originalImageVisibility = fallback.style.visibility;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -101,7 +101,7 @@ export function mountShield(container) {
     try {
       const [THREE, { createShield }] = await Promise.all([
         import('./assets/3d/three.module.js'),
-        import('./assets/3d/official-shield.js?v=closing-20260908'),
+        import('./assets/3d/official-shield.js?v=white-studio-1'),
       ]);
       if (destroyed) return;
       scene = createShield({ THREE, canvas });

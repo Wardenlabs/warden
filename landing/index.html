@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Warden — the AI gateway that enforces your rules on your team’s own laptops</title>
-<meta name="description" content="You write the rule in one sentence. Warden checks connected AI requests against it, on their own laptop, before they reach the model. Free and open source.">
+<title>Warden — Your AI. Your rules.</title>
+<meta name="description" content="Set the rules for your team’s connected AI tools. Review the drafts, activate them and see why a request was blocked. Free and open source.">
 <link rel="canonical" href="https://warden-theta.vercel.app/">
 
 <!-- The real mark, not the hand-drawn shield that used to sit here as a data
@@ -16,21 +16,22 @@
 <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-<meta property="og:title" content="Warden — the local AI gateway that enforces your rules">
-<meta property="og:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
+<meta property="og:title" content="Warden — AI rules that actually apply">
+<meta property="og:description" content="Decide what your team can share with connected AI tools. Free and open source for macOS, Windows and Linux.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://warden-theta.vercel.app/">
 <meta property="og:site_name" content="Warden">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="https://warden-theta.vercel.app/og.png">
+<meta property="og:image" content="https://warden-theta.vercel.app/assets/share/warden-share-v2.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The Warden lockup over a lit hairline, with the line: writing the rules down is not the same as enforcing them.">
+<meta property="og:image:alt" content="Warden. AI rules that actually apply. Free. Open source. A silver shield on a carbon background.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Warden — the local AI gateway that enforces your rules">
-<meta name="twitter:description" content="Writing the rules down is not the same as enforcing them. Warden checks what your team sends, on their own computer, before it goes anywhere.">
-<meta name="twitter:image" content="https://warden-theta.vercel.app/og.png">
-<meta name="theme-color" content="#081119">
+<meta name="twitter:title" content="Warden — AI rules that actually apply">
+<meta name="twitter:description" content="Decide what your team can share with connected AI tools. Free and open source for macOS, Windows and Linux.">
+<meta name="twitter:image:alt" content="Warden. AI rules that actually apply. Free. Open source. A silver shield on a carbon background.">
+<meta name="twitter:image" content="https://warden-theta.vercel.app/assets/share/warden-share-v2.png">
+<meta name="theme-color" content="#101113">
 
 <!-- Structured data, and the reason it is worth the bytes on a page with no
      build step: a search engine and an assistant answering "how do I stop my
@@ -72,19 +73,12 @@ setTimeout(function () {
   if (!window.__wardenReady) document.documentElement.classList.remove('js');
 }, 2500);
 </script>
-<link rel="preload" href="assets/brand/Inter-Variable.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="stylesheet" href="styles.css?v=story-20260908d">
-<link rel="stylesheet" href="story-depth.css?v=motion-2">
-<link rel="stylesheet" href="rules-scene.css?v=motion-2">
-<link rel="stylesheet" href="closing-scene.css?v=depth-1">
-<link rel="stylesheet" href="hero-hook.css?v=gate-4">
-<link rel="stylesheet" href="visual-restraint.css?v=restraint-1">
-<!-- app.js imports light.js, so without these the browser does not learn the
-     second file exists until the first one has arrived and parsed. Two hints
-     make it one round trip instead of two, which is the whole of the page's
-     critical path: there is no framework and no font to wait on. -->
-<link rel="modulepreload" href="app.js?v=gate-4">
-<link rel="modulepreload" href="light.js?v=motion-2">
+<link rel="stylesheet" href="foundation-v2.css?v=hero-flow-1">
+<link rel="stylesheet" href="experience-v2.css?v=closing-focus-1">
+<link rel="stylesheet" href="product-scenes-v2.css?v=hero-flow-1">
+<!-- Preload the page controller; content and downloads also work without it. -->
+<link rel="modulepreload" href="app.js?v=hero-flow-1">
+
 <!-- Anonymous Vercel page views remain available alongside the PostHog funnel.
      Only the production hostname loads this collector; local previews stay clean. -->
 <script>if (location.hostname === 'warden-theta.vercel.app') { window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); }; const a = document.createElement('script'); a.defer = true; a.src = '/_vercel/insights/script.js'; document.head.append(a); }</script>
@@ -100,7 +94,7 @@ setTimeout(function () {
     </a>
     <nav aria-label="Main navigation">
       <a href="#how" class="hide-sm">How it works</a>
-      <a href="#spend" class="hide-sm">What it costs</a>
+      <a href="#spend" class="hide-sm">Usage limits</a>
       <a href="https://github.com/Wardenlabs/warden" class="hide-sm">GitHub</a>
       <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg" class="btn btn-primary btn-sm header-download" data-platform-download><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 13v4h12v-4"/></svg><span class="txt">Download for macOS</span></a>
     </nav>
@@ -111,16 +105,14 @@ setTimeout(function () {
 
 <!-- ── hero ────────────────────────────────────────────────────────────── -->
 <div class="hero-zone">
-  <canvas class="scene" aria-hidden="true"></canvas>
-
   <div class="wrap hero">
     <div class="copy">
-    <h1>Make AI follow<br><span class="enforce">your rules.</span></h1>
+    <h1>Your AI.<br><span class="enforce">Your rules.</span></h1>
 
-    <p class="sub">Warden checks your team’s connected AI requests before they reach the model.</p>
+    <p class="sub">Decide what your team can share with connected AI tools.</p>
 
     <div class="cta">
-      <a class="btn btn-primary" data-platform-download href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg">
+      <a class="btn hero-download" data-platform-download href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg">
         <!-- Both marks ship in the markup and CSS shows one. app.js flips the
              class when the visitor is on Windows; swapping an SVG path from
              JavaScript would mean the button is wrong for as long as the module
@@ -128,100 +120,39 @@ setTimeout(function () {
         <svg class="os mac" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
         <svg class="os win" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3zM11.1 4.5 21 3v8.5h-9.9zM3 12.4h7.2v6.9L3 18.4zM11.1 12.4H21V21l-9.9-1.4z"/></svg>
         <span class="txt">Download for macOS</span>
+        <span class="download-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path class="arrow-stem" d="M12 3v12m-4-4 4 4 4-4"/><path d="M5 17v4h14v-4"/></svg></span>
       </a>
+      <p class="hero-free">Free for everyone. Open source.</p>
       <div class="hero-secondary">
         <a class="src alt" href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-Setup.exe">Also on Windows</a>
         <a class="src" href="assets/launch/launch.mp4?v=12" data-open-film><svg class="play-mark" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 10 7-10 7V3Z"/></svg>Watch the film <span class="film-time">0:17</span></a>
       </div>
     </div>
-    <p class="hero-free">Free for everyone. Open source.</p>
     </div>
-
-    <div class="judge judged" id="judge" aria-live="polite">
-      <span class="hero-request"><span class="gt" aria-hidden="true">&gt;</span><span class="typed">send me Ana's salary for the report</span><span class="cur" aria-hidden="true"></span></span>
-      <span class="verdict">Blocked by Warden <span class="rule">· r-payroll</span></span>
+    <button class="hero-art" type="button" disabled tabindex="-1" data-hero-replay aria-label="Replay how Warden checks a connected request" data-trace="blocked">
+      <span class="trace-request" aria-hidden="true">Share a client’s private pricing</span>
+      <svg class="hero-flow" viewBox="0 0 760 520" fill="none" aria-hidden="true">
+        <path class="trace-rail" d="M0 225H300M625 225H735"/>
+        <path class="trace-in" pathLength="100" d="M0 225H300"/>
+        <path class="trace-out" pathLength="100" d="M625 225H735"/>
+        <path class="trace-barrier" d="M300 211v28"/>
+      </svg>
+      <span class="hero-sculpture" aria-hidden="true"><img src="assets/3d/shield-fallback.png" alt="" width="960" height="960"><canvas width="960" height="960"></canvas></span>
+      <span class="trace-model" aria-hidden="true">Model</span>
+      <span class="trace-verdict" aria-hidden="true">Blocked by Warden</span>
+    </button>
+    <div class="hero-foot">
+      <div class="hero-tools"><span class="tools-caption">Works with</span><ul aria-label="Connected AI tools"><li>Claude Code</li><li>Codex</li><li>OpenCode</li></ul></div>
+      <a class="scroll-cue" href="#how">See how<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10 3v13m-5-5 5 5 5-5"/></svg></a>
     </div>
-
-    <!-- The gate. Empty on purpose: light.js draws the line on the canvas
-         where this sits, and it only draws itself when there is no WebGL. -->
-    <div class="gate" aria-hidden="true"></div>
   </div>
 </div>
-
-<!-- ── §1 how it works: one day, three scenes ───────────────────────────── -->
-<!--
-     The section is a story with a clock, not a feature list. Scene 01 the
-     rule is written, scene 02 somebody hits it at 14:22, scene 03 the day
-     comes back as a ledger — and the 14:22 row in the ledger is the block
-     from scene 02, which is the whole trick: the reader watches one day
-     happen instead of reading three claims.
-
-     Each scene starts its own three-beat sequence when it enters the viewport.
-     The page keeps native, unpinned scrolling while the narration and product
-     panel advance on their own. app.js only ever reveals markup that is already
-     here: with scripting off, or under reduced motion, every panel is simply complete.
-
-     Every panel is the product's own markup or the hook's own output.
-     Nothing here is drawn: if a panel cannot be traced to a file in this
-     repo it does not ship, and landing/README.md says why.
--->
-<section id="how">
-  <div class="wrap sec">
-
-    <div class="main how-intro" data-reveal>
-      <div class="how-intro-copy">
-        <h2 class="loud"><span class="ln"><span>Write a rule.</span></span><span class="ln"><span>It stops the request.</span></span><span class="ln"><span>You see that it did.</span></span></h2>
-      </div>
-      <figure class="checkpoint" aria-label="An AI request for salary details is blocked by the payroll rule and appears in the decision log.">
-        <div class="checkpoint-geometry" aria-hidden="true">
-          <svg class="checkpoint-route" viewBox="0 0 560 350" fill="none">
-            <path class="route-base" d="M82 117H180Q203 117 220 144L281 240Q295 263 326 263H483"/>
-            <path class="route-in" d="M82 117H180Q203 117 220 144L249 190"/>
-            <path class="route-out" d="M290 240Q305 263 326 263H483"/>
-          </svg>
-          <div class="request-object">
-            <span class="object-label"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg>AI request</span>
-            <strong>Salary details</strong>
-            <span class="request-object-line"></span>
-          </div>
-          <div class="checkpoint-shield">
-            <img src="assets/3d/shield-fallback.png" alt="" width="600" height="600" loading="lazy">
-            <canvas></canvas>
-          </div>
-          <div class="decision-object">
-            <span class="object-label">Decision log <span class="decision-time">14:22</span></span>
-            <strong><svg viewBox="0 0 24 24"><path d="m8 3-5 5v8l5 5h8l5-5V8l-5-5H8Z"/><path d="m9 9 6 6m0-6-6 6"/></svg>Blocked</strong>
-            <span class="decision-rule">r-payroll</span>
-          </div>
-          <span class="checkpoint-caption">Checked locally</span>
-        </div>
-      </figure>
-    </div>
-
-    <!-- Scene 01: the sentence becomes the rules it meant. This is
-         `compilePolicy` in src/policy/compile.ts — a splitting pass, then the
-         measured `compileRule` once per statement, then ratification one rule
-         at a time. The rule texts are the catalogue's and the seed policy's,
-         not invented for the page. -->
-    <div class="chapter" data-chapter="write">
+<section id="how"><div class="wrap sec"><div class="chapter" data-chapter="write">
       <div class="stage">
-      <div class="chapter-caption"><span>01</span> 09:00 · Set the policy</div>
+
       <div class="story-controls" role="group" aria-label="Write scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> Describe</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> Review</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> Activate</button></div><button type="button" data-story-replay aria-label="Replay write scene"><span aria-hidden="true">↻</span> Replay</button></div>
-      <div class="says">
-      <div class="say">
-        <h3>You write one sentence.</h3>
-        <p>Tell Warden what the team needs to protect, the way you’d say it out loud.</p>
-      </div>
-      <div class="say">
-        <h3>Warden turns it into rules.</h3>
-        <p>One instruction becomes the rules it needs. Each comes with examples of what should stop and what should go through.</p>
-      </div>
-      <div class="say">
-        <h3>You read the list and switch them on.</h3>
-        <p>All at once, or one at a time. Here two go live and the contract-terms rule stays off until you say so. Only the rules you activate apply to your team.</p>
-      </div>
-      </div>
-      <div class="sgate" aria-hidden="true"></div>
+      <div class="says"><div class="say"><h2>Tell Warden what stays private.</h2><p>It drafts the rules; you review them before they apply.</p></div></div>
+
 
       <div class="panel rules-scene">
         <div class="pstick">
@@ -234,262 +165,144 @@ setTimeout(function () {
               <div class="composer">
                 <div class="hero-box">
                   <div class="composer-meta"><span class="composer-author">You</span><span class="composer-scope">Your team’s policy</span></div>
-                  <textarea id="ruleMsg" rows="2" readonly tabindex="-1" aria-label="Describe the rule">customer data must not leave the company, and nobody approves payments over USD 5,000 without me</textarea>
-                  <div class="composer-bottom"><span>You decide what goes live.</span><button type="button" class="btn primary send" data-story-step="1" aria-label="Show the example rule drafts"><span class="send-label">Draft rules</span><span class="sent-label">Drafted</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></button></div>
+                  <textarea id="ruleMsg" rows="2" readonly tabindex="-1" aria-label="Describe the rule">Help our team write client emails without exposing confidential information.</textarea>
+                  <div class="composer-bottom"><span>You approve each rule.</span><button type="button" class="btn primary send" data-story-step="1" aria-label="Show the example rule drafts"><span class="send-label">Draft rules</span><span class="sent-label">Review drafts</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></button></div>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="ruleset" id="ruleSet">
-            <div class="policy-list-head"><div><strong>Proposed rules</strong><span>From your instruction</span></div><span class="policy-list-count"><span class="policy-count-draft">3 drafts</span><span class="policy-count-active">2 active · 1 skipped</span></span></div>
-            <div class="rules-empty" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10l6 6v18H7V4h2Zm10 0v7h6M11 16h10m-10 5h7"/></svg><strong>Your rules start as drafts.</strong><span>Read each proposal before it applies to your team.</span></div>
+            <div class="policy-list-head"><div><strong>Proposed rules</strong><span>From your instruction</span></div><span class="policy-list-count"><span class="policy-count-draft">Drafts</span><span class="policy-count-active">Active</span></span></div>
+            <div class="rules-empty" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10l6 6v18H7V4h2Zm10 0v7h6M11 16h10m-10 5h7"/></svg><strong>Warden drafts the rules.</strong><span>You decide what to activate.</span></div>
             <article class="ru">
-              <div class="rule-heading"><h4>Customer personal data</h4><span class="badge BLOCK">Block</span></div>
-              <p class="rtx">Keep identifying customer details inside the company.</p>
-              <div class="rule-bottom"><details class="rule-details"><summary>Read full rule<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></summary><div class="rule-definition"><code class="rid mono">r-customer-personal-data</code><p>Customer personal data (a name together with contact details, an address or a document number) must not be exported or prepared for any recipient outside the company.</p></div></details><span class="rule-draft-state">Not active</span><span class="ract"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>Activated</span></div>
+              <div class="rule-heading"><h4>Client contact details</h4><span class="badge BLOCK">Block</span></div>
+              <p class="rtx">Keep client contact details inside the company.</p>
+              <div class="rule-bottom"><details class="rule-details"><summary>Read full rule<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></summary><div class="rule-definition"><code class="rid mono">r-customer-personal-data</code><p>Client contact details (a name together with contact details, an address or a document number) must not be exported or prepared for any recipient outside the company.</p></div></details><span class="rule-draft-state">Not active</span><span class="ract"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>Active</span></div>
             </article>
-            <article class="ru skip">
+            <article class="ru">
               <div class="rule-heading"><h4>Confidential contract terms</h4><span class="badge BLOCK">Block</span></div>
               <p class="rtx">Keep one customer’s negotiated terms from other customers.</p>
-              <div class="rule-bottom"><details class="rule-details"><summary>Read full rule<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></summary><div class="rule-definition"><code class="rid mono">r-contract-terms</code><p>Contract terms negotiated with a specific customer must not be disclosed to, or compared for, any other customer.</p></div></details><span class="rule-draft-state">Not active</span><span class="ract off">Skipped</span></div>
+              <div class="rule-bottom"><details class="rule-details"><summary>Read full rule<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></summary><div class="rule-definition"><code class="rid mono">r-contract-terms</code><p>Contract terms negotiated with a specific customer must not be disclosed to, or compared for, any other customer.</p></div></details><span class="rule-draft-state">Not active</span><span class="ract">Active</span></div>
             </article>
-            <article class="ru">
-              <div class="rule-heading"><h4>Payments over $5,000</h4><span class="badge ESCALATE">Review</span></div>
-              <p class="rtx">Require the CEO’s written sign-off before releasing funds.</p>
-              <div class="rule-bottom"><details class="rule-details"><summary>Read full rule<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></summary><div class="rule-definition"><code class="rid mono">r-payment-approval</code><p>No one may approve, authorise, or instruct the release of a payment above USD 5,000 without written sign-off from the CEO.</p></div></details><span class="rule-draft-state">Not active</span><span class="ract"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>Activated</span></div>
-            </article>
-            <div class="policy-list-footer"><span class="policy-review-note">Only the rules you activate apply.</span><span class="policy-active-note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>Your choices are in place.</span><button type="button" class="policy-activate" data-story-step="2" aria-label="Show two example rules activated and one skipped">Activate 2 rules<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 9h10m-4-4 4 4-4 4"/></svg></button></div>
+
+            <div class="policy-list-footer"><span class="policy-review-note">Only the rules you activate apply.</span><span class="policy-active-note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>Rules active</span><button type="button" class="policy-activate" data-story-step="2" aria-label="Activate the example rules">Activate rules<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 9h10m-4-4 4 4-4 4"/></svg></button></div>
           </div>
-          <p class="policy-example-note">Illustrative policy. These controls only change the example.</p>
+          <p class="policy-example-note">Example policy. Try drafting and activating the rules.</p>
         </div>
       </div>
       </div>
-    </div>
-
-    <!-- Scene 02: the hook's literal output, in three tools. Radios and
-         labels, not buttons and a handler: the switch works with scripting
-         off, arrow keys come free, and app.js stays out of it. The panes are
-         siblings of the inputs so plain `:checked ~` does all of it. -->
-    <div class="chapter stops" data-chapter="hit">
+    </div><div class="chapter stops" data-chapter="hit">
       <div class="stage">
-      <div class="chapter-caption"><span>02</span> 14:22 · A request hits the rule</div>
-      <div class="story-controls" role="group" aria-label="Hit scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> Request</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> Blocked</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> Their tools</button></div><button type="button" data-story-replay aria-label="Replay hit scene"><span aria-hidden="true">↻</span> Replay</button></div>
-      <div class="says">
-      <div class="say">
-        <h3>Somebody asks for a salary.</h3>
-        <p>14:22, mid-report, inside Claude Code. The check runs on their laptop before the prompt goes anywhere.</p>
-      </div>
-      <div class="say">
-        <h3>Blocked, and told why.</h3>
-        <p>Your rule, quoted back, plus what they can ask instead. No ticket, no Slack thread.</p>
-      </div>
-      <div class="say">
-        <h3>Your rules, in their tools.</h3>
-        <p>Try the tabs. Claude Code, Codex and OpenCode show the same reason through their Warden connection.</p>
-      </div>
-      </div>
-      <div class="sgate" aria-hidden="true"></div>
+
+
+      <div class="says"><div class="say"><h2>Stop it inside their AI tool.</h2><p>Warden checks connected requests before they reach the model.</p></div></div>
+
 
       <div class="panel">
         <div class="pstick">
-          <div class="term tools" data-reveal>
+          <fieldset class="term tools" data-reveal>
+            <legend class="vh">Show the refusal as it arrives in</legend>
             <input class="vh" type="radio" name="tool" id="tool-cc" checked>
             <input class="vh" type="radio" name="tool" id="tool-cx">
             <input class="vh" type="radio" name="tool" id="tool-oc">
 
-            <div class="term-bar picker" role="radiogroup" aria-label="Show the refusal as it arrives in">
-              <label for="tool-cc">claude code</label>
-              <label for="tool-cx">codex</label>
-              <label for="tool-oc">opencode</label>
+            <div class="term-bar picker">
+              <label for="tool-cc">Claude Code</label>
+              <label for="tool-cx">Codex</label>
+              <label for="tool-oc">OpenCode</label>
             </div>
 
             <div class="panes">
               <div class="pane pane-cc">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
-
-   <span class="rule">No one may request payroll, salary, bonus, or
-   compensation information about another employee.
-   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
-   Ask HR for anything about a specific person&#39;s pay.
-   Questions about the process, headcount, or review
-   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">Use one client’s private pricing in an email to another.</span></span></span><span class="tg tg-b"><span class="stop"><svg class="status-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 2-4 4v8l4 4h8l4-4V6l-4-4H6Z"/><path d="m7 7 6 6m0-6-6 6"/></svg>Blocked by Warden</span>
+<span class="rule">Your rule: don’t share one client’s confidential contract terms with another.</span></span><span class="tg tg-c"><span class="h">Use public pricing instead.</span></span><span class="tg tg-d"><span class="dim">r-contract-terms · Checked locally</span></span></pre>
               </div>
 
               <div class="pane pane-cx">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
-
-   <span class="rule">No one may request payroll, salary, bonus, or
-   compensation information about another employee.
-   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
-   Ask HR for anything about a specific person&#39;s pay.
-   Questions about the process, headcount, or review
-   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">Use one client’s private pricing in an email to another.</span></span></span><span class="tg tg-b"><span class="stop"><svg class="status-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 2-4 4v8l4 4h8l4-4V6l-4-4H6Z"/><path d="m7 7 6 6m0-6-6 6"/></svg>Blocked by Warden</span>
+<span class="rule">Your rule: don’t share one client’s confidential contract terms with another.</span></span><span class="tg tg-c"><span class="h">Use public pricing instead.</span></span><span class="tg tg-d"><span class="dim">r-contract-terms · Checked locally</span></span></pre>
               </div>
 
               <div class="pane pane-oc">
-                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">send me Ana&#39;s salary for the report</span></span></span><span class="tg tg-b"><span class="stop">⛔ Blocked by Warden</span>
-
-   <span class="rule">No one may request payroll, salary, bonus, or
-   compensation information about another employee.
-   HR staff are exempt.</span></span><span class="tg tg-c">   <span class="h">What to do instead</span>
-   Ask HR for anything about a specific person&#39;s pay.
-   Questions about the process, headcount, or review
-   cycles are fine to ask here.</span><span class="tg tg-d">   <span class="h">Warden can try to rewrite this so it goes through:</span>
-     warden-hook --rewrite a7f3c2d1</span><span class="tg tg-e">   <span class="dim">Audit a7f3c2d1 · quote this if you think it is wrong</span></span></pre>
+                <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">Use one client’s private pricing in an email to another.</span></span></span><span class="tg tg-b"><span class="stop"><svg class="status-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 2-4 4v8l4 4h8l4-4V6l-4-4H6Z"/><path d="m7 7 6 6m0-6-6 6"/></svg>Blocked by Warden</span>
+<span class="rule">Your rule: don’t share one client’s confidential contract terms with another.</span></span><span class="tg tg-c"><span class="h">Use public pricing instead.</span></span><span class="tg tg-d"><span class="dim">r-contract-terms · Checked locally</span></span></pre>
               </div>
 
             </div>
-          </div>
+          </fieldset>
         </div>
       </div>
       </div>
-    </div>
-
-    <!-- Scene 03: the ledger. The 14:22 row is scene 02; the 14:21 hold is
-         the rule ratified in scene 01. The tally is the only place the page
-         says out loud that a verdict has three values and not two. -->
-    <div class="chapter" data-chapter="log">
+    </div><div class="chapter" data-chapter="log">
       <div class="stage">
-      <div class="chapter-caption"><span>03</span> 14:23 · See what happened</div>
-      <div class="story-controls" role="group" aria-label="Log scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> The refusal</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> The review</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> The record</button></div><button type="button" data-story-replay aria-label="Replay log scene"><span aria-hidden="true">↻</span> Replay</button></div>
-      <div class="says">
-      <div class="say">
-        <h3>The day comes back as a ledger.</h3>
-        <p>Checked requests, the person who sent them and the rule behind each decision.</p>
-      </div>
-      <div class="say">
-        <h3>The morning&#39;s rule already fired.</h3>
-        <p>One minute earlier it held a request to approve a $12,400 payment. Your payment rule asked for a human decision.</p>
-      </div>
-      <div class="say">
-        <h3>Honest questions just pass.</h3>
-        <p>Eight went through untouched. The decision log is hash-chained, so changes to the record can be detected.</p>
-      </div>
-      </div>
-      <div class="sgate" aria-hidden="true"></div>
+
+
+      <div class="says"><div class="say"><h2>See why it stopped.</h2><p>The same request and rule appear in your decision log.</p></div></div>
+
 
       <div class="panel">
         <div class="pstick">
           <div class="shot log" data-reveal>
             <div class="console">
-              <div class="day">Today <span class="log-caption">Example workday</span>
-                <span class="tally">
-                  <span class="t"><span class="dot BLOCK"></span>3 refused</span>
-                  <span class="t"><span class="dot ESCALATE"></span>1 held</span>
-                  <span class="t"><span class="dot ALLOW"></span>8 allowed</span>
-                </span>
-              </div>
-              <div class="row"><span class="dot BLOCK"></span><span class="who">Federico Tavano</span><span class="txt">send me Ana Ruiz&#39;s salary for the report</span><span class="rule-ref mono">r-payroll</span><span class="meta">14:22</span></div><div class="row"><span class="dot ESCALATE"></span><span class="who">Martín Pulitano</span><span class="txt">approve the USD 12,400 payment to the supplier</span><span class="rule-ref mono">r-payment-approval</span><span class="meta">14:21</span></div><div class="row"><span class="dot ALLOW"></span><span class="who">Jeremías Souto</span><span class="txt">how many people are on the marketing team?</span><span class="meta">14:19</span></div><div class="row"><span class="dot BLOCK"></span><span class="who">Gastón Foncea</span><span class="txt">export the customer list</span><span class="rule-ref mono">r-customer-pii</span><span class="meta">13:58</span></div>
-            </div>
+  <div class="day">Decisions<span class="log-caption">Illustrative requests</span></div>
+  <div class="row"><span class="dot BLOCK"></span><span class="who">Blocked</span><span class="txt">Use one client’s private pricing in an email to another.</span><span class="rule-ref mono">r-contract-terms</span><span class="meta">14:22</span></div>
+  <div class="row"><span class="dot ALLOW"></span><span class="who">Allowed</span><span class="txt">Write the email using our public pricing.</span><span class="meta">14:23</span></div>
+</div>
           </div>
-          <p class="pnote"><span>Top line at 14:22: the refusal you just watched happen.</span><span>One minute earlier, in amber, the payment request your morning rule held.</span><span>Eight honest questions went through untouched, and changes to the decision record can be detected.</span></p>
+
         </div>
       </div>
       </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- ── §2 scene four: what it costs ─────────────────────────────────────── -->
-<!--
-     Built with the same scene machinery as §1, because it is the same gate
-     doing the other half of its job. The ceilings are one mono line rather
-     than four cards: nobody reads four cards to learn that a quota is a
-     sentence about a role.
--->
-<section id="spend">
-  <div class="wrap sec">
-
-    <div class="main" data-reveal>
-      <p class="label kicker">What it costs</p>
-      <h2 class="loud"><span class="ln"><span>A prompt that leaks nothing</span></span><span class="ln"><span>can still cost you.</span></span></h2>
-    </div>
-
-    <div class="chapter" data-chapter="spend">
+    </div></div></section>
+<section id="spend"><div class="wrap sec"><div class="chapter" data-chapter="spend">
       <div class="stage">
-      <div class="chapter-caption"><span>04</span> 14:24 · Keep usage in check</div>
-      <div class="story-controls" role="group" aria-label="Spend scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> The request</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> The limit</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> The review</button></div><button type="button" data-story-replay aria-label="Replay spend scene"><span aria-hidden="true">↻</span> Replay</button></div>
-      <div class="says">
-      <div class="say">
-        <h3>An agent, left running.</h3>
-        <p>Somebody said keep going on a big repository and walked off. 128,400 tokens since this morning.</p>
-      </div>
-      <div class="say">
-        <h3>Over the ceiling.</h3>
-        <p>The next request is held when reported usage reaches the role’s limit.</p>
-      </div>
-      <div class="say">
-        <h3>Held, never refused.</h3>
-        <p>It waits for an administrator. They can review the request and decide how the work continues.</p>
-      </div>
-      </div>
-      <div class="sgate" aria-hidden="true"></div>
+
+
+      <div class="says"><div class="say"><h2>Limit usage, too.</h2><p>At the reported usage ceiling, Warden holds the next request for review.</p></div></div>
+
 
       <div class="panel">
         <div class="pstick">
           <div class="term" data-reveal>
-            <div class="term-bar">claude code</div>
-            <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">keep going — refactor the rest of the module</span></span></span><span class="tg tg-b"><span class="hold">⏸ Held for review by Warden</span>
-
-   <span class="rule">this session has generated 128,400 tokens, over the
-   100,000 allowed for role &quot;engineer&quot;</span></span><span class="tg tg-c">   Waiting on an administrator. Not a refusal:
-   when they answer, ask again and it is judged on its own.</span><span class="tg tg-d">   <span class="dim">Audit b41e9a07 · quote this if you think it is wrong</span></span></pre>
+            <div class="term-bar">Example usage limit</div>
+            <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">Keep going with the refactor.</span></span></span><span class="tg tg-b"><span class="hold">Held for review by Warden</span>
+<span class="rule">128,400 tokens reported · 100,000 allowed</span></span><span class="tg tg-c">An administrator reviews the next request.</span></pre>
           </div>
 
-          <p class="pnote"><span>128,400 tokens reported this session, against a ceiling of 100,000.</span><span>The key belongs to an engineer, so the engineer&#39;s ceiling is the one that applies.</span><span>Held rather than refused, so the work survives the wait.</span></p>
 
-          <div class="ceilings">
-            <span class="label">Ceilings, per role</span>
-            <ul>
-              <li><span class="r">intern</span><span class="v">20 prompts a day</span></li>
-              <li><span class="r">analyst</span><span class="v">100 prompts a day</span></li>
-              <li class="ceil-eng"><span class="r">engineer</span><span class="v">200 a day · 100k tokens a session</span></li>
-              <li><span class="r">finance</span><span class="v">150 prompts a day</span></li>
-              <li><span class="r">admin</span><span class="v">500 prompts a day</span></li>
-            </ul>
-          </div>
+
+
         </div>
       </div>
       </div>
-    </div>
-
-  </div>
-</section>
-
+    </div></div></section>
 </main>
 
-<!-- The official shield, closing statement and installers share one scene. -->
+<!-- The closing action repeats the download without repeating the hero. -->
 <footer id="download">
   <div class="wrap foot">
     <div class="closing-body">
-      <div class="shield-stage" aria-hidden="true"><img class="shield-fallback" src="assets/3d/shield-fallback.png" alt="" width="480" height="480" loading="lazy"><canvas width="480" height="480"></canvas></div>
       <div class="closing-copy">
-        <p class="close">Writing them down was never the hard part.</p>
+        <div class="download-heading"><h2 class="close">Download Warden</h2><p class="fine">Free for everyone. Open source.</p></div>
         <div class="closing-actions">
     <div class="dl">
-      <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg">
+      <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg" aria-label="Download for macOS, Apple Silicon">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z"/></svg>
           <span>
-            <span class="t">macOS</span>
-            <span class="m">Apple Silicon · .dmg</span>
+            <span class="t"><span class="dl-verb">Download for </span>macOS</span>
           </span>
           <span class="go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg></span>
         </a>
-      <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-Setup.exe">
+      <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-Setup.exe" aria-label="Download for Windows, x64">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3zM11.1 4.5 21 3v8.5h-9.9zM3 12.4h7.2v6.9L3 18.4zM11.1 12.4H21V21l-9.9-1.4z"/></svg>
           <span>
-            <span class="t">Windows</span>
-            <span class="m">x64 · .exe</span>
+            <span class="t"><span class="dl-verb">Download for </span>Windows</span>
           </span>
           <span class="go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg></span>
         </a>
+      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <span aria-hidden="true">↗</span></a>
     </div>
-    <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <span aria-hidden="true">↗</span></a>
-    <p class="fine"><strong>Free for everyone. Open source.</strong><br>Policy checks run locally. Allowed requests continue to your configured model.</p>
         </div>
       </div>
     </div>
@@ -508,9 +321,10 @@ setTimeout(function () {
 </footer>
 
 <dialog id="film-dialog" aria-labelledby="film-title"><div class="film-bar"><h2 id="film-title">Warden in 17 seconds</h2><button type="button" id="close-film" aria-label="Close film">✕</button></div><video id="launch-video" controls playsinline preload="none" poster="assets/launch/launch-poster-v12.jpg"><source data-src="assets/launch/launch.mp4?v=12" type="video/mp4"><a href="assets/launch/launch.mp4?v=12">Watch the Warden launch film</a></video></dialog>
-<script type="module" src="app.js?v=gate-4"></script>
-<script type="module" src="story-depth.js?v=motion-2"></script>
-<script type="module" src="analytics-entry.js?v=motion-2"></script>
+<script type="module" src="app.js?v=hero-flow-1"></script>
+
+<script type="module" src="analytics-entry.js?v=hero-flow-1"></script>
+<script type="module" src="kool-entry.js?v=download-1"></script>
 
 </body>
 </html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Warden social card</title>
+  <style>
+    @font-face {
+      font-family: Manrope;
+      src: url("assets/brand/Manrope-Variable.ttf") format("truetype");
+      font-weight: 200 800;
+      font-display: block;
+    }
+
+    :root {
+      color-scheme: dark;
+      --carbon: #101113;
+      --white: #fff;
+      --grey: #b5b8be;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1200px; height: 630px; }
+    body {
+      background: var(--carbon);
+      color: var(--white);
+      font-family: Manrope, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      position: relative;
+      isolation: isolate;
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+    }
+
+    .wordmark {
+      position: absolute;
+      left: 74px;
+      top: 64px;
+      width: 187px;
+      height: auto;
+      filter: brightness(0) invert(1);
+    }
+
+    h1 {
+      position: absolute;
+      left: 70px;
+      top: 213px;
+      margin: 0;
+      font-size: 84px;
+      line-height: 1.08;
+      font-weight: 650;
+      letter-spacing: -4.6px;
+    }
+
+    h1 span { display: block; }
+
+    .qualifier {
+      position: absolute;
+      left: 74px;
+      bottom: 65px;
+      margin: 0;
+      color: var(--grey);
+      font-size: 25px;
+      line-height: 1.25;
+      font-weight: 450;
+      letter-spacing: -.4px;
+    }
+
+    .shield {
+      position: absolute;
+      z-index: -1;
+      left: 652px;
+      top: 5px;
+      width: 600px;
+      height: 600px;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <main class="card" aria-label="Warden. AI rules that actually apply. Free. Open source.">
+    <img class="wordmark" src="assets/brand/warden-wordmark-light.svg" alt="Warden">
+    <h1><span>AI rules that</span><span>actually apply.</span></h1>
+    <p class="qualifier">Free. Open source.</p>
+    <img class="shield" src="assets/3d/shield-fallback.png" alt="" width="600" height="600">
+  </main>
+</body>
+</html>

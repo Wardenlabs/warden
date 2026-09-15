@@ -1,0 +1,8 @@
+{
+  "name": "warden-kool-integration",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@joinkool/sdk": "https://app.joinkool.co/scripts/kool-sdk.tgz"
+  }
+}

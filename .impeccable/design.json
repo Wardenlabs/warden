@@ -1,0 +1,745 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-10T09:16:07+00:00",
+  "title": "Design System: Warden",
+  "extensions": {
+    "colorMeta": {
+      "white": {
+        "role": "primary",
+        "displayName": "White",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "white-hover": {
+        "role": "primary",
+        "displayName": "White Hover",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "white-ink": {
+        "role": "primary",
+        "displayName": "White Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "studio": {
+        "role": "neutral",
+        "displayName": "Studio",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "night-950": {
+        "role": "neutral",
+        "displayName": "Night 950",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "night-900": {
+        "role": "neutral",
+        "displayName": "Night 900",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "night-850": {
+        "role": "neutral",
+        "displayName": "Night 850",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "night-800": {
+        "role": "neutral",
+        "displayName": "Night 800",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "night-750": {
+        "role": "neutral",
+        "displayName": "Night 750",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "steel-500": {
+        "role": "neutral",
+        "displayName": "Steel 500",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "steel-400": {
+        "role": "neutral",
+        "displayName": "Steel 400",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "steel-300": {
+        "role": "neutral",
+        "displayName": "Steel 300",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "steel-200": {
+        "role": "neutral",
+        "displayName": "Steel 200",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Line Soft",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Line Strong",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "coral": {
+        "role": "secondary",
+        "displayName": "Coral",
+        "tonalRamp": [
+          "oklch(15% 0.06 25)",
+          "oklch(26% 0.06 25)",
+          "oklch(38% 0.06 25)",
+          "oklch(49% 0.06 25)",
+          "oklch(61% 0.06 25)",
+          "oklch(72% 0.06 25)",
+          "oklch(84% 0.06 25)",
+          "oklch(95% 0.06 25)"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Amber",
+        "tonalRamp": [
+          "oklch(15% 0.06 80)",
+          "oklch(26% 0.06 80)",
+          "oklch(38% 0.06 80)",
+          "oklch(49% 0.06 80)",
+          "oklch(61% 0.06 80)",
+          "oklch(72% 0.06 80)",
+          "oklch(84% 0.06 80)",
+          "oklch(95% 0.06 80)"
+        ]
+      },
+      "studio-block": {
+        "role": "secondary",
+        "displayName": "Studio Block",
+        "tonalRamp": [
+          "oklch(15% 0.06 25)",
+          "oklch(26% 0.06 25)",
+          "oklch(38% 0.06 25)",
+          "oklch(49% 0.06 25)",
+          "oklch(61% 0.06 25)",
+          "oklch(72% 0.06 25)",
+          "oklch(84% 0.06 25)",
+          "oklch(95% 0.06 25)"
+        ]
+      },
+      "product-bg": {
+        "role": "neutral",
+        "displayName": "Product Bg",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-raised": {
+        "role": "neutral",
+        "displayName": "Product Raised",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-sunken": {
+        "role": "neutral",
+        "displayName": "Product Sunken",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-line": {
+        "role": "neutral",
+        "displayName": "Product Line",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-soft-line": {
+        "role": "neutral",
+        "displayName": "Product Soft Line",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-ink": {
+        "role": "neutral",
+        "displayName": "Product Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-secondary": {
+        "role": "neutral",
+        "displayName": "Product Secondary",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-faint": {
+        "role": "neutral",
+        "displayName": "Product Faint",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "product-block": {
+        "role": "secondary",
+        "displayName": "Product Block",
+        "tonalRamp": [
+          "oklch(15% 0.06 25)",
+          "oklch(26% 0.06 25)",
+          "oklch(38% 0.06 25)",
+          "oklch(49% 0.06 25)",
+          "oklch(61% 0.06 25)",
+          "oklch(72% 0.06 25)",
+          "oklch(84% 0.06 25)",
+          "oklch(95% 0.06 25)"
+        ]
+      },
+      "product-block-soft": {
+        "role": "secondary",
+        "displayName": "Product Block Soft",
+        "tonalRamp": [
+          "oklch(15% 0.06 25)",
+          "oklch(26% 0.06 25)",
+          "oklch(38% 0.06 25)",
+          "oklch(49% 0.06 25)",
+          "oklch(61% 0.06 25)",
+          "oklch(72% 0.06 25)",
+          "oklch(84% 0.06 25)",
+          "oklch(95% 0.06 25)"
+        ]
+      },
+      "product-review": {
+        "role": "tertiary",
+        "displayName": "Product Review",
+        "tonalRamp": [
+          "oklch(15% 0.06 80)",
+          "oklch(26% 0.06 80)",
+          "oklch(38% 0.06 80)",
+          "oklch(49% 0.06 80)",
+          "oklch(61% 0.06 80)",
+          "oklch(72% 0.06 80)",
+          "oklch(84% 0.06 80)",
+          "oklch(95% 0.06 80)"
+        ]
+      },
+      "product-review-soft": {
+        "role": "tertiary",
+        "displayName": "Product Review Soft",
+        "tonalRamp": [
+          "oklch(15% 0.06 80)",
+          "oklch(26% 0.06 80)",
+          "oklch(38% 0.06 80)",
+          "oklch(49% 0.06 80)",
+          "oklch(61% 0.06 80)",
+          "oklch(72% 0.06 80)",
+          "oklch(84% 0.06 80)",
+          "oklch(95% 0.06 80)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Manrope hero statement with white enforcement emphasis."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Large Manrope section statements."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Manrope story arguments."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Manrope explanations and product content."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "System-mono chapter labels and operational evidence."
+      }
+    },
+    "shadows": [
+      {
+        "name": "product-plane",
+        "value": "0 1rem 3rem rgb(23 24 26 / .045)",
+        "purpose": "Faint boundary around a complete flat white editor, terminal, or log."
+      },
+      {
+        "name": "hero-request",
+        "value": "0 1.5rem 3rem rgb(0 0 0 / .22)",
+        "purpose": "Lifts the small light request sheet beside the unboxed shield."
+      },
+      {
+        "name": "illustrated-object",
+        "value": "0 20px 40px rgb(22 24 28 / .12)",
+        "purpose": "Grounds request and decision sheets in the light illustration."
+      },
+      {
+        "name": "hero-shield",
+        "value": "drop-shadow(0 2.5rem 2rem rgb(0 0 0 / .38))",
+        "purpose": "Gives the official silver-and-white shield physical weight."
+      },
+      {
+        "name": "modal-focus",
+        "value": "0 2rem 6rem rgb(0 0 0 / .62)",
+        "purpose": "Deep elevation reserved for the native film dialog."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Primary settling curve for state changes, reveals, and finite impacts."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+        "purpose": "Reserved symmetric curve for deliberate state travel."
+      },
+      {
+        "name": "control-fast",
+        "value": "160–180ms var(--ease-out)",
+        "purpose": "Button, link, disclosure, and tool-tab feedback."
+      },
+      {
+        "name": "state-medium",
+        "value": "220–380ms var(--ease-out)",
+        "purpose": "Pressed indicators, verdict color changes, and narration swaps."
+      },
+      {
+        "name": "content-reveal",
+        "value": "opacity 520ms var(--ease-out), transform 700ms var(--ease-out)",
+        "purpose": "One-time section reveal that settles completely for reading."
+      },
+      {
+        "name": "hero-impact",
+        "value": "620ms var(--ease-out)",
+        "purpose": "One finite request-to-verdict event across request, silver shield, and result."
+      },
+      {
+        "name": "checkpoint-sequence",
+        "value": "650–900ms var(--ease-out) with bounded 150–700ms delays",
+        "purpose": "Carries a request through the shield into the decision record once."
+      },
+      {
+        "name": "shield-entrance",
+        "value": "1900ms finite entrance",
+        "purpose": "Introduces the neutral silver-and-white official object once; pauses while hidden or offscreen and sleeps when settled."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "minimum-viewport",
+        "value": "20rem"
+      },
+      {
+        "name": "checkpoint-small",
+        "value": "22.5rem"
+      },
+      {
+        "name": "checkpoint-medium",
+        "value": "26.875rem"
+      },
+      {
+        "name": "compact-product",
+        "value": "27rem"
+      },
+      {
+        "name": "compact-copy",
+        "value": "30rem"
+      },
+      {
+        "name": "checkpoint-fallback",
+        "value": "32.5rem"
+      },
+      {
+        "name": "product-comfort",
+        "value": "40rem"
+      },
+      {
+        "name": "medium",
+        "value": "48rem"
+      },
+      {
+        "name": "wide-layout",
+        "value": "64rem"
+      },
+      {
+        "name": "product-reference",
+        "value": "90rem"
+      },
+      {
+        "name": "cinema",
+        "value": "100rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Download Button",
+      "kind": "button",
+      "description": "A native action with visible focus and restrained neutral feedback.",
+      "html": "<button class=\"ds-primary\" type=\"button\">Download for macOS</button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.75rem 1.125rem;border:1px solid var(--accent,#fff);border-radius:var(--radius-md,.375rem);background:var(--accent,#fff);color:var(--accent-ink,#17181b);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-primary:hover{background:var(--accent-hover,#e4e4df);}.ds-primary:focus-visible{outline:2px solid var(--accent,#fff);outline-offset:4px;}.ds-primary:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none;transform:none;}}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "description": "A native action with visible focus and restrained neutral feedback.",
+      "html": "<button class=\"ds-secondary\" type=\"button\">View source</button>",
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.75rem 1.125rem;border:1px solid var(--line-strong,#62666d);border-radius:var(--radius-md,.375rem);background:var(--night-900,#151619);color:var(--paper,#f2f2ef);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-secondary:hover{background:var(--night-800,#222428);}.ds-secondary:focus-visible{outline:2px solid var(--line-strong,#62666d);outline-offset:4px;}.ds-secondary:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none;transform:none;}}",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Product Action",
+      "kind": "button",
+      "description": "A native action with visible focus and restrained neutral feedback.",
+      "html": "<button class=\"ds-product\" type=\"button\">Activate rules</button>",
+      "css": ".ds-product{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.75rem 1.125rem;border:1px solid var(--product-ink,#17181a);border-radius:.2rem;background:var(--product-ink,#17181a);color:var(--product-bg,#fff);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-product:hover{background:#37393d;}.ds-product:focus-visible{outline:2px solid var(--product-ink,#17181a);outline-offset:4px;}.ds-product:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-product{transition:none;transform:none;}}",
+      "refersTo": "button-product"
+    },
+    {
+      "name": "Policy Composer",
+      "kind": "input",
+      "description": "A read-only landing example on a quiet pale writing area.",
+      "html": "<section class=\"ds-composer\"><strong class=\"ds-author\">You</strong><textarea class=\"ds-policy-text\" readonly tabindex=\"-1\" aria-label=\"Example policy\">customer data must not leave the company</textarea><span class=\"ds-note\">You decide what goes live.</span></section>",
+      "css": ".ds-composer{padding:1.5rem 1rem 1rem;background:var(--product-raised,#f5f5f3);color:var(--product-ink,#17181a);font-family:var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);border-bottom:1px solid var(--product-line,#d7d7d2);}.ds-author{font-size:.8125rem;font-weight:620;}.ds-policy-text{display:block;width:100%;height:9rem;resize:none;margin-top:1rem;padding:0;border:0;background:transparent;color:var(--product-ink,#17181a);font:470 1.125rem/1.42 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:-.03em;}.ds-note{color:var(--product-faint,#646870);font-size:.75rem;}",
+      "refersTo": "policy-field"
+    },
+    {
+      "name": "Block Badge",
+      "kind": "chip",
+      "description": "Explicit verdict text on a dedicated pale semantic surface.",
+      "html": "<span class=\"ds-badge-block\">BLOCK</span>",
+      "css": ".ds-badge-block{display:inline-block;padding:.22rem .45rem;border-radius:.15rem;background:var(--product-block-soft,#fff0ef);color:var(--product-block,#ac3036);font:650 .6875rem/1.4 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:.025em;text-transform:uppercase;}",
+      "refersTo": "badge-block"
+    },
+    {
+      "name": "Review Badge",
+      "kind": "chip",
+      "description": "Explicit verdict text on a dedicated pale semantic surface.",
+      "html": "<span class=\"ds-badge-review\">REVIEW</span>",
+      "css": ".ds-badge-review{display:inline-block;padding:.22rem .45rem;border-radius:.15rem;background:var(--product-review-soft,#fff5df);color:var(--product-review,#80550a);font:650 .6875rem/1.4 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:.025em;text-transform:uppercase;}",
+      "refersTo": "badge-review"
+    },
+    {
+      "name": "Product Rule Row",
+      "kind": "card",
+      "description": "A flat white rule row with native disclosure and neutral active status.",
+      "html": "<article class=\"ds-rule\"><div class=\"ds-rule-head\"><strong>Customer data stays inside</strong><span class=\"ds-rule-badge\">BLOCK</span></div><p>Requests containing customer data are blocked.</p><div class=\"ds-rule-foot\"><details class=\"ds-rule-details\"><summary>Read full rule</summary><p>Do not send customer data outside the company.</p></details><span class=\"ds-active\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"m3 8 3 3 7-7\"/></svg>Active</span></div></article>",
+      "css": ".ds-rule{padding:1.25rem 1rem .75rem;background:var(--product-bg,#fff);color:var(--product-ink,#17181a);border:1px solid var(--product-line,#d7d7d2);border-radius:.25rem;font:400 1rem/1.5 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);box-shadow:0 1rem 3rem rgb(23 24 26 / .045);}.ds-rule-head,.ds-rule-foot{display:flex;justify-content:space-between;align-items:start;gap:.75rem;}.ds-rule-head strong{font-weight:620;}.ds-rule-badge{padding:.22rem .45rem;border-radius:.15rem;background:var(--product-block-soft,#fff0ef);color:var(--product-block,#ac3036);font-size:.6875rem;font-weight:650;}.ds-rule p{color:var(--product-secondary,#50535a);}.ds-rule-details summary{display:flex;min-height:44px;align-items:center;color:var(--product-secondary,#50535a);font-size:.75rem;cursor:pointer;}.ds-rule-details summary:hover{color:var(--product-ink,#17181a);text-decoration:underline;}.ds-rule-details summary:focus-visible{outline:2px solid var(--product-ink,#17181a);outline-offset:4px;}.ds-active{display:inline-flex;min-height:44px;align-items:center;gap:.35rem;font-size:.75rem;font-weight:550;white-space:nowrap;}.ds-active svg{width:.8rem;height:.8rem;}",
+      "refersTo": "product-panel"
+    },
+    {
+      "name": "Story Step Navigation",
+      "kind": "nav",
+      "description": "Native story buttons with pressed state and a neutral underline on the light section.",
+      "html": "<div class=\"ds-steps\" role=\"group\" aria-label=\"Policy scene\"><button type=\"button\" aria-pressed=\"false\">Describe</button><button type=\"button\" aria-pressed=\"true\">Review</button><button type=\"button\" aria-pressed=\"false\">Activate</button></div>",
+      "css": ".ds-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#f1f1ee;border-bottom:1px solid #c7c8c4;}.ds-steps button{min-height:44px;padding:.6rem .25rem;border:0;border-bottom:2px solid transparent;background:transparent;color:#5d6067;font:400 .75rem/1.2 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);text-align:left;cursor:pointer;}.ds-steps button[aria-pressed=\"true\"]{color:#17181b;border-bottom-color:#17181b;}.ds-steps button:hover{color:#17181b;}.ds-steps button:focus-visible{outline:2px solid #17181b;outline-offset:4px;}"
+    },
+    {
+      "name": "Decision Log Row",
+      "kind": "custom",
+      "description": "A labeled decision on white, separated with a soft line.",
+      "html": "<div class=\"ds-log-row\"><span class=\"ds-log-dot\" aria-hidden=\"true\"></span><strong>Customer data</strong><span class=\"ds-log-decision\">Blocked before sending</span><time>09:41</time></div>",
+      "css": ".ds-log-row{display:grid;grid-template-columns:.6rem minmax(0,1fr) auto;grid-template-areas:\"dot who time\" \". copy copy\";align-items:center;gap:.5rem .6rem;min-height:7rem;padding:1.1rem 1rem;background:var(--product-bg,#fff);border-bottom:1px solid var(--product-soft-line,#e5e5df);font-family:var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);}.ds-log-dot{grid-area:dot;width:.4rem;height:.4rem;border-radius:50%;background:var(--product-block,#ac3036);}.ds-log-row strong{grid-area:who;color:var(--product-ink,#17181a);font-size:.875rem;font-weight:580;}.ds-log-decision{grid-area:copy;color:var(--product-secondary,#50535a);font-size:1rem;}.ds-log-row time{grid-area:time;color:var(--product-faint,#646870);font:400 .75rem/1.5 var(--mono,ui-monospace,monospace);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Warden White Studio",
+    "overview": "White is Warden's brand. A large silver-and-white shield carries the identity with real geometry, neutral metal lighting, and room around its silhouette. Charcoal provides the stage for this object and the white download action; the product story opens into a light studio with white working surfaces, dark text, and deliberate whitespace.\n\nThe interface is modern, clean, and readable. Manrope gives the large statements and product copy one consistent voice. Fine rules, aligned rows, compact labels, and restrained red and amber verdicts help the reader follow a request from policy to decision. Depth belongs primarily to the sculpted shield and the request illustration; the product itself remains flat and steady.\n\nThis is a code-led system documenting the user's white brand direction and the current implementation, not a claim of an approved visual comp. The active sources are `landing/foundation-v2.css`, `landing/experience-v2.css`, and `landing/product-scenes-v2.css`, loaded by `landing/index.html`. Older unused styles are not visual authority. `PRODUCT.md` remains the source of product truth.",
+    "keyCharacteristics": [
+      "White brand actions and a sculptural silver-and-white official shield.",
+      "A charcoal hero and closing frame surrounding a spacious light product story.",
+      "Self-hosted Manrope paired with compact system-mono evidence.",
+      "Flat white product canvases, quiet chrome, and aligned information rows.",
+      "Red for block, amber for review, and neutral active or allow states, always labeled.",
+      "Finite explanatory motion, native controls, and complete static fallbacks."
+    ],
+    "rules": [
+      {
+        "name": "The White Identity Rule",
+        "body": "White and neutral metal carry Warden's brand. Do not introduce green, mint, or teal as brand, action, activation, or lighting accents.",
+        "section": "colors"
+      },
+      {
+        "name": "The Labeled Verdict Rule",
+        "body": "Red means block and amber means review or hold. Active and allow stay neutral. Pair every verdict with explicit words, an icon, or both; choose the dedicated semantic tokens for its light or dark surface.",
+        "section": "colors"
+      },
+      {
+        "name": "The Statement and Evidence Rule",
+        "body": "Use Manrope for statements and interface content; reserve mono for times, rule IDs, counts, limits, platforms, and audit references.",
+        "section": "typography"
+      },
+      {
+        "name": "The Readable Evidence Rule",
+        "body": "Reflow dense rows and wrap technical strings on narrow screens. Keep compact badges and secondary references at or above 0.6875rem, and keep request and decision copy larger.",
+        "section": "typography"
+      },
+      {
+        "name": "The Immediate Download Rule",
+        "body": "The primary platform download is visible from first paint, before the demonstration, and never moves or waits for a verdict sequence.",
+        "section": "layout"
+      },
+      {
+        "name": "The Native Scroll Rule",
+        "body": "Keep browser-native vertical scrolling. Chapters can play once when visible; they never pin the viewport, trap the wheel, or require playback to reveal the complete story.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Product Rule",
+        "body": "Separate product content through spacing, alignment, tonal surfaces, and hairlines. Keep rows and panels steady at rest and on hover; reserve physical staging for the shield illustration.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Readable Rest Rule",
+        "body": "Motion explains cause and effect, then stops. A visitor must be able to inspect the full decision without chasing moving content.",
+        "section": "components"
+      },
+      {
+        "name": "The Honest Fallback Rule",
+        "body": "No-JavaScript and reduced-motion experiences show complete content and real native controls; they do not expose instructions for interactions that are unavailable.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** lead with white brand actions and the official silver-and-white sculpted shield.",
+      "**Do** give product examples light, flat working surfaces, aligned rows, and readable dark text.",
+      "**Do** use red for block, amber for review, and neutral active or allow states with explicit labels or icons.",
+      "**Do** keep the immediate platform download visible and repeat concrete macOS and Windows downloads near the close.",
+      "**Do** distinguish example drafts from activated rules and keep full rule text available through native disclosures.",
+      "**Do** preserve local Manrope assets and their license, native scrolling, visible focus, and 44px interaction targets.",
+      "**Do** provide complete static evidence for reduced-motion and no-JavaScript visitors.",
+      "**Do** preserve the existing analytics hooks and defer factual product claims to `PRODUCT.md`."
+    ],
+    "donts": [
+      "**Don't** reintroduce green, mint, or teal as Warden's brand, action, status, or shield-lighting direction.",
+      "**Don't** restore the obsolete continuous dark product treatment or let unused legacy styles override the active v2 system.",
+      "**Don't** box the hero shield into another dashboard or give every product row its own card and shadow.",
+      "**Don't** replace the supplied mark geometry or present the current code-led direction as an approved visual comp.",
+      "**Don't** add generic particles, constant ambient motion, scroll traps, or letter-by-letter headline animation.",
+      "**Don't** delay, move, or hide the primary download while the demonstration plays.",
+      "**Don't** convey a verdict by color alone or turn read-only examples into misleading editable controls.",
+      "**Don't** invent product evidence, installer destinations, customers, or analytics payloads for a visual effect."
+    ]
+  }
+}

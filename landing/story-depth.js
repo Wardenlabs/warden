@@ -3,6 +3,7 @@ if (checkpoint) {
   const geometry = checkpoint.querySelector('.checkpoint-geometry');
   const shield = checkpoint.querySelector('.checkpoint-shield');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const lowCapability = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
   let visible = false, assetsReady = false, started = false, finished = reducedMotion.matches;
   let shieldLoad;
 
@@ -29,8 +30,16 @@ if (checkpoint) {
 
   function loadShield() {
     if (shieldLoad) return shieldLoad;
+    if (reducedMotion.matches || lowCapability) {
+      shieldLoad = Promise.resolve(false).then(() => {
+        assetsReady = true;
+        settle();
+        return false;
+      });
+      return shieldLoad;
+    }
     shieldLoad = (shield
-      ? import('./shield.js?v=depth-1').then(({ mountShield }) => mountShield(shield).ready)
+      ? import('./shield.js?v=white-studio-1').then(({ mountShield }) => mountShield(shield).ready)
       : Promise.resolve(false))
       .catch(() => false)
       .then(() => {

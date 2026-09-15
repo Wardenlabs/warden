@@ -22,3 +22,11 @@ desktop/dist
 # Source films, revision history and local QA are not part of the website.
 videos
 output
+
+# Local pairing, credentials and agent state must not be uploaded.
+.env*
+.mcp.json
+.kool
+.agents
+.codex
+.pnpm-store

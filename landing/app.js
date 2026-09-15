@@ -1,7 +1,8 @@
-import { mountLight } from './light.js?v=motion-2';
 
 // The head watchdog falls back to readable markup if this module cannot load.
 window.__wardenReady = true;
+// Restore enhancement if the readable fallback ran while this module was delayed.
+document.documentElement.classList.add('js');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const hasIO = 'IntersectionObserver' in window;
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -57,44 +58,10 @@ function makeTyper(elements) {
 }
 
 const zone = document.querySelector('.hero-zone');
-let heroReady = false, heroFallback;
-function showHeroChoices() {
-  if (heroReady) return;
-  heroReady = true;
-  clearTimeout(heroFallback);
-  zone?.classList.add('hero-ready');
-  if (zone) zone.dataset.heroPhase = 'ready';
-}
-let light;
-try { if (zone) light = mountLight(zone, {
-  onVerdictSettled: showHeroChoices,
-  onUnavailable: () => { if (zone.classList.contains('judged')) showHeroChoices(); }
-}); }
-catch (error) { zone?.classList.add('nogl'); console.warn(error.message); }
-const judge = document.getElementById('judge');
-const heroTyper = makeTyper(judge ? [judge.querySelector('.typed')] : []);
-const heroPlayback = new AbortController();
-function heroVerdict(on) {
-  judge?.classList.toggle('judged', on);
-  zone?.classList.toggle('judged', on);
-  light?.set(on);
-}
-if (zone && !motion.matches) {
-  heroVerdict(false);
-  if (zone) zone.dataset.heroPhase = 'request';
-  // Secondary links must still become available if the GPU or a tab stops
-  // producing frames. The primary action is never in this delayed group.
-  heroFallback = setTimeout(showHeroChoices, 2500);
-  (async () => {
-    if (!await wait(140, heroPlayback.signal)) return;
-    await heroTyper?.run(620, heroPlayback.signal);
-    if (await wait(140, heroPlayback.signal)) {
-      heroVerdict(true);
-      if (zone && !heroReady) zone.dataset.heroPhase = 'verdict';
-      if (!light && await wait(500, heroPlayback.signal)) showHeroChoices();
-    }
-  })();
-} else { heroVerdict(true); showHeroChoices(); }
+let heroChoiceTimer;
+function showHeroChoices() { clearTimeout(heroChoiceTimer); zone?.classList.add('hero-ready'); }
+if (motion.matches) showHeroChoices();
+else heroChoiceTimer = setTimeout(showHeroChoices, 1900);
 
 const revealables = $$('[data-reveal]');
 let revealObserver;
@@ -114,13 +81,13 @@ const chapters = $$('.chapter');
 const ruleBox = document.getElementById('ruleMsg');
 const sendButton = document.querySelector('[data-chapter="write"] .send');
 const timings = {
-  write: { type: 620, first: 900, second: 1500 },
-  hit: { type: 480, first: 780, second: 1200 },
-  log: { type: 0, first: 850, second: 1250 },
-  spend: { type: 520, first: 850, second: 1250 }
+  write: { type: 420, first: 620, second: 880 },
+  hit: { type: 340, first: 520, second: 760 },
+  log: { type: 0, first: 520, second: 720 },
+  spend: { type: 360, first: 560, second: 800 }
 };
 const states = new Map(chapters.map(chapter => [chapter, {
-  controller: null, started: false,
+  controller: null, started: false, manual: false, scrollDriven: false,
   typer: makeTyper(chapter.dataset.chapter === 'write' ? [ruleBox] : $$('.pt', chapter))
 }]));
 let autoplay;
@@ -169,12 +136,16 @@ function stop(chapter) {
 }
 function setStep(chapter, step, { effects = false, signal } = {}) {
   if (step > 0) states.get(chapter).typer?.finish();
+  const focusedActivation = step !== 1 && document.activeElement?.matches('.policy-activate')
+    && chapter.contains(document.activeElement);
   chapter.dataset.step = String(step);
+  if (focusedActivation) chapter.querySelector('.story-steps [data-story-step="2"]')?.focus({preventScroll:true});
   $$('[data-story-step]', chapter).forEach(button => {
     button.setAttribute('aria-pressed', String(Number(button.dataset.storyStep) === step));
   });
-  $$('.say', chapter).forEach((statement, index) => {
-    statement.setAttribute('aria-hidden', String(!motion.matches && index !== step));
+  const statements = $$('.say', chapter);
+  statements.forEach((statement, index) => {
+    statement.setAttribute('aria-hidden', String(statements.length > 1 && index !== step));
   });
   // Manual steps may happen before the reveal observer fires.
   $$('[data-reveal]', chapter).forEach(el => el.classList.add('is-in'));
@@ -204,41 +175,96 @@ async function play(chapter) {
   if (!await wait(timing.second, signal)) return;
   setStep(chapter, 2, { effects: true, signal });
   // Original CSS chips and tool examples resolve, then hold indefinitely.
-  if (await wait(1500, signal)) chapter.dataset.storyPlaying = 'false';
+  if (await wait(900, signal)) chapter.dataset.storyPlaying = 'false';
 }
 for (const chapter of chapters) {
+  chapter.addEventListener('focusin', event => {
+    if (chapter.dataset.chapter !== 'write' || !event.target.closest('button, summary')) return;
+    states.get(chapter).manual = true;
+    stop(chapter); unobserveChapter(chapter);
+  });
   chapter.dataset.step = '0';
   $$('[data-story-step]', chapter).forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.storyStep === '0'));
     button.addEventListener('click', () => {
       const step = Number(button.dataset.storyStep);
       if (![0, 1, 2].includes(step)) return;
-      stop(chapter); states.get(chapter).started = true; unobserveChapter(chapter);
-      setStep(chapter, motion.matches ? 2 : step);
+      stop(chapter); states.get(chapter).started = true; states.get(chapter).manual = true; unobserveChapter(chapter);
+      setStep(chapter, step);
     });
   });
   $$('[data-story-replay]', chapter).forEach(button => {
     // Focus stays on the stable replay button throughout playback.
-    button.addEventListener('click', () => play(chapter));
+    button.addEventListener('click', () => { states.get(chapter).manual = true; play(chapter); });
   });
 }
+// Native scrolling advances the sequence. Tall/narrow screens keep ordinary
+// flow with the bounded on-entry playback, so no product panel gets clipped.
+const scrollLayout = matchMedia('(min-width: 64rem) and (min-height: 40rem)');
+let storyFrame = 0;
+function sizeStories() {
+  const header = document.querySelector('header')?.getBoundingClientRect().height || 72;
+  for (const chapter of chapters) {
+    const state = states.get(chapter);
+    const stage = chapter.querySelector('.stage');
+    const eligible = !motion.matches && scrollLayout.matches && ['write', 'hit'].includes(chapter.dataset.chapter) && stage.offsetHeight < innerHeight - header - 64;
+    const wasScrollDriven = state.scrollDriven;
+    state.scrollDriven = Boolean(eligible);
+    chapter.classList.toggle('scroll-driven', Boolean(eligible));
+    if (eligible) chapter.style.setProperty('--story-height', `${stage.offsetHeight + innerHeight * .5}px`);
+    else chapter.style.removeProperty('--story-height');
+    if (wasScrollDriven && !eligible && !state.manual && !motion.matches) {
+      state.started = false;
+      unobserveChapter(chapter);
+      autoplay?.observe(playbackTargets.get(chapter));
+    }
+  }
+  updateScrollStory();
+}
+function updateScrollStory() {
+  storyFrame = 0;
+  const header = document.querySelector('header')?.getBoundingClientRect().height || 72;
+  const progress = Math.max(0, Math.min(1, scrollY / (zone?.offsetHeight || innerHeight)));
+  if (!motion.matches) zone?.style.setProperty('--hero-scroll', String(progress));
+  for (const chapter of chapters) {
+    const state = states.get(chapter);
+    if (!state.scrollDriven || state.manual) continue;
+    const rect = chapter.getBoundingClientRect();
+    const range = chapter.offsetHeight - chapter.querySelector('.stage').offsetHeight;
+    const progress = Math.max(0, Math.min(1, (header + 28 - rect.top) / range));
+    chapter.style.setProperty('--story-progress', String(progress));
+    const step = progress < .28 ? 0 : progress < .64 ? 1 : 2;
+    if (chapter.dataset.step !== String(step)) { stop(chapter); setStep(chapter, step); }
+  }
+}
+const queueStoryFrame = () => { if (!storyFrame) storyFrame = requestAnimationFrame(updateScrollStory); };
+addEventListener('scroll', queueStoryFrame, {passive:true});
+addEventListener('resize', sizeStories, {passive:true});
 if (motion.matches || !hasIO) chapters.forEach(complete);
 else {
   autoplay = new IntersectionObserver(entries => {
     for (const entry of entries) {
       if (!canStartChapter(entry)) continue;
       const chapter = targetChapters.get(entry.target);
-      if (chapter && !states.get(chapter).started) play(chapter);
+      if (chapter && !states.get(chapter).started && !states.get(chapter).scrollDriven) play(chapter);
     }
   }, { rootMargin: '0px 0px -10% 0px', threshold: [0, .05, .15, .3, .5] });
   playbackTargets.forEach(target => autoplay.observe(target));
 }
+sizeStories();
+document.fonts?.ready.then(sizeStories);
+// Expanded rule definitions can outgrow a sticky frame. Re-measure the content
+// itself so every line stays reachable, including after zoom or font changes.
+if ('ResizeObserver' in window) {
+  const storySizeObserver = new ResizeObserver(sizeStories);
+  chapters.forEach(chapter => storySizeObserver.observe(chapter.querySelector('.stage')));
+}
+
 motion.addEventListener('change', () => {
   if (!motion.matches) return;
-  heroPlayback.abort(); heroTyper?.finish(); heroVerdict(true);
   showHeroChoices();
   revealObserver?.disconnect(); revealables.forEach(el => el.classList.add('is-in'));
-  chapters.forEach(complete);
+  chapters.forEach(complete); sizeStories();
 });
 
 // Links retain their native fallback and modified-click behavior. The movie
@@ -284,10 +310,12 @@ const footerDownloads = document.querySelector('.foot .dl');
 const windowsDownload = footerDownloads?.querySelector(`a[href="${WIN.href}"]`);
 if (onWindows && windowsDownload) footerDownloads.prepend(windowsDownload);
 
-// Lazy footer WebGL remains independent: failure leaves the static mark.
-const shieldStage = document.querySelector('.shield-stage');
-if (shieldStage) {
-  const mount = () => import('./shield.js?v=depth-1')
+// WebGL remains independent: failure leaves the static official mark.
+const shieldStages = $$('.shield-stage, .hero-sculpture');
+const lowCapability = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
+for (const shieldStage of shieldStages) {
+if (!motion.matches && !lowCapability) {
+  const mount = () => import('./shield.js?v=scroll-story-1')
     .then(({ mountShield }) => mountShield(shieldStage)).catch(() => {});
   if (hasIO) {
     const observer = new IntersectionObserver(entries => {
@@ -297,3 +325,7 @@ if (shieldStage) {
     observer.observe(shieldStage);
   } else mount();
 }
+}
+
+const heroArt = document.querySelector('[data-hero-replay]');
+if (heroArt) import('./hero-trace.js?v=hero-flow-1').then(({mountHeroTrace}) => mountHeroTrace(heroArt)).catch(() => { heroArt.disabled = true; });

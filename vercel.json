@@ -1,12 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
-  "buildCommand": "",
+  "installCommand": "npm ci --prefix integrations/kool --ignore-scripts --no-audit --no-fund",
+  "buildCommand": "node scripts/build-kool-browser.mjs",
   "outputDirectory": "landing",
   "cleanUrls": true,
   "trailingSlash": false,
   "github": { "silent": true },
+  "functions": {
+    "api/download.mjs": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/(.*)",
