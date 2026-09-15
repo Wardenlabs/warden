@@ -1,25 +1,24 @@
 /**
- * Team: the people Warden judges.
+ * Team: the people Warden judges, their roles, and the company they belong to.
  *
- * One thing per tab and one page per person. People is the list, and it is
- * where nearly everything happens in place: the role is a select in the row,
- * and the row's menu carries the rest. Roles and Company are their own tabs
- * rather than sections stacked under the list, because a page that shows four
- * things at once is a page where nothing is the thing you came for.
- *
- * A person is a page, `#/people/<id>`, not a drawer between two rows. It
- * leads with how they are doing (or with the setup they have not done yet),
- * then their key, then the rules that judge them. Removing them and issuing a
- * new key live in the menu, not in a footer that every visit has to scroll
- * past.
+ * Three tabs and one page per person. People is the list, where the role is
+ * changed in place from its label and the row's ··· carries the rest. A person
+ * is a page, `#/people/<id>`, that leads with how they are doing (or with the
+ * setup they have not done yet), folds how they connect, and lists the rules
+ * that judge them and why. Roles holds the one-line daily limit; Company is a
+ * settings page with one open task and the rest folded.
  */
 import { $, api, attr, del, esc, post, state } from './core.js';
 import { refreshPeople, refreshPolicy } from './data.js';
-import { bindPolicy, sendRuleMessage } from './draft.js';
-import { TOOL_NAMES, avatar, copyText, personById, plural, ruleName } from './format.js';
-import { bindLimits, limitEditor } from './limits.js';
+import { resetDraft } from './draft.js';
+import { TOOL_NAMES, copyText, personById, plural, ruleName } from './format.js';
+import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { disclosure, render } from './render.js';
 import { go } from './router.js';
+import {
+  button, confirmResult, contextBar, dialog, disclosureRow, effectText, feedback, listState, menu,
+  pageHead, roleLabel, roleTone, showToast, tabs
+} from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ TEAM ════════════════════════════════════════════════════════════════════
@@ -32,7 +31,10 @@ import { VIEWS } from './views.js';
 const TABS = [['', 'People'], ['roles', 'Roles'], ['company', 'Company']];
 const tabOf = () => (state.sel === 'roles' || state.sel === 'company' ? state.sel : state.sel ? null : '');
 
-const toolsOf = (e) => (e.connected ?? []).map((c) => TOOL_NAMES[c.tool] ?? c.tool).join(', ');
+const exemptRoles = () => new Set(state.policy.exemptRoles ?? ['admin']);
+const isExemptRole = (role) => exemptRoles().has(role);
+const firstName = (p) => String(p?.name ?? '').split(' ')[0];
+const toolsOf = (e) => (e.connected ?? []).map((c) => TOOL_NAMES[c.tool] ?? c.tool);
 const requestsOf = (e) => (e.connected ?? []).reduce((n, c) => n + (c.count ?? 0), 0);
 const isConnected = (e) => Boolean(e.connected?.length);
 const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? null;
@@ -56,553 +58,405 @@ const maskKey = (key) => {
   return cut > 0 && k.length > cut + 12 ? `${k.slice(0, cut + 1)}${'•'.repeat(16)}${k.slice(-6)}` : k;
 };
 
+/**
+ * Roles in the order they are offered, with exempt ones last.
+ *
+ * `admin` sits in `exemptRoles`, which means an admin is measured against no
+ * company-wide rules at all. It is also alphabetically first, so it was the
+ * default on a fresh install — and the very first person anybody added, before
+ * they had read anything about exemptions, was silently unjudged. A default that
+ * hands out a bypass is the wrong default however defensible the sort order.
+ */
+const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
+
 VIEWS.people = {
   body: () => {
     const tab = tabOf();
     if (tab === null) return personPage(personById(state.sel));
     return `<div class="sheet">
-      ${pageHead()}
-      ${demoBanner()}
-      <nav class="tabs" aria-label="Team sections">
-        ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' on' : ''}" data-go="people"${sel ? ` data-sel="${sel}"` : ''}>${label}</button>`).join('')}
-      </nav>
+      ${contextBar([{ label: 'Your workspace' }])}
+      ${pageHead({
+        title: 'Team',
+        sub: 'Manage the people whose requests run through Warden.',
+        actions: tab === '' ? button('Add people', { kind: 'primary', id: 'openAdd' }) : tab === 'roles' ? button('New role', { kind: 'primary', id: 'openNewRole' }) : ''
+      })}
+      ${tabs('people', TABS, tab, 'Team sections')}
       ${tab === '' ? peopleTab() : tab === 'roles' ? rolesTab() : companyTab()}
+      ${dialogMarkup()}
     </div>`;
   },
   bind: () => {
-    bindPolicy();
     bindActions();
+    bindDialogs();
     const tab = tabOf();
-    if (tab === null) { bindPerson(); return; }
-    if (tab === '') bindPeople();
+    if (tab === null) bindPerson();
+    else if (tab === '') bindPeople();
     else if (tab === 'roles') bindRoles();
     else bindCompany();
   }
 };
 
-// ── the page head, shared by the three tabs ──────────────────────────────────
+// ── dialogs ──────────────────────────────────────────────────────────────────
 
-/**
- * The title and one line that says where the team stands. One fact, said
- * once: the number that asks for something — people who have not connected —
- * is the link; when it is zero the line says so, then how the gateway is
- * reached, which is the next thing an administrator wonders.
- *
- * No button up here. Adding people is the form under the tabs, and a primary
- * button whose whole job was to focus a field already on the screen was the
- * heaviest thing on the page doing the least.
- */
-function pageHead() {
-  const emps = state.company.employees;
-  const unsetup = emps.filter((e) => !isConnected(e)).length;
-  const reach = `<span class="muted">${state.publicUrl ? 'reachable on the internet' : 'reachable from this machine only'}</span>`;
-  const line = !emps.length
-    ? `<span class="muted">nobody yet</span><i>·</i>${reach}`
-    : unsetup
-      ? `<span>${plural(emps.length, 'person', 'people')}</span><i>·</i>
-         <button type="button" class="linkbtn strong" data-go="people" data-q="only=unsetup">${unsetup} without setup →</button>`
-      : `<span>${plural(emps.length, 'person', 'people')}</span><i>·</i><span>all connected</span><i>·</i>${reach}`;
-  return `<header class="page-head">
-    <div>
-      <h1 class="page-title">Team</h1>
-      <div class="page-status">${line}</div>
-    </div>
-  </header>`;
+/** One dialog at a time, named by what it is about, with its own error. */
+let dlg = null;
+const openDialog = (kind, data = {}) => { dlg = { kind, error: '', busy: false, ...data }; render(); };
+const closeDialog = () => { dlg = null; render(); };
+
+function dialogMarkup() {
+  if (!dlg) return '';
+  const p = personById(dlg.id);
+  const first = esc(firstName(p));
+  switch (dlg.kind) {
+    case 'add': {
+      const roles = orderedRoles();
+      const role = dlg.role ?? roles[0] ?? '';
+      return dialog({
+        id: 'addPeople', title: 'Add people',
+        body: `<p>Each person gets their own connection key.</p>
+          <div class="field">
+            <label for="newNames">Names</label>
+            <input type="text" id="newNames" placeholder="e.g. Ana López, Pablo Ruiz" autocomplete="off" value="${esc(dlg.names ?? '')}">
+            <span class="field-help">Separate multiple names with commas.</span>
+          </div>
+          <div class="field"><span class="field-label">Role</span>
+            <div class="role-choices" role="radiogroup" aria-label="Role">${roles.map((r) => `<button type="button" role="radio" aria-checked="${r === role}" class="role-label --${roleTone(r)} role-choice${r === role ? ' --chosen' : ''}" data-choose-role="${esc(r)}">${r === role ? '✓ ' : ''}${esc(r)}</button>`).join('')}</div>
+            ${isExemptRole(role) ? `<span class="field-help --attention">${esc(role)} is exempt from company-wide rules: only rules that name the role or the person apply.</span>` : ''}
+          </div>
+          ${dlg.error ? feedback({ tone: 'error', title: 'Some people were not added', body: esc(dlg.error), icon: true }) : ''}`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="addPeople"' }) + button(dlg.busy ? 'Adding…' : 'Add people', { kind: 'primary', id: 'confirmAdd', disabled: !(dlg.names ?? '').trim(), busy: dlg.busy })
+      });
+    }
+    case 'added': {
+      const added = dlg.added.map((id) => personById(id)).filter(Boolean);
+      const one = added.length === 1;
+      return dialog({
+        id: 'added', title: '', close: false,
+        body: `${confirmResult({ title: one ? `${firstName(added[0])} was added` : `${added.length} people added`, body: one ? 'Share their connection key to finish setup.' : 'Their connection keys are ready.' })}
+          <ul class="added-list">${added.map((a) => `<li><span>${esc(a.name)}</span>${roleLabel(a.role)}</li>`).join('')}</ul>
+          ${dlg.failed?.length ? feedback({ tone: 'error', icon: true, title: plural(dlg.failed.length, 'name was', 'names were') + ' not added', body: dlg.failed.map(esc).join('<br>') }) : ''}`,
+        actions: one ? button('Done', { attrs: 'data-dialog-close="added"' }) + button('Open person', { kind: 'primary', attrs: `data-go="people" data-sel="${attr(added[0].id)}"` }) : button('Done', { kind: 'primary', attrs: 'data-dialog-close="added"' })
+      });
+    }
+    case 'role':
+      return dialog({
+        id: 'changeRole', title: `Change ${firstName(p)}’s role?`,
+        body: dlg.error
+          ? `<p>Selected role: ${esc(dlg.to)}. This role is exempt from company-wide rules.</p>
+             ${feedback({ tone: 'error', icon: true, title: 'Role couldn’t be changed', body: `${first} is still ${esc(p?.role)}. Their current rules remain in effect. Try again.${dlg.error ? `<br>${esc(dlg.error)}` : ''}` })}`
+          : `<p>Two things change. Your company-wide rules stop being applied to ${first}, and ${first} gets administrator access to Warden with the key they already have. Rules written for ${esc(dlg.to)}, or for ${first} by name, still apply.</p>
+             <div class="role-change">${roleLabel(p?.role)}<span aria-hidden="true">→</span>${roleLabel(dlg.to)}</div>`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="changeRole"' }) + button(dlg.busy ? 'Changing…' : dlg.error ? 'Retry change' : 'Change role', { kind: 'primary', id: 'confirmRole', busy: dlg.busy })
+      });
+    case 'roleDone':
+      return dialog({
+        id: 'roleDone', title: 'Role updated',
+        body: `<p>${first} is now ${/^[aeiou]/i.test(dlg.to) ? 'an' : 'a'} ${esc(dlg.to)} and exempt from company-wide rules. Rules that name ${esc(dlg.to)} or ${first} still apply.</p>`,
+        actions: button('Done', { kind: 'primary', attrs: 'data-dialog-close="roleDone"' })
+      });
+    case 'key':
+      return dialog({
+        id: 'newKey', title: 'Generate a new key?',
+        body: dlg.error
+          ? `<p>The current key will be replaced only when the new key is generated successfully.</p>${feedback({ tone: 'error', icon: true, title: 'New key couldn’t be generated', body: `A new key could not be generated. ${first}’s current key still works.` })}`
+          : `<p>${first}’s current key will stop working immediately. Share the new setup message so ${first} can reconnect their tools.</p>`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="newKey"' }) + button(dlg.busy ? 'Generating…' : dlg.error ? 'Try again' : 'Generate new key', { kind: 'primary', id: 'confirmKey', busy: dlg.busy })
+      });
+    case 'keyDone':
+      return dialog({
+        id: 'keyDone', title: 'New key generated',
+        body: `<p>The previous key no longer works. Share ${first}’s new setup message so ${first} can reconnect their tools.</p>`,
+        actions: button('Done', { attrs: 'data-dialog-close="keyDone"' }) + button('Copy setup message', { kind: 'primary', attrs: `data-act="copy-setup" data-id="${attr(dlg.id)}"` })
+      });
+    case 'remove':
+      return dialog({
+        id: 'removePerson', title: `Remove ${firstName(p)} from the team?`,
+        body: dlg.error
+          ? `<p>Removing ${first} revokes their connection key and access through Warden.</p>${feedback({ tone: 'error', icon: true, title: `${firstName(p)} couldn’t be removed`, body: `${first} could not be removed. ${first} is still on the team and their access is unchanged.` })}`
+          : `<p>${first} will lose access through Warden and their connection key will stop working.</p>`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="removePerson"' }) + button(dlg.busy ? 'Removing…' : dlg.error ? 'Retry removal' : 'Remove person', { kind: 'danger', id: 'confirmRemove', busy: dlg.busy })
+      });
+    case 'newRole':
+      return dialog({
+        id: 'newRole', title: 'New role',
+        body: `<p>A role is a name your rules can point at. Give it a daily limit now or leave it open and set one later.</p>
+          <div class="field"><label for="newRoleName">Name</label><input type="text" id="newRoleName" placeholder="designer" autocomplete="off" value="${esc(dlg.name ?? '')}"><span class="field-help">Lowercase, no spaces — people are judged by this name.</span></div>
+          <div class="field"><label for="newRoleQuota">Requests a day</label><input type="text" inputmode="numeric" id="newRoleQuota" placeholder="none" autocomplete="off" value="${esc(dlg.quota ?? '')}"><span class="field-help">Leave blank for no limit.</span></div>
+          ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The role was not created', body: esc(dlg.error) }) : ''}`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="newRole"' }) + button(dlg.busy ? 'Creating…' : 'Create role', { kind: 'primary', id: 'confirmNewRole', busy: dlg.busy })
+      });
+    case 'reset':
+      return dialog({
+        id: 'resetCompany', title: 'Reset this company?',
+        body: `<p>Every person but the first administrator goes, and every stored prompt is cleared. That administrator gets a fresh key — the old ones stop working. Your rules stay.</p>
+          ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The company was not reset', body: esc(dlg.error) }) : ''}`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="resetCompany"' }) + button(dlg.busy ? 'Resetting…' : 'Reset company', { kind: 'danger', id: 'confirmReset', busy: dlg.busy })
+      });
+    default:
+      return '';
+  }
 }
 
-/**
- * A seeded directory says so where the seeded people are seen, not only on
- * the tab with the rename field. Somebody opening Team for the first time is
- * looking at eight people they never added; the sentence that explains that
- * has to be above them.
- */
-function demoBanner() {
-  if (!state.company.demo) return '';
-  return `<div class="banner warn demo"><b>Sample data.</b> ${esc(state.company.name)} and everyone in it are made up.
-    <button type="button" class="linkish" data-go="people" data-sel="company">Make it yours</button></div>`;
+function bindDialogs() {
+  const scrim = document.querySelector('[data-dialog-scrim]');
+  if (scrim) scrim.onclick = (e) => { if (e.target === scrim && !dlg?.busy) closeDialog(); };
+  for (const b of document.querySelectorAll('[data-dialog-close]')) b.onclick = () => closeDialog();
+  if (!dlg) return;
+
+  const names = $('newNames');
+  if (names) { names.oninput = () => { dlg.names = names.value; const ok = $('confirmAdd'); if (ok) ok.disabled = !names.value.trim(); }; if (!dlg.focused) { names.focus(); dlg.focused = true; } }
+  for (const b of document.querySelectorAll('[data-choose-role]')) b.onclick = () => { dlg.role = b.dataset.chooseRole; render(); };
+  const add = $('confirmAdd');
+  if (add) add.onclick = () => void addPeople();
+
+  const role = $('confirmRole');
+  if (role) role.onclick = () => void changeRole(dlg.id, dlg.to, true);
+
+  const key = $('confirmKey');
+  if (key) key.onclick = async () => {
+    dlg.busy = true; render();
+    const { ok } = await post(`/api/people/${encodeURIComponent(dlg.id)}/key`).catch(() => ({ ok: false }));
+    if (!ok) { dlg.busy = false; dlg.error = 'failed'; render(); return; }
+    await refreshPeople();
+    openDialog('keyDone', { id: dlg.id });
+  };
+
+  const remove = $('confirmRemove');
+  if (remove) remove.onclick = async () => {
+    const id = dlg.id;
+    const p = personById(id);
+    dlg.busy = true; render();
+    const { ok, j } = await del(`/api/people/${encodeURIComponent(id)}`).catch(() => ({ ok: false, j: null }));
+    if (!ok) { dlg.busy = false; dlg.error = j?.error ?? 'failed'; render(); return; }
+    dlg = null;
+    await refreshPeople();
+    go('people');
+    // Rules written only for someone who has left still exist and now bind
+    // nobody. Saying so beats leaving dead policy in the list unremarked.
+    const orphaned = j.orphanedRules?.length ?? 0;
+    showToast(`${firstName(p)} was removed`, `Their connection key no longer works.${orphaned ? ` ${plural(orphaned, 'rule')} written only for ${firstName(p)} now ${orphaned === 1 ? 'applies' : 'apply'} to nobody — retarget or remove ${orphaned === 1 ? 'it' : 'them'} on Rules.` : ''}`);
+  };
+
+  const roleName = $('newRoleName');
+  if (roleName) { roleName.oninput = () => { dlg.name = roleName.value; }; if (!dlg.focused) { roleName.focus(); dlg.focused = true; } }
+  const roleQuota = $('newRoleQuota');
+  if (roleQuota) roleQuota.oninput = () => { dlg.quota = roleQuota.value; };
+  const newRole = $('confirmNewRole');
+  if (newRole) newRole.onclick = async () => {
+    const name = (dlg.name ?? '').trim();
+    const quota = limitValue(dlg.quota);
+    if (!name) { dlg.error = 'Give the role a name.'; render(); return; }
+    if (Number.isNaN(quota)) { dlg.error = 'Use a whole number of requests above zero, or leave it blank for no limit.'; render(); return; }
+    dlg.busy = true; render();
+    const { ok, j } = await post('/api/roles', { role: name, maxRequestsPerDay: quota ?? 0 }).catch(() => ({ ok: false, j: null }));
+    if (!ok) { dlg.busy = false; dlg.error = j?.error ?? 'Warden could not be reached.'; render(); return; }
+    dlg = null;
+    await Promise.all([refreshPeople(), refreshPolicy()]);
+    render();
+    showToast('Role created', `${name} can now be given to people and named by rules.`);
+  };
+
+  const reset = $('confirmReset');
+  if (reset) reset.onclick = async () => {
+    dlg.busy = true; render();
+    const { ok, j } = await post('/api/company/reset', { name: state.company.name }).catch(() => ({ ok: false, j: null }));
+    if (!ok) { dlg.busy = false; dlg.error = j?.error ?? 'Warden could not be reached.'; render(); return; }
+    dlg = null;
+    await refreshPeople();
+    render();
+    showToast('Company reset', 'Everyone else was removed and stored prompts were cleared. The administrator’s new key is on their page.');
+  };
 }
 
 // ── People ───────────────────────────────────────────────────────────────────
 
 /**
- * Roles for the add-someone dropdown, with `admin` never first.
- *
- * `admin` sits in `exemptRoles`, which means an admin is measured against no
- * rules at all. It is also alphabetically first, so it was the selected option
- * on a fresh install — and the very first person anybody added, before they
- * had read anything about exemptions, was silently unjudgeable. A default that
- * hands out a bypass is the wrong default however defensible the sort order.
+ * The role, changed where it is read: the label is the trigger, the menu
+ * lists roles with their identity colour. Making somebody exempt asks first,
+ * because it hands out both a bypass and administrator access; anything else
+ * is applied at once and said in a toast.
  */
-function roleOptions(selected, short = false) {
-  const exempt = new Set(state.policy.exemptRoles ?? ['admin']);
-  const ordinary = state.company.roles.filter((r) => !exempt.has(r));
-  const privileged = state.company.roles.filter((r) => exempt.has(r));
-  const opt = (r, suffix = '') => `<option value="${attr(r)}"${r === selected ? ' selected' : ''}>${esc(r)}${suffix}</option>`;
-  // A select is as wide as its widest option, so the one in a row says
-  // `admin`, not the sentence; the sentence is on the Roles tab.
-  return [...ordinary.map((r) => opt(r)), ...privileged.map((r) => opt(r, short ? '' : ' — exempt from every rule'))].join('');
+function roleMenu(p) {
+  const roles = orderedRoles();
+  const items = roles.map((r) => `<button type="button" role="menuitemradio" aria-checked="${r === p.role}" class="menu-item" data-set-role="${esc(r)}" data-id="${attr(p.id)}"><i class="menu-dot --${roleTone(r)}"></i><span>${esc(r)}</span>${r === p.role ? '<b class="menu-check">✓</b>' : ''}</button>`).join('');
+  return `<details class="menu --left role-menu">
+    <summary class="menu-trigger" aria-label="Role of ${esc(p.name)}: ${esc(p.role)}">${roleLabel(p.role)}</summary>
+    <div class="menu-list" role="menu">
+      ${roles.length > 5 ? `<input type="text" class="menu-search" placeholder="Search roles…" aria-label="Search roles" data-role-search>` : ''}
+      ${items}
+      <div class="menu-note" hidden data-role-empty>No roles found</div>
+    </div>
+  </details>`;
+}
+
+function personActions(p) {
+  return [
+    { label: `Write a rule for ${firstName(p)}`, act: 'write-rule', attrs: `data-id="${attr(p.id)}"` },
+    { label: 'New key', act: 'key', attrs: `data-id="${attr(p.id)}"` },
+    { label: 'Remove from team', act: 'remove', attrs: `data-id="${attr(p.id)}"`, destructive: true }
+  ];
 }
 
 function peopleTab() {
   const only = state.query.only === 'unsetup';
   const all = state.company.employees;
-  const emps = only ? all.filter((e) => !isConnected(e)) : all;
-  return `
-    <div class="add-row">
-      <input type="text" id="newName" class="grow" placeholder="Names, comma-separated" autocomplete="off">
-      <select id="newRole">${roleOptions()}</select>
-      <button type="button" class="btn primary" id="addPerson">Add</button>
+  const unsetup = all.filter((e) => !isConnected(e)).length;
+  const shown = only ? all.filter((e) => !isConnected(e)) : all;
+  const load = state.loads.people;
+  if (load?.error) {
+    return listState({ title: 'Could not load the team', body: 'We could not confirm who is on the team. Retry to load the latest list.', icon: true, action: button('Retry loading', { kind: 'primary', id: 'retryPeople' }) });
+  }
+  if (load?.loading && !all.length) {
+    return listState({ title: 'Loading the team…', body: 'Fetching people, their roles and their connections.' });
+  }
+  if (!all.length) {
+    return listState({ title: 'Nobody yet', body: 'Add people and Warden issues each of them a connection key.', action: button('Add people', { kind: 'primary', id: 'openAddEmpty' }) });
+  }
+  return `<div class="subhead">
+      <span class="subhead-count">${only ? `${plural(shown.length, 'person', 'people')} without setup` : plural(all.length, 'person', 'people')}</span>
+      ${only ? button('Show everyone', { attrs: 'data-go="people"' }) : unsetup ? button(`${unsetup} without setup →`, { attrs: 'data-go="people" data-q="only=unsetup"' }) : ''}
     </div>
-    <div class="note under" id="addNote"></div>
-    ${only ? `<div class="filter-note">Only ${plural(emps.length, 'person', 'people')} without setup ·
-        <button type="button" class="linkish" data-go="people">Show everyone</button></div>` : ''}
-    ${all.length
-      ? `<div class="tbl">
-          <div class="thead"><span>Person</span><span>Role</span><span>Connected</span><span>Last active</span><span></span></div>
-          ${emps.map(personRow).join('')}
-        </div>`
-      : '<div class="empty"><b>Nobody yet</b><span>Add somebody above and Warden issues them a key.</span></div>'}`;
+    <div class="table people-table" role="table" aria-label="People">
+      <div class="thead" role="row"><span>Person</span><span>Role</span><span>Connected tools</span><span>Last active</span><span></span></div>
+      ${shown.map(personRow).join('')}
+    </div>`;
 }
 
 /**
- * One row. The name opens the page; the role edits in place; the menu has
- * what used to need the page open.
- *
- * No rule count. It read the same in every row and "0" on the admin with no
- * hint that exemption was why — a column that is always the same number is
- * decoration. Exemption is said where it applies, beside the role; the rules
- * themselves are the page's job. Last active is what an administrator
+ * One row. The name opens the page; the role changes in place; the menu has
+ * what used to need the page open. Last active is what an administrator
  * actually sweeps a list of people for.
  */
 function personRow(e) {
   const on = isConnected(e);
-  const exempt = new Set(state.policy.exemptRoles ?? ['admin']).has(e.role);
-  return `<div class="trow">
-    <button type="button" class="pname" data-go="people" data-sel="${attr(e.id)}">${avatar(e)}<span class="nm">${esc(e.name)}</span></button>
-    <span class="c-role">
-      <select class="mini" data-role-of="${attr(e.id)}" aria-label="Role of ${esc(e.name)}">${roleOptions(e.role, true)}</select>
-      ${exempt ? '<span class="chip warn" title="Measured against no rules">Exempt</span>' : ''}
-    </span>
-    <span class="c-conn${on ? ' on' : ''}"><i class="dot"></i>${on ? `${esc(toolsOf(e))} · ${plural(requestsOf(e), 'request')}` : 'Not connected yet'}</span>
-    <span class="c-when">${ago(lastActiveAt(e))}</span>
-    ${menu(e.id, [['open', 'Open'], ['key', 'New key'], ['remove', 'Remove from team', 'danger']])}
+  return `<div class="trow --link" role="row" tabindex="0" data-go="people" data-sel="${attr(e.id)}">
+    <span class="cell-strong person-name">${esc(e.name)}</span>
+    <span class="role-cell">${roleMenu(e)}${isExemptRole(e.role) ? '<span class="exempt-note">Exempt from company-wide rules</span>' : ''}</span>
+    <span class="cell-stack">${on ? `<span class="cell-strong">${esc(toolsOf(e).join(', '))}</span><small>${plural(requestsOf(e), 'request')}</small>` : '<span class="cell-strong">Not connected yet</span><small>Open person to set up</small>'}</span>
+    <span class="cell-muted">${ago(lastActiveAt(e))}</span>
+    <span class="row-menu">${menu(personActions(e), { label: `Actions for ${e.name}` })}</span>
   </div>`;
 }
 
-function menu(id, items) {
-  return `<details class="menu">
-    <summary aria-label="More">···</summary>
-    <div class="menu-list">
-      ${items.map(([act, label, cls]) => `<button type="button" class="menu-item${cls ? ` ${cls}` : ''}" data-act="${act}" data-id="${attr(id)}">${label}</button>`).join('')}
-    </div>
-  </details>`;
+async function addPeople() {
+  const names = (dlg.names ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  if (!names.length) return;
+  const role = dlg.role ?? orderedRoles()[0];
+  dlg.busy = true; render();
+  // Sequential rather than concurrent because ids are derived from names and
+  // two people called Ana must not race for the same one.
+  const added = [];
+  const failed = [];
+  for (const name of names) {
+    const { ok, j } = await post('/api/people', { name, role }).catch(() => ({ ok: false, j: null }));
+    if (ok) added.push(j.id); else failed.push(`${name}: ${j?.error ?? 'Warden could not be reached.'}`);
+  }
+  await refreshPeople();
+  if (!added.length) { dlg.busy = false; dlg.error = failed.join(' · '); render(); return; }
+  openDialog('added', { added, failed });
 }
 
-// A menu closes when you click anywhere else. Once for the document, not per
-// render: menus are rebuilt with every render and the listener is not.
-document.addEventListener('click', (e) => {
-  for (const m of document.querySelectorAll('details.menu[open]')) if (!m.contains(e.target)) m.removeAttribute('open');
-});
+async function changeRole(id, to, confirmed = false) {
+  const p = personById(id);
+  if (!p || p.role === to) return;
+  if (!confirmed && isExemptRole(to) && !isExemptRole(p.role)) { openDialog('role', { id, to }); return; }
+  if (dlg) { dlg.busy = true; render(); }
+  const { ok, j } = await post('/api/people', { id: p.id, name: p.name, role: to }).catch(() => ({ ok: false, j: null }));
+  if (!ok) {
+    if (dlg) { dlg.busy = false; dlg.error = j?.error ?? 'Warden could not be reached.'; render(); }
+    else showToast('Role couldn’t be changed', `${p.name} is still ${p.role}. ${j?.error ?? 'Try again.'}`);
+    return;
+  }
+  await refreshPeople();
+  if (isExemptRole(to) && !isExemptRole(p.role)) openDialog('roleDone', { id, to });
+  else { dlg = null; render(); showToast('Role updated', `${p.name} is now ${to}.`); }
+}
 
 function bindPeople() {
-  /**
-   * Adding people, without a round trip per person.
-   *
-   * A comma-separated list is added in order and the field is left cleared and
-   * focused, so a whole team is one paste. One person is still one name and
-   * Enter — and for one person, their page (and their key) is what you wanted
-   * next, so that is where it goes.
-   *
-   * Sequential rather than concurrent because ids are derived from names and
-   * two people called Ana must not race for the same one.
-   */
-  const addPeople = async () => {
-    const field = $('newName');
-    const names = field.value.split(',').map((n) => n.trim()).filter(Boolean);
-    if (!names.length) return;
-    const role = $('newRole').value;
-    const added = [];
-    const failed = [];
-    for (const name of names) {
-      const { ok, j } = await post('/api/people', { name, role });
-      if (ok) added.push(j); else failed.push(`${name}: ${j.error ?? 'failed'}`);
-    }
-    await refreshPeople();
-    if (added.length === 1 && !failed.length) { go('people', added[0].id); return; }
-    render();
-    const note = $('addNote');
-    if (note) note.textContent = [added.length ? `Added ${added.length}.` : '', ...failed].filter(Boolean).join(' · ');
-    const next = $('newName');
-    if (next) { next.value = ''; next.focus(); }
-  };
-  $('addPerson').onclick = addPeople;
-  $('newName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); void addPeople(); } };
-
-  for (const sel of document.querySelectorAll('select[data-role-of]')) {
-    sel.onchange = async (e) => {
-      const p = personById(sel.dataset.roleOf);
-      if (!p) return;
-      const { ok, j } = await post('/api/people', { id: p.id, name: p.name, role: e.target.value });
-      if (!ok) { $('addNote').textContent = j.error ?? 'could not change role'; }
-      await refreshPeople();
-      render();
-    };
-  }
-}
-
-// ── Roles ────────────────────────────────────────────────────────────────────
-
-/**
- * What a role decides: a daily limit and whether the rules apply at all.
- * Exemption is the one fact here that is easy to hand out by accident, so it
- * is the one thing in colour.
- */
-function rolesTab() {
-  const exempt = new Set(state.policy.exemptRoles ?? ['admin']);
-  const quotas = new Map((state.policy.quotas ?? []).map((q) => [q.role, q]));
-  return `<div class="tbl roles">
-    <div class="thead"><span>Role</span><span>People</span><span>Daily limit</span><span>Judged by</span><span></span></div>
-    ${state.company.roles.map((r) => {
-      const held = state.company.employees.filter((e) => e.role === r).length;
-      const q = quotas.get(r);
-      const editing = state.quotaEdit === r;
-      return `<div class="trow">
-        <span class="strong">${esc(r)}</span>
-        <span>${held}</span>
-        <span><button type="button" class="linkbtn" data-quota="${attr(r)}" aria-expanded="${editing}">${q?.maxRequestsPerDay ? `${q.maxRequestsPerDay} / day` : 'No limit'}</button></span>
-        <span>${exempt.has(r) ? '<span class="chip warn">Exempt from every rule</span>' : 'Every rule'}</span>
-        ${held === 0 ? menu(r, [['remove-role', 'Remove role', 'danger']]) : '<span></span>'}
-      </div>
-      ${editing ? `<div class="trow-note">${limitEditor(r)}</div>` : ''}`;
-    }).join('')}
-    <div class="tfoot">
-      <input type="text" id="newRoleName" class="grow" placeholder="New role">
-      <input type="number" min="1" id="newRoleQuota" placeholder="Requests / day">
-      <button type="button" class="btn" id="addRole">Add role</button>
-    </div>
-  </div>
-  <div class="note under">A daily limit opens its role's ceilings — output, context and prompt size.
-    Token counts are reported by the tool, not measured here.</div>
-  <div class="note under" id="roleNote"></div>`;
-}
-
-function bindRoles() {
-  bindLimits();
-  const addRole = async () => {
-    const role = $('newRoleName').value.trim();
-    if (!role) return;
-    const { ok, j } = await post('/api/roles', { role, maxRequestsPerDay: Number($('newRoleQuota').value || 0) });
-    if (!ok) { $('roleNote').textContent = j.error ?? 'failed'; return; }
-    await Promise.all([refreshPeople(), refreshPolicy()]);
-    render();
-  };
-  $('addRole').onclick = addRole;
-  for (const id of ['newRoleName', 'newRoleQuota']) {
-    $(id).onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); void addRole(); } };
-  }
-}
-
-// ── Company ──────────────────────────────────────────────────────────────────
-
-/**
- * The company's own name, and how the team reaches this machine. Set once,
- * so it is the last tab, not the first thing on the page.
- *
- * "Start fresh" keeps one administrator and issues them a new key, because a
- * directory with nobody in an exempt role is a console that cannot be opened
- * again once `WARDEN_ADMIN_REQUIRE_KEY` is set — and because the point of
- * starting over is that the demo's keys stop working. It leaves the policy
- * alone: rules and people are separate decisions.
- *
- * Both honest properties of a quick tunnel are on the screen rather than in a
- * dialog somebody dismissed a week ago: the address is public to whoever holds
- * it, and it changes every time the tunnel restarts.
- */
-function companyTab() {
-  const demo = Boolean(state.company.demo);
-  const on = Boolean(state.publicUrl);
-  return `<div class="cards">
-    <section class="card">
-      <div class="label">Company</div>
-      ${demo ? `<div class="banner warn"><b>Sample data.</b> ${esc(state.company.name)} and everyone in it are made up.</div>` : ''}
-      <div class="inline-row">
-        <input type="text" id="orgInput" class="grow" value="${demo ? '' : esc(state.company.name ?? '')}" placeholder="Your company's name">
-        <button type="button" class="btn${demo ? ' primary' : ''}" id="orgSave">${demo ? 'This is us' : 'Rename'}</button>
-      </div>
-      <div class="note" id="orgNote">${state.orgNote
-        ? esc(state.orgNote)
-        : `<button type="button" class="linkish" id="orgReset">${demo ? 'Clear the sample team' : 'Start fresh…'}</button> removes everyone and issues you a new key. Your rules stay.`}</div>
-    </section>
-
-    <section class="card">
-      <div class="label">Address</div>
-      <div class="v">${on ? `<span class="mono">${esc(state.publicUrl)}</span>` : 'This machine only. Teammates elsewhere cannot reach it.'}</div>
-      ${state.canLeaveDemo
-        ? `<div class="inline-row">
-            <button type="button" class="btn" id="toggleExpose"${state.mock ? ' disabled' : ''}>${on ? 'Take it off the internet' : 'Put it on the internet'}</button>
-           </div>
-           <div class="note" id="exposeNote">${state.mock
-             ? 'Not while Warden is in demo mode: nothing here is really judged.'
-             : 'Anyone with the address reaches the gateway; they still need a key. It changes every time the tunnel restarts.'}</div>`
-        : '<div class="note">Open a tunnel from the Warden app, or put your own proxy in front of it.</div>'}
-    </section>
-  </div>`;
-}
-
-function bindCompany() {
-  $('orgSave').onclick = async () => {
-    const name = $('orgInput').value.trim();
-    if (!name) return;
-    const { ok, j } = await post('/api/company', { name }, { method: 'PUT' });
-    state.orgNote = ok ? 'Renamed.' : (j?.error ?? 'could not rename');
-    if (ok) await refreshPeople();
-    render();
-  };
-
-  const reset = $('orgReset');
-  if (reset) reset.onclick = async () => {
-    const name = $('orgInput').value.trim() || state.company.name;
-    // Irreversible and it revokes keys, so it asks. The wording names both
-    // consequences rather than asking "are you sure" about nothing in
-    // particular.
-    const people = state.company.employees.length;
-    if (!confirm(
-      `Remove ${people === 1 ? 'the 1 person' : `all ${people} people`} and issue the administrator a new key?\n\n` +
-      'Their keys stop working right away. Your rules stay.'
-    )) return;
-    const { ok, j } = await post('/api/company/reset', { name });
-    state.orgNote = ok ? 'Started fresh. Add your team under People.' : (j?.error ?? 'could not reset');
-    if (ok) await refreshPeople();
-    render();
-  };
-
-  const expose = $('toggleExpose');
-  if (expose) expose.onclick = async () => {
-    const enabled = !state.publicUrl;
-    expose.disabled = true;
-    expose.textContent = enabled ? 'Opening the tunnel…' : 'Closing the tunnel…';
-    const { ok, j } = await post('/api/gateway/expose', { enabled });
-    const note = $('exposeNote');
-    if (!ok) {
-      expose.disabled = false;
-      expose.textContent = enabled ? 'Put it on the internet' : 'Take it off the internet';
-      if (note) note.textContent = j?.error ?? 'could not change that';
-      return;
-    }
-    // 202: asked, not done. The gateway restarts behind the tunnel and the
-    // console learns the address from /health once it is back.
-    if (note) note.textContent = enabled
-      ? 'Opening. The address appears here when the gateway is back, usually within a few seconds.'
-      : 'Closing. The address stops working as soon as the gateway is back.';
-  };
+  const retry = $('retryPeople');
+  if (retry) retry.onclick = async () => { retry.disabled = true; await refreshPeople(); render(); };
+  const open = () => openDialog('add', { role: orderedRoles()[0] });
+  if ($('openAdd')) $('openAdd').onclick = open;
+  if ($('openAddEmpty')) $('openAddEmpty').onclick = open;
 }
 
 // ── one person ───────────────────────────────────────────────────────────────
 
-/**
- * The page for one person. It answers, in order: how are they doing (or have
- * they even connected), what do they put on their machine, and which rules
- * judge them and why. Nothing here explains itself in a paragraph; the
- * numbers and the list are the explanation.
- */
 function personPage(p) {
   if (!p) {
-    return `<div class="sheet person">
-      <button type="button" class="back linkish" data-go="people">← Team</button>
-      <div class="empty"><b>This person has been removed.</b></div>
-    </div>`;
+    return `<div class="sheet">${contextBar([{ label: 'Team', go: 'people', back: true }, { label: 'Removed' }])}
+      ${pageHead({ title: 'This person is not on the team' })}${listState({ title: 'Nothing to show', body: 'They were removed, or the link is from another installation.' })}</div>`;
   }
-  const first = esc(p.name.split(' ')[0]);
+  const first = esc(firstName(p));
   const hits = state.audit.filter((a) => a.actor?.id === p.id);
-  const stopped = hits.filter((h) => h.decision?.verdict !== 'ALLOW').length;
+  const count = (v) => hits.filter((h) => h.decision?.verdict === v).length;
   const on = isConnected(p);
-
-  return `<div class="sheet person">
-    <button type="button" class="back linkish" data-go="people">← Team</button>
-
-    <header class="person-head">
-      ${avatar(p, true)}
-      <div class="grow">
-        <h1 class="page-title">${esc(p.name)}</h1>
-        <div class="person-meta">
-          <select id="editRole" class="mini" aria-label="Role">${roleOptions(p.role, true)}</select>
-          <span class="c-conn${on ? ' on' : ''}"><i class="dot"></i>${on ? esc(toolsOf(p)) : 'Not connected yet'}</span>
-          ${p.quota ? `<span>${p.quota} requests a day</span>` : ''}
+  const exempt = isExemptRole(p.role);
+  const seeActivity = button('See activity →', { kind: 'link', attrs: `data-act="decisions" data-id="${attr(p.id)}"` });
+  const summary = exempt
+    ? `<div class="person-card"><div><h2 class="section-title --big">Exempt from company-wide rules</h2><p>${first}’s ${esc(p.role)} role is not judged by company-wide rules. Rules that name the role or ${first} still apply. Previous activity remains available.</p></div>${seeActivity}</div>`
+    : on || hits.length
+      ? `<div class="person-card"><div><h2 class="section-title --big">${plural(hits.length, 'request')} seen</h2><p>${count('ALLOW')} allowed · ${count('BLOCK')} blocked · ${count('ESCALATE')} held for review</p></div>${seeActivity}</div>`
+      : `<div class="person-card --setup"><div><h2 class="section-title --big">${first} hasn’t connected yet</h2><p>Share their setup message. It includes their connection key and instructions for each tool.</p></div><div>${button('Copy setup message', { kind: 'primary', attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}</div></div>`;
+  return `<div class="sheet">
+    ${contextBar([{ label: 'Team', go: 'people', back: true }, { label: p.name }])}
+    ${pageHead({
+      title: p.name,
+      sub: on ? `${esc(toolsOf(p).join(', '))} · Last active ${ago(lastActiveAt(p))}` : 'Not connected yet',
+      actions: menu(personActions(p), { label: `Actions for ${p.name}` })
+    })}
+    <div class="facts person-role">${roleMenu(p)}<span class="fact-v">Role determines which rules apply.</span></div>
+    ${summary}
+    <div class="reading-wide">
+      ${disclosureRow('p:setup', 'Connection & setup', '', `
+        <div class="setup-share">
+          <div><b>Share setup with ${first}</b><p>Copy a message with their connection key and setup instructions, then send it to them.</p></div>
+          ${button('Copy setup message', { compact: true, attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}
         </div>
-      </div>
-      ${menu(p.id, [['key', 'New key'], ['decisions', 'See their decisions'], ['remove', 'Remove from team', 'danger']])}
-    </header>
-    <div class="note under" id="personNote"></div>
-
-    ${on || hits.length
-      ? `<div class="stats">
-          <div class="stat"><b>${hits.length}</b><span>${hits.length === 1 ? 'request seen' : 'requests seen'}</span></div>
-          <div class="stat"><b${stopped ? ' class="block"' : ''}>${stopped}</b><span>stopped</span></div>
-          <div class="stat"><b id="ruleStat">${p.ruleCount}</b><span>${p.ruleCount === 1 ? 'rule judges them' : 'rules judge them'}</span></div>
-          <button type="button" class="stat-link" data-act="decisions" data-id="${attr(p.id)}">See decisions →</button>
-        </div>`
-      : `<div class="setup-card">
-          <div><b>${first} has not connected yet.</b><span class="note">The setup message has their key and the steps for every tool. Send it to them.</span></div>
-          <button type="button" class="btn primary" data-act="copy-setup" data-id="${attr(p.id)}">Copy setup message</button>
-        </div>`}
-
-    <section class="block">
-      <div class="label">Key</div>
-      <div class="key-row">
-        <span class="mono grow" title="Their identity. A new one revokes the old.">${esc(maskKey(p.apiKey))}</span>
-        <button type="button" class="linkbtn" data-copy="${attr(`export WARDEN_API_KEY=${p.apiKey}`)}">Copy key</button>
-        ${on || hits.length ? `<button type="button" class="linkbtn" data-act="copy-setup" data-id="${attr(p.id)}">Copy setup message</button>` : ''}
-      </div>
-      <div class="folds">
-        ${disclosure('p:onboarding', 'Setup steps, tool by tool', '<div id="onboarding"><div class="note">loading…</div></div>')}
+        ${disclosure('p:key', 'View connection key', `<div class="key-row"><span class="mono" title="Their identity. A new one revokes the old.">${esc(maskKey(p.apiKey))}</span>${button('Copy key', { compact: true, attrs: `data-copy="${attr(`export WARDEN_API_KEY=${p.apiKey}`)}"` })}</div>`)}
+        ${disclosure('p:manual', 'Configure manually', '<div id="onboarding"><p class="disclosure-text">Loading the steps…</p></div>')}
+      `, { open: state.open.has('p:setup'), big: true })}
+    </div>
+    <section class="person-rules">
+      <h2 class="section-title --big">Rules that apply to ${first}</h2>
+      <div class="table person-rules-table" role="table" aria-label="Rules that apply to ${first}" id="personRules">
+        <div class="thead" role="row"><span>Rule</span><span>Why it applies</span><span>Effect</span></div>
+        <div class="trow"><span class="cell-muted">Loading the rules…</span></div>
       </div>
     </section>
-
-    <section class="block">
-      <div class="label">Rules</div>
-      <div class="rule-list" id="personRules"><div class="note">loading…</div></div>
-      <div class="rule-add">
-        ${state.personCompose === p.id
-          ? `<textarea id="personRuleText" rows="2" placeholder="e.g. cannot request data from other teams"></textarea>
-             <div class="inline-row">
-               <button type="button" class="btn primary" id="personCompile">Write this rule</button>
-               <button type="button" class="btn quiet" id="personCancel">Cancel</button>
-             </div>`
-          : `<button type="button" class="linkish" id="personCompose">+ Write a rule for ${first}</button>`}
-      </div>
-    </section>
+    ${dialogMarkup()}
   </div>`;
 }
 
 function bindPerson() {
   const p = personById(state.sel);
   if (!p) return;
-
-  $('editRole').onchange = async (e) => {
-    const { ok, j } = await post('/api/people', { id: p.id, name: p.name, role: e.target.value });
-    $('personNote').textContent = ok ? `Now judged as ${j.role}.` : (j.error ?? 'failed');
-    if (ok) { await refreshPeople(); render(); }
-  };
-
-  const compose = $('personCompose');
-  if (compose) compose.onclick = () => { state.personCompose = p.id; render(); $('personRuleText')?.focus(); };
-  const cancel = $('personCancel');
-  if (cancel) cancel.onclick = () => { state.personCompose = null; render(); };
-  const compile = $('personCompile');
-  if (compile) compile.onclick = () => {
-    const text = $('personRuleText').value.trim();
-    if (!text) return;
-    state.personCompose = null;
-    state.draftFor = p.id;
-    state.ruleChat = [];
-    void sendRuleMessage(text);
-  };
-
   void fillRules(p);
-  void renderOnboarding(p);
+  if (state.open.has('p:setup') && state.open.has('p:manual')) void renderOnboarding(p);
+  const manual = document.querySelector('details[data-key="p:manual"]');
+  if (manual) manual.addEventListener('toggle', () => { if (manual.open) void renderOnboarding(p); });
 }
 
 /**
  * Every rule that will judge this person, personal ones first, with why it
- * binds them on the right — because "everyone" and "written for you" are very
- * different things to be told when a prompt is refused.
+ * binds them — because "everyone" and "written for you" are very different
+ * things to be told when a request is refused.
  */
 async function fillRules(p) {
   const host = $('personRules');
   if (!host) return;
-  const { j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`);
+  const { ok, j } = await api(`/api/people/${encodeURIComponent(p.id)}/rules`).catch(() => ({ ok: false }));
   if (!host.isConnected || state.sel !== p.id) return;
+  const head = '<div class="thead" role="row"><span>Rule</span><span>Why it applies</span><span>Effect</span></div>';
+  if (!ok) { host.innerHTML = `${head}<div class="trow"><span class="cell-muted">The rules could not be loaded.</span></div>`; return; }
   const order = { personal: 0, role: 1, company: 2 };
   const rules = [...(j?.rules ?? [])].sort((a, b) => (order[a.binding] ?? 3) - (order[b.binding] ?? 3));
-  const why = { personal: `for ${p.name.split(' ')[0]}`, role: p.role, company: 'everyone' };
-  host.innerHTML = rules.length
-    ? rules.map((r) => `<button type="button" class="rule-line" data-go="policy" data-sel="${attr(r.id)}">
-        <span class="dot ${esc(r.severity)}"></span>
-        <span class="t">${esc(ruleName(r))}</span>
-        <span class="why">${esc(why[r.binding] ?? '')}</span>
-      </button>`).join('')
-    : '<div class="note">No rule applies to them yet.</div>';
-  // The row's count and this list can disagree for an exempt role — the list
-  // says which rules name them, the count says which will fire — so the
-  // number and its label follow the list once it is here.
-  const stat = $('ruleStat');
-  if (stat) {
-    stat.textContent = rules.length;
-    stat.nextElementSibling.textContent = rules.length === 1 ? 'rule judges them' : 'rules judge them';
-  }
+  const why = (r) => (r.binding === 'personal' ? roleLabel('everyone', p.name) : r.binding === 'role' ? roleLabel(p.role) : roleLabel('everyone', 'Everyone'));
+  host.innerHTML = head + (rules.length
+    ? rules.map((r) => `<div class="trow --link" role="row" tabindex="0" data-go="policy" data-sel="${attr(r.id)}">
+        <span class="cell-strong">${esc(ruleName(r))}</span><span>${why(r)}</span><span>${effectText(r.severity)}</span></div>`).join('')
+    : `<div class="trow"><span class="cell-muted">No rule applies to ${esc(firstName(p))} yet.</span></div>`);
 }
-
-// ── actions shared by rows, the page, and their menus ────────────────────────
-
-/**
- * One handler on the pane for every `data-act`. Menus are rebuilt on each
- * render, so binding them one by one would be a loop that has to be right in
- * three places; delegating is right once.
- */
-function bindActions() {
-  $('pane').onclick = async (e) => {
-    // The pane outlives this view; the handler must not act on another one.
-    if (state.view !== 'people') return;
-    const el = e.target.closest('[data-act]');
-    if (!el) return;
-    el.closest('details.menu')?.removeAttribute('open');
-    const id = el.dataset.id;
-    const p = personById(id);
-
-    switch (el.dataset.act) {
-      case 'open':
-        go('people', id);
-        return;
-
-      case 'decisions':
-        state.actorFilter = id;
-        go('activity');
-        return;
-
-      case 'copy-setup': {
-        const { ok, j } = await api(`/api/people/${encodeURIComponent(id)}/onboarding`);
-        if (ok) await copyText(j.message, el);
-        else if ($('personNote')) $('personNote').textContent = j?.error ?? 'could not build the setup message';
-        return;
-      }
-
-      case 'key':
-        if (!p || !confirm(`Issue ${p.name} a new key? Their current one stops working immediately.`)) return;
-        await post(`/api/people/${encodeURIComponent(id)}/key`);
-        await refreshPeople();
-        render();
-        if ($('personNote')) $('personNote').textContent = 'New key issued. The old one no longer works.';
-        return;
-
-      case 'remove': {
-        if (!p || !confirm(`Remove ${p.name}? Their key stops working immediately.`)) return;
-        const { ok, j } = await del(`/api/people/${encodeURIComponent(id)}`);
-        if (!ok) { const n = $('personNote') ?? $('addNote'); if (n) n.textContent = j.error ?? 'failed'; return; }
-        await refreshPeople();
-        go('people');
-        // Rules written only for someone who has left still exist and now bind
-        // nobody. Saying so beats leaving dead policy in the list unremarked.
-        if (j.orphanedRules?.length) {
-          const pane = $('pane').querySelector('.sheet');
-          if (pane) pane.insertAdjacentHTML('afterbegin',
-            `<div class="banner warn">${j.orphanedRules.length} rule(s) were written only for ${esc(j.removed.name)} and now apply to nobody. Retarget or remove them under Rules.</div>`);
-        }
-        return;
-      }
-
-      case 'remove-role': {
-        if (!confirm(`Remove the role "${id}"? Its daily limit goes with it.`)) return;
-        const { ok, j } = await del(`/api/roles/${encodeURIComponent(id)}`);
-        if (!ok) { $('roleNote').textContent = j.error ?? 'failed'; return; }
-        await Promise.all([refreshPeople(), refreshPolicy()]);
-        render();
-        return;
-      }
-    }
-  };
-}
-
-// ── onboarding, folded under the key ─────────────────────────────────────────
 
 /**
  * The setup for one person, per tool, with their values already in it.
@@ -611,52 +465,262 @@ function bindActions() {
  * pasted chat message say the same thing, and so the gateway address is one the
  * server knows is reachable rather than one the admin typed from memory.
  */
+let onboardingTool = 0;
 async function renderOnboarding(person) {
   const host = $('onboarding');
-  if (!host) return;
-  const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`);
+  if (!host || host.dataset.loaded) return;
+  host.dataset.loaded = '1';
+  const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`).catch(() => ({ ok: false, j: null }));
   if (!host.isConnected) return;
-  if (!ok) { host.innerHTML = `<div class="note">${esc(j.error ?? 'failed')}</div>`; return; }
-
-  const tools = j.integrations;
-  const step = (st) => `
-    <div class="group">
-      <div class="note"><b>${esc(st.title)}</b></div>
-      ${st.note ? `<div class="note">${esc(st.note)}</div>` : ''}
-      <div class="codewrap">
-        <pre class="code">${esc(st.code)}</pre>
-        <button type="button" class="btn sm copy" data-copy="${attr(st.code)}">Copy</button>
-      </div>
+  if (!ok) { host.innerHTML = `<p class="disclosure-text">${esc(j?.error ?? 'The setup steps could not be loaded.')}</p>`; return; }
+  const tools = j.integrations ?? [];
+  const step = (st) => `<div class="setup-step">
+      <b>${esc(st.title)}</b>
+      ${st.note ? `<p>${esc(st.note)}</p>` : ''}
+      <div class="codewrap"><pre class="code">${esc(st.code)}</pre>${button('Copy', { compact: true, attrs: `data-copy="${attr(st.code)}"` })}</div>
     </div>`;
+  const draw = () => {
+    const t = tools[onboardingTool] ?? tools[0];
+    host.innerHTML = `
+      <span class="kicker">Everyone does this first</span>
+      ${(j.common ?? []).map(step).join('')}
+      <span class="kicker">Then their tool</span>
+      <div class="seg-tool" role="group" aria-label="Tool">${tools.map((x, i) => `<button type="button" aria-pressed="${x === t}" data-tool="${i}">${esc(x.name)}</button>`).join('')}</div>
+      ${t ? `<p class="disclosure-text">${esc(t.summary)} ${t.kind === 'hook' ? 'Checks before the prompt leaves the machine.' : 'Routes through the gateway.'} ${t.worksOnSubscription ? 'Works on a subscription.' : 'Needs an API key.'} <span class="status-text --${t.verified ? 'allow' : 'attention'}">${t.verified ? 'Verified working' : 'Not verified end to end'}</span></p>
+        ${t.steps.map(step).join('')}` : ''}`;
+    for (const b of host.querySelectorAll('[data-tool]')) b.onclick = () => { onboardingTool = Number(b.dataset.tool); draw(); };
+  };
+  draw();
+}
 
-  host.innerHTML = `
-    <div class="label">Everyone does this first</div>
-    ${j.common.map(step).join('')}
-    <div class="label">Then their tool</div>
-    <div class="chips" id="toolTabs">
-      ${tools.map((t, i) => `<button type="button" class="chip${i === 0 ? ' on' : ''}" data-tool="${i}">${esc(t.name)}</button>`).join('')}
+// ── actions shared by rows, the page, and their menus ────────────────────────
+
+function bindActions() {
+  $('pane').onclick = async (e) => {
+    // The pane outlives this view; the handler must not act on another one.
+    if (state.view !== 'people') return;
+    const setRole = e.target.closest('[data-set-role]');
+    if (setRole) {
+      setRole.closest('details.menu')?.removeAttribute('open');
+      void changeRole(setRole.dataset.id, setRole.dataset.setRole);
+      return;
+    }
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    el.closest('details.menu')?.removeAttribute('open');
+    const id = el.dataset.id;
+    const p = personById(id);
+    switch (el.dataset.act) {
+      case 'decisions':
+        state.actorFilter = id;
+        state.filter = 'all';
+        go('activity');
+        return;
+      case 'copy-setup': {
+        const { ok, j } = await api(`/api/people/${encodeURIComponent(id)}/onboarding`).catch(() => ({ ok: false, j: null }));
+        if (ok) await copyText(j.message, el);
+        else showToast('The setup message could not be built', j?.error ?? 'Try again.');
+        return;
+      }
+      case 'write-rule':
+        resetDraft();
+        state.draftFor = id;
+        go('policy', 'new');
+        return;
+      case 'key':
+        if (p) openDialog('key', { id });
+        return;
+      case 'remove':
+        if (p) openDialog('remove', { id });
+        return;
+      case 'set-limit':
+        roleEdit = { role: id, value: String(quotaOf(id).maxRequestsPerDay ?? ''), error: '', busy: false };
+        render();
+        $('roleLimit')?.focus();
+        return;
+      case 'remove-role': {
+        const { ok, j } = await del(`/api/roles/${encodeURIComponent(id)}`).catch(() => ({ ok: false, j: null }));
+        if (!ok) { showToast('The role was not removed', j?.error ?? 'Warden could not be reached.'); return; }
+        await Promise.all([refreshPeople(), refreshPolicy()]);
+        render();
+        showToast('Role removed', `${id} and its daily limit are gone.`);
+      }
+    }
+  };
+  // Filtering a long role menu does not re-render: it hides items in place.
+  for (const input of document.querySelectorAll('[data-role-search]')) {
+    input.onclick = (e) => e.stopPropagation();
+    input.oninput = () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const item of input.closest('.menu-list').querySelectorAll('[data-set-role]')) {
+        const match = item.dataset.setRole.toLowerCase().includes(q);
+        item.hidden = !match;
+        if (match) shown++;
+      }
+      input.closest('.menu-list').querySelector('[data-role-empty]').hidden = shown > 0;
+    };
+  }
+}
+
+// ── Roles ────────────────────────────────────────────────────────────────────
+
+/**
+ * The daily limit, as an inline editor of one line: the field, what the number
+ * means, and Save only once the value has changed. Session ceilings are not
+ * here — they are tokens, and tokens are Models' business.
+ */
+let roleEdit = null;
+
+function rolesTab() {
+  const roles = state.company.roles;
+  return `<div class="subhead"><span class="subhead-count">${plural(roles.length, 'role')}</span></div>
+    <div class="table roles-table" role="table" aria-label="Roles">
+      <div class="thead" role="row"><span>Role</span><span>People</span><span>Judged by</span><span>Daily limit</span><span></span></div>
+      ${roles.map(roleRow).join('')}
     </div>
-    <div id="toolBody"></div>`;
+    <p class="table-foot">A daily limit is a number of requests, not money. Setting one also opens that role's session ceilings — output, context and prompt size, on Models. Token counts are reported by the tool, not measured here.</p>`;
+}
 
-  const showTool = (i) => {
-    const t = tools[i];
-    $('toolBody').innerHTML = `
-      <div class="group">
-        <div class="chips">
-          <span class="chip static">${t.kind === 'hook' ? 'checks before the prompt leaves the machine' : 'routes through the gateway'}</span>
-          <span class="chip static">${t.worksOnSubscription ? 'works on a subscription' : 'needs an API key'}</span>
-          <span class="badge ${t.verified ? 'ALLOW' : 'BLOCK'}">${t.verified ? 'verified working' : 'unverified'}</span>
-        </div>
-        <div class="note">${esc(t.summary)}</div>
-        ${t.steps.map(step).join('')}
-      </div>`;
-  };
-  showTool(0);
+function roleRow(r) {
+  const held = state.company.employees.filter((e) => e.role === r).length;
+  const q = quotaOf(r);
+  const editing = roleEdit?.role === r;
+  const items = [
+    { label: 'Set daily limit', act: 'set-limit', attrs: `data-id="${attr(r)}"` },
+    held ? { label: 'Remove role', disabled: true } : { label: 'Remove role', act: 'remove-role', attrs: `data-id="${attr(r)}"`, destructive: true },
+    ...(held ? [{ note: `${plural(held, 'person still holds', 'people still hold')} it` }] : [])
+  ];
+  const row = `<div class="trow${editing ? ' --editing' : ''}" role="row">
+    <span>${roleLabel(r)}</span>
+    <span>${plural(held, 'person', 'people')}</span>
+    <span>${isExemptRole(r) ? '<span class="exempt-note">Exempt from company-wide rules</span>' : 'Every rule'}</span>
+    <span class="${q.maxRequestsPerDay ? '' : 'cell-muted'}">${q.maxRequestsPerDay ? `${q.maxRequestsPerDay} / day` : 'No limit'}</span>
+    <span class="row-menu">${menu(items, { label: `Actions for ${r}` })}</span>
+  </div>`;
+  if (!editing) return row;
+  const current = String(q.maxRequestsPerDay ?? '');
+  const changed = roleEdit.value.trim() !== current;
+  const dropsCeilings = !roleEdit.value.trim() && current && (q.maxSessionOutputTokens || q.maxContextTokens || q.maxPromptChars);
+  return `${row}<div class="inline-editor" role="group" aria-label="Daily limit for ${esc(r)}">
+    <label for="roleLimit"><b>Daily limit for ${esc(r)}</b></label>
+    <input type="text" inputmode="numeric" id="roleLimit" class="field-compact" value="${esc(roleEdit.value)}" placeholder="none" autocomplete="off"${roleEdit.busy ? ' readonly' : ''}>
+    <span class="inline-editor-help">requests a day · blank means no limit${dropsCeilings ? ' · clearing it also clears this role’s session ceilings' : ''}</span>
+    ${changed ? button(roleEdit.busy ? 'Saving…' : 'Save limit', { kind: 'primary', compact: true, id: 'saveRoleLimit', busy: roleEdit.busy }) : ''}
+    ${button('Cancel', { compact: true, id: 'cancelRoleLimit', disabled: roleEdit.busy })}
+    ${roleEdit.error ? `<span class="inline-editor-error" role="alert">${esc(roleEdit.error)}</span>` : ''}
+  </div>`;
+}
 
-  $('toolTabs').onclick = (e) => {
-    const chip = e.target.closest('[data-tool]');
-    if (!chip) return;
-    [...$('toolTabs').children].forEach((c) => c.classList.toggle('on', c === chip));
-    showTool(Number(chip.dataset.tool));
+function bindRoles() {
+  if ($('openNewRole')) $('openNewRole').onclick = () => openDialog('newRole');
+  const field = $('roleLimit');
+  if (field) {
+    field.oninput = () => {
+      const was = roleEdit.value.trim() !== String(quotaOf(roleEdit.role).maxRequestsPerDay ?? '');
+      roleEdit.value = field.value;
+      roleEdit.error = '';
+      if (was !== (roleEdit.value.trim() !== String(quotaOf(roleEdit.role).maxRequestsPerDay ?? '')) || !roleEdit.value.trim()) render();
+    };
+    field.onkeydown = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); roleEdit = null; render(); }
+      if (e.key === 'Enter') $('saveRoleLimit')?.click();
+    };
+  }
+  if ($('cancelRoleLimit')) $('cancelRoleLimit').onclick = () => { roleEdit = null; render(); };
+  const save = $('saveRoleLimit');
+  if (save) save.onclick = async () => {
+    const value = limitValue(roleEdit.value);
+    roleEdit.busy = true; render();
+    const result = await saveQuota(roleEdit.role, { maxRequestsPerDay: value, ...(value == null ? { maxSessionOutputTokens: null, maxContextTokens: null, maxPromptChars: null } : {}) });
+    if (!result.ok) { roleEdit.busy = false; roleEdit.error = result.error; render(); return; }
+    const role = roleEdit.role;
+    roleEdit = null;
+    render();
+    showToast('Daily limit saved', value ? `${role} can make ${value} requests a day.` : `${role} has no daily limit.`);
   };
+}
+
+// ── Company ──────────────────────────────────────────────────────────────────
+
+/**
+ * The company's name, the sample, and the reset, as a settings page.
+ *
+ * The reset says what the gateway does: everyone but the first administrator
+ * goes, that administrator gets a new key, stored prompts are cleared, and the
+ * rules stay. There is no type-the-name ceremony, because that was sized for a
+ * loss of rules that does not happen. How the team reaches this machine is not
+ * a company fact and lives on This device.
+ */
+let orgName = null;
+
+function companyTab() {
+  const demo = Boolean(state.company.demo);
+  const value = orgName ?? (demo ? '' : state.company.name ?? '');
+  const saved = demo ? '' : state.company.name ?? '';
+  const people = state.company.employees.length;
+  const roles = state.company.roles.length;
+  const rules = state.policy.rules.length;
+  const installed = demo || Boolean(state.company.sampleInstalledAt);
+  return `<div class="reading settings-page">
+    <section class="settings-task">
+      <h2 class="section-title">Company name</h2>
+      <p class="section-lede">Everyone in Team belongs to this company. The name is a label — changing it doesn't change who is judged or which rules apply.</p>
+      <div class="inline-form">
+        <input type="text" id="orgInput" value="${esc(value)}" placeholder="Your company's name" autocomplete="off">
+        ${button('Save name', { id: 'orgSave', disabled: !value.trim() || value.trim() === saved })}
+      </div>
+    </section>
+    <div class="disclosures">
+      ${disclosureRow('c:sample', 'Sample data', installed ? `Installed · ${plural(people, 'person', 'people')} · ${plural(roles, 'role')} · ${plural(rules, 'rule')}` : 'Not installed', installed
+        ? `${feedback({ tone: 'attention', title: 'Sample rules are enforced', body: 'They judge real requests exactly like the rules you write. Anything they block is really blocked.' })}
+           <div>${button('Clear sample data', { id: 'clearSample' })}</div>`
+        : `<p class="disclosure-text">A made-up company and the rules that judge it, to look around before your own team is in.</p><div>${button('Load sample data', { id: 'loadSampleCompany' })}</div>`, { open: state.open.has('c:sample') })}
+      ${disclosureRow('c:reset', 'Reset company', 'People and prompts · rules stay', `
+        <p class="disclosure-text">Removes every person except the first administrator, who gets a fresh key, and clears every stored prompt. Your rules and roles stay. There is no undo.</p>
+        <div>${button('Reset company', { kind: 'danger', id: 'openReset' })}</div>`, { open: state.open.has('c:reset') })}
+    </div>
+    <p class="table-foot">Looking for the address people connect to? That belongs to the machine running Warden, not to the company — it lives in <button type="button" class="linkish" data-go="soloRules">This device</button>.</p>
+  </div>`;
+}
+
+function bindCompany() {
+  const input = $('orgInput');
+  const save = $('orgSave');
+  if (input && save) {
+    const saved = state.company.demo ? '' : state.company.name ?? '';
+    input.oninput = () => { orgName = input.value; save.disabled = !input.value.trim() || input.value.trim() === saved; };
+    save.onclick = async () => {
+      const name = input.value.trim();
+      if (!name) return;
+      save.disabled = true;
+      const { ok, j } = await post('/api/company', { name }, { method: 'PUT' }).catch(() => ({ ok: false, j: null }));
+      if (!ok) { showToast('The name was not saved', j?.error ?? 'Warden could not be reached.'); save.disabled = false; return; }
+      orgName = null;
+      await refreshPeople();
+      render();
+      showToast('Name saved', `This company is ${name}.`);
+    };
+  }
+  const clear = $('clearSample');
+  if (clear) clear.onclick = async () => {
+    clear.disabled = true;
+    const { ok, j } = await post('/api/company/sample/clear').catch(() => ({ ok: false, j: null }));
+    if (!ok) { clear.disabled = false; showToast('The sample was not cleared', j?.error ?? 'Warden could not be reached.'); return; }
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+    // Nothing matched, so say that rather than leaving a button that looks
+    // broken: the company is already all theirs.
+    showToast('Sample data cleared', j.people || j.rules || j.quotas
+      ? `Removed what came with Warden: ${plural(j.people ?? 0, 'person', 'people')}, ${plural(j.rules ?? 0, 'rule')}, ${plural(j.quotas ?? 0, 'limit')}. Anything you wrote or edited stays.`
+      : 'Nothing here came with Warden. Every rule and every person is yours.');
+  };
+  const load = $('loadSampleCompany');
+  if (load) load.onclick = async () => {
+    load.disabled = true;
+    await post('/api/company/sample');
+    await Promise.all([refreshPolicy(), refreshPeople()]);
+    render();
+  };
+  if ($('openReset')) $('openReset').onclick = () => openDialog('reset');
 }

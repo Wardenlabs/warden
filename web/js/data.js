@@ -24,30 +24,56 @@ export async function boot() {
     return;
   }
 
-  await Promise.all([refreshPolicy(), refreshPeople(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations(), refreshCompiler(), refreshAdjudicator()]);
+  // The directory and the model settings decide where an empty hash lands and
+  // what the shell says above every page, so they are read before the first
+  // render. The lists are read after it, each marking itself loading, so a
+  // slow log shows the page that is waiting for it rather than a blank window.
+  await Promise.all([refreshPeople(), refreshCompiler(), refreshAdjudicator()]);
   window.addEventListener('hashchange', route);
   route();
+  const lists = [refreshPolicy(), refreshAudit(), loadPresets(), refreshChain(), refreshAppeals(), refreshEscalations()];
+  for (const list of lists) void list.then(() => render());
+  await Promise.allSettled(lists);
   subscribe();
 }
 
+/**
+ * Whether a list is still being read and whether its last read failed, per
+ * list. Before this the console could not tell "no rules" from "the policy
+ * did not answer" — a failed read left an empty array behind and the page said
+ * nothing was being stopped, which is the one sentence a failure must never
+ * produce. A failed refresh keeps whatever was read before; the page says the
+ * read failed and offers the same request again.
+ */
+const loading = (key) => { state.loads[key] = { loading: true, error: '' }; };
+const loaded = (key, ok, j) => {
+  state.loads[key] = { loading: false, error: ok ? '' : String(j?.error ?? 'The gateway did not answer.') };
+  return ok;
+};
+const settle = async (key, path) => {
+  loading(key);
+  const result = await api(path).catch(() => ({ ok: false, j: null }));
+  return loaded(key, result.ok, result.j) ? result.j : null;
+};
+
 export async function refreshPolicy() {
-  const { j } = await api('/api/policy');
-  state.policy = j;
+  const j = await settle('policy', '/api/policy');
+  if (j && Array.isArray(j.rules)) state.policy = j;
 }
 
 export async function refreshPeople() {
-  const { j } = await api('/api/people');
-  state.company = j;
+  const j = await settle('people', '/api/people');
+  if (j && Array.isArray(j.employees)) state.company = j;
 }
 
-async function refreshAudit() {
-  const { ok, j } = await api(`/api/audit?limit=${AUDIT_LIMIT}`);
-  state.audit = ok && Array.isArray(j) ? j : [];
+export async function refreshAudit(limit = AUDIT_LIMIT) {
+  const j = await settle('audit', `/api/audit?limit=${limit}`);
+  if (Array.isArray(j)) state.audit = j;
 }
 
 /** The chain no longer sits in a corner as ambient status. It is fetched so
  *  the decision that someone actually asks about can prove itself. */
-async function refreshChain() {
+export async function refreshChain() {
   const { ok, j } = await api('/api/audit/verify').catch(() => ({ ok: false }));
   state.chain = ok ? j : null;
 }
@@ -70,13 +96,13 @@ async function loadPresets() {
 }
 
 export async function refreshAppeals() {
-  const { ok, j } = await api('/api/appeals');
-  state.appeals = ok && Array.isArray(j) ? j : [];
+  const j = await settle('appeals', '/api/appeals');
+  if (Array.isArray(j)) state.appeals = j;
 }
 
 export async function refreshEscalations() {
-  const { ok, j } = await api('/api/escalations');
-  state.escalations = ok && Array.isArray(j) ? j : [];
+  const j = await settle('escalations', '/api/escalations');
+  if (Array.isArray(j)) state.escalations = j;
 }
 
 /**

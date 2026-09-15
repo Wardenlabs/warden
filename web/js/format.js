@@ -66,12 +66,11 @@ export function audienceLabel(appliesTo) {
     .join(', ');
 }
 
-export const isPersonal = (rule) => rule.appliesTo?.some((t) => t.startsWith('@'));
 const ruleById = (id) => state.policy.rules.find((r) => r.id === id) ?? null;
 
 export const TOOL_NAMES = {
   'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor',
-  opencode: 'OpenCode', generic: 'other tool', proxy: 'API'
+  opencode: 'OpenCode', generic: 'other tool', proxy: 'API', console: 'Warden console'
 };
 
 /**

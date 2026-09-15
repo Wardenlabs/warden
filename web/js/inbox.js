@@ -1,165 +1,286 @@
 /**
- * Inbox: held requests waiting for a person, and blocks somebody said were wrong.
+ * Inbox: what is waiting on a person — held requests, and blocks somebody said were wrong — each as its own page.
  */
-import { decisionDetail, pendingEscalations } from './activity.js';
+import { GLYPH, decisionFolds, ensureEntry, findEntry, missingDecision, pendingEscalations, promptMarkup, ruleCard, verdictHead, whenLine } from './activity.js';
+import { readable } from './answers.js';
 import { $, attr, esc, post, state } from './core.js';
 import { refreshAppeals, refreshEscalations } from './data.js';
-import { clip, ruleName } from './format.js';
+import { actorName, fileSize, hhmm, personById, plural, ruleName } from './format.js';
 import { render } from './render.js';
 import { go } from './router.js';
+import { badgeVerdict, button, confirmResult, contextBar, feedback, fileChip, groupBand, listState, pageHead, turn } from './ui.js';
 import { VIEWS } from './views.js';
 
 /**
- * Everything waiting on a person, in two kinds.
+ * Everything waiting on a person, in one list and three groups.
  *
  * A held request is Warden declining to decide. An appeal is Warden having
  * decided wrong, according to the person it landed on. Both need a human and
  * neither belongs in the log, where a correct block and an incorrect one look
  * identical — which is the whole reason appeals exist as a separate record.
+ *
+ * Groups, not tabs: a tab that says "2" hides the other count behind a click,
+ * and the question this page answers is "what needs me", all of it.
+ *
+ * An appeal's address is `appeal-<auditId>`. Appeals have no id of their own
+ * in the API; the decision they dispute does, and one person appeals one
+ * decision, so the audit id is the stable key.
  */
+const APPEAL = 'appeal-';
+
 VIEWS.inbox = {
   onEnter: () => { void Promise.all([refreshAppeals(), refreshEscalations()]).then(render); },
   bind: bindInbox,
   body: () => {
-    const waiting = pendingEscalations();
-    const answered = state.escalations.filter((e) => e.review);
-    if (!state.appeals.length && !state.escalations.length) {
-      return `<div class="sheet"><div class="empty">
-        <b>Nothing waiting</b>
-        <span>Requests that need your sign-off land here, next to blocks somebody says were wrong.</span>
-      </div></div>`;
-    }
-    return `<div class="sheet">
-      ${waiting.length ? `
-        <div class="day">Waiting on you<span class="n">${waiting.length}</span></div>
-        ${waiting.map(escalationRow).join('')}` : ''}
-      ${state.appeals.length ? `
-        <div class="day">Reported as wrong<span class="n">${state.appeals.length}</span></div>
-        ${state.appeals.map(appealRow).join('')}` : ''}
-      ${answered.length ? `
-        <div class="day">Already answered<span class="n">${answered.length}</span></div>
-        ${answered.map(escalationRow).join('')}` : ''}
-    </div>`;
+    if (!state.sel) return listPage();
+    if (state.sel.startsWith(APPEAL)) return appealPage(state.appeals.find((a) => a.auditId === state.sel.slice(APPEAL.length)));
+    return heldPage(state.escalations.find((e) => e.auditId === state.sel));
   }
+};
+
+const whoOf = (id, fallback) => personById(id)?.name ?? fallback ?? id;
+const roleOf = (e) => personById(e.employeeId)?.role ?? e.role;
+
+// ── the list ─────────────────────────────────────────────────────────────────
+
+function listPage() {
+  const crumbs = [{ label: 'Workspace' }, { label: 'Inbox' }];
+  const loads = [state.loads.escalations, state.loads.appeals];
+  const sub = 'Held requests and blocks people say were wrong — everything that needs a person.';
+  if (loads.some((l) => !l || (l.loading && !state.escalations.length && !state.appeals.length))) {
+    return `<div class="sheet">${contextBar(crumbs, { text: 'Loading the inbox…' })}${pageHead({ title: 'Inbox', sub: 'Checking what needs you…' })}
+      ${listState({ title: 'Loading the inbox…', body: 'Fetching the items that are waiting on a person.' })}</div>`;
+  }
+  if (loads.some((l) => l.error)) {
+    return `<div class="sheet">${contextBar(crumbs, { text: 'Inbox unavailable' })}${pageHead({ title: 'Inbox', sub: 'Requests are still being judged.' })}
+      ${listState({ tone: 'attention', title: 'Could not load the inbox', body: 'The queue could not be read from this machine. Nothing is lost — held requests stay held until someone answers.', action: button('Retry loading', { kind: 'primary', id: 'retryInbox' }) })}</div>`;
+  }
+  const waiting = pendingEscalations();
+  const answered = state.escalations.filter((e) => e.review);
+  if (!waiting.length && !state.appeals.length && !answered.length) {
+    return `<div class="sheet">${contextBar(crumbs, { text: 'Nothing waiting', tone: 'allow' })}${pageHead({ title: 'Inbox', sub })}
+      <div class="empty-center"><b>Nothing waiting</b><span>Requests that need your sign-off land here, next to blocks somebody says were wrong.</span></div></div>`;
+  }
+  return `<div class="sheet">
+    ${contextBar(crumbs, waiting.length ? { text: `${waiting.length} waiting on you`, tone: 'attention' } : { text: 'Nothing waiting', tone: 'allow' })}
+    ${pageHead({ title: 'Inbox', sub })}
+    <div class="table inbox-table" role="table" aria-label="Inbox">
+      ${waiting.length ? groupBand('Waiting on you', waiting.length) + waiting.map(heldRow).join('') : ''}
+      ${state.appeals.length ? groupBand('Reported as wrong', state.appeals.length) + state.appeals.map(appealRow).join('') : ''}
+      ${answered.length ? groupBand('Answer recorded', answered.length) + answered.map(heldRow).join('') : ''}
+    </div>
+  </div>`;
+}
+
+/** "12:12 today", "16:05 yesterday", or the date. */
+const when = (ts) => {
+  const line = whenLine(ts);
+  return line.includes(' · ') ? line.split(' · ').reverse().join(' ') : line;
 };
 
 /**
  * One held request.
  *
  * An escalation is not a refusal and must not read like one: the person was not
- * told no, they were told to wait, and this is the screen where somebody ends
+ * told no, they were told to wait, and this is the page where somebody ends
  * that wait.
  */
-function escalationRow(e) {
-  const open = state.sel === e.auditId;
+function heldRow(e) {
   const done = Boolean(e.review);
-  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(e.auditId)}" aria-expanded="${open}">
-      <span class="dot ${done ? '' : 'ESCALATE'}"></span>
-      <span class="col">
-        <span class="t">${e.ruleText ? esc(ruleName(e.ruleId ?? '')) : 'Held without a named rule'}</span>
-        <span class="m">
-          <span>${esc(e.employeeName ?? e.employeeId)} · ${esc(e.role)}</span>
-          ${done
-            ? `<span class="badge ${e.review.outcome === 'approved' ? 'ALLOW' : 'BLOCK'}">${esc(e.review.outcome)}</span>`
-            : '<span class="badge ESCALATE">waiting</span>'}
-          <span class="mono">${esc(String(e.at).slice(0, 16).replace('T', ' '))}</span>
-        </span>
-      </span>
-    </button>
-    ${open ? escalationDetail(e) : ''}`;
-}
-
-function escalationDetail(e) {
-  const entry = state.audit.find((x) => x.auditId === e.auditId);
-  const who = esc(e.employeeName ?? e.employeeId);
-
-  const head = `<p class="summary">${who} sent something the <b>${esc(ruleName(e.ruleId ?? ''))}</b> rule says needs sign-off. Not refused, just waiting on you.</p>
-    ${e.employeeNote ? `<div class="group">
-      <div class="label">They added</div>
-      <div class="banner">“${esc(e.employeeNote)}”</div>
-    </div>` : ''}
-    ${e.review ? `<div class="group">
-      <div class="label">Answered</div>
-      <div class="banner${e.review.outcome === 'approved' ? '' : ' warn'}">
-        <b>${esc(e.review.outcome)}</b>${e.review.note ? ` — ${esc(e.review.note)}` : ''}
-      </div>
-    </div>` : `<div class="group">
-      <div class="label">Answer them</div>
-      <textarea id="reviewNote" rows="2" placeholder="What should they know? (optional)"></textarea>
-      <div class="chips">
-        <button type="button" class="btn primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
-        <button type="button" class="btn danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
-      </div>
-      <div class="note">This answers them. Their next ask is judged on its own.</div>
-      <div class="note bad" id="reviewNote_err"></div>
-    </div>`}`;
-
-  return entry ? decisionDetail(entry, head) : `<div class="detail">${head}</div>`;
-}
-
-function bindInbox() {
-  const sheet = $('pane').querySelector('.sheet');
-  if (!sheet) return;
-  sheet.querySelectorAll('[data-review]').forEach((btn) => {
-    btn.onclick = async () => {
-      const note = $('reviewNote')?.value.trim();
-      btn.disabled = true;
-      const { ok, j } = await post(`/api/escalations/${encodeURIComponent(btn.dataset.id)}`, { outcome: btn.dataset.review, ...(note ? { note } : {}) });
-      if (!ok) {
-        btn.disabled = false;
-        const err = $('reviewNote_err');
-        if (err) err.textContent = j.error ?? 'could not record that';
-        return;
-      }
-      await refreshEscalations();
-      render();
-    };
-  });
+  return `<div class="trow --link${done ? ' --done' : ''}" role="row" tabindex="0" data-go="inbox" data-sel="${attr(e.auditId)}">
+    <span class="who-cell"><i class="dot --${done ? 'muted' : 'attention'}"></i><span class="${done ? 'cell-muted' : 'cell-strong'}">${e.ruleId ? esc(ruleName(e.ruleId)) : 'Held without a named rule'}</span></span>
+    <span class="cell-muted">${esc(whoOf(e.employeeId, e.employeeName))} · ${esc(roleOf(e))}</span>
+    <span>${done
+      ? `<span class="verdict-text --${e.review.outcome === 'approved' ? 'allow' : 'block'}">${e.review.outcome === 'approved' ? 'Approval' : 'Refusal'} recorded</span>`
+      : '<span class="verdict-text --attention">↗ Waiting</span>'}</span>
+    <span class="cell-muted num time-cell">${esc(done ? when(e.review.at) : when(e.at))}</span>
+  </div>`;
 }
 
 function appealRow(a) {
-  const open = state.sel === a.auditId;
-  return `<button type="button" class="row roomy${open ? ' on' : ''}" data-toggle="inbox" data-sel="${attr(a.auditId)}" aria-expanded="${open}">
-      <span class="dot BLOCK"></span>
-      <span class="col">
-        <span class="t">${a.note ? esc(a.note) : `${esc(a.employeeName)} said this block was wrong`}</span>
-        <span class="m">
-          <span>${esc(a.employeeName)}</span>
-          ${a.ruleId ? `<span>${esc(ruleName(a.ruleId))}</span>` : '<span>no rule fired</span>'}
-          <span class="mono">${esc(String(a.at).slice(0, 16).replace('T', ' '))}</span>
-        </span>
-      </span>
-    </button>
-    ${open ? appealDetail(a) : ''}`;
+  return `<div class="trow --link" role="row" tabindex="0" data-go="inbox" data-sel="${APPEAL}${attr(a.auditId)}">
+    <span class="who-cell"><i class="dot --block"></i><span class="cell-strong">${a.note ? `“${esc(a.note)}”` : `${esc(whoOf(a.employeeId, a.employeeName))} said this block was wrong`}</span></span>
+    <span class="cell-muted">${esc(whoOf(a.employeeId, a.employeeName))} · ${a.ruleId ? esc(ruleName(a.ruleId)) : 'no rule fired'}</span>
+    <span><span class="verdict-text --block">⊘ Blocked</span></span>
+    <span class="cell-muted num time-cell">${esc(when(a.at))}</span>
+  </div>`;
 }
 
-function appealDetail(a) {
-  const entry = state.audit.find((x) => x.auditId === a.auditId);
-  // The decision itself carries everything, so show it — but lead with what the
-  // person said, because that is the part the log cannot tell you.
-  const head = `<div class="group">
-      <div class="label">${esc(a.employeeName)} reported this</div>
-      ${a.note
-        ? `<div class="banner">“${esc(a.note)}”</div>`
-        : '<div class="note">No note, just that it was wrong.</div>'}
-    </div>
-    ${a.ruleId ? `<div class="group">
-      <div class="label">The rule that stopped them</div>
-      <button type="button" class="ruleref" data-go="policy" data-sel="${attr(a.ruleId)}">
-        <span class="dot block"></span>
-        <span class="col">
-          <span class="t">${esc(ruleName(a.ruleId))}</span>
-          <span class="m">${esc(clip(a.ruleText, 130))}</span>
-        </span>
-      </button>
-    </div>` : ''}`;
+// ── a held request ───────────────────────────────────────────────────────────
 
-  if (!entry) {
-    return `<div class="detail">
-      ${head}
-      <div class="note">The decision itself is older than the log this console loaded, so only what they reported is shown.</div>
+/**
+ * What an answer is doing, per held request: whether it is being saved, what
+ * failed, and what the gateway said when it was already answered. The note is
+ * kept here so a failed save or a re-render cannot lose what was typed.
+ */
+const answers = new Map();
+const answerOf = (id) => {
+  if (!answers.has(id)) answers.set(id, { note: '', saving: null, error: null, conflict: false, justNow: false });
+  return answers.get(id);
+};
+
+const waitedFor = (ts) => {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(ts)) / 60000));
+  return m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`;
+};
+
+function heldPage(e) {
+  if (!e) return state.loads.escalations?.loading ? missingDecision('Inbox', 'inbox') : `<div class="sheet">${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
+    ${pageHead({ title: 'This request is not waiting any more' })}${listState({ title: 'Nothing to answer', body: 'It is not in the queue. It may have been answered from another console.' })}</div>`;
+  const entry = findEntry(e.auditId);
+  const a = answerOf(e.auditId);
+  const first = whoOf(e.employeeId, e.employeeName).split(' ')[0];
+  const d = entry?.decision ?? { verdict: 'ESCALATE', firedRules: e.ruleId ? [{ ruleId: e.ruleId, ruleText: e.ruleText, severity: 'escalate' }] : [] };
+  const judged = entry ? ` · judged in ${((entry.decision.totalMs ?? 0) / 1000).toFixed(1)} s` : '';
+  const added = e.employeeNote ? `<div class="turn-note">They added — “${esc(e.employeeNote)}”</div>` : '';
+  const request = entry
+    ? requestTurnFor(entry, added)
+    : turn('person', { who: `${esc(whoOf(e.employeeId, e.employeeName))} · ${esc(roleOf(e))}`, body: `<div class="turn-text muted">The request is older than the log this page loaded.</div>${added}` });
+  const done = e.review;
+  const outcomeWord = (o) => (o === 'approved' ? 'Approval' : 'Refusal');
+
+  if (done) {
+    return `<div class="sheet">
+      ${contextBar(a.justNow ? [{ label: 'Back to Inbox', go: 'inbox', back: true }] : [{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
+      ${verdictHead({ tone: done.outcome === 'approved' ? 'allow' : 'block', title: `${outcomeWord(done.outcome)} recorded`, sub: `Recorded ${a.justNow ? 'just now' : whenLine(done.at)} · original decision: Held at ${hhmm(e.at)}` })}
+      <div class="exchange reading">
+        ${request}
+        ${ruleCard(d, { note: '<p class="turn-meta">This request did not reach the assistant. Your answer did not resume it.</p>' })}
+      </div>
+      ${a.conflict ? `<div class="reading answer-block">${feedback({ title: 'An answer was already recorded', body: 'Your new answer was not saved. The existing recorded answer is shown below.' })}</div>` : ''}
+      ${entry && !a.conflict ? decisionFolds(entry, { chain: false, record: false }) : ''}
+      <div class="reading answer-block">
+        <span class="field-label">Recorded note</span>
+        <p class="recorded-note">${done.note ? esc(done.note) : 'No note was added.'}</p>
+        ${a.justNow && !a.conflict
+          ? confirmResult({ title: 'Your answer was recorded', body: `The original request was not resumed.<br>${esc(first)} must send a new request; Warden will check it again.`, action: button('Back to Inbox', { kind: 'primary', attrs: 'data-go="inbox"' }) })
+          : `<div>${button('Back to Inbox', { kind: 'primary', attrs: 'data-go="inbox"' })}</div>`}
+      </div>
+      ${entry && a.conflict ? decisionFolds(entry, { chain: false, record: false }) : ''}
     </div>`;
   }
-  // Splice the report into the decision's own detail, above everything else.
-  return decisionDetail(entry, head);
+
+  const saving = a.saving;
+  const failed = a.error;
+  return `<div class="sheet">
+    ${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
+    ${verdictHead({ tone: 'attention', glyph: GLYPH.ESCALATE, title: 'Held', sub: `${whenLine(e.at)} · waiting ${waitedFor(e.at)}${judged}` })}
+    <div class="exchange reading">
+      ${request}
+      ${ruleCard(d, { note: '<p class="turn-meta">This request did not reach the assistant. Your answer will not resume it.</p>' })}
+    </div>
+    <hr class="hairline">
+    <section class="reading answer-block" aria-labelledby="answerTitle">
+      <h2 class="section-title --big" id="answerTitle">Record your answer</h2>
+      ${failed ? feedback({ tone: 'error', icon: true, title: `${outcomeWord(failed.outcome)} couldn’t be saved`, body: `Your ${outcomeWord(failed.outcome).toLowerCase()} was not recorded. This request is still waiting for review.<br>Your note is preserved below — try saving again.${failed.why ? `<br>${esc(failed.why)}` : ''}` }) : ''}
+      <p class="answer-lead">${failed ? `Once your answer is saved, ${esc(first)} must send a new request.` : `${esc(first)} must send a new request after reading your answer.`} Every new request is checked again.</p>
+      <div class="field">
+        <label for="reviewNote">Note to ${esc(first)} <span class="optional">(optional)</span></label>
+        <textarea id="reviewNote" rows="3" placeholder="Add context for your answer…"${saving ? ' readonly' : ''}>${esc(a.note)}</textarea>
+        <span class="field-help">${saving ? 'Saving your answer…' : failed ? 'Your note was preserved. Try saving again.' : 'Your note is kept if saving fails.'}</span>
+      </div>
+      <div class="btn-row">
+        ${button(saving === 'approved' ? 'Saving approval…' : failed?.outcome === 'approved' ? 'Retry saving approval' : 'Record approval', { kind: 'primary', attrs: `data-review="approved" data-id="${attr(e.auditId)}"`, busy: saving === 'approved', disabled: Boolean(saving) })}
+        ${button(saving === 'refused' ? 'Saving refusal…' : failed?.outcome === 'refused' ? 'Retry saving refusal' : 'Record refusal', { kind: saving ? 'quiet' : 'danger', attrs: `data-review="refused" data-id="${attr(e.auditId)}"`, busy: saving === 'refused', disabled: Boolean(saving) })}
+      </div>
+    </section>
+    ${entry ? decisionFolds(entry, { chain: false, record: false }) : ''}
+  </div>`;
+}
+
+function requestTurnFor(entry, extra) {
+  const d = entry.decision ?? {};
+  const role = personById(entry.actor?.id)?.role ?? entry.actor?.role;
+  const files = (d.documents ?? []).map((doc) => fileChip(doc.name, fileSize(doc.bytes ?? 0))).join('');
+  return turn('person', {
+    who: `${esc(actorName(entry.actor))}${role ? ` · ${esc(role)}` : ''}`,
+    body: `${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not stored — the log keeps the hash, not the text</div>'}${files ? `<div class="labels">${files}</div>` : ''}${extra}`,
+    cls: 'request-turn'
+  });
+}
+
+// ── an appeal ────────────────────────────────────────────────────────────────
+
+/**
+ * What a person said was wrong, their words first.
+ *
+ * The action is "Open the rule": the rule is the thing an administrator can
+ * change, and the API has no way to mark an appeal resolved, so the page does
+ * not offer one.
+ */
+function appealPage(a) {
+  if (!a) return missingDecision('Inbox', 'inbox');
+  const entry = findEntry(a.auditId);
+  const name = whoOf(a.employeeId, a.employeeName);
+  const first = name.split(' ')[0];
+  const role = personById(a.employeeId)?.role;
+  const blockedAt = entry ? hhmm(entry.ts) : null;
+  const ruleHits = a.ruleId ? state.audit.filter((x) => (x.decision?.firedRules ?? []).some((r) => r.ruleId === a.ruleId) && x.decision?.verdict === 'BLOCK').length : 0;
+  const disputes = a.ruleId ? state.appeals.filter((x) => x.ruleId === a.ruleId).length : 0;
+  const d = entry?.decision;
+  return `<div class="sheet">
+    ${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Reported as wrong' }])}
+    ${verdictHead({
+      lead: `<div class="appeal-meta">${badgeVerdict('BLOCK')}<span>${esc(name)}${role ? ` · ${esc(role)}` : ''}${blockedAt ? ` · blocked at ${esc(blockedAt)}` : ''} · reported at ${esc(hhmm(a.at))}</span></div>`,
+      tone: 'ink', title: `${first} says this block was wrong.`,
+      action: a.ruleId ? button('Open the rule', { attrs: `data-go="policy" data-sel="${attr(a.ruleId)}"` }) : ''
+    })}
+    <div class="exchange reading">
+      ${turn('person', { who: `${esc(name)} · reported at ${esc(hhmm(a.at))}`, body: `<div class="turn-text">${a.note ? `“${esc(a.note)}”` : 'No note, just that it was wrong.'}</div>` })}
+      <span class="kicker exchange-kicker">The decision they dispute</span>
+      ${entry ? `<article class="turn --warden dispute-card">
+          <div class="turn-who">What they sent · ${esc(hhmm(entry.ts))}</div>
+          ${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not stored — the log keeps the hash, not the text</div>'}
+          ${(d.documents ?? []).length ? `<div class="labels">${d.documents.map((doc) => fileChip(doc.name, fileSize(doc.bytes ?? 0))).join('')}</div>` : ''}
+        </article>
+        ${ruleCard(d, { note: a.ruleId ? `<p class="turn-meta">${plural(ruleHits, 'block')} by this rule in the loaded log · ${disputes} disputed</p>` : '' })}`
+      : '<p class="exchange-note">The decision itself is older than the log this console loaded, so only what they reported is shown.</p>'}
+    </div>
+    ${entry ? decisionFolds(entry, { chain: false, record: false }) : ''}
+  </div>`;
+}
+
+// ── bindings ─────────────────────────────────────────────────────────────────
+
+function bindInbox() {
+  if (state.sel?.startsWith(APPEAL)) ensureEntry(state.sel.slice(APPEAL.length));
+  else if (state.sel) ensureEntry(state.sel);
+
+  const retry = $('retryInbox');
+  if (retry) retry.onclick = async () => { retry.disabled = true; await Promise.all([refreshAppeals(), refreshEscalations()]); render(); };
+
+  const note = $('reviewNote');
+  if (note && state.sel) note.oninput = () => { answerOf(state.sel).note = note.value; };
+
+  document.querySelectorAll('[data-review]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      const a = answerOf(id);
+      const outcome = btn.dataset.review;
+      a.note = $('reviewNote')?.value ?? a.note;
+      a.saving = outcome;
+      a.error = null;
+      render();
+      const note = a.note.trim();
+      const { ok, status, j } = await post(`/api/escalations/${encodeURIComponent(id)}`, { outcome, ...(note ? { note } : {}) })
+        .catch(() => ({ ok: false, status: 0, j: { error: 'Warden could not be reached.' } }));
+      a.saving = null;
+      if (status === 409) {
+        // Somebody answered first. Theirs stands; say so and show it.
+        a.conflict = true;
+        a.justNow = true;
+        await refreshEscalations();
+        render();
+        return;
+      }
+      if (!ok) {
+        a.error = { outcome, why: readable(j?.error ?? '') };
+        render();
+        return;
+      }
+      a.justNow = true;
+      await refreshEscalations();
+      if (state.view === 'inbox' && state.sel === id) render(); else go('inbox', id);
+    };
+  });
 }

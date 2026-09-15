@@ -7,6 +7,7 @@
  * two of them, which is why they live apart from either.
  */
 import { $, api, esc, state } from './core.js';
+import { button, feedback } from './ui.js';
 
 /**
  * An error a person can read, out of whatever the gateway sent.
@@ -47,9 +48,16 @@ export function readable(err) {
 export function notARuleAnswer(j) {
   const reason = esc(j.reason || 'There is no prohibition in it.');
   if (typeof j.factor !== 'number') {
-    return `<b>Nothing to enforce there.</b> ${reason}`;
+    return feedback({ title: 'Nothing to enforce there.', body: reason });
   }
-  return `<b>That is a spending target, not a rule.</b> ${reason}${limitsPlan(j)}`;
+  if (!Array.isArray(j.limits) || j.limits.length === 0) {
+    return feedback({
+      title: 'This request describes a spending limit',
+      body: `No rule was drafted. Review the daily limit in Team → Roles, or describe the type of request Warden should detect.
+        <div class="feedback-actions">${button('Review role limits', { kind: 'primary', attrs: 'data-go="people" data-sel="roles"' })}</div>`
+    });
+  }
+  return feedback({ title: 'That is a spending target, not a rule.', body: `${reason}${limitsPlan(j)}` });
 }
 
 /**
@@ -65,15 +73,13 @@ export function notARuleAnswer(j) {
 export function limitsPlan(j) {
   const pct = Math.round((1 - j.factor) * 100);
   if (!Array.isArray(j.limits) || j.limits.length === 0) {
-    return `<div>Cutting ${pct}% needs a limit to cut. No role has a daily limit yet, so set one per role on
-      <button type="button" class="linkish" data-go="people">Team</button> and say this again.</div>`;
+    return `<p class="limits-lead">Cutting ${pct}% needs a limit to cut. No role has a daily limit yet, so set one per role on
+      <button type="button" class="linkish" data-go="people" data-sel="roles">Team → Roles</button> and say this again.</p>`;
   }
   state.pendingLimits = j.limits;
-  return `<div>Cutting every daily limit by ${pct}%:</div>
-    <div class="limit-plan">${j.limits.map((row) => `
-      <div class="r"><span class="k">${esc(row.role)}</span>
-        <span class="v num">${row.from} → ${row.to} a day</span></div>`).join('')}</div>
-    <div><button type="button" class="btn primary" id="applyLimits">Apply these limits</button></div>`;
+  return `<p class="limits-lead">Cutting every daily limit by ${pct}%:</p>
+    <dl class="limit-plan">${j.limits.map((row) => `<dt>${esc(row.role)}</dt><dd class="num">${row.from} → ${row.to} a day</dd>`).join('')}</dl>
+    <div class="feedback-actions"><button type="button" class="btn --primary --compact" id="applyLimits">Apply these limits</button></div>`;
 }
 
 /**
@@ -93,14 +99,18 @@ export function limitsPlan(j) {
 export function compileFailure(j) {
   const why = esc(j?.error ?? 'the model did not answer');
   if (j?.kind === 'compiler-setup-required') {
-    return `<b>Choose what writes your rules first.</b> ${why}<div><button type="button" class="btn primary" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>`;
+    return feedback({ tone: 'attention', title: 'Choose what writes your rules first.', body: `${why}<div class="feedback-actions"><button type="button" class="btn --primary --compact" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>` });
   }
   if (j?.kind !== 'model-down') {
-    return `I could not compile that: ${why}. Try saying it more plainly.`;
+    return feedback({ tone: 'error', title: 'No rule was drafted', body: `I could not compile that: ${why}. Try saying it more plainly.`, icon: true });
   }
-  return `<b>The local model is not running.</b> ${why}.
-    <div>Rewording will not help. <button type="button" class="linkish" id="showLog">Show me the gateway log</button>, which is where the reason is.</div>
-    <div>If you have Claude Code or Codex signed in, <button type="button" class="linkish" data-go="compiler">point the compiler at it</button> and rules compile without the local model.</div>`;
+  return feedback({
+    tone: 'error', icon: true,
+    title: 'The local model is not running.',
+    body: `${why}.
+      <div>Rewording will not help. <button type="button" class="linkish" id="showLog">Show me the gateway log</button>, which is where the reason is.</div>
+      <div>If you have Claude Code or Codex signed in, <button type="button" class="linkish" data-go="models" data-q="setup=compiler">point the compiler at it</button> and rules compile without the local model.</div>`
+  });
 }
 
 /**
