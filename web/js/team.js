@@ -302,6 +302,13 @@ function peopleTab() {
   const all = state.company.employees;
   const unsetup = all.filter((e) => !isConnected(e)).length;
   const shown = only ? all.filter((e) => !isConnected(e)) : all;
+  const load = state.loads.people;
+  if (load?.error) {
+    return listState({ title: 'Could not load the team', body: 'We could not confirm who is on the team. Retry to load the latest list.', icon: true, action: button('Retry loading', { kind: 'primary', id: 'retryPeople' }) });
+  }
+  if (load?.loading && !all.length) {
+    return listState({ title: 'Loading the team…', body: 'Fetching people, their roles and their connections.' });
+  }
   if (!all.length) {
     return listState({ title: 'Nobody yet', body: 'Add people and Warden issues each of them a connection key.', action: button('Add people', { kind: 'primary', id: 'openAddEmpty' }) });
   }
@@ -366,6 +373,8 @@ async function changeRole(id, to, confirmed = false) {
 }
 
 function bindPeople() {
+  const retry = $('retryPeople');
+  if (retry) retry.onclick = async () => { retry.disabled = true; await refreshPeople(); render(); };
   const open = () => openDialog('add', { role: orderedRoles()[0] });
   if ($('openAdd')) $('openAdd').onclick = open;
   if ($('openAddEmpty')) $('openAddEmpty').onclick = open;

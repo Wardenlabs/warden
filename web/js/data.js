@@ -62,8 +62,8 @@ export async function refreshPolicy() {
 }
 
 export async function refreshPeople() {
-  const { j } = await api('/api/people');
-  state.company = j;
+  const j = await settle('people', '/api/people');
+  if (j && Array.isArray(j.employees)) state.company = j;
 }
 
 export async function refreshAudit(limit = AUDIT_LIMIT) {
