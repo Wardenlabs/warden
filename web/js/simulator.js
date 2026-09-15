@@ -32,7 +32,7 @@ VIEWS.simulator = {
       <div class="sheet">
         ${state.chat.length
           ? state.chat.map(renderMessage).join('')
-          : state.company.employees.length ? '<div class="empty"><b>See what Warden would do</b><span>Check a prompt, a document, or both as somebody on your team. The same policy and identity checks apply.</span></div>' : '<div class="empty"><b>Set up an identity to check requests</b><span>Choose who Warden should check as. Protect this device to create your own identity, or add people to your team.</span><div class="actions"><button type="button" class="btn primary" data-go="soloRules">Set up this device</button><button type="button" class="btn" data-go="people">Add people</button></div></div>'}
+          : state.company.employees.length ? '<div class="empty"><b>See what Warden would do</b><span>Check a prompt, a document, or both as somebody on your team. The same policy and identity checks apply.</span></div>' : '<div class="empty"><b>Set up an identity to check requests</b><span>Choose who Warden should check as. Protect this device to create your own identity, or add people to your team.</span><div class="actions"><button type="button" class="btn --primary" data-go="soloRules">Set up this device</button><button type="button" class="btn" data-go="people">Add people</button></div></div>'}
         ${documentReviewPendingMarkup(state.chat.at(-1)?.documents, state.sending && state.chat.at(-1)?.from === 'employee')}
       </div>
     </div>
@@ -40,7 +40,7 @@ VIEWS.simulator = {
       <div class="sheet">
         <div class="hero-box">
           <textarea id="prompt" rows="2" aria-label="Prompt to check" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Drop a file, or paste a request to test…'}"${state.sending ? ' disabled' : ''}></textarea>
-          <button type="button" class="btn primary send" id="send"${state.sending || documentsBusy() || !state.company.employees.length ? ' disabled' : ''}>${state.sending ? 'Checking…' : 'Test'}</button>
+          <button type="button" class="btn --primary send" id="send"${state.sending || documentsBusy() || !state.company.employees.length ? ' disabled' : ''}>${state.sending ? 'Checking…' : 'Test'}</button>
         </div>
         ${documentComposer()}
       </div>
@@ -212,7 +212,7 @@ function followUpControls(m, i) {
         ${m.followUp.hasDocuments ? '<div class="note">To revise a document request, update the file and check it again.</div>' : ''}
         ${m.appealOpen ? `
           <textarea id="appealNote" rows="2" placeholder="What were you actually trying to do? (optional)"></textarea>
-          <button type="button" class="btn primary" data-send-appeal="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'appeal' ? 'Sending…' : 'Send the report'}</button>` : ''}
+          <button type="button" class="btn --primary" data-send-appeal="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'appeal' ? 'Sending…' : 'Send the report'}</button>` : ''}
         ${m.error ? `<div class="note bad">${esc(m.error)}</div>` : ''}`}
   </div>`;
 }

@@ -81,7 +81,7 @@ export function rulesHead(right = '') {
       ${right}
     </header>
     <nav class="tabs" aria-label="Rules sections">
-      ${TABS.map(([id, label]) => `<button type="button" class="tab${tab === id ? ' on' : ''}" ${
+      ${TABS.map(([id, label]) => `<button type="button" class="tab${tab === id ? ' --on' : ''}" ${
         id === 'test' ? 'data-go="simulator"' : id === 'new' ? 'data-go="policy" data-sel="new"' : 'data-go="policy"'
       }>${label}${id === 'new' && tab !== 'new' && (state.draft || state.set) ? ' •' : ''}</button>`).join('')}
     </nav>
@@ -320,7 +320,7 @@ export function mockBanner() {
     <b>Demo mode. None of this is real.</b> No model has judged anything you see here.
     ${state.canLeaveDemo
       ? `<div class="banner-act">
-           <button type="button" class="btn primary" id="getModels">Download the models</button>
+           <button type="button" class="btn --primary" id="getModels">Download the models</button>
            <span class="note">5.4&nbsp;GB, once. Warden restarts by itself when they land.</span>
          </div>`
       : '<div class="note">Run <span class="mono">pnpm run setup</span>. 5.4&nbsp;GB, once.</div>'}
@@ -336,7 +336,7 @@ function heroComposer() {
     <div class="hero-box">
       <textarea id="ruleMsg" rows="2" placeholder="Describe it the way you would to a colleague…"></textarea>
       ${modelPicker()}
-      <button type="button" class="btn primary send" id="ruleSend">Write it</button>
+      <button type="button" class="btn --primary send" id="ruleSend">Write it</button>
     </div>
 
     <div class="hero-sugg" id="cats">
@@ -439,6 +439,6 @@ function ruleDetail(rule) {
       </div>`)}
     </div>
 
-    <div><button type="button" class="btn danger" id="delRule" data-id="${attr(rule.id)}">Remove rule</button></div>
+    <div><button type="button" class="btn --danger" id="delRule" data-id="${attr(rule.id)}">Remove rule</button></div>
   </div>`;
 }

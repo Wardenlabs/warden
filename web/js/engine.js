@@ -15,7 +15,7 @@ function enginePage() {
   const m = state.models;
   const status = engineStatus(m);
   return `<div class="sheet settings">
-    <button type="button" class="btn quiet" data-go="models">Back to Models</button>
+    <button type="button" class="btn --link" data-go="models">Back to Models</button>
     <div class="headline"><span class="dot ${status.tone}" aria-hidden="true"></span><div><div class="t">${esc(status.title)}</div><div class="m">${esc(status.detail)}</div></div></div>
     ${m?.runtime?.ok === false ? `<div class="section"><div class="label">Runtime error</div><div class="banner bad"><b>The local model worker could not start.</b><pre class="code">${esc(m.runtime.path ?? 'Runtime not found')}
 ${esc(m.runtime.detail)}</pre></div></div>` : ''}

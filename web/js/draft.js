@@ -25,7 +25,7 @@ import { bindSet, runSetPreviews, setCards } from './draft-set.js';
 export function ruleChatPane() {
   return `<div class="chatwrap">
     <div class="sheet chat-head">
-      ${rulesHead('<button type="button" class="btn quiet" id="cancelDraft">Start over</button>')}
+      ${rulesHead('<button type="button" class="btn --link" id="cancelDraft">Start over</button>')}
     </div>
     <div class="chat" id="ruleChat">
       <div class="sheet">
@@ -41,7 +41,7 @@ export function ruleChatPane() {
             ? 'Tell Warden how to change it…'
             : state.set ? 'Refine the set (“solo para ventas”, “sumá…”), or describe another rule…' : 'Describe the rule in your own words…'}"></textarea>
           ${modelPicker()}
-          <button type="button" class="btn primary send" id="ruleSend"${state.ruleBusy ? ' disabled' : ''}>${state.ruleBusy ? 'Working…' : 'Send'}</button>
+          <button type="button" class="btn --primary send" id="ruleSend"${state.ruleBusy ? ' disabled' : ''}>${state.ruleBusy ? 'Working…' : 'Send'}</button>
         </div>
       </div>
     </div>
@@ -160,7 +160,7 @@ function issueBlock(p) {
     <div class="issue-examples">${rows.map((r) => `<div>"${esc(r.prompt)}"</div>`).join('')}</div>
     <div class="chips">
       <button type="button" class="btn" id="refineBtn" data-refine="${esc(refineText)}">${kind === 'fp' ? 'Narrow it' : 'Make it more specific'}</button>
-      <button type="button" class="btn quiet" id="keepIssueBtn">Keep as is</button>
+      <button type="button" class="btn --link" id="keepIssueBtn">Keep as is</button>
     </div>
   </div>`;
 }
@@ -218,8 +218,8 @@ function draftCard() {
       ${issueBlock(p)}
 
       <div class="chips">
-        <button type="button" class="btn primary" id="ratifyBtn"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
-        <button type="button" class="btn quiet" id="dropBtn">Discard</button>
+        <button type="button" class="btn --primary" id="ratifyBtn"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
+        <button type="button" class="btn --link" id="dropBtn">Discard</button>
       </div>
 
       <div class="folds">
@@ -463,7 +463,7 @@ function offerRegression() {
   const n = regressionSample().length;
   if (!n) return 'Activate it below when it reads right.';
   return `Want me to replay the last ${n} requests Warden allowed and see if this rule would have stopped any?
-    <button type="button" class="btn sm" id="regressBtn">Replay ${n} real requests</button>`;
+    <button type="button" class="btn --compact" id="regressBtn">Replay ${n} real requests</button>`;
 }
 
 function regressionSample() { return state.audit

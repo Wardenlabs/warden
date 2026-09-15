@@ -26,7 +26,7 @@ export function compilerNeedsSetup() {
 /** Shared by solo and team: a setup step, with the rest of the console open. */
 export function compilerSetupNudge() {
   if (!compilerNeedsSetup() || ['models', 'compiler'].includes(state.view)) return '';
-  return `<section class="compiler-setup-nudge" aria-labelledby="compilerSetupTitle"><div><h2 id="compilerSetupTitle">Choose what writes your rules</h2><p>Warden needs a model to turn your instructions into rules. Nothing drafts until you pick one; you can keep exploring, or start from the rule presets. Employee requests are analyzed on this machine either way.</p></div><button type="button" class="btn primary" data-go="models" data-q="setup=compiler">Set up the rule writer</button></section>`;
+  return `<section class="compiler-setup-nudge" aria-labelledby="compilerSetupTitle"><div><h2 id="compilerSetupTitle">Choose what writes your rules</h2><p>Warden needs a model to turn your instructions into rules. Nothing drafts until you pick one; you can keep exploring, or start from the rule presets. Employee requests are analyzed on this machine either way.</p></div><button type="button" class="btn --primary" data-go="models" data-q="setup=compiler">Set up the rule writer</button></section>`;
 }
 
 const defaultProviderModel = (provider) => provider?.id.endsWith('-cli') ? '' : provider?.models?.[0] ?? '';
@@ -38,7 +38,7 @@ function claudeConnected(draft = compilerDraft()) {
 
 VIEWS.compiler = {
   railParent: 'models',
-  body: () => `<div class="sheet settings"><button class="btn quiet" data-go="models">Back to Models</button>${compilerSettings()}</div>`,
+  body: () => `<div class="sheet settings"><button class="btn --link" data-go="models">Back to Models</button>${compilerSettings()}</div>`,
   bind: bindCompiler
 };
 
@@ -107,12 +107,12 @@ function claudeQuickSetup(draft) {
     ${status?.message ? `<p class="note${['install-required', 'sign-in-required'].includes(status.status) ? ' warn' : ''}" role="status">${esc(status.message)}</p>` : ''}
     ${installed === false ? `<p class="note">Install the command-line app on this gateway, as the same user running Warden, then refresh its status.</p>
       <a class="btn" href="https://code.claude.com/docs/en/setup#install-claude-code" target="_blank" rel="noopener noreferrer">Open installation guide<span class="sr-only"> in a new tab</span></a>` : ''}
-    ${installed !== false && !signedIn ? `<div class="claude-login-command"><code>claude auth login</code><button type="button" class="btn quiet" data-copy="${attr('claude auth login')}">Copy sign-in command</button></div>` : ''}
+    ${installed !== false && !signedIn ? `<div class="claude-login-command"><code>claude auth login</code><button type="button" class="btn --link" data-copy="${attr('claude auth login')}">Copy sign-in command</button></div>` : ''}
     <div class="job-actions">
       ${connected
-        ? `<button type="submit" class="btn primary" id="cSave"${state.compilerTest?.saved ? ' disabled' : ''}>${busy === 'save' ? 'Applying…' : 'Apply the rule writer'}</button>`
-        : `<button type="button" class="btn primary" id="cTest">${busy === 'test' ? 'Testing connection…' : 'Test connection'}</button>`}
-      <button type="button" class="btn quiet" id="cAnother">Use another model</button>
+        ? `<button type="submit" class="btn --primary" id="cSave"${state.compilerTest?.saved ? ' disabled' : ''}>${busy === 'save' ? 'Applying…' : 'Apply the rule writer'}</button>`
+        : `<button type="button" class="btn --primary" id="cTest">${busy === 'test' ? 'Testing connection…' : 'Test connection'}</button>`}
+      <button type="button" class="btn --link" id="cAnother">Use another model</button>
       <span class="note">Uses your Claude Code account and plan. The check sends one short test request.</span>
     </div>
   </div>`;
@@ -127,13 +127,13 @@ function claudeSetup(draft) {
   const authLabel = signedIn ? 'Signed in' : status?.auth === 'signed-out' ? 'Sign-in required' : installed === false ? 'Install first' : 'Not confirmed';
   const isApplied = state.compiler?.provider === 'claude-cli' && state.compiler.activeSource === 'settings' && !compilerNeedsSetup() && !state.compiler.overriddenByEnv && state.compiler.model === draft.model;
   return `<section class="claude-setup" aria-labelledby="claudeSetupHeading">
-    <div class="claude-setup-head"><div><h3 id="claudeSetupHeading">${compilerNeedsSetup() ? 'Set up Claude Code to draft rules' : 'Connect Claude Code'}</h3><p class="note">Use a terminal on the gateway computer, as the same user running Warden. Usage follows your Claude Code account and provider plan.</p></div><button type="button" class="btn quiet" id="cRefresh">${busy === 'refresh' ? 'Checking…' : 'Refresh status'}</button></div>
+    <div class="claude-setup-head"><div><h3 id="claudeSetupHeading">${compilerNeedsSetup() ? 'Set up Claude Code to draft rules' : 'Connect Claude Code'}</h3><p class="note">Use a terminal on the gateway computer, as the same user running Warden. Usage follows your Claude Code account and provider plan.</p></div><button type="button" class="btn --link" id="cRefresh">${busy === 'refresh' ? 'Checking…' : 'Refresh status'}</button></div>
     ${status?.message ? `<p class="note${['install-required', 'sign-in-required'].includes(status.status) ? ' warn' : ''}" role="status">${esc(status.message)}</p>` : ''}
     <ol class="claude-setup-steps">
       <li><div class="claude-step-heading"><h4>Install Claude Code</h4><span class="model-status${installed ? ' good' : ''}">${installed === true ? 'Installed' : installed === false ? 'Not found' : 'Not checked'}</span></div><p>Install the command-line app on this gateway, then refresh its status here.</p><a class="btn" href="https://code.claude.com/docs/en/setup#install-claude-code" target="_blank" rel="noopener noreferrer">Open installation guide<span class="sr-only"> in a new tab</span></a></li>
-      <li><div class="claude-step-heading"><h4>Sign in</h4><span class="model-status${signedIn ? ' good' : ''}">${authLabel}</span></div><p>Run this command in the gateway’s terminal and complete the sign-in flow it opens.</p><div class="claude-login-command"><code>claude auth login</code><button type="button" class="btn quiet" data-copy="${attr('claude auth login')}">Copy sign-in command</button></div></li>
+      <li><div class="claude-step-heading"><h4>Sign in</h4><span class="model-status${signedIn ? ' good' : ''}">${authLabel}</span></div><p>Run this command in the gateway’s terminal and complete the sign-in flow it opens.</p><div class="claude-login-command"><code>claude auth login</code><button type="button" class="btn --link" data-copy="${attr('claude auth login')}">Copy sign-in command</button></div></li>
       <li><div class="claude-step-heading"><h4>Check the connection</h4><span id="claudeTestStatus" class="model-status${connected ? ' good' : ''}">${connected ? 'Connection checked' : 'Not checked'}</span></div><p>Send a short test request through Claude Code. This can use your account’s allowance. An unknown sign-in status can still be checked.</p><button type="button" class="btn" id="cTest">${busy === 'test' ? 'Testing connection…' : 'Test connection'}</button></li>
-      <li><div class="claude-step-heading"><h4>Apply the compiler</h4><span class="model-status${isApplied ? ' good' : ''}">${isApplied ? 'Applied' : 'Your choice'}</span></div><p>${state.compiler?.overriddenByEnv ? 'Save this preference for when the environment override is removed.' : 'Use this checked connection for new rule drafts. Employee requests continue to be analyzed locally.'}</p><button type="submit" class="btn primary" id="cSave"${!connected || state.compilerTest?.saved ? ' disabled' : ''}>${busy === 'save' ? 'Applying…' : 'Apply compiler'}</button></li>
+      <li><div class="claude-step-heading"><h4>Apply the compiler</h4><span class="model-status${isApplied ? ' good' : ''}">${isApplied ? 'Applied' : 'Your choice'}</span></div><p>${state.compiler?.overriddenByEnv ? 'Save this preference for when the environment override is removed.' : 'Use this checked connection for new rule drafts. Employee requests continue to be analyzed locally.'}</p><button type="submit" class="btn --primary" id="cSave"${!connected || state.compilerTest?.saved ? ' disabled' : ''}>${busy === 'save' ? 'Applying…' : 'Apply compiler'}</button></li>
     </ol>
   </section>`;
 }
@@ -178,7 +178,7 @@ export function compilerSettings() {
       ${remote || cli ? `<div class="field"><label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}><span>Replace employee names with their IDs before sending</span></label></div>` : ''}
       ${claude ? claudeSetup(d) : `<div class="actions">
         ${remote ? '<button type="button" class="btn" id="cTest">Test connection</button>' : ''}
-        <button type="submit" class="btn primary" id="cSave">${busy === 'save' ? 'Applying…' : 'Apply compiler'}</button>
+        <button type="submit" class="btn --primary" id="cSave">${busy === 'save' ? 'Applying…' : 'Apply compiler'}</button>
       </div>`}
     </fieldset>
     <div id="compilerFeedback" role="status" aria-live="polite">${compilerFeedback()}</div>

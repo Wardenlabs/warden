@@ -64,7 +64,7 @@ VIEWS.people = {
       ${pageHead()}
       ${demoBanner()}
       <nav class="tabs" aria-label="Team sections">
-        ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' on' : ''}" data-go="people"${sel ? ` data-sel="${sel}"` : ''}>${label}</button>`).join('')}
+        ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' --on' : ''}" data-go="people"${sel ? ` data-sel="${sel}"` : ''}>${label}</button>`).join('')}
       </nav>
       ${tab === '' ? peopleTab() : tab === 'roles' ? rolesTab() : companyTab()}
     </div>`;
@@ -151,7 +151,7 @@ function peopleTab() {
     <div class="add-row">
       <input type="text" id="newName" class="grow" placeholder="Names, comma-separated" autocomplete="off">
       <select id="newRole">${roleOptions()}</select>
-      <button type="button" class="btn primary" id="addPerson">Add</button>
+      <button type="button" class="btn --primary" id="addPerson">Add</button>
     </div>
     <div class="note under" id="addNote"></div>
     ${only ? `<div class="filter-note">Only ${plural(emps.length, 'person', 'people')} without setup ·
@@ -193,7 +193,7 @@ function menu(id, items) {
   return `<details class="menu">
     <summary aria-label="More">···</summary>
     <div class="menu-list">
-      ${items.map(([act, label, cls]) => `<button type="button" class="menu-item${cls ? ` ${cls}` : ''}" data-act="${act}" data-id="${attr(id)}">${label}</button>`).join('')}
+      ${items.map(([act, label, cls]) => `<button type="button" class="menu-item${cls ? ` --${cls === 'danger' ? 'destructive' : cls}` : ''}" data-act="${act}" data-id="${attr(id)}">${label}</button>`).join('')}
     </div>
   </details>`;
 }
@@ -443,7 +443,7 @@ function personPage(p) {
         </div>`
       : `<div class="setup-card">
           <div><b>${first} has not connected yet.</b><span class="note">The setup message has their key and the steps for every tool. Send it to them.</span></div>
-          <button type="button" class="btn primary" data-act="copy-setup" data-id="${attr(p.id)}">Copy setup message</button>
+          <button type="button" class="btn --primary" data-act="copy-setup" data-id="${attr(p.id)}">Copy setup message</button>
         </div>`}
 
     <section class="block">
@@ -465,8 +465,8 @@ function personPage(p) {
         ${state.personCompose === p.id
           ? `<textarea id="personRuleText" rows="2" placeholder="e.g. cannot request data from other teams"></textarea>
              <div class="inline-row">
-               <button type="button" class="btn primary" id="personCompile">Write this rule</button>
-               <button type="button" class="btn quiet" id="personCancel">Cancel</button>
+               <button type="button" class="btn --primary" id="personCompile">Write this rule</button>
+               <button type="button" class="btn --link" id="personCancel">Cancel</button>
              </div>`
           : `<button type="button" class="linkish" id="personCompose">+ Write a rule for ${first}</button>`}
       </div>
@@ -625,7 +625,7 @@ async function renderOnboarding(person) {
       ${st.note ? `<div class="note">${esc(st.note)}</div>` : ''}
       <div class="codewrap">
         <pre class="code">${esc(st.code)}</pre>
-        <button type="button" class="btn sm copy" data-copy="${attr(st.code)}">Copy</button>
+        <button type="button" class="btn --compact copy" data-copy="${attr(st.code)}">Copy</button>
       </div>
     </div>`;
 

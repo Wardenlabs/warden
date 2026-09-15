@@ -62,7 +62,7 @@ function todayCard() {
     <p class="line">Warden looked at <b>${rows.length}</b> request${rows.length === 1 ? '' : 's'} today and stopped <b>${stopped}</b>.
       ${people ? `${plural(people, 'person', 'people')} hit a rule.` : 'Nobody hit a rule.'}</p>
     ${waiting ? `<div class="cta">
-      <button type="button" class="btn primary" data-go="inbox">${plural(waiting, 'request')} waiting on you</button>
+      <button type="button" class="btn --primary" data-go="inbox">${plural(waiting, 'request')} waiting on you</button>
     </div>` : ''}
   </div>`;
 }

@@ -87,8 +87,8 @@ function escalationDetail(e) {
       <div class="label">Answer them</div>
       <textarea id="reviewNote" rows="2" placeholder="What should they know? (optional)"></textarea>
       <div class="chips">
-        <button type="button" class="btn primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
-        <button type="button" class="btn danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
+        <button type="button" class="btn --primary" data-review="approved" data-id="${attr(e.auditId)}">Approve</button>
+        <button type="button" class="btn --danger" data-review="refused" data-id="${attr(e.auditId)}">Refuse</button>
       </div>
       <div class="note">This answers them. Their next ask is judged on its own.</div>
       <div class="note bad" id="reviewNote_err"></div>

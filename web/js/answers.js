@@ -73,7 +73,7 @@ export function limitsPlan(j) {
     <div class="limit-plan">${j.limits.map((row) => `
       <div class="r"><span class="k">${esc(row.role)}</span>
         <span class="v num">${row.from} → ${row.to} a day</span></div>`).join('')}</div>
-    <div><button type="button" class="btn primary" id="applyLimits">Apply these limits</button></div>`;
+    <div><button type="button" class="btn --primary" id="applyLimits">Apply these limits</button></div>`;
 }
 
 /**
@@ -93,7 +93,7 @@ export function limitsPlan(j) {
 export function compileFailure(j) {
   const why = esc(j?.error ?? 'the model did not answer');
   if (j?.kind === 'compiler-setup-required') {
-    return `<b>Choose what writes your rules first.</b> ${why}<div><button type="button" class="btn primary" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>`;
+    return `<b>Choose what writes your rules first.</b> ${why}<div><button type="button" class="btn --primary" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>`;
   }
   if (j?.kind !== 'model-down') {
     return `I could not compile that: ${why}. Try saying it more plainly.`;

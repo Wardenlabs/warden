@@ -24,10 +24,10 @@ VIEWS.redteam = {
   body: () => {
     const s = state.rtReport;
     const toolbar = `<div class="toolbar">
-      <button type="button" class="btn quiet" data-go="policy">← Rules</button>
+      <button type="button" class="btn --link" data-go="policy">← Rules</button>
       <span class="spacer"></span>
       <button type="button" class="btn" id="loadRt">Load last report</button>
-      <button type="button" class="btn primary" id="runRt"${state.rtBusy ? ' disabled' : ''}>${state.rtBusy ? 'Running…' : 'Run suite'}</button>
+      <button type="button" class="btn --primary" id="runRt"${state.rtBusy ? ' disabled' : ''}>${state.rtBusy ? 'Running…' : 'Run suite'}</button>
     </div>`;
 
     if (!s) {
@@ -57,7 +57,7 @@ VIEWS.redteam = {
           ${(s.warden ?? []).map((c) => {
             const b = (s.baseline ?? []).find((x) => x.class === c.class);
             const rate = pc(c.correct, c.total);
-            const colour = rate > 70 ? 'var(--allow)' : rate > 40 ? 'var(--escalate)' : 'var(--block)';
+            const colour = rate > 70 ? 'var(--verdict-allow)' : rate > 40 ? 'var(--verdict-attention)' : 'var(--verdict-block)';
             return `<tr>
               <td>${esc(c.class)}${c.isControl ? ' <span class="note">(control)</span>' : ''}</td>
               <td class="n">${rate}%<div class="bar"><i style="width:${rate}%;background:${colour}"></i></div></td>

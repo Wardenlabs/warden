@@ -54,7 +54,7 @@ function editorMarkup() {
   const editing = Boolean(d.id);
   const endpoint = !local;
   return `<form id="customModelForm" class="model-editor library-editor" aria-labelledby="modelEditorTitle" aria-busy="${Boolean(editor.busy)}">
-    <div class="model-section-head"><h3 id="modelEditorTitle">${editing ? 'Edit model' : 'Add your model'}</h3><button type="button" class="btn quiet" id="closeModelEditor"${editor.busy ? ' disabled' : ''}>Cancel</button></div>
+    <div class="model-section-head"><h3 id="modelEditorTitle">${editing ? 'Edit model' : 'Add your model'}</h3><button type="button" class="btn --link" id="closeModelEditor"${editor.busy ? ' disabled' : ''}>Cancel</button></div>
     <fieldset class="model-fields"${editor.busy ? ' disabled' : ''}>
       ${editing ? '' : `<div class="field"><label for="customModelKind">Connection</label><select id="customModelKind" data-no-restore><option value="endpoint"${endpoint ? ' selected' : ''}>API endpoint · compiler</option><option value="local"${local ? ' selected' : ''}>Local GGUF · compiler or analyzer</option></select></div>`}
       ${field('customModelName', 'Name', d.name, 'e.g. My local compiler', 'required maxlength="100" autocomplete="off"')}
@@ -69,7 +69,7 @@ function editorMarkup() {
         ${d.source === 'upload' ? `<div class="field"><label for="customModelFile">GGUF file</label><input id="customModelFile" class="model-file-input" type="file" accept=".gguf" aria-describedby="modelFileHelp"><span id="modelFileHelp" class="note">${editor.pendingFile ? `${esc(editor.pendingFile.name)} · ${fileSize(editor.pendingFile.size)} selected` : 'Choose a .gguf model. Large files may take several minutes to upload.'}</span></div>` : d.source === 'path' ? field('customModelPath', 'Absolute file path on the gateway', d.path, '/path/to/model.gguf', 'required spellcheck="false" autocomplete="off"') : field('customModelDownload', 'Direct download URL', d.url, 'https://example.com/model.gguf', 'required spellcheck="false" autocomplete="off"')}
         <fieldset class="model-role-fields"><legend>Use it for</legend><label class="check"><input id="customModelCompiler" type="checkbox"${d.roles.includes('compiler') ? ' checked' : ''} data-no-restore><span>Compiler — writes rules</span></label><label class="check"><input id="customModelAnalyzer" type="checkbox"${d.roles.includes('adjudicator') ? ' checked' : ''} data-no-restore><span>Analyzer — checks requests locally</span></label></fieldset>
         <div class="field"><label for="customModelFormat">Response format</label><select id="customModelFormat" data-no-restore><option value="compliance"${d.format === 'compliance' ? ' selected' : ''}>General instruction model · JSON compliance</option><option value="dynaguard"${d.format === 'dynaguard' ? ' selected' : ''}>DynaGuard · PASS / FAIL</option></select><span class="note">DynaGuard is analyzer-only. Successful compatibility tests are required before an imported model can be used.</span></div>`}
-      <div class="actions"><button type="submit" class="btn primary" id="saveCustomModel">${editor.busy === 'save' ? local ? 'Importing…' : 'Saving…' : editing ? 'Save changes' : local ? d.source === 'url' ? 'Start download' : 'Import model' : 'Save connection'}</button></div>
+      <div class="actions"><button type="submit" class="btn --primary" id="saveCustomModel">${editor.busy === 'save' ? local ? 'Importing…' : 'Saving…' : editing ? 'Save changes' : local ? d.source === 'url' ? 'Start download' : 'Import model' : 'Save connection'}</button></div>
     </fieldset>
     ${editor.busy === 'save' && local && !editing ? `<div class="transfer-status" role="status"><progress aria-label="Importing model"></progress><span>Importing the model. Keep this page open until it finishes.</span>${editor.controller ? '<button type="button" class="btn" id="cancelModelUpload">Cancel upload</button>' : ''}</div>` : ''}
     ${editor.note?.scope === 'form' ? feedback(editor.note) : ''}
@@ -106,7 +106,7 @@ function modelRow(model) {
     ...roles.map((role) => `<button type="button" class="menu-item" id="test-${id}-${role}" data-model-test="${id}" data-role="${role}"${editor.busy ? ' disabled' : ''}>${editor.busy === `${model.id}:test:${role}` ? 'Testing…' : `Test for ${jobLabel(role).toLowerCase()}`}</button>`),
     ...roles.filter((role) => !active.includes(role) && role !== promoted).map((role) => `<button type="button" class="menu-item" id="activate-${id}-${role}" data-model-use="${id}" data-role="${role}"${editor.busy || !tested.includes(role) || overrides[role] ? ' disabled' : ''} title="${overrides[role] ? 'The environment controls this role. Remove its override to apply a saved model.' : tested.includes(role) ? `Use this model as the ${roleLabel(role)}` : `Test this model as the ${roleLabel(role)} first`}">${editor.busy === `${model.id}:use:${role}` ? 'Applying…' : `Use for ${jobLabel(role).toLowerCase()}`}</button>`),
     `<button type="button" class="menu-item" data-model-edit="${id}"${editor.busy || assigned ? ' disabled' : ''} title="${assigned ? 'Choose another model before editing this selection.' : 'Edit this saved model'}">Edit</button>`,
-    `<button type="button" class="menu-item danger" data-model-remove="${id}"${editor.busy || assigned ? ' disabled' : ''} title="${assigned ? 'Choose another model for each assigned role before removing this one.' : 'Remove this saved model'}">Remove</button>`
+    `<button type="button" class="menu-item --destructive" data-model-remove="${id}"${editor.busy || assigned ? ' disabled' : ''} title="${assigned ? 'Choose another model for each assigned role before removing this one.' : 'Remove this saved model'}">Remove</button>`
   ];
   return `<div class="trow" data-model-id="${esc(model.id)}">
     <span class="c-model"><b>${esc(model.name)}</b><span class="mono">${model.kind === 'endpoint' ? `${esc(model.model)} · ${esc(model.baseUrl)}` : `${esc(model.filename ?? 'GGUF model')} · ${fileSize(model.bytes ?? 0)}`}</span></span>
@@ -121,7 +121,7 @@ function modelRow(model) {
   ${assigned ? '<p class="trow-note note">To edit or remove this model, choose another model for each assigned role first.</p>' : ''}
   ${pending ? '<p class="trow-note note" role="status">Checking compatibility may take a minute while the model loads.</p>' : ''}
   ${editor.note?.scope === model.id ? `<div class="trow-note">${feedback(editor.note)}</div>` : ''}
-  ${editor.confirmDelete === model.id ? `<div class="trow-note model-delete-confirm" role="group" aria-label="Confirm model removal"><p>Remove <b>${esc(model.name)}</b> from this installation? Imported weights will be deleted.</p><div class="actions"><button type="button" class="btn danger" data-model-delete="${id}">Remove model</button><button type="button" class="btn" id="cancelModelDelete">Keep model</button></div></div>` : ''}`;
+  ${editor.confirmDelete === model.id ? `<div class="trow-note model-delete-confirm" role="group" aria-label="Confirm model removal"><p>Remove <b>${esc(model.name)}</b> from this installation? Imported weights will be deleted.</p><div class="actions"><button type="button" class="btn --danger" data-model-delete="${id}">Remove model</button><button type="button" class="btn" id="cancelModelDelete">Keep model</button></div></div>` : ''}`;
 }
 
 /** What the row says about whether this model can be put to work. */
@@ -135,7 +135,7 @@ function transferMarkup() {
   if (!jobs.length) return '';
   return `<div class="model-transfers" aria-label="Model downloads">${jobs.map((job) => {
     const running = ['queued', 'downloading'].includes(job.state);
-    return `<div class="model-transfer"><div><b>${esc(job.name ?? 'Model download')}</b><span class="note">${job.state === 'complete' ? 'Imported. Test it below before use.' : job.state === 'failed' ? esc(job.error ?? 'Download failed. Add the model again to retry.') : job.state === 'cancelled' ? 'Download cancelled.' : `${fileSize(job.received ?? 0)}${job.total ? ` of ${fileSize(job.total)}` : ''} downloaded`}</span></div>${running ? `<progress aria-label="Download progress for ${esc(job.name ?? 'model')}"${job.total ? ` max="${job.total}" value="${job.received ?? 0}"` : ''}></progress><button type="button" class="btn quiet" data-cancel-download="${attr(job.id)}">Cancel</button>` : `<span class="model-status${job.state === 'failed' ? ' bad' : ''}">${esc(job.state)}</span>`}</div>`;
+    return `<div class="model-transfer"><div><b>${esc(job.name ?? 'Model download')}</b><span class="note">${job.state === 'complete' ? 'Imported. Test it below before use.' : job.state === 'failed' ? esc(job.error ?? 'Download failed. Add the model again to retry.') : job.state === 'cancelled' ? 'Download cancelled.' : `${fileSize(job.received ?? 0)}${job.total ? ` of ${fileSize(job.total)}` : ''} downloaded`}</span></div>${running ? `<progress aria-label="Download progress for ${esc(job.name ?? 'model')}"${job.total ? ` max="${job.total}" value="${job.received ?? 0}"` : ''}></progress><button type="button" class="btn --link" data-cancel-download="${attr(job.id)}">Cancel</button>` : `<span class="model-status${job.state === 'failed' ? ' bad' : ''}">${esc(job.state)}</span>`}</div>`;
   }).join('')}</div>`;
 }
 
@@ -144,7 +144,7 @@ export function libraryMarkup() {
   return `<section class="library" aria-label="Model library">
     <div class="library-head">
       <p class="note">Saved weights and connections, shared by every administrator of this installation.</p>
-      <button type="button" class="btn primary" id="addCustomModel"${editor.draft || editor.busy || !library.catalog ? ' disabled' : ''}>Add model</button>
+      <button type="button" class="btn --primary" id="addCustomModel"${editor.draft || editor.busy || !library.catalog ? ' disabled' : ''}>Add model</button>
     </div>
     ${library.error ? `<div class="banner bad" role="alert">${esc(library.error)} <button type="button" class="linkbtn" id="retryModelLibrary">Try again</button></div>` : ''}
     ${editorMarkup()}

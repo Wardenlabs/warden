@@ -8,6 +8,7 @@ import { bindGetModels } from './engine.js';
 import { captureFieldValues, restoreFieldValues } from './form-state.js';
 import { renderNav } from './nav.js';
 import { go } from './router.js';
+import { disclosureRow } from './ui.js';
 import { firstRunBanner, mockBanner } from './rules.js';
 import { VIEWS } from './views.js';
 
@@ -121,9 +122,8 @@ export function bindDisclosures() {
   }
 }
 
-export function disclosure(key, label, body) {
-  return `<details class="fold" data-key="${esc(key)}"${state.open.has(key) ? ' open' : ''}>
-    <summary>${esc(label)}</summary>
-    <div class="fold-body">${body}</div>
-  </details>`;
+/** Disclosure / Row, with its open state carried in `state.open`. `datum` is
+ *  the short state on the right, and only when it reports state. */
+export function disclosure(key, label, body, datum = '') {
+  return disclosureRow(key, label, datum, body, { open: state.open.has(key) });
 }

@@ -90,8 +90,8 @@ function pageHead() {
     : 'not connected yet';
 
   const action = isProtected
-    ? `<button type="button" class="btn primary" id="soloFocusRule">Add rule</button>`
-    : `<button type="button" class="btn primary" id="soloProtect"${state.soloProtecting ? ' disabled' : ''}>${state.soloProtecting ? 'Setting up…' : 'Protect this device'}</button>`;
+    ? `<button type="button" class="btn --primary" id="soloFocusRule">Add rule</button>`
+    : `<button type="button" class="btn --primary" id="soloProtect"${state.soloProtecting ? ' disabled' : ''}>${state.soloProtecting ? 'Setting up…' : 'Protect this device'}</button>`;
 
   return `<header class="page-head">
     <div>
@@ -162,7 +162,7 @@ function menu(id, items) {
   return `<details class="menu">
     <summary aria-label="More">···</summary>
     <div class="menu-list">
-      ${items.map(([act, label, cls]) => `<button type="button" class="menu-item${cls ? ` ${cls}` : ''}" data-act="${act}" data-id="${attr(id)}">${label}</button>`).join('')}
+      ${items.map(([act, label, cls]) => `<button type="button" class="menu-item${cls ? ` --${cls === 'danger' ? 'destructive' : cls}` : ''}" data-act="${act}" data-id="${attr(id)}">${label}</button>`).join('')}
     </div>
   </details>`;
 }
@@ -195,7 +195,7 @@ function soloBody() {
     <div class="row solo-add">
       <span class="dot"></span>
       <input type="text" id="soloRuleText" class="grow" placeholder="Write your own rule…" autocomplete="off"${state.soloBusy ? ' disabled' : ''}>
-      <button type="button" class="btn quiet" id="soloRuleSend"${state.soloBusy ? ' disabled' : ''}>Add</button>
+      <button type="button" class="btn --link" id="soloRuleSend"${state.soloBusy ? ' disabled' : ''}>Add</button>
     </div>
     ${state.soloRuleNote ? `<div class="note under">${state.soloRuleNote}</div>` : ''}
   </div>`;
@@ -341,7 +341,7 @@ function soloSettingsBody() {
     <div class="section">
       <div class="label">Managing a team too?</div>
       <p class="note">Add people, send each their install link, and write rules for them. What you've set up here keeps working as it does now.</p>
-      <button type="button" class="btn primary" id="soloGoTeam" style="width:fit-content">Add people</button>
+      <button type="button" class="btn --primary" id="soloGoTeam" style="width:fit-content">Add people</button>
     </div>
   </div>`;
 }

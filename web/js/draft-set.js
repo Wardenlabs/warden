@@ -42,9 +42,9 @@ export function setCards() {
       <span class="when">${active} active · ${open.length} waiting${editing ? ` · ${editing} being edited above` : ''}</span>
     </div>
     ${open.length ? `<div class="chips">
-      <button type="button" class="btn primary" id="ratifyAll"${state.ruleBusy || checking ? ' disabled' : ''}>
+      <button type="button" class="btn --primary" id="ratifyAll"${state.ruleBusy || checking ? ' disabled' : ''}>
         ${checking ? 'Checking each one…' : `Activate all ${open.length}`}</button>
-      <button type="button" class="btn quiet" id="dropAll">Discard the rest</button>
+      <button type="button" class="btn --link" id="dropAll">Discard the rest</button>
     </div>
     ${worrying ? `<div class="note">${plural(worrying, 'rule')} below ${worrying === 1 ? 'has' : 'have'} a check worth reading before you activate everything.</div>` : ''}`
     : ''}
@@ -73,9 +73,9 @@ export function setCards() {
       <span class="k">Applies to</span><span class="v">${esc(audienceLabel(d.appliesTo))}</span>
     </div></div>
     ${active ? '' : `<div class="chips">
-      <button type="button" class="btn primary" data-set-act="ratify" data-set-i="${i}"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
-      <button type="button" class="btn sm" data-set-act="edit" data-set-i="${i}"${state.ruleBusy || state.draft ? ' disabled' : ''}>Edit alone</button>
-      <button type="button" class="btn quiet" data-set-act="drop" data-set-i="${i}">Discard</button>
+      <button type="button" class="btn --primary" data-set-act="ratify" data-set-i="${i}"${state.ruleBusy ? ' disabled' : ''}>Activate</button>
+      <button type="button" class="btn --compact" data-set-act="edit" data-set-i="${i}"${state.ruleBusy || state.draft ? ' disabled' : ''}>Edit alone</button>
+      <button type="button" class="btn --link" data-set-act="drop" data-set-i="${i}">Discard</button>
     </div>`}
     <div class="folds">
       ${it.preview ? disclosure(`s:check:${i}`, `The ${plural(it.preview.rows.length, 'request')} it was checked against`, checkRowsOf(it.preview)) : ''}

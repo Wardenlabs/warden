@@ -36,7 +36,7 @@ export function limitEditor(role) {
       <input type="number" min="1" step="1" id="qPrompt" value="${q.maxPromptChars ?? ''}" placeholder="none"></label>
     ${state.quotaError ? `<div class="note bad">${esc(state.quotaError)}</div>` : ''}
     <div class="quota-actions">
-      <button type="submit" class="btn primary">Save</button>
+      <button type="submit" class="btn --primary">Save</button>
       <button type="button" class="btn" id="qCancel">Cancel</button>
     </div>
   </form>`;

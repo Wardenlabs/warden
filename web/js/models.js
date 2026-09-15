@@ -98,7 +98,7 @@ function pageHead(tab) {
       <h1 class="page-title">Models</h1>
       <div class="page-status">${statusLine(tab)}</div>
     </div>
-    <button type="button" class="btn quiet" id="refreshModels"${refreshing ? ' disabled' : ''}>${refreshing ? 'Refreshing…' : 'Refresh'}</button>
+    <button type="button" class="btn --link" id="refreshModels"${refreshing ? ' disabled' : ''}>${refreshing ? 'Refreshing…' : 'Refresh'}</button>
   </header>`;
 }
 
@@ -189,7 +189,7 @@ function analyzerSettings() {
     <ul class="analyzer-options">${a.choices.map((choice) => {
       const on = choice.id === chosen;
       const current = !a.overriddenByEnv && choice.onDisk && on;
-      return `<li class="analyzer-option${on ? ' chosen' : ''}"><div><div class="library-model-name"><h3>${esc(choice.label)}</h3>${on ? `<span class="model-status${current ? ' good' : ' warn'}">${current ? 'Selected' : 'Saved preference'}</span>` : ''}</div><p>${esc(choice.trade)}</p><div class="model-metadata"><span>${(choice.approxMB / 1000).toFixed(1)} GB</span><span class="${choice.onDisk ? 'good' : 'warn'}">${choice.onDisk ? 'On this gateway' : 'Not downloaded'}</span><span>${esc(choice.perDecision ?? 'Speed not measured')}</span></div></div><div class="analyzer-option-action">${on && !choice.onDisk && state.canLeaveDemo ? '<button type="button" class="btn primary js-get-models">Download model</button>' : `<button type="button" class="btn" data-analyzer-choice="${esc(choice.id)}"${changingAnalyzer || on ? ' disabled' : ''}>${changingAnalyzer === choice.id ? 'Applying…' : current ? 'Selected' : choice.onDisk ? 'Use model' : 'Select for download'}</button>`}</div></li>`;
+      return `<li class="analyzer-option${on ? ' chosen' : ''}"><div><div class="library-model-name"><h3>${esc(choice.label)}</h3>${on ? `<span class="model-status${current ? ' good' : ' warn'}">${current ? 'Selected' : 'Saved preference'}</span>` : ''}</div><p>${esc(choice.trade)}</p><div class="model-metadata"><span>${(choice.approxMB / 1000).toFixed(1)} GB</span><span class="${choice.onDisk ? 'good' : 'warn'}">${choice.onDisk ? 'On this gateway' : 'Not downloaded'}</span><span>${esc(choice.perDecision ?? 'Speed not measured')}</span></div></div><div class="analyzer-option-action">${on && !choice.onDisk && state.canLeaveDemo ? '<button type="button" class="btn --primary js-get-models">Download model</button>' : `<button type="button" class="btn" data-analyzer-choice="${esc(choice.id)}"${changingAnalyzer || on ? ' disabled' : ''}>${changingAnalyzer === choice.id ? 'Applying…' : current ? 'Selected' : choice.onDisk ? 'Use model' : 'Select for download'}</button>`}</div></li>`;
     }).join('')}</ul>
     ${selected && !selected.onDisk ? `<p class="note warn">${esc(selected.label)} is not downloaded yet. ${state.canLeaveDemo ? 'Download it to finish applying this selection.' : 'Run the model setup on the gateway to download it.'} The card above says which model is judging now.</p>` : ''}
     ${analyzerNote ? `<p class="note ${analyzerNote.ok ? 'good' : 'bad'}" role="${analyzerNote.ok ? 'status' : 'alert'}">${esc(analyzerNote.text)}</p>` : ''}
@@ -217,7 +217,7 @@ function activeTab() {
 function promptsTab() {
   const templates = promptEditor.catalog?.templates ?? [];
   if (promptEditor.openRole) {
-    return `<div class="tab-back"><button type="button" class="btn quiet" id="closePromptTemplate">← All templates</button></div>
+    return `<div class="tab-back"><button type="button" class="btn --link" id="closePromptTemplate">← All templates</button></div>
       ${promptEditorMarkup(promptEditor.openRole)}`;
   }
   if (!templates.length) {
@@ -248,7 +248,7 @@ function modelsPage() {
   return `<div class="sheet settings models-page">
     ${pageHead(tab)}
     <nav class="tabs" aria-label="Models sections">
-      ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' on' : ''}" data-go="models"${sel ? ` data-sel="${sel}"` : ''}>${label}${sel === 'prompts' && hasPromptChanges() ? ' •' : ''}</button>`).join('')}
+      ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' --on' : ''}" data-go="models"${sel ? ` data-sel="${sel}"` : ''}>${label}${sel === 'prompts' && hasPromptChanges() ? ' •' : ''}</button>`).join('')}
     </nav>
     ${tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()}
   </div>`;
