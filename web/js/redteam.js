@@ -3,6 +3,7 @@
  */
 import { $, api, esc, post, state } from './core.js';
 import { render } from './render.js';
+import { button, contextBar, feedback, listState, pageHead, statusText } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ RED TEAM ════════════════════════════════════════════════════════════════
@@ -23,15 +24,14 @@ VIEWS.redteam = {
   railParent: 'policy',
   body: () => {
     const s = state.rtReport;
-    const toolbar = `<div class="toolbar">
-      <button type="button" class="btn --link" data-go="policy">← Rules</button>
-      <span class="spacer"></span>
-      <button type="button" class="btn" id="loadRt">Load last report</button>
-      <button type="button" class="btn --primary" id="runRt"${state.rtBusy ? ' disabled' : ''}>${state.rtBusy ? 'Running…' : 'Run suite'}</button>
-    </div>`;
-
+    const head = `${contextBar([{ label: 'Rules', go: 'policy', back: true }, { label: 'Red team' }])}
+      ${pageHead({
+        title: 'Red team',
+        sub: 'The canned attack corpus, replayed against the sample policy. It measures the guard, not the rules you wrote.',
+        actions: button('Load last report', { id: 'loadRt' }) + button(state.rtBusy ? 'Running…' : 'Run suite', { kind: 'primary', id: 'runRt', busy: state.rtBusy })
+      })}`;
     if (!s) {
-      return `<div class="sheet">${toolbar}<div class="empty"><b>No report yet</b><span>Run the suite to see how the guard does against attacks somebody already wrote down.</span></div></div>`;
+      return `<div class="sheet">${head}${listState({ title: 'No report yet', body: 'Run the suite to see how the guard does against attacks somebody already wrote down.' })}</div>`;
     }
     const attacks = (s.warden ?? []).filter((c) => !c.isControl);
     const controls = (s.warden ?? []).filter((c) => c.isControl);
@@ -41,31 +41,23 @@ VIEWS.redteam = {
     const pc = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
     return `<div class="sheet">
-      ${toolbar}
-      <div class="group">
-        ${s.adapter === 'mock' ? '<div class="banner warn">Demo mode: these numbers measure nothing.</div>' : ''}
-        <p class="summary">Warden stopped <b>${caught} of ${atotal}</b> attacks, and wrongly stopped <b>${fp} of ${ctotal}</b> legitimate requests.</p>
-        <div class="stats">
-          <div class="stat"><div class="n good">${pc(caught, atotal)}%</div><div class="k">attacks stopped</div></div>
-          <div class="stat"><div class="n${fp ? ' warn' : ' good'}">${pc(fp, ctotal)}%</div><div class="k">wrongly stopped</div></div>
-        </div>
-      </div>
-      <div class="section">
-        <table>
-          <thead><tr><th>Attack class</th><th class="n">Warden</th><th class="n">No guard</th></tr></thead>
-          <tbody>
+      ${head}
+      <div class="reading-wide settings-page">
+        ${s.adapter === 'mock' ? feedback({ tone: 'attention', title: 'Demo mode', body: 'These numbers measure nothing: no model judged the corpus.' }) : ''}
+        <p class="redteam-summary">Warden stopped <b>${caught} of ${atotal}</b> attacks (${pc(caught, atotal)}%), and wrongly stopped <b>${fp} of ${ctotal}</b> legitimate requests (${pc(fp, ctotal)}%).</p>
+        <div class="table redteam-table" role="table" aria-label="Attack classes">
+          <div class="thead" role="row"><span>Attack class</span><span>Warden</span><span>No guard</span></div>
           ${(s.warden ?? []).map((c) => {
             const b = (s.baseline ?? []).find((x) => x.class === c.class);
             const rate = pc(c.correct, c.total);
-            const colour = rate > 70 ? 'var(--verdict-allow)' : rate > 40 ? 'var(--verdict-attention)' : 'var(--verdict-block)';
-            return `<tr>
-              <td>${esc(c.class)}${c.isControl ? ' <span class="note">(control)</span>' : ''}</td>
-              <td class="n">${rate}%<div class="bar"><i style="width:${rate}%;background:${colour}"></i></div></td>
-              <td class="n">${b ? `${pc(b.correct, b.total)}%` : '—'}</td>
-            </tr>`;
+            const tone = rate > 70 ? 'allow' : rate > 40 ? 'attention' : 'block';
+            return `<div class="trow" role="row">
+              <span>${esc(c.class)}${c.isControl ? ' <span class="cell-muted">(control)</span>' : ''}</span>
+              <span class="rate">${statusText(`${rate}%`, tone)}<span class="rate-bar --${tone}"><i style="width:${rate}%"></i></span></span>
+              <span class="num">${b ? `${pc(b.correct, b.total)}%` : '—'}</span>
+            </div>`;
           }).join('')}
-          </tbody>
-        </table>
+        </div>
       </div>
     </div>`;
   },

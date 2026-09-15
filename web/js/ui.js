@@ -89,7 +89,7 @@ export function menu(items, { label = 'More actions', trigger = '···', align 
 
 export function menuItem(it) {
   if (it.note) return `<div class="menu-note">${esc(it.note)}</div>`;
-  const cls = `menu-item${it.destructive ? ' --destructive' : ''}`;
+  const cls = `menu-item${it.destructive ? ' --destructive' : ''}${it.cls ? ` ${it.cls}` : ''}`;
   return `<button type="button" role="menuitem" class="${cls}"${it.id ? ` id="${esc(it.id)}"` : ''}${it.act ? ` data-act="${esc(it.act)}"` : ''}${it.attrs ? ` ${it.attrs}` : ''}${it.disabled ? ' disabled' : ''}>
     ${it.dot ? `<i class="menu-dot --${esc(it.dot)}"></i>` : ''}<span>${esc(it.label)}</span>${it.check ? '<b class="menu-check" aria-label="current">✓</b>' : ''}
   </button>`;

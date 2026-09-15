@@ -1,5 +1,6 @@
 /** Runtime diagnostics. Model choices live together on the Models screen. */
 import { esc, post, state } from './core.js';
+import { contextBar, feedback, pageHead, statusText } from './ui.js';
 import { modelLabel } from './format.js';
 import { VIEWS } from './views.js';
 
@@ -14,15 +15,23 @@ function engineStatus(m) {
 function enginePage() {
   const m = state.models;
   const status = engineStatus(m);
-  return `<div class="sheet settings">
-    <button type="button" class="btn --link" data-go="models">Back to Models</button>
-    <div class="headline"><span class="dot ${status.tone}" aria-hidden="true"></span><div><div class="t">${esc(status.title)}</div><div class="m">${esc(status.detail)}</div></div></div>
-    ${m?.runtime?.ok === false ? `<div class="section"><div class="label">Runtime error</div><div class="banner bad"><b>The local model worker could not start.</b><pre class="code">${esc(m.runtime.path ?? 'Runtime not found')}
-${esc(m.runtime.detail)}</pre></div></div>` : ''}
-    <div class="section"><div class="label">Model files on this gateway</div>
-      ${m ? `<div class="models">${m.models.map((model) => `<div class="model ${model.onDisk ? 'have' : 'off'}"><span class="role">${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="file">${esc(modelLabel(model.name))}</span><span class="state">${model.onDisk ? `On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}` : model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span></div>`).join('')}</div>` : '<p class="note">Model inventory is unavailable. Refresh Models to try again.</p>'}
-      <p class="note">Text documents are read directly. Scans and images use the document reader’s offline OCR; this inventory lists the guard’s QVAC models.</p>
-      ${m?.models.some((model) => !model.onDisk && model.fetchable !== false) ? state.canLeaveDemo ? '<button type="button" class="btn js-get-models">Download missing models</button>' : '<p class="note">Run <code>pnpm run setup</code> on the gateway to download missing built-in models.</p>' : ''}
+  const tone = { ok: 'success', warn: 'attention', bad: 'error' }[status.tone];
+  return `<div class="sheet">
+    ${contextBar([{ label: 'Models', go: 'models', back: true }, { label: 'Runtime details' }])}
+    ${pageHead({ title: 'Runtime details', sub: 'What the gateway is running, and the model files it found on this machine.' })}
+    <div class="reading settings-page">
+      ${feedback({ tone, title: status.title, body: esc(status.detail), icon: tone === 'error' })}
+      ${m?.runtime?.ok === false ? `<section class="settings-task"><h2 class="section-title">Runtime error</h2><p class="section-lede">The local model worker could not start.</p><pre class="code">${esc(m.runtime.path ?? 'Runtime not found')}
+${esc(m.runtime.detail)}</pre></section>` : ''}
+      <section class="settings-task">
+        <h2 class="section-title">Model files on this gateway</h2>
+        ${m ? `<div class="table runtime-table" role="table" aria-label="Model files">
+          <div class="thead" role="row"><span>Job</span><span>Model</span><span>On disk</span></div>
+          ${m.models.map((model) => `<div class="trow" role="row"><span>${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="mono cell-clip">${esc(modelLabel(model.name))}</span><span>${model.onDisk ? statusText(`On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}`, 'allow') : `<span class="cell-muted">${model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span>`}</span></div>`).join('')}
+        </div>` : '<p class="section-lede">Model inventory is unavailable. Refresh Models to try again.</p>'}
+        <p class="table-foot">Text documents are read directly. Scans and images use the document reader’s offline OCR; this inventory lists the guard’s QVAC models.</p>
+        ${m?.models.some((model) => !model.onDisk && model.fetchable !== false) ? state.canLeaveDemo ? '<div><button type="button" class="btn js-get-models">Download missing models</button></div>' : '<p class="table-foot">Run <code>pnpm run setup</code> on the gateway to download missing built-in models.</p>' : ''}
+      </section>
     </div>
   </div>`;
 }
@@ -49,7 +58,7 @@ export function bindGetModels() {
       models.textContent = label;
       // The one failure worth naming: no shell to do it, so say what to run.
       models.insertAdjacentHTML('afterend',
-        `<span class="note bad">${esc(j?.error ?? 'could not start the download')}</span>`);
+        `<span class="form-note --block">${esc(j?.error ?? 'could not start the download')}</span>`);
       return;
     }
     // The shell relaunches the app from under us, so there is nothing after

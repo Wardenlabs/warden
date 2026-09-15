@@ -1,19 +1,15 @@
-/** The two model roles, their actual runtime selections, and your saved models. */
+/** Models: which model does each job, the library of weights and connections, and the prompt templates. */
 import { $, attr, esc, post, state } from './core.js';
 import { bindCompiler, clearCompilerSecret, compilerNeedsSetup, compilerSettings } from './compiler.js';
 import { refreshAdjudicator, refreshCompiler } from './data.js';
 import { bindGetModels } from './engine.js';
 import { modelLabel, plural } from './format.js';
+import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { bindLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
 import { bindPromptEditor, closePromptEditor, hasPromptChanges, loadPrompts, promptEditor, promptEditorMarkup, promptIsDirty, togglePromptEditor } from './prompt-editor.js';
 import { render } from './render.js';
-import { go } from './router.js';
+import { button, contextBar, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
-
-let expanded = null;
-let changingAnalyzer = '';
-let analyzerNote = null;
-let refreshing = false;
 
 /**
  * Three tabs, one view.
@@ -29,6 +25,15 @@ let refreshing = false;
 const TABS = [['', 'Active'], ['library', 'Library'], ['prompts', 'Prompts']];
 const tabOf = () => (state.sel === 'library' || state.sel === 'prompts' ? state.sel : '');
 
+let refreshing = false;
+/** The rule writer's full settings, open under its block: "Use another model". */
+let writerOpen = false;
+/** A judge being switched to, while the gateway loads it. */
+let switching = null;
+let judgeNote = null;
+/** Which role's ceilings are open for editing, and the draft values. */
+let ceilingEdit = null;
+
 async function refreshSelections() {
   await Promise.all([refreshCompiler(), refreshAdjudicator()]);
   if (promptEditor.catalog) await loadPrompts();
@@ -36,126 +41,75 @@ async function refreshSelections() {
 
 async function enterModels() {
   const setupLink = state.view === 'compiler' || state.query?.setup === 'compiler';
-  if (setupLink || (compilerNeedsSetup() && !promptEditor.openRole)) expanded = 'compiler';
-  if (setupLink) closePromptEditor();
+  if (setupLink) { writerOpen = true; closePromptEditor(); }
   if (refreshing) return;
   refreshing = true;
   try { await Promise.all([loadLibrary(), refreshSelections()]); }
   finally {
     refreshing = false;
-    if (compilerNeedsSetup() && !expanded && !promptEditor.openRole) expanded = 'compiler';
     if (['models', 'compiler'].includes(state.view)) render();
   }
 }
 
-/**
- * What the runtime is doing, in the two or three words a status line has room
- * for. This is the whole of the old three-sentence runtime note: the sentences
- * that carried weight — that analysis runs here, that an unavailable analyzer
- * holds requests rather than passing them — are said by the Request judge card
- * and by the error state below, so the line itself only has to say which of
- * those is true right now.
- */
-function runtimeWord() {
+// ── the page head ────────────────────────────────────────────────────────────
+
+function judgeState() {
   const m = state.models;
-  if (!m) return 'model status unavailable';
-  if (m.mock) return 'demo mode';
-  if (m.runtime?.ok === false || m.state === 'failed') return 'judge unavailable';
-  return m.state === 'ready' ? 'judge ready' : 'judge loads on demand';
+  if (!m) return { text: 'status unavailable', tone: 'attention' };
+  if (state.adjudicator?.overriddenByEnv) return { text: 'set by the environment · local only', tone: 'attention' };
+  if (m.mock) return { text: 'demo mode · nothing is judged', tone: 'attention' };
+  if (m.runtime?.ok === false || m.state === 'failed') return { text: 'unavailable · requests are held', tone: 'block' };
+  return m.state === 'ready' ? { text: 'loaded · local only', tone: 'allow' } : { text: 'loads on first request · local only', tone: 'allow' };
 }
 
-/** The one line under the title, per tab. Each tab answers its own question,
- *  so each says the count that belongs to it rather than a shared summary. */
+function writerState() {
+  const c = state.compiler;
+  if (!c) return { text: 'status unavailable', tone: 'attention' };
+  if (c.configurationError) return { text: 'needs attention', tone: 'block' };
+  if (compilerNeedsSetup()) return { text: 'needs setup', tone: 'attention' };
+  if (c.overriddenByEnv) return { text: 'set by the environment', tone: 'attention' };
+  const where = state.models?.drafting?.where;
+  return { text: c.provider === 'local' ? 'drafting on this machine' : `drafting ${where ? `· ${where}` : 'through the configured compiler'}`, tone: 'allow' };
+}
+
 function statusLine(tab) {
-  const sep = '<i>·</i>';
-  const runtime = runtimeWord();
   if (tab === 'library') {
     const models = library.catalog?.models ?? [];
-    const active = models.filter((model) => (model.activeRoles ?? []).length).length;
     const builtIn = state.adjudicator?.choices?.length ?? 0;
-    return `<span>${plural(models.length, 'model')}</span>${sep}<span class="muted">${active} active</span>${
-      builtIn ? `${sep}<button type="button" class="linkbtn strong" data-go="models">${builtIn} built-in →</button>` : ''}`;
+    const active = models.filter((model) => (model.activeRoles ?? []).length).length;
+    return { text: `${plural(models.length + builtIn, 'model')} · ${active} of yours active · ${builtIn} built-in` };
   }
   if (tab === 'prompts') {
     const templates = promptEditor.catalog?.templates ?? [];
     const customized = templates.filter((item) => item.custom).length;
-    const inUse = templates.filter((item) => item.active).length;
-    return `<span>${plural(templates.length, 'template')}</span>${sep}<span class="muted">${
-      customized ? `${customized} customized` : 'defaults intact'}</span>${
-      inUse ? `${sep}<button type="button" class="linkbtn strong" data-go="models">${inUse} in use →</button>` : ''}`;
+    return { text: `${plural(templates.length, 'template')} · ${customized ? `${customized} customized` : 'defaults intact'}` };
   }
-  const needsSetup = compilerNeedsSetup();
-  const both = !needsSetup && !state.compiler?.configurationError;
-  return `<span>2 jobs</span>${sep}<span class="muted">${both && runtime === 'judge ready' ? 'both configured' : runtime}</span>${
-    needsSetup ? `${sep}<button type="button" class="linkbtn strong" data-go="models" data-q="setup=compiler">rule writer without setup →</button>` : ''
-  }${sep}<button type="button" class="linkbtn" data-go="engine">Runtime details</button>`;
+  const judge = judgeState();
+  const writer = writerState();
+  if (judge.tone === 'block') return { text: 'Judge unavailable · requests are held', tone: 'block' };
+  if (writer.tone === 'block') return { text: 'Rule writer needs attention', tone: 'block' };
+  if (compilerNeedsSetup()) return { text: `Judge ${state.models?.mock ? 'in demo mode' : 'ready'} · rule writer needs setup`, tone: 'attention' };
+  if (state.models?.mock) return { text: '2 jobs · demo mode', tone: 'attention' };
+  return { text: '2 jobs · both configured', tone: 'allow' };
 }
 
-/** Title, the line, and the one control that belongs to the whole page. */
-function pageHead(tab) {
-  return `<header class="page-head">
-    <div>
-      <h1 class="page-title">Models</h1>
-      <div class="page-status">${statusLine(tab)}</div>
-    </div>
-    <button type="button" class="btn --link" id="refreshModels"${refreshing ? ' disabled' : ''}>${refreshing ? 'Refreshing…' : 'Refresh'}</button>
-  </header>`;
-}
+const SUBS = {
+  '': 'Two jobs run Warden: one writes rules, one judges requests.',
+  library: 'Saved weights and connections, shared by this installation.',
+  prompts: 'Full templates each job uses. Edits apply to new work only; defaults stay untouched until you change them.'
+};
+
+// ── Active: two jobs ─────────────────────────────────────────────────────────
 
 /**
- * One job, one card.
- *
- * Title, the line that says what the job is, the state it is in, and one
- * action — the editorial rule the whole page is now built on. Everything that
- * used to be a paragraph of caveats is either said by the description (which
- * is where the two sentences with security weight live: the rule writer sees
- * only the administrator's own instructions, and the judge never sends what
- * the team writes anywhere) or is small print under the model line.
- *
- * The editors open inline underneath, one at a time, exactly as before.
+ * The value is the control. Each job shows the model doing it as a Trigger /
+ * Value, with its state as coloured text beside it, and the menu that changes
+ * it hangs from the value. The menu offers only what is ready to be put to work
+ * — downloaded built-ins and models that passed a test for this job; anything
+ * else is resolved on Library, so a switch here never lands on weights nobody
+ * has checked.
  */
-function jobCard(role) {
-  const compiler = role === 'compiler';
-  const open = expanded === role;
-  const setup = compiler && compilerNeedsSetup();
-  return `<section class="job" aria-labelledby="${role}Title">
-    <div class="job-head">
-      <h2 id="${role}Title">${compiler ? 'Rule writer' : 'Request judge'}</h2>
-      ${jobChip(role)}
-    </div>
-    <p class="job-what">${compiler
-      ? 'Turns the policies you write into enforceable rules. It only ever sees your own instructions — never employee requests or documents.'
-      : 'Checks every employee request and document against your rules. Always runs on this machine — what your team writes never leaves it.'}</p>
-    <div class="job-body">
-      ${setup ? compilerSettings() : jobMeta(role)}
-    </div>
-    ${open && !setup ? `<div id="${role}Editor" class="job-editor">${compiler ? compilerSettings() : analyzerSettings()}</div>` : ''}
-  </section>`;
-}
-
-/** The state of the job, in the words the card has room for. */
-function jobChip(role) {
-  const chip = (kind, text) => `<span class="chip ${kind || 'static'}">${esc(text)}</span>`;
-  if (role === 'compiler') {
-    const c = state.compiler;
-    if (c?.configurationError) return chip('bad', 'Needs attention');
-    if (c?.overriddenByEnv) return chip('warn', 'Environment override');
-    // A passed test with nothing applied is one click from done, and calling
-    // that "Needs setup" next to three green ticks reads as a contradiction.
-    if (compilerNeedsSetup()) return chip('warn', state.compilerTest?.ok ? 'Tested · apply to finish' : 'Needs setup');
-    const label = (c?.providers ?? []).find((p) => p.id === c.provider)?.label;
-    return chip('good', `${label ? label.replace(' on this machine', '') : 'Configured'} · connected`);
-  }
-  const m = state.models;
-  if (state.adjudicator?.overriddenByEnv) return chip('warn', 'Environment override');
-  if (!m) return chip('warn', 'Status unavailable');
-  if (m.mock) return chip('warn', 'Demo mode · nothing is judged');
-  if (m.runtime?.ok === false || m.state === 'failed') return chip('bad', 'Unavailable · requests are held');
-  return m.state === 'ready' ? chip('good', 'Ready · runs locally') : chip('static', 'Loads on demand · runs locally');
-}
-
-/** Which model is doing the job, where, and the one button that changes it. */
-function jobMeta(role) {
+function inForceName(role) {
   const compiler = role === 'compiler';
   const active = compiler ? state.models?.drafting : state.models?.judging;
   const inForce = library.catalog?.inForce?.[role] ?? (compiler ? state.compiler?.inForce : state.adjudicator?.inForce) ?? active?.model;
@@ -164,50 +118,141 @@ function jobMeta(role) {
   // remain loaded. Resolve the running file before consulting role metadata.
   const custom = library.catalog?.models.find((model) => model.kind === 'local' && (basename === `${model.id}.gguf` || basename === model.filename))
     ?? library.catalog?.models.find((model) => model.activeRoles?.includes(role));
-  const configurationError = compiler ? state.compiler?.configurationError : null;
-  const open = expanded === role;
-  return `<div class="job-meta">
-      <span class="job-model"><b class="mono" data-active-model="${role}">${esc(configurationError ? 'Compiler unavailable' : custom?.name || modelLabel(inForce) || 'Status unavailable')}</b>${
-        configurationError ? `<span class="note bad">${esc(configurationError)}</span>` : `<span>· ${esc(active?.where ?? 'refresh to read the current model')}</span>`}</span>
-      <span class="job-act">
-        <button type="button" class="linkbtn" data-prompt-role="${role}">Edit prompts${hasPromptChanges(role) ? ' •' : ''}</button>
-        <button type="button" class="btn" id="edit-${role}" data-edit-role="${role}" aria-expanded="${open}" aria-controls="${role}Editor">${open ? 'Close' : 'Change model'}</button>
-      </span>
-    </div>
-    ${compiler ? '' : '<span class="note job-note">PDFs, Word files, text, scans and images are read on this machine before the same rules are applied to them.</span>'}`;
+  if (compiler && state.compiler?.configurationError) return 'Compiler unavailable';
+  if (custom?.name) return custom.name;
+  if (compiler && state.compiler?.provider && state.compiler.provider !== 'local' && !state.compiler.overriddenByEnv) {
+    const label = (state.compiler.providers ?? []).find((p) => p.id === state.compiler.provider)?.label?.replace(' on this machine', '');
+    return `${label ?? state.compiler.provider}${state.compiler.provider.endsWith('-cli') ? ` · ${state.compiler.model || 'CLI default'}` : state.compiler.model ? ` · ${state.compiler.model}` : ''}`;
+  }
+  return modelLabel(inForce) || 'Status unavailable';
 }
 
-function analyzerSettings() {
+function judgeChoices() {
   const a = state.adjudicator;
-  if (!a) return '<p class="note bad" role="alert">Analyzer choices could not be loaded. Refresh Models to try again.</p>';
-  const custom = library.catalog?.selections?.adjudicator;
-  const chosen = !custom ? a.model : null;
-  const selected = a.choices.find((choice) => choice.id === chosen);
-  return `<div class="model-editor analyzer-editor" aria-busy="${Boolean(changingAnalyzer)}">
-    <p class="note">The analyzer always runs on this gateway.</p>
-    ${a.overriddenByEnv ? `<div class="banner warn"><b>Controlled by the environment.</b> ${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.</div>` : ''}
-    <ul class="analyzer-options">${a.choices.map((choice) => {
-      const on = choice.id === chosen;
-      const current = !a.overriddenByEnv && choice.onDisk && on;
-      return `<li class="analyzer-option${on ? ' chosen' : ''}"><div><div class="library-model-name"><h3>${esc(choice.label)}</h3>${on ? `<span class="model-status${current ? ' good' : ' warn'}">${current ? 'Selected' : 'Saved preference'}</span>` : ''}</div><p>${esc(choice.trade)}</p><div class="model-metadata"><span>${(choice.approxMB / 1000).toFixed(1)} GB</span><span class="${choice.onDisk ? 'good' : 'warn'}">${choice.onDisk ? 'On this gateway' : 'Not downloaded'}</span><span>${esc(choice.perDecision ?? 'Speed not measured')}</span></div></div><div class="analyzer-option-action">${on && !choice.onDisk && state.canLeaveDemo ? '<button type="button" class="btn --primary js-get-models">Download model</button>' : `<button type="button" class="btn" data-analyzer-choice="${esc(choice.id)}"${changingAnalyzer || on ? ' disabled' : ''}>${changingAnalyzer === choice.id ? 'Applying…' : current ? 'Selected' : choice.onDisk ? 'Use model' : 'Select for download'}</button>`}</div></li>`;
-    }).join('')}</ul>
-    ${selected && !selected.onDisk ? `<p class="note warn">${esc(selected.label)} is not downloaded yet. ${state.canLeaveDemo ? 'Download it to finish applying this selection.' : 'Run the model setup on the gateway to download it.'} The card above says which model is judging now.</p>` : ''}
-    ${analyzerNote ? `<p class="note ${analyzerNote.ok ? 'good' : 'bad'}" role="${analyzerNote.ok ? 'status' : 'alert'}">${esc(analyzerNote.text)}</p>` : ''}
-  </div>`;
+  const customId = library.catalog?.selections?.adjudicator;
+  const builtIn = (a?.choices ?? []).filter((c) => c.onDisk || (!customId && c.id === a.model))
+    .map((c) => ({ label: c.label, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: !c.onDisk }));
+  const custom = (library.catalog?.models ?? []).filter((m) => (m.testedRoles ?? []).includes('adjudicator'))
+    .map((m) => ({ label: m.name, check: (m.activeRoles ?? []).includes('adjudicator'), attrs: `data-judge-custom="${attr(m.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));
+  return [...builtIn, ...custom, { label: 'Add a model…', attrs: 'data-go="models" data-sel="library"' }];
 }
 
-function activeTab() {
-  return `<div class="jobs">${jobCard('compiler')}${jobCard('adjudicator')}</div>`;
+function writerChoices() {
+  const c = state.compiler;
+  const localOnDisk = state.models?.models?.some((m) => m.role === 'compiler' && m.onDisk);
+  const current = c?.provider ?? 'local';
+  const items = [];
+  if (current !== 'local' && current !== 'catalog') items.push({ label: inForceName('compiler'), check: true, attrs: 'data-writer-keep="1"' });
+  if (localOnDisk || current === 'local') items.push({ label: 'Local weights on this machine', check: current === 'local', attrs: 'data-writer-local="1"', disabled: Boolean(c?.overriddenByEnv) });
+  for (const m of (library.catalog?.models ?? []).filter((x) => (x.testedRoles ?? []).includes('compiler'))) {
+    items.push({ label: m.name, check: (m.activeRoles ?? []).includes('compiler'), attrs: `data-writer-custom="${attr(m.id)}"`, disabled: Boolean(library.catalog?.overrides?.compiler) });
+  }
+  items.push({ label: 'Another provider or endpoint…', attrs: 'data-writer-other="1"' });
+  items.push({ label: 'Add a model…', attrs: 'data-go="models" data-sel="library"' });
+  return items;
+}
+
+function valueMenu(role, items, label, buttonLabel = '') {
+  const name = role === 'adjudicator' && switching ? switching.label : inForceName(role);
+  return `<details class="menu --${buttonLabel ? 'right' : 'left'} value-menu">
+    ${buttonLabel
+      ? `<summary class="btn" aria-label="${esc(label)}">${esc(buttonLabel)}<b class="sr-only" data-active-model="${role}">${esc(name)}</b></summary>`
+      : `<summary class="trigger-value" aria-label="${esc(label)}"><b class="trigger-name" data-active-model="${role}">${esc(name)}</b><i aria-hidden="true">▾</i></summary>`}
+    <div class="menu-list" role="menu">${items.map((it) => `<button type="button" role="menuitemradio" aria-checked="${Boolean(it.check)}" class="menu-item" ${it.attrs}${it.disabled ? ' disabled' : ''}><span>${esc(it.label)}</span>${it.check ? '<b class="menu-check">✓</b>' : ''}</button>`).join('')}</div>
+  </details>`;
+}
+
+function writerBlock() {
+  const c = state.compiler;
+  const s = writerState();
+  if (compilerNeedsSetup()) {
+    return `<section class="job-block" aria-labelledby="compilerTitle">
+      <h2 class="section-title" id="compilerTitle">Rule writer</h2>
+      <p class="section-lede">Turns the policies you write into enforceable rules. It only ever sees your own instructions — never employee requests or documents.</p>
+      <p class="job-warning">Needs setup — rules can't be written yet.</p>
+      <div class="job-setup-host">${compilerSettings()}</div>
+    </section>`;
+  }
+  return `<section class="job-block" aria-labelledby="compilerTitle">
+    <h2 class="section-title" id="compilerTitle">Rule writer</h2>
+    <p class="section-lede">Writes rules from what you say. Only ever sees your instructions — never your team’s requests.</p>
+    <div class="job-value">${valueMenu('compiler', writerChoices(), 'Change the rule writer')}${statusText(s.text, s.tone)}</div>
+    ${c?.configurationError ? feedback({ tone: 'error', icon: true, title: 'Compiler configuration needs attention', body: esc(c.configurationError) }) : ''}
+    ${writerOpen ? `<div class="job-editor">${compilerSettings()}</div>` : ''}
+  </section>`;
+}
+
+function judgeBlock() {
+  const s = judgeState();
+  const a = state.adjudicator;
+  const selected = a?.choices?.find((c) => c.id === a.model && !library.catalog?.selections?.adjudicator);
+  const firstRun = compilerNeedsSetup();
+  return `<section class="job-block" aria-labelledby="adjudicatorTitle">
+    <h2 class="section-title" id="adjudicatorTitle">Request judge</h2>
+    ${firstRun
+      // While the rule writer is still being set up, the judge is the settled
+      // half of the page: its state reads as one line and the change is a
+      // button beside it, so the one open task stays the setup above.
+      ? `<p class="section-lede">Checks every employee request and document against your rules. Always runs on this machine — what your team writes never leaves it.</p>
+        <div class="job-task">${statusText(`${switching ? switching.label : inForceName('adjudicator')} · ${switching ? `loading… requests already being judged finish on ${switching.from}; new ones wait until it is ready` : s.text}`, switching ? 'attention' : s.tone)}${valueMenu('adjudicator', judgeChoices(), 'Change the request judge', 'Change model')}</div>`
+      : `<p class="section-lede">Judges every request against your rules. Runs here — your team’s work never leaves this machine.</p>
+        <div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge')}${switching
+          ? statusText(`Loading ${switching.label}… requests already being judged finish on ${switching.from}; new ones wait until it is ready.`, 'attention')
+          : statusText(s.text, s.tone)}</div>`}
+    ${!a ? feedback({ tone: 'error', icon: true, title: 'Analyzer choices could not be loaded', body: 'Refresh Models to try again.' }) : ''}
+    ${a?.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment', body: `${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.` }) : ''}
+    ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. ${state.canLeaveDemo ? '<button type="button" class="linkish js-get-models">Download models</button>' : 'Run the model setup on the gateway to download it.'}</p>` : ''}
+    ${judgeNote ? `<p class="job-note --${judgeNote.ok ? 'allow' : 'block'}" role="${judgeNote.ok ? 'status' : 'alert'}">${esc(judgeNote.text)}</p>` : ''}
+    <p class="job-note">PDFs, Word files, text, scans and images are read on this machine before the same rules are applied to them. <button type="button" class="linkish" data-go="engine">Runtime details</button></p>
+  </section>`;
 }
 
 /**
- * Prompts: a template list, and the editor behind one row.
- *
- * The prompt editor used to open inline under whichever role you were looking
- * at on what is now Active, which put a 22-rem textarea and its variable
- * reference in the middle of the page you go to to read one status. It is the
- * thing on this screen that is touched least often, so it is a tab, and the
- * tab opens on the list rather than on a text box.
+ * Session ceilings, per role, where the notion of a token lives. A ceiling
+ * escalates the request that hits it — it never blocks (src/guard/budget.ts).
+ * The API keeps ceilings only on a role that has a daily limit, so a role
+ * without one shows its ceilings as absent and points at where the limit is set.
+ */
+const CEILINGS = [['maxSessionOutputTokens', 'Output tokens'], ['maxContextTokens', 'Context tokens'], ['maxPromptChars', 'Prompt chars']];
+
+function ceilingsBlock() {
+  const roles = state.company.roles;
+  const set = roles.filter((r) => CEILINGS.some(([k]) => quotaOf(r)[k])).length;
+  const body = `<div class="table ceilings-table" role="table" aria-label="Session ceilings">
+      <div class="thead" role="row"><span>Role</span>${CEILINGS.map(([, l]) => `<span>${l}</span>`).join('')}</div>
+      ${roles.map((r) => {
+        const q = quotaOf(r);
+        if (ceilingEdit?.role === r) {
+          return `<div class="trow --editing" role="row"><span class="cell-strong">${esc(r)}</span>${CEILINGS.map(([k, l]) => `<span><input type="text" inputmode="numeric" class="field-compact" id="ceil-${k}" aria-label="${l} for ${esc(r)}" value="${esc(ceilingEdit.values[k])}" placeholder="—"${ceilingEdit.busy ? ' readonly' : ''}></span>`).join('')}</div>
+            <div class="inline-editor --ceilings">
+              ${CEILINGS.some(([k]) => ceilingEdit.values[k].trim() !== String(q[k] ?? '')) ? button(ceilingEdit.busy ? 'Saving…' : 'Save ceilings', { kind: 'primary', compact: true, id: 'saveCeilings', busy: ceilingEdit.busy }) : ''}
+              ${button('Cancel', { compact: true, id: 'cancelCeilings', disabled: ceilingEdit.busy })}
+              ${ceilingEdit.error ? `<span class="inline-editor-error" role="alert">${esc(ceilingEdit.error)}</span>` : ''}
+            </div>`;
+        }
+        const limited = Boolean(q.maxRequestsPerDay);
+        return `<div class="trow${limited ? ' --link' : ''}" role="row"${limited ? ` tabindex="0" data-edit-ceilings="${esc(r)}" aria-label="Edit ceilings for ${esc(r)}"` : ''}>
+          <span class="cell-strong">${esc(r)}${limited ? '' : '<small class="cell-note">needs a daily limit</small>'}</span>
+          ${CEILINGS.map(([k]) => `<span class="${q[k] ? '' : 'cell-muted'} num">${q[k] ? Number(q[k]).toLocaleString() : '—'}</span>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="table-foot">Hitting a ceiling escalates the request — it never blocks. Blank means no limit. A role needs a daily limit on <button type="button" class="linkish" data-go="people" data-sel="roles">Team → Roles</button> before it can have ceilings.</p>`;
+  return disclosureRow('m:ceilings', 'Session ceilings', `${set ? `Set for ${plural(set, 'role')}` : 'None set'} · per role · escalate, never block`, body, { open: state.open.has('m:ceilings') || Boolean(ceilingEdit) });
+}
+
+function activeTab() {
+  return `<div class="reading models-active">
+    ${writerBlock()}
+    ${judgeBlock()}
+    ${compilerNeedsSetup() ? '' : `<div class="disclosures">${ceilingsBlock()}</div>`}
+  </div>`;
+}
+
+// ── Prompts ──────────────────────────────────────────────────────────────────
+
+/**
+ * A template list, and the editor behind one row.
  *
  * Editing keeps the machinery it always had — a draft per template, the
  * revision conflict, restore-default — by choosing the template through
@@ -217,50 +262,68 @@ function activeTab() {
 function promptsTab() {
   const templates = promptEditor.catalog?.templates ?? [];
   if (promptEditor.openRole) {
-    return `<div class="tab-back"><button type="button" class="btn --link" id="closePromptTemplate">← All templates</button></div>
+    return `<div class="prompt-back">${button('← All templates', { kind: 'link', id: 'closePromptTemplate' })}</div>
       ${promptEditorMarkup(promptEditor.openRole)}`;
   }
   if (!templates.length) {
     return promptEditor.loading
-      ? '<div class="model-loading" role="status"><span class="skeleton-line"></span><span class="skeleton-line short"></span><span class="sr-only">Loading prompt templates…</span></div>'
-      : `<p class="note bad tab-lede" role="alert">${esc(promptEditor.error || 'No prompt templates are available. Refresh to try again.')}</p>`;
+      ? feedback({ title: 'Loading prompt templates…', body: 'Fetching the templates each job uses.' })
+      : `${feedback({ tone: 'attention', title: 'Could not load the prompt templates', body: esc(promptEditor.error || 'No prompt templates are available.') })}<div class="list-state-action">${button('Retry loading', { kind: 'primary', id: 'refreshPrompts' })}</div>`;
   }
-  return `<p class="note tab-lede">Full templates each job uses. Edits apply to new work only; defaults stay untouched until you change them.</p>
-    ${promptEditor.error ? `<p class="note bad tab-lede" role="alert">${esc(promptEditor.error)} Your drafts are kept.</p>` : ''}
-    <div class="tbl prompts">
-      <div class="thead"><span>Template</span><span>Job</span><span>Status</span><span></span></div>
+  return `${promptEditor.error ? feedback({ tone: 'error', icon: true, title: 'Prompts could not be refreshed', body: `${esc(promptEditor.error)} Your drafts are kept.` }) : ''}
+    <div class="table prompts-table" role="table" aria-label="Prompt templates">
+      <div class="thead" role="row"><span>Template</span><span>Job</span><span>Status</span><span></span></div>
       ${templates.map(promptRow).join('')}
     </div>`;
 }
 
 function promptRow(item) {
   const unsaved = promptIsDirty(item.id);
-  return `<div class="trow">
-    <span class="c-model"><b>${esc(item.name)}</b><span class="mono">${esc(item.id)}</span></span>
+  return `<div class="trow" role="row">
+    <span class="mono cell-clip" title="${esc(item.name)}">${esc(item.id)}</span>
     <span>${item.role === 'compiler' ? 'Rule writer' : 'Request judge'}</span>
-    <span class="c-prompt-state">${unsaved ? '<span class="chip warn">Unsaved changes</span>' : item.custom ? '<span class="chip warn">Customized</span>' : '<span class="c-status">Default</span>'}${item.active ? '' : '<span class="c-status">· not in use</span>'}</span>
-    <span class="c-model-act"><button type="button" class="btn" data-prompt-template="${attr(item.id)}" data-role="${esc(item.role)}">Edit</button></span>
+    <span>${unsaved ? '<span class="status-text --attention">Unsaved changes</span>' : item.custom ? '<b class="cell-strong">Customized</b>' : '<span class="cell-muted">Default</span>'}${item.active ? '' : '<span class="cell-muted"> · not in use</span>'}</span>
+    <span class="row-menu">${button('Edit', { kind: 'link', compact: true, attrs: `data-prompt-template="${attr(item.id)}" data-role="${esc(item.role)}"` })}</span>
   </div>`;
 }
 
+// ── the page ─────────────────────────────────────────────────────────────────
+
 function modelsPage() {
   const tab = tabOf();
-  return `<div class="sheet settings models-page">
-    ${pageHead(tab)}
-    <nav class="tabs" aria-label="Models sections">
-      ${TABS.map(([sel, label]) => `<button type="button" class="tab${tab === sel ? ' --on' : ''}" data-go="models"${sel ? ` data-sel="${sel}"` : ''}>${label}${sel === 'prompts' && hasPromptChanges() ? ' •' : ''}</button>`).join('')}
-    </nav>
+  return `<div class="sheet models-page">
+    ${contextBar([{ label: 'Your workspace' }], statusLine(tab))}
+    ${pageHead({ title: 'Models', sub: SUBS[tab], actions: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '' })}
+    ${tabs('models', TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), tab, 'Models sections')}
     ${tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()}
   </div>`;
+}
+
+async function switchJudge(label, from, request) {
+  if (switching) return;
+  switching = { label, from };
+  judgeNote = null;
+  render();
+  try {
+    const result = await request();
+    if (!result.ok || result.j?.ok === false) throw new Error(typeof result.j?.error === 'string' ? result.j.error : 'The judge could not be changed. The previous judge is still in force.');
+    judgeNote = { ok: true, text: result.j?.needsDownload ? `${label} is selected. Download it to finish applying it; ${from} judges until then.` : `${label} is judging new requests.` };
+    await Promise.all([refreshSelections(), loadLibrary()]);
+  } catch (error) {
+    judgeNote = { ok: false, text: error.message || 'Warden could not be reached. The previous judge is still in force.' };
+  } finally {
+    switching = null;
+    if (['models', 'compiler'].includes(state.view)) render();
+  }
 }
 
 function bindModels() {
   const tab = tabOf();
   // The list needs the catalogue the per-role editor used to fetch on opening.
   if (tab === 'prompts' && !promptEditor.catalog && !promptEditor.loading) void loadPrompts();
-  for (const button of document.querySelectorAll('[data-prompt-template]')) button.onclick = () => {
-    const role = button.dataset.role;
-    promptEditor.selected[role] = decodeURIComponent(button.dataset.promptTemplate);
+  for (const b of document.querySelectorAll('[data-prompt-template]')) b.onclick = () => {
+    const role = b.dataset.role;
+    promptEditor.selected[role] = decodeURIComponent(b.dataset.promptTemplate);
     if (promptEditor.openRole !== role) togglePromptEditor(role);
     render();
     // Without preventScroll the caret lands below the fold and takes the tabs
@@ -268,32 +331,89 @@ function bindModels() {
     $('promptTemplateText')?.focus({ preventScroll: true });
   };
   if ($('closePromptTemplate')) $('closePromptTemplate').onclick = () => { closePromptEditor(); render(); };
-  if ($('refreshModels')) $('refreshModels').onclick = () => { void enterModels(); render(); };
-  for (const button of document.querySelectorAll('[data-edit-role]')) button.onclick = () => { clearCompilerSecret(); closePromptEditor(); expanded = expanded === button.dataset.editRole ? null : button.dataset.editRole; render(); $(button.id)?.focus(); };
-  for (const button of document.querySelectorAll('[data-prompt-role]')) button.onclick = () => {
-    const role = button.dataset.promptRole;
-    clearCompilerSecret(); expanded = null;
-    if (promptEditor.openRole !== role) togglePromptEditor(role);
-    go('models', 'prompts');
+
+  const from = () => inForceName('adjudicator');
+  for (const b of document.querySelectorAll('[data-judge-builtin]')) b.onclick = () => {
+    b.closest('details.menu')?.removeAttribute('open');
+    const choice = state.adjudicator?.choices?.find((c) => c.id === b.dataset.judgeBuiltin);
+    if (!choice || b.getAttribute('aria-checked') === 'true') return;
+    void switchJudge(choice.label, from(), () => post('/api/settings/adjudicator', { model: choice.id }));
   };
-  if (expanded === 'compiler' || compilerNeedsSetup()) bindCompiler(loadLibrary);
-  for (const button of document.querySelectorAll('[data-analyzer-choice]')) button.onclick = async () => {
-    if (changingAnalyzer) return;
-    changingAnalyzer = button.dataset.analyzerChoice; analyzerNote = null; render();
-    try {
-      const result = await post('/api/settings/adjudicator', { model: changingAnalyzer });
-      if (!result.ok) throw new Error(typeof result.j?.error === 'string' ? result.j.error : 'The analyzer could not be changed. Try again.');
-      analyzerNote = { ok: true, text: result.j.needsDownload ? 'Preference saved. Download this model to finish applying it.' : 'Analyzer applied. New requests use this selection.' };
-      await Promise.all([refreshSelections(), loadLibrary()]);
-    } catch (error) { analyzerNote = { ok: false, text: error.message || 'Warden could not be reached. Try again.' }; }
-    finally { changingAnalyzer = ''; if (['models', 'compiler'].includes(state.view)) { render(); $('edit-adjudicator')?.focus(); } }
+  for (const b of document.querySelectorAll('[data-judge-custom]')) b.onclick = () => {
+    b.closest('details.menu')?.removeAttribute('open');
+    const model = library.catalog?.models.find((m) => m.id === decodeURIComponent(b.dataset.judgeCustom));
+    if (!model || b.getAttribute('aria-checked') === 'true') return;
+    void switchJudge(model.name, from(), () => post(`/api/settings/models/${attr(model.id)}/activate`, { role: 'adjudicator' }));
   };
+
+  const writerCustom = document.querySelectorAll('[data-writer-custom]');
+  for (const b of writerCustom) b.onclick = async () => {
+    b.closest('details.menu')?.removeAttribute('open');
+    if (b.getAttribute('aria-checked') === 'true') return;
+    b.disabled = true;
+    const result = await post(`/api/settings/models/${b.dataset.writerCustom}/activate`, { role: 'compiler' }).catch(() => ({ ok: false, j: null }));
+    if (!result.ok) { writerOpen = true; state.compilerTest = { ok: false, error: result.j?.error ?? 'The rule writer could not be changed.' }; }
+    await Promise.all([refreshSelections(), loadLibrary()]);
+    render();
+  };
+  const local = document.querySelector('[data-writer-local]');
+  if (local) local.onclick = async () => {
+    local.closest('details.menu')?.removeAttribute('open');
+    if (local.getAttribute('aria-checked') === 'true') return;
+    const result = await post('/api/settings/compiler', { provider: 'local', baseUrl: '', model: '', apiKey: '', redactNames: Boolean(state.compiler?.redactNames) }, { method: 'PUT' }).catch(() => ({ ok: false, j: null }));
+    if (!result.ok) { writerOpen = true; state.compilerTest = { ok: false, error: result.j?.error ?? 'The rule writer could not be changed.' }; }
+    state.compilerDraft = null;
+    await Promise.all([refreshSelections(), loadLibrary()]);
+    render();
+  };
+  const other = document.querySelector('[data-writer-other]');
+  if (other) other.onclick = () => { other.closest('details.menu')?.removeAttribute('open'); clearCompilerSecret(); writerOpen = true; render(); $('cProvider')?.focus(); };
+  for (const keep of document.querySelectorAll('[data-writer-keep]')) keep.onclick = () => keep.closest('details.menu')?.removeAttribute('open');
+
+  if (writerOpen || compilerNeedsSetup()) bindCompiler(loadLibrary);
+
+  for (const row of document.querySelectorAll('[data-edit-ceilings]')) {
+    const open = () => {
+      const q = quotaOf(row.dataset.editCeilings);
+      ceilingEdit = { role: row.dataset.editCeilings, busy: false, error: '', values: Object.fromEntries(CEILINGS.map(([k]) => [k, String(q[k] ?? '')])) };
+      state.open.add('m:ceilings');
+      render();
+      $('ceil-maxSessionOutputTokens')?.focus();
+    };
+    row.onclick = open;
+    row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+  }
+  if (ceilingEdit) {
+    for (const [k] of CEILINGS) {
+      const field = $(`ceil-${k}`);
+      if (!field) continue;
+      field.oninput = () => {
+        const q = quotaOf(ceilingEdit.role);
+        const before = CEILINGS.some(([key]) => ceilingEdit.values[key].trim() !== String(q[key] ?? ''));
+        ceilingEdit.values[k] = field.value;
+        ceilingEdit.error = '';
+        if (before !== CEILINGS.some(([key]) => ceilingEdit.values[key].trim() !== String(q[key] ?? ''))) render();
+      };
+      field.onkeydown = (e) => { if (e.key === 'Enter') $('saveCeilings')?.click(); if (e.key === 'Escape') { ceilingEdit = null; render(); } };
+    }
+  }
+  if ($('cancelCeilings')) $('cancelCeilings').onclick = () => { ceilingEdit = null; render(); };
+  if ($('saveCeilings')) $('saveCeilings').onclick = async () => {
+    ceilingEdit.busy = true; render();
+    const changes = Object.fromEntries(CEILINGS.map(([k]) => [k, limitValue(ceilingEdit.values[k])]));
+    const result = await saveQuota(ceilingEdit.role, changes);
+    if (!result.ok) { ceilingEdit.busy = false; ceilingEdit.error = result.error; render(); return; }
+    ceilingEdit = null;
+    render();
+  };
+
   bindGetModels();
   bindLibrary(refreshSelections);
   bindPromptEditor();
 }
 
-VIEWS.models = { body: modelsPage, bind: bindModels, onEnter: enterModels, onLeave: clearCompilerSecret };
-// Existing links from the rule composer keep working, while both roles and
-// custom models remain visible from the same top-level administration page.
+VIEWS.models = { body: modelsPage, bind: bindModels, onEnter: enterModels, onLeave: () => { clearCompilerSecret(); writerOpen = false; ceilingEdit = null; } };
+// The old compiler page's address still works — the composer's picker and older
+// links point at it — and lands on Active with the rule writer's settings open.
 VIEWS.compiler = { ...VIEWS.models, railParent: 'models' };
+

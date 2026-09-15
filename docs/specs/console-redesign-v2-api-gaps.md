@@ -166,3 +166,68 @@ API, qué se implementó.
 - **API**: `GET /api/people` no trae fecha de alta.
 - **Implementado**: la línea dice solo el estado de conexión ("Not connected
   yet").
+
+## This device
+
+### Las reglas de este dispositivo
+
+- **Frames**: `this-device/local` 493:82, `direccion-publica` 495:129.
+- **Diseño**: la página es la máquina y nada más — Tools on this machine,
+  Public address y Data on this machine. No hay lugar para las reglas propias.
+- **API**: una instalación solo sigue teniendo `/api/solo/rules` (listar,
+  agregar, borrar), `/api/solo/presets` con su toggle y `/api/solo/protect`.
+  En una instalación pura (sin equipo) "Rules" no está en la navegación, así
+  que sin esta sección esas rutas quedan sin pantalla.
+- **Implementado** (decisión del owner): los bloques del frame arriba, tal
+  cual, y debajo la sección "Rules on this device" re-estilizada con el
+  sistema nuevo (§6.8): tabla con el efecto, el texto, el toggle y ··· Remove;
+  banda "Suggested" con los presets apagados; campo para escribir una regla.
+  Las reglas de la empresa que no aplican a esta identidad (rol exento) se
+  listan en gris con "everyone · not judged for you".
+
+### Put it on the internet fuera de la app de escritorio
+
+- **Frames**: `direccion-publica` 495:129, `exponiendo` 495:213.
+- **Diseño**: el disclosure siempre ofrece "Put it on the internet".
+- **API**: `POST /api/gateway/expose` responde 202 solo si hay un shell de
+  escritorio escuchando; si no, 409 ("not running inside the desktop app").
+- **Implementado**: el botón aparece solo cuando la consola sabe que hay un
+  shell (`canLeaveDemo`); en demo queda deshabilitado con la razón, y sin
+  shell el disclosure dice "Open a tunnel from the Warden app, or put your own
+  proxy in front of it." El 202 se muestra como "Asked the tunnel to open —
+  usually under a minute" y el resultado se lee de `/health`.
+
+## Models
+
+### Cambiar el juez: qué pasa con los requests mientras carga
+
+- **Frame**: `models/cambiando-modelo` 506:406.
+- **Diseño**: "● Loading X… judging continues on Y until it's ready".
+- **API**: `RoleCoordinator` (`src/qvac/coordination.ts`): el cambio de pesos
+  es un escritor encolado que **frena a los lectores nuevos**; solo las
+  decisiones ya empezadas terminan con Y. Un request que llega durante la
+  carga espera a X, no lo juzga Y.
+- **Implementado**: "Loading X… requests already being judged finish on Y; new
+  ones wait until it is ready." en ámbar al lado del trigger, que ya muestra X.
+
+### El menú del juez: "solo modelos testeados"
+
+- **Frame**: `models/menu-de-modelo` 506:304.
+- **Diseño**: el menú lista solo modelos testeados, con el activo tildado, y
+  "Add a model…" al final.
+- **API**: el modelo *seleccionado* puede no estar descargado
+  (`/api/settings/adjudicator` → `choices[].onDisk: false`); no deja de ser la
+  selección vigente.
+- **Implementado**: los built-in descargados y los custom testeados para el
+  rol; si el seleccionado no está en disco aparece tildado pero deshabilitado,
+  y debajo del bloque la línea ámbar "X is selected but not downloaded yet".
+
+### Session ceilings de un rol sin límite diario
+
+- **Frame**: `models/session-ceilings` 512:423.
+- **Diseño**: toda fila de rol es editable.
+- **API**: los ceilings viven en la misma fila de cuota que el límite diario;
+  `PUT /api/quotas/:role` sin `maxRequestsPerDay` borra la fila entera (ver
+  "Límite diario y session ceilings en el mismo `PUT`").
+- **Implementado**: solo son editables los roles con límite diario; los demás
+  muestran "needs a daily limit" y la nota al pie apunta a Team → Roles.

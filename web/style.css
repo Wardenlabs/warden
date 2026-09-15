@@ -245,825 +245,6 @@ body {
   padding: 0 0 var(--s-12);
 }
 
-/* Filters and per-view actions sit with the content they act on, not in the
-   app chrome — which keeps the top bar the same on every screen. */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  flex-wrap: wrap;
-  padding: var(--s-2) var(--s-3) var(--s-5);
-}
-.toolbar .spacer { flex: 1; }
-.toolbar .label { margin-right: var(--s-2); }
-
-/* ═══ controls ═══════════════════════════════════════════════════════════ */
-
-/* Destructive actions sit under the thing they destroy, not in the toolbar
-   over it: they are the last resort on the page, not one of its options. */
-.models { display: flex; flex-direction: column; gap: 1px; margin-top: var(--s-3); }
-.model {
-  display: grid; grid-template-columns: 7rem 1fr auto; gap: var(--s-3);
-  align-items: baseline; padding: var(--s-2) 0;
-  border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-2);
-}
-.model:last-child { border-bottom: 0; }
-.model .role { color: var(--ink); font-weight: var(--fw-semi); }
-.model .file { font-family: var(--mono); font-size: var(--fs-1); color: var(--muted); overflow-wrap: anywhere; }
-.model .state { color: var(--verdict-allow); white-space: nowrap; }
-/* Not downloaded is a fact to act on, not an error, so it reads as a warning
-   rather than a block: the app still works, it just works on nothing. */
-.model.missing .state { color: var(--verdict-attention); }
-.model.missing .role { color: var(--muted); }
-
-/* The Engine screen: a status sentence, then the seat that judges.
-   Reuses the model row, the banner and the stat ink already defined above —
-   what is new is the headline and the two seats. */
-.headline { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) var(--s-3) 0; }
-.headline .dot { flex: none; margin-top: 6px; }
-.headline .t { font-size: var(--fs-4); font-weight: var(--fw-semi); line-height: var(--lh-snug); letter-spacing: var(--ls-tight); }
-.headline .m { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); margin-top: var(--s-1); }
-.headline .dot.ok  { background: var(--verdict-allow); }
-.headline .dot.warn { background: var(--verdict-attention); }
-.headline .dot.bad { background: var(--verdict-block); }
-
-/* The judge picker: one row per seat, a radio, and an explicit "Use this".
-   It was a grid of cards whose only tell for the chosen one was a hairline
-   ring, and clicking a card silently switched the judge; people could not
-   see what was active or that the cards did anything. */
-.seatlist { display: grid; border: 1px solid var(--line-hairline); border-radius: var(--r-control); overflow: hidden; }
-.seatrow {
-  display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: var(--s-4); align-items: center;
-  padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-hairline);
-}
-.seatrow:first-child { border-top: 0; }
-.seatrow.on { background: var(--surface-subtle); }
-.seatrow .radio { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line-control); background: var(--surface-page); }
-.seatrow.on .radio { border-color: var(--action); background: var(--action); box-shadow: inset 0 0 0 3px var(--surface-subtle); }
-.seatbody { display: grid; gap: 2px; min-width: 0; }
-.seathead { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.seathead .name { font-size: var(--fs-3); font-weight: var(--fw-semi); color: var(--ink); }
-.badge.quiet { background: none; border: 1px solid var(--line-hairline); color: var(--muted); }
-.seatrow .trade { font-size: var(--fs-3); color: var(--ink-body); line-height: var(--lh-snug); }
-.seatrow .meta { display: flex; flex-wrap: wrap; gap: var(--s-4); font-family: var(--mono); font-size: var(--fs-1); color: var(--muted); margin-top: 2px; }
-.seatrow .meta .have { color: var(--verdict-allow); }
-.seatrow .meta .want { color: var(--verdict-attention); }
-.seatact { justify-self: end; }
-
-.model.off .state { color: var(--muted); }
-.model.off .role { color: var(--muted); }
-.elsewhere { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); font-size: var(--fs-3); color: var(--ink-body); }
-.elsewhere b { font-weight: var(--fw-semi); color: var(--ink); }
-
-.limit-plan { margin: var(--s-2) 0; }
-.limit-plan .r { display: flex; gap: var(--s-3); padding: 2px 0; font-size: var(--fs-2); }
-.limit-plan .k { color: var(--ink); min-width: 7rem; }
-.limit-plan .v { color: var(--ink-body); font-family: var(--mono); }
-
-
-
-/* ═══ shared primitives ══════════════════════════════════════════════════ */
-
-.label {
-  font-size: var(--fs-1);
-  font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.num  { font-variant-numeric: tabular-nums; }
-
-.dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--muted); }
-.dot.ALLOW    { background: var(--verdict-allow); }
-.dot.BLOCK    { background: var(--verdict-block); }
-.dot.ESCALATE { background: var(--verdict-attention); }
-.dot.block    { background: var(--verdict-block); }
-.dot.escalate { background: var(--verdict-attention); }
-.dot.allow    { background: var(--verdict-allow); }
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--r-control);
-  padding: 1px var(--s-2);
-  font-size: var(--fs-1);
-  font-weight: var(--fw-medium);
-  font-family: var(--mono);
-  background: var(--surface-subtle);
-  color: var(--muted);
-}
-.badge.ALLOW    { background: var(--verdict-allow-bg);    color: var(--verdict-allow); }
-.badge.BLOCK    { background: var(--verdict-block-bg);    color: var(--verdict-block); }
-.badge.ESCALATE { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-/* `warn` fires without stopping anything, so it borrows the held-for-review
-   palette rather than the refusal one. Nothing was refused. */
-.badge.warn { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-.badge.block    { background: var(--verdict-block-bg);    color: var(--verdict-block); }
-.badge.escalate { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-/* `.block` is also a layout class further down this file, so at equal
-   specificity it wins and hands the severity badge its `display: grid`. In a
-   flex row that went unnoticed — a flex item shrinks to its content either way
-   — but in a table cell the badge grew to the full column. */
-.badge.block, .badge.escalate, .badge.warn { display: inline-flex; }
-
-.chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  padding: 2px var(--s-3);
-  font-size: var(--fs-2);
-  color: var(--muted);
-  background: var(--surface-page);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.chip:hover { background: var(--surface-subtle); color: var(--ink); }
-.chip.on { background: var(--action); border-color: var(--action); color: var(--action-ink); }
-.chip.static, .chip.static:hover { cursor: default; background: var(--surface-page); color: var(--muted); }
-
-.avatar {
-  width: 24px; height: 24px;
-  border-radius: 50%;
-  flex: none;
-  display: grid; place-items: center;
-  background: var(--surface-subtle);
-  border: 1px solid var(--line-hairline);
-  color: var(--muted);
-  font-size: var(--fs-1);
-  font-weight: var(--fw-medium);
-}
-.avatar.lg { width: 44px; height: 44px; font-size: var(--fs-3); }
-
-.empty {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  place-items: center;
-  align-content: center;
-  gap: var(--s-2);
-  min-height: 280px;
-  padding: var(--s-10) var(--s-8);
-  text-align: center;
-  color: var(--muted);
-}
-.empty b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink-body); }
-.empty span { font-size: var(--fs-3); max-width: 40ch; line-height: var(--lh-snug); }
-
-.note { font-size: var(--fs-2); color: var(--muted); line-height: var(--lh-snug); }
-.note.warn { color: var(--verdict-attention); }
-.note.bad  { color: var(--verdict-block); }
-.note.good { color: var(--verdict-allow); }
-
-.banner {
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  padding: var(--s-4);
-  font-size: var(--fs-3);
-  line-height: var(--lh-snug);
-  color: var(--ink-body);
-  background: var(--surface-subtle);
-}
-.banner.warn { background: var(--verdict-attention-bg); border-color: transparent; color: var(--verdict-attention); }
-.banner.bad  { background: var(--verdict-block-bg);    border-color: transparent; color: var(--verdict-block); }
-
-.code {
-  margin: 0;
-  padding: var(--s-4);
-  background: var(--surface-subtle);
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  font-family: var(--mono);
-  font-size: var(--fs-2);
-  line-height: var(--lh-snug);
-  color: var(--ink-body);
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-x: auto;
-}
-.code.oneline { white-space: pre; word-break: normal; }
-.codewrap { position: relative; }
-.codewrap .copy { position: absolute; top: var(--s-2); right: var(--s-2); opacity: 0; }
-.codewrap:hover .copy, .codewrap .copy:focus-visible { opacity: 1; }
-
-.divider { height: 1px; background: var(--line-hairline); }
-
-.group { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
-.group > .btn { justify-self: start; }
-
-/* The onboarding pack is followed with a terminal open beside it, and it
-   rendered as one unbroken column: a title, a command, another title, another
-   command, every gap the same size. Nothing said where one step ended. The
-   spacing now carries the structure — a title sits with its own command and
-   away from the next one — and the two headings get a rule above them, the
-   same separator `.section + .section` uses everywhere else. */
-/* A step title is a heading doing a note's job. Reads as one now. */
-
-.kv { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
-.kv .r { display: flex; align-items: baseline; gap: var(--s-4); font-size: var(--fs-3); }
-.kv .k { flex: 0 0 108px; color: var(--muted); font-size: var(--fs-2); }
-.kv .v { flex: 1; min-width: 0; color: var(--ink-body); word-break: break-word; }
-
-
-.offscreen { position: fixed; top: -1000px; opacity: 0; }
-
-/* ═══ rows ═══════════════════════════════════════════════════════════════ */
-
-/* A log row stays tight on purpose: its job is to let you sweep a hundred and
-   forty in two seconds. Everything read rather than swept gets .roomy. */
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  width: 100%;
-  padding: var(--s-2) var(--s-3);
-  border: none;
-  border-bottom: 1px solid var(--line-hairline);
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  min-width: 0;
-  font-size: var(--fs-3);
-  color: var(--ink-body);
-}
-.row:hover { background: var(--surface-subtle); }
-.row.on { background: var(--surface-subtle); border-bottom-color: transparent; }
-.row .who {
-  flex: 0 0 100px;
-  color: var(--ink);
-  font-weight: var(--fw-medium);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.row .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-.row .meta {
-  flex: none;
-  font-family: var(--mono);
-  font-size: var(--fs-1);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.row .rule-ref {
-  flex: none;
-  max-width: 170px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fs-2);
-  color: var(--muted);
-}
-
-.row.roomy { align-items: flex-start; padding: var(--s-5) var(--s-3); gap: var(--s-4); }
-.row.roomy .dot, .row.roomy .avatar { margin-top: 3px; }
-.row.roomy .col { min-width: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
-.row.roomy .t { color: var(--ink); font-weight: var(--fw-medium); line-height: var(--lh-snug); }
-.row.roomy .m {
-  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
-  font-size: var(--fs-2); color: var(--muted);
-}
-
-/* ═══ red team ═══════════════════════════════════════════════════════════ */
-
-.stats { display: flex; gap: var(--s-10); flex-wrap: wrap; }
-.stat .n {
-  font-size: var(--fs-7);
-  font-weight: var(--fw-semi);
-  letter-spacing: -.02em;
-  line-height: var(--lh-tight);
-  font-variant-numeric: tabular-nums;
-}
-.stat .n.good { color: var(--verdict-allow); }
-.stat .n.warn { color: var(--verdict-attention); }
-.stat .k { font-size: var(--fs-2); color: var(--muted); }
-
-table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
-th, td { text-align: left; padding: var(--s-3); border-bottom: 1px solid var(--line-hairline); }
-th {
-  font-size: var(--fs-1);
-  font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-  border-bottom: 1px solid var(--line-hairline);
-}
-td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-.bar { height: 3px; background: var(--surface-subtle); border-radius: 2px; overflow: hidden; margin-top: var(--s-1); }
-.bar i { display: block; height: 100%; }
-
-/* ═══ misc ═══════════════════════════════════════════════════════════════ */
-
-.section { padding: var(--s-8) var(--s-3) 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-.section + .section { border-top: 1px solid var(--line-hairline); margin-top: var(--s-8); }
-
-.quota {
-  display: flex; flex-direction: column; gap: var(--s-1);
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  padding: var(--s-3);
-  font-size: var(--fs-2);
-  color: var(--muted);
-}
-.quota-row { display: flex; align-items: baseline; gap: var(--s-3); }
-
-/* Offered, and honest about not being there. Still clickable: somebody who is
-   about to install Claude Code can set it up first and have it work when they
-   do, and refusing the click would only make that a puzzle. */
-
-/* The action a banner is about, on the banner. */
-.banner-act { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); flex-wrap: wrap; }
-
-/* Open under the role it belongs to. Bounded, because the label and its box
-   belong beside each other: across the full width of the table they read as
-   two unrelated columns. */
-.quota.editing { gap: var(--s-2); border: none; padding: 0; max-width: 320px; }
-.quota.editing .quota-row { gap: var(--s-2); }
-.quota.editing input {
-  margin-left: auto; width: 5.5rem; min-width: 0; padding: 2px var(--s-2);
-  border: 1px solid var(--line-hairline); border-radius: var(--r-control);
-  font-family: var(--mono); font-size: var(--fs-2); text-align: right;
-  background: var(--surface-page); color: var(--ink);
-}
-.quota-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
-
-/* A card in a compiled set that is already active, or lifted out to be
-   edited: still on the list as a record, visibly not a decision to make. */
-
-/* The record kept a hash, not the text. A bare em dash reads as missing data;
-   this reads as a promise being kept. */
-.nokeep { font-style: normal; color: var(--muted); opacity: 0.65; }
-
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--line-control); border-radius: 5px; border: 3px solid var(--surface-page); }
-::-webkit-scrollbar-track { background: transparent; }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-
-@media (max-width: 760px) {
-  .seatrow { grid-template-columns: 16px minmax(0, 1fr); }
-  .seatact { grid-column: 2; justify-self: start; }
-  .elsewhere { flex-direction: column; align-items: flex-start; gap: var(--s-3); }
-  .sheet { padding: 0 0 var(--s-10); }
-  .hero { padding: var(--s-10) 0 var(--s-8); }
-  .detail { padding: var(--s-5); }
-  .row .rule-ref { display: none; }
-}
-/* ── compiler settings ────────────────────────────────────────────────────
-   Scoped to `.settings` throughout. An earlier pass here redefined `.field`,
-   `.field > label` and `.row` at the top level — house classes, `.row` alone
-   used fifteen times — so styling one new page would have restyled every form
-   in the console. The only global additions are new names.
-
-   The page borrows `.pill` for the provider row and the verdict dot for the
-   on/off-machine line rather than introducing a second visual language: this
-   product has exactly one saturated colour family and it means "what happened
-   to a request", which is close enough to "does this leave the building". */
-.settings .lede { max-width: 46rem; color: var(--ink-body); font-size: var(--fs-3); margin: 0 0 var(--s-4); }
-.settings .field { margin-bottom: var(--s-4); max-width: 46rem; }
-.settings .hero-sugg.tight { margin: 0; justify-content: flex-start; }
-.settings input[type="text"], .settings input[type="password"] {
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  background: var(--surface-page);
-  color: var(--ink);
-  font: inherit;
-  width: 100%;
-}
-.settings input:focus-visible { outline: 2px solid var(--line-accessible); outline-offset: 1px; }
-.settings .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--s-4); max-width: 46rem; }
-/* Notes that sit outside a `.field` still belong to the same column. */
-.settings > .section > .note, .settings .section > .note { display: block; max-width: 46rem; }
-
-/* Where compilation runs, stated once and at a glance. */
-.settings .where {
-  display: flex; align-items: flex-start; gap: var(--s-3);
-  max-width: 46rem; margin-bottom: var(--s-4);
-  padding: var(--s-3);
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  background: var(--surface-subtle);
-  font-size: var(--fs-3); color: var(--ink-body); line-height: var(--lh-body);
-}
-.settings .where .dot { margin-top: 5px; flex: none; }
-
-/* The most important text on the page, so it gets a container of its own
-   rather than a third paragraph of grey notes. */
-.settings .leaves {
-  max-width: 46rem; margin: var(--s-5) 0 var(--s-4);
-  padding: var(--s-4);
-  border: 1px solid var(--line-control);
-  border-radius: var(--r-control);
-}
-.settings .leaves-head {
-  font-size: var(--fs-1); font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-  margin-bottom: var(--s-3);
-}
-.settings .leaves ul { margin: 0 0 var(--s-4); padding-left: 1.1rem; color: var(--ink-body); font-size: var(--fs-3); }
-.settings .leaves li { margin-bottom: var(--s-2); }
-.settings .leaves .note { margin: var(--s-2) 0 0; }
-/* Not the console's uppercase field label: this one contains `@ana`, and an
-   upper-cased token is a different token to anyone reading it literally. */
-.settings .check {
-  display: flex; align-items: center; gap: var(--s-2);
-  font-weight: var(--fw-medium);
-  text-transform: none; letter-spacing: normal; font-size: var(--fs-3); color: var(--ink);
-}
-.settings .actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-5); }
-
-/* This device: one bordered list standing in for what used to be four
-   sections. `.row` already gives a tight, single-line, ellipsis-safe flex
-   row — the same one the activity log sweeps a hundred at a time — so
-   nothing new was needed for the shape, only for what a bare `.row .txt`
-   does not say on its own: which rows are the ones actually judging you. */
-.settings .tbl.solo-rules { overflow: hidden; }
-.settings .tbl.solo-rules > .row:last-child { border-bottom: none; }
-.settings .tbl.solo-rules .txt.on { color: var(--ink); font-weight: var(--fw-medium); }
-.settings .row.solo-add { cursor: default; margin: 0 var(--s-3); }
-.settings .row.solo-add:hover { background: none; }
-.settings .row.solo-add input[type="text"] {
-  border: none; background: none; padding: 0; color: var(--ink);
-}
-.settings .row.solo-add input[type="text"]:focus { outline: none; }
-.settings .row.solo-add input[type="text"]::placeholder { color: var(--muted); }
-.settings .label.under { margin: var(--s-6) var(--s-3) var(--s-2); }
-
-.note.good { color: var(--verdict-allow); }
-.note.bad { color: var(--verdict-block); }
-.compiler-line { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); }
-.linkish {
-  background: none; border: 0; padding: 0; font: inherit; color: var(--muted);
-  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
-}
-.linkish:hover { color: var(--ink); }
-
-@media (max-width: 640px) {
-  .settings .grid2 { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* The groups of the "This device" list: a category label needs air above it,
-   or the last row of one category reads as the first of the next. */
-.group + .group { margin-top: var(--s-4); }
-
-
-/* ═══ team ═══════════════════════════════════════════════════════════════
-   One thing per tab, one page per person. The list edits in place (the role
-   is a select in its row, the rest is in the row's menu); the page leads with
-   three numbers, then the key, then the rules. Same tokens as everything
-   else — what is new is a page head with a real title, tabs under it, and a
-   table that reads as one. */
-
-
-
-
-.grow { flex: 1; min-width: 0; }
-
-/* the table */
-.tbl { margin: 0 var(--s-3); border: 1px solid var(--line-hairline); border-radius: var(--r-control); }
-/* Under People the add row holds the table off the tabs; a table that comes
-   straight after them gets the same air by itself. */
-.tabs + .tbl { margin-top: var(--s-6); }
-.tbl .thead, .tbl .trow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px 210px 90px 32px;
-  align-items: center;
-  gap: var(--s-5);
-  padding: 0 var(--s-4) 0 var(--s-5);
-}
-.tbl.roles .thead, .tbl.roles .trow { grid-template-columns: minmax(0, 1fr) 90px 140px 220px 32px; }
-/* The rules table drops the box. A row opens its detail underneath, and a
-   detail inside a rounded, bordered container has to pretend it is a row —
-   hairlines between the rows carry the same structure and let the open one
-   breathe. */
-.tbl .thead {
-  height: 36px;
-  background: var(--surface-subtle);
-  border-bottom: 1px solid var(--line-hairline);
-  border-radius: var(--r-control) var(--r-control) 0 0;
-  font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-}
-.tbl .trow { min-height: 52px; border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); color: var(--ink-body); }
-.tbl .trow:hover { background: var(--surface-subtle); }
-.tbl > .trow:last-child { border-bottom: none; border-radius: 0 0 var(--r-control) var(--r-control); }
-.tbl .tfoot {
-  display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5);
-  background: var(--surface-subtle); border-radius: 0 0 var(--r-control) var(--r-control);
-}
-.tbl .tfoot input[type="number"] { width: 150px; }
-.tbl .tfoot .btn { flex: none; }
-
-.strong { color: var(--ink); font-weight: var(--fw-medium); }
-
-/* The role, edited where it is read. Eight bordered dropdowns in a column
-   outweighed eight names, so the control looks like text until the pointer
-   is on it — then the border and the chevron come back and it is a select. */
-
-
-
-/* The model picker: bottom-left of the composer, opposite the send button.
-   A named button with a menu, because the grey "Drafting with … Change" line
-   that used to sit under the box was read as a caption and nobody clicked it. */
-.model-pick > summary {
-  width: auto; height: 28px; padding: 0 var(--s-3);
-  display: inline-flex; align-items: center; gap: var(--s-2);
-  font-size: var(--fs-2); letter-spacing: 0; color: var(--ink-body);
-  border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-page);
-}
-.model-pick > summary:hover, .model-pick[open] > summary { background: var(--surface-subtle); border-color: var(--line-control); color: var(--ink); }
-.model-pick > summary .dot { background: var(--verdict-allow); }
-.model-pick > summary .k { color: var(--muted); }
-.model-pick > summary .caret { color: var(--muted); font-size: var(--fs-2); line-height: 0; margin-top: -3px; }
-.model-pick .menu-list { left: 0; right: auto; top: calc(100% + 6px); min-width: 280px; }
-/* Docked at the bottom of a conversation the menu has nowhere to go but up. */
-.composer .model-pick .menu-list { top: auto; bottom: calc(100% + 6px); }
-.menu-head { padding: var(--s-2) var(--s-3) var(--s-1); font-size: var(--fs-1); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted); }
-.model-pick .menu-item { display: grid; gap: 1px; white-space: normal; }
-.model-pick .menu-item.on { background: var(--surface-subtle); color: var(--ink); }
-.model-pick .menu-item:disabled { color: var(--muted); cursor: default; }
-.model-pick .menu-item:disabled:hover { background: none; }
-.menu-sub { font-size: var(--fs-1); color: var(--muted); }
-.model-pick .menu-item:disabled .menu-sub { color: var(--muted); }
-
-/* Company: two cards, set once */
-
-/* one person */
-
-.stats { display: grid; grid-template-columns: 1fr 1fr 1fr auto; border: 1px solid var(--line-hairline); border-radius: var(--r-control); overflow: hidden; }
-.stat { display: grid; gap: var(--s-1); padding: var(--s-6); border-left: 1px solid var(--line-hairline); }
-.stat:first-child { border-left: none; }
-.stat b { font-size: var(--fs-7); font-weight: var(--fw-semi); letter-spacing: -.024em; line-height: 1; color: var(--ink); }
-.stat b.stat span { font-size: var(--fs-3); color: var(--muted); }
-.stat-link {
-  border: none; border-left: 1px solid var(--line-hairline); background: none;
-  padding: 0 var(--s-6);
-  font: inherit; font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--ink);
-  white-space: nowrap; cursor: pointer;
-}
-.stat-link:hover { background: var(--surface-subtle); }
-
-/* Not connected: the one thing to do, instead of numbers there are none of */
-
-.block { display: grid; gap: var(--s-3); }
-
-
-/* Models extends the console's reading column. Roles lead with the model
-   actually in force; editing and saved connections open underneath that fact. */
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.ui-icon { width: 18px; height: 18px; flex: none; }
-.models-page h1, .models-page h2, .models-page h3, .models-page p { margin: 0; }
-.models-page h1 { font-size: var(--fs-7); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
-.models-page h2 { font-size: var(--fs-4); font-weight: var(--fw-semi); line-height: var(--lh-snug); }
-.models-page h3 { font-size: var(--fs-3); font-weight: var(--fw-semi); line-height: var(--lh-snug); overflow-wrap: anywhere; }
-.compiler-setup-nudge { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); padding: var(--s-5); margin: 0 var(--s-3) var(--s-5); border: 1px solid var(--line-accessible); border-radius: var(--r-control); background: var(--surface-subtle); }
-.compiler-setup-nudge > div { min-width: 0; }
-.compiler-setup-nudge h2 { margin: 0; font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
-.compiler-setup-nudge p { margin: var(--s-2) 0 0; max-width: var(--prose); font-size: var(--fs-2); color: var(--ink-body); }
-.compiler-setup-nudge > .btn { flex: none; }
-.claude-setup { margin-top: var(--s-6); border-top: 1px solid var(--line-control); padding-top: var(--s-5); }
-.claude-setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-3); }
-.claude-setup-head > div { min-width: 0; }
-.claude-setup-head > .btn { flex: none; }
-.claude-setup-head .note { margin-top: var(--s-2); max-width: var(--prose); }
-.claude-setup-steps { margin: var(--s-4) 0 0; padding-left: var(--s-5); }
-.claude-setup-steps > li { padding: var(--s-4) 0 var(--s-4) var(--s-2); border-top: 1px solid var(--line-hairline); }
-.claude-setup-steps > li::marker { color: var(--muted); font-size: var(--fs-2); font-weight: var(--fw-semi); }
-.claude-step-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-3); }
-.claude-step-heading h4 { margin: 0; font-size: var(--fs-3); font-weight: var(--fw-semi); }
-.claude-setup-steps li > p { margin: var(--s-2) 0 var(--s-3); font-size: var(--fs-2); color: var(--ink-body); max-width: var(--prose); }
-.claude-login-command { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); }
-.claude-login-command > code { padding: var(--s-3); border: 1px solid var(--line-control); border-radius: var(--r-control); background: var(--surface-page); overflow-wrap: anywhere; }
-.compiler-local-missing { display: grid; justify-items: start; gap: var(--s-3); }
-/* Active is two cards, one per job: a title, the line that says what the job
-   is, the state it is in and one action. The three levels of nested grey panel
-   that used to be here had almost everything at 13px regular, so nothing on
-   the page won and the page said nothing about what to do first. */
-.jobs { display: grid; gap: var(--s-5); padding: var(--s-6) var(--s-3) 0; }
-.job { padding: var(--s-6); border: 1px solid var(--line-hairline); border-radius: var(--r-control); }
-.job-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
-.models-page .job-head h2 { font-size: var(--fs-4); font-weight: var(--fw-semi); }
-.models-page .job-what { margin: var(--s-3) 0 0; max-width: var(--prose); font-size: var(--fs-3); color: var(--ink-body); line-height: var(--lh-snug); }
-.job-body { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line-hairline); }
-.job-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; }
-.job-model { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; flex-wrap: wrap; }
-.job-model b { font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--ink); overflow-wrap: anywhere; }
-.job-model > span { font-size: var(--fs-2); color: var(--muted); overflow-wrap: anywhere; }
-.job-act { display: flex; align-items: center; gap: var(--s-5); flex: none; }
-.job-act .linkbtn { font-size: var(--fs-2); color: var(--ink-body); }
-.models-page .job-note { display: block; margin-top: var(--s-4); max-width: var(--prose); }
-.job-editor { margin-top: var(--s-5); }
-/* A state chip reports; it is not a button, and nothing here opens on hover. */
-.job .chip { cursor: default; font-size: var(--fs-2); }
-.chip.good, .chip.good:hover { background: var(--verdict-allow-bg); border-color: transparent; color: var(--verdict-allow); }
-.chip.bad, .chip.bad:hover { background: var(--verdict-block-bg); border-color: transparent; color: var(--verdict-block); }
-.chip.warn:hover { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-
-/* First run: the finished steps collapse to a tick on one line, and the next
-   thing to do is the only button with weight. */
-.job-setup { display: grid; gap: var(--s-4); justify-items: start; }
-.setup-rec { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.models-page .setup-rec h3 { font-size: var(--fs-3); font-weight: var(--fw-medium); }
-.setup-steps { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-6); margin: 0; padding: 0; list-style: none; font-size: var(--fs-2); color: var(--muted); }
-.setup-steps li { display: inline-flex; align-items: center; gap: var(--s-2); }
-.setup-steps li.done { color: var(--ink-body); }
-.setup-steps .mark { color: var(--muted); }
-.setup-steps li.done .mark { color: var(--verdict-allow); }
-.setup-steps .linkbtn { font-size: var(--fs-2); color: var(--muted); }
-.job-actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.job-actions > .note { margin-left: var(--s-2); max-width: var(--prose); }
-.models-page .model-editor { background: var(--surface-subtle); padding: var(--s-6); border-radius: var(--r-control); }
-.model-fields { min-width: 0; margin: var(--s-5) 0 0; padding: 0; border: 0; }
-.models-page .model-editor .field { max-width: none; }
-.models-page .field > label, .model-role-fields legend { display: block; margin-bottom: var(--s-2); color: var(--ink); font-weight: var(--fw-medium); font-size: var(--fs-2); }
-.models-page .field .note { display: block; margin-top: var(--s-2); }
-.models-page .field .check { display: flex; }
-.models-page input[type="text"], .models-page input[type="password"], .models-page select { min-height: 40px; border-color: var(--line-control); }
-.models-page input::placeholder, .document-composer input::placeholder, .composer textarea::placeholder { color: var(--muted); }
-.models-page input:focus-visible, .models-page select:focus-visible, .models-page button:focus-visible, .document-composer button:focus-visible, .document-composer input:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
-.models-page input, .models-page select, .document-composer input { accent-color: var(--action); caret-color: var(--action); }
-.models-page ::selection, .document-composer ::selection { background: var(--action); color: var(--action-ink); }
-.models-page .optional { color: var(--muted); font-weight: var(--fw-normal); }
-.models-page .banner { margin: var(--s-4) 0; }
-.models-page .note.good, .model-status.good, .model-metadata .good { color: var(--verdict-allow); }
-.models-page .note.bad, .model-status.bad { color: var(--verdict-block); }
-.models-page .note.warn, .model-status.warn, .model-metadata .warn, .document-record .note.warn { color: var(--verdict-attention); }
-#compilerFeedback:not(:empty) { margin-top: var(--s-4); }
-/* Library: the inventory, as one table. Local weights and endpoint
-   connections share the rows because the question an administrator brings here
-   — what have I saved, what may it do, can I use it — has the same shape for
-   both. The built-in analyzer choices are not duplicated in it: they are
-   options of the Request judge editor on Active, and two lists claiming to be
-   the same catalogue with different activation rules is the stacking this
-   redesign is undoing. */
-.library-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); padding: var(--s-6) var(--s-3) var(--s-5); }
-.library-head .note { max-width: var(--prose); }
-.library-head .btn { flex: none; }
-.tbl.models .thead, .tbl.models .trow { grid-template-columns: minmax(0, 1fr) 150px 120px 190px 72px; }
-.tbl.prompts .thead, .tbl.prompts .trow { grid-template-columns: minmax(0, 1fr) 170px 200px 72px; }
-.c-prompt-state { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-/* The lede a tab needs before its table, aligned with the table's own inset. */
-.tab-lede { display: block; padding: var(--s-6) var(--s-3) var(--s-5); max-width: var(--prose); }
-.tab-back { padding: var(--s-6) var(--s-3) 0; }
-.c-model { display: grid; gap: 2px; min-width: 0; padding: var(--s-3) 0; }
-.c-model b { font-weight: var(--fw-medium); color: var(--ink); overflow-wrap: anywhere; }
-.c-model .mono { font-size: var(--fs-1); color: var(--muted); overflow-wrap: anywhere; }
-.c-format { font-size: var(--fs-2); color: var(--muted); }
-.c-status { font-size: var(--fs-2); color: var(--muted); }
-.c-model-act { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-2); }
-.c-model-act .btn { flex: none; }
-/* A row's own feedback belongs under that row, inside the table, not in a
-   column that would have to be as wide as the longest error in the list. */
-.trow-note { padding: var(--s-3) var(--s-5) var(--s-4); border-bottom: 1px solid var(--line-hairline); }
-.trow-note .note { max-width: var(--prose); }
-.tbl > .trow-note:last-child { border-bottom: none; }
-.library .model-editor, .library .model-transfers, .library > .banner, .library > .note { margin: 0 var(--s-3) var(--s-5); }
-.models-page .prompt-editor { margin: var(--s-5) var(--s-3) var(--s-6); }
-.library .empty { margin: 0 var(--s-3); }
-
-.model-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-5); margin-bottom: var(--s-3); }
-.model-section-head > div { min-width: 0; }
-.model-section-head .note { margin-top: var(--s-2); max-width: var(--prose); }
-.model-section-head .btn { flex: none; }
-.model-form-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s-4); }
-.models-page .library-editor { margin-top: 0; }
-.model-role-fields { min-width: 0; padding: 0; border: 0; margin: 0 0 var(--s-5); }
-.models-page .model-role-fields .check { margin: var(--s-2) 0; font-size: var(--fs-3); }
-.models-page .model-file-input { width: 100%; font: inherit; color: var(--ink-body); }
-.model-file-input::file-selector-button { font: inherit; color: var(--ink-body); background: var(--surface-page); border: 1px solid var(--line-control); padding: var(--s-3) var(--s-4); border-radius: var(--r-control); margin-right: var(--s-3); cursor: pointer; }
-.model-file-input::file-selector-button:hover { background: var(--surface-subtle); }
-.analyzer-options { padding: 0; list-style: none; margin: var(--s-5) 0 0; }
-.library-model-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-3); }
-.model-status { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--fs-2); font-weight: var(--fw-medium); color: var(--muted); }
-.model-metadata { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--s-4); row-gap: var(--s-1); margin-top: var(--s-2); color: var(--muted); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
-.model-delete-confirm { margin-top: var(--s-4); padding: var(--s-4); background: var(--verdict-block-bg); border-radius: var(--r-control); }
-.model-delete-confirm .actions { margin-top: var(--s-3); }
-.analyzer-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-5); padding: var(--s-5) 0; border-top: 1px solid var(--line-control); }
-.analyzer-option > div > p { margin-top: var(--s-2); color: var(--ink-body); font-size: var(--fs-2); }
-.analyzer-option-action { align-self: center; }
-.analyzer-editor > .note:last-child { margin-top: var(--s-4); }
-.model-transfers { margin-top: var(--s-5); }
-.model-transfer { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0; border-bottom: 1px solid var(--line-hairline); }
-.model-transfer > div { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.model-transfer .note { display: block; }
-.model-transfer progress { width: 100px; }
-.transfer-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-4); font-size: var(--fs-2); }
-.models-page progress { accent-color: var(--action); height: 6px; }
-.model-loading { display: grid; gap: var(--s-3); margin-top: var(--s-5); padding: var(--s-6) 0; }
-.skeleton-line { display: block; width: 70%; height: 12px; background: var(--surface-subtle); border-radius: var(--r-control); }
-.skeleton-line.short { width: 45%; }
-
-/* Prompt drafts belong to their template, so switching or refreshing never
-   substitutes another prompt's text into the editor. */
-.prompt-editor { min-width: 0; padding: var(--s-6); margin-bottom: var(--s-6); border-radius: var(--r-control); background: var(--surface-subtle); }
-.prompt-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-5); }
-.prompt-editor-heading > div { min-width: 0; }
-.prompt-editor-heading .note { margin-top: var(--s-2); max-width: var(--prose); }
-.prompt-editor-heading > .btn { flex: none; }
-.prompt-editor .prompt-template-picker { max-width: 100%; }
-.prompt-template-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-3); }
-.prompt-editor .prompt-description { display: block; margin: var(--s-2) 0 var(--s-5); max-width: var(--prose); }
-.prompt-editor .prompt-text-field { max-width: none; }
-.prompt-editor textarea { display: block; width: 100%; min-height: 22rem; resize: vertical; padding: var(--s-4); border: 1px solid var(--line-control); border-radius: var(--r-control); color: var(--ink); background: var(--surface-page); font: var(--fs-2)/1.6 var(--mono); tab-size: 2; caret-color: var(--action); }
-.prompt-editor textarea:focus-visible, .prompt-editor summary:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
-.prompt-editor textarea[readonly] { color: var(--muted); }
-.prompt-editor textarea[aria-invalid="true"] { border-color: var(--verdict-block); }
-.prompt-errors { padding-left: var(--s-5); margin: var(--s-2) 0 0; font-size: var(--fs-2); color: var(--verdict-block); overflow-wrap: anywhere; }
-.prompt-errors li + li { margin-top: var(--s-1); }
-.prompt-editor h4 { font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--ink); margin: 0 0 var(--s-2); }
-.prompt-variables { padding: var(--s-4) 0; }
-.prompt-variables > ul { list-style: none; padding: 0; margin: var(--s-3) 0 0; display: grid; gap: var(--s-3); }
-.prompt-variables li { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); align-items: start; gap: var(--s-4); }
-.prompt-variables li > div { min-width: 0; font-size: var(--fs-2); }
-.prompt-variables li p { color: var(--ink-body); overflow-wrap: anywhere; }
-.prompt-variable-kind { color: var(--muted); font-size: var(--fs-1); }
-.prompt-token { justify-content: flex-start; max-width: 100%; background: var(--surface-page); }
-.prompt-token code { white-space: normal; overflow-wrap: anywhere; text-align: left; }
-.prompt-reference { padding: var(--s-3) 0; border-top: 1px solid var(--line-control); }
-.prompt-reference summary { width: fit-content; max-width: 100%; font-size: var(--fs-2); font-weight: var(--fw-medium); color: var(--ink-body); cursor: pointer; }
-.prompt-reference pre { max-height: 26rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-page); border: 1px solid var(--line-hairline); border-radius: var(--r-control); padding: var(--s-4); margin: var(--s-3) 0; color: var(--ink-body); font: var(--fs-2)/1.6 var(--mono); }
-.prompt-save-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; border-top: 1px solid var(--line-control); padding-top: var(--s-4); margin-top: var(--s-2); }
-.prompt-save-row .actions { margin: 0; }
-.prompt-save-row > .note { font-size: var(--fs-2); }
-.prompt-conflict, .prompt-reset-confirm { margin-top: var(--s-4); padding: var(--s-4); border: 1px solid var(--line-control); border-radius: var(--r-control); background: var(--surface-page); font-size: var(--fs-2); }
-.prompt-conflict > p, .prompt-reset-confirm > p { color: var(--ink-body); }
-.prompt-conflict .actions, .prompt-reset-confirm .actions { margin-top: var(--s-3); }
-.prompt-editor .prompt-feedback, .prompt-editor .prompt-draft-help { display: block; margin-top: var(--s-4); max-width: var(--prose); }
-.prompt-editor .prompt-feedback:empty { display: none; }
-
-/* Attachment preparation is separate from extraction: a ready file has not
-   passed a policy check. The verdict reports the server's reading metadata. */
-.document-composer { margin-top: var(--s-3); border: 1px dashed transparent; border-radius: var(--r-control); padding: var(--s-1); transition: border-color 180ms ease, background-color 180ms ease; }
-.document-composer.dragging { border-color: var(--action); background: var(--surface-subtle); }
-.document-attach-row { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.document-formats, .document-privacy { font-size: var(--fs-2); color: var(--muted); margin: var(--s-1) var(--s-4) 0; }
-.document-selection { padding: 0; margin: var(--s-3) 0; list-style: none; display: grid; gap: var(--s-2); max-height: 200px; overflow-y: auto; }
-.document-selection > li { display: flex; align-items: center; gap: var(--s-3); background: var(--surface-subtle); border-radius: var(--r-control); padding: var(--s-3) var(--s-4); }
-.document-selection > li > div { display: grid; flex: 1; min-width: 0; }
-.document-selection b { font-size: var(--fs-2); font-weight: var(--fw-medium); overflow-wrap: anywhere; }
-.document-extension { color: var(--muted); font-size: var(--fs-1); font-weight: var(--fw-medium); flex: none; width: 40px; }
-.document-selection .btn { min-width: 36px; min-height: 36px; padding: var(--s-2); justify-content: center; }
-#documentFeedback .note { margin: var(--s-2) var(--s-4); overflow-wrap: anywhere; }
-.document-records { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
-.document-record { border: 1px solid var(--line-hairline); border-radius: var(--r-control); padding: var(--s-4); }
-.document-record-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-3); }
-.document-record-title b { overflow-wrap: anywhere; font-size: var(--fs-2); font-weight: var(--fw-medium); }
-.document-record > .note { margin: var(--s-2) 0 0; overflow-wrap: anywhere; }
-.attachment-count { flex: none; color: var(--muted); font-size: var(--fs-2); white-space: nowrap; }
-
-@media (max-width: 760px) {
-  .compiler-setup-nudge, .claude-setup-head { flex-direction: column; align-items: flex-start; }
-  .compiler-setup-nudge > .btn { white-space: normal; }
-  .job { padding: var(--s-5); }
-  .job-head { align-items: flex-start; }
-  .job-meta { flex-direction: column; align-items: flex-start; gap: var(--s-4); }
-  .job-act { width: 100%; justify-content: space-between; }
-  .models-page .model-editor { padding: var(--s-4); }
-  .prompt-editor { padding: var(--s-4); }
-  .prompt-editor-heading { flex-direction: column; }
-  .prompt-editor textarea { min-height: 20rem; font-size: var(--fs-4); }
-  .prompt-variables li { grid-template-columns: minmax(0, 1fr); gap: var(--s-1); }
-  .prompt-token { width: fit-content; }
-  .model-form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .analyzer-option { grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
-  .model-transfer { flex-wrap: wrap; }
-  .model-transfer progress { width: 100%; order: 3; }
-  /* A four-column table has no four columns on a phone. The name keeps the
-     row, the facts under it stack, and the actions stay beside the name where
-     a thumb expects them. The header goes: with one item per line there is
-     nothing left for it to head. */
-  .tbl.models .thead, .tbl.prompts .thead, .tbl.rules .thead { display: none; }
-  /* The rule keeps the line and wraps; the severity stays beside it because
-     it is the one thing you scan a policy for. Who it applies to and what it
-     has done go underneath. */
-  .tbl.rules .trow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--s-2) var(--s-4);
-    padding: var(--s-4) var(--s-4) var(--s-4) var(--s-5);
-  }
-  .tbl.rules .trow > :nth-child(3) { grid-column: 2; grid-row: 1; justify-self: end; }
-  .tbl.rules .trow > .c-aud, .tbl.rules .trow > .c-activity { grid-column: 1 / -1; font-size: var(--fs-2); color: var(--muted); }
-  .c-rule { padding: 0; flex-wrap: wrap; }
-  .c-rule .nm { white-space: normal; }
-  .tbl.models .trow, .tbl.prompts .trow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--s-2) var(--s-4);
-    padding: var(--s-4) var(--s-4) var(--s-4) var(--s-5);
-  }
-  .tbl.models .trow > span:not(.c-model):not(.c-model-act),
-  .tbl.prompts .trow > span:not(.c-model):not(.c-model-act) { grid-column: 1; font-size: var(--fs-2); color: var(--muted); }
-  .tbl.models .trow > .c-model-act, .tbl.prompts .trow > .c-model-act { grid-column: 2; grid-row: 1; }
-  .library-head { flex-direction: column; align-items: flex-start; }
-  .models-page .btn { min-height: 40px; }
-  .models-page input[type="text"], .models-page input[type="password"], .models-page select, #prompt { font-size: var(--fs-4); }
-  .document-formats { margin-left: var(--s-3); }
-  .document-selection { max-height: 140px; }
-  .row .who { flex-basis: 70px; }
-}
-
 /* ═══ components ══════════════════════════════════════════════════════════
    One class per Figma component in "Warden · Sistema", modifiers as `--name`
    classes. The templates that emit this markup live in web/js/ui.js; a view
@@ -1597,7 +778,7 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .test-subject { display: grid; gap: var(--s-3); margin-top: calc(-1 * var(--s-4)); }
 .test-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); margin: 0; font-size: var(--fs-3); color: var(--muted); }
 .test-instruction { margin: 0; font-size: var(--fs-4); color: var(--ink-body); max-width: var(--w-reading); }
-.select-inline { width: auto; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
+.select-inline { width: auto; max-width: 100%; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
 .verdict-card { gap: var(--s-4); padding: var(--s-7); }
 .verdict-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
 .verdict-title { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
@@ -1765,3 +946,209 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .inline-form input { max-width: 400px; }
 .settings-page .disclosures { border-top: 1px solid var(--line-hairline); }
 .settings-page .table-foot { font-size: var(--fs-4); margin-top: 0; }
+
+/* ═══ utilities ══════════════════════════════════════════════════════════ */
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.offscreen { position: fixed; top: -1000px; opacity: 0; }
+.ui-icon { width: 18px; height: 18px; flex: none; }
+.form-note { margin: 0; font-size: var(--fs-3); line-height: var(--lh-snug); color: var(--muted); }
+.form-note.--allow { color: var(--verdict-allow); }
+.form-note.--block { color: var(--verdict-block); }
+.form-note.--attention { color: var(--verdict-attention); }
+.cell-note { display: block; font-size: var(--fs-3); font-weight: var(--fw-normal); color: var(--muted); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-control); border-radius: 5px; border: 3px solid var(--surface-page); }
+.sidebar::-webkit-scrollbar-thumb { background: var(--sidebar-avatar); border-color: var(--sidebar-bg); }
+::-webkit-scrollbar-track { background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* ═══ documents ══════════════════════════════════════════════════════════ */
+
+.document-records { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.document-record { display: grid; gap: var(--s-2); padding: var(--s-4) var(--s-5); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-page); }
+.document-record-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-3); }
+.document-record-title b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); overflow-wrap: anywhere; }
+.model-status { font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--muted); }
+.model-status.good { color: var(--verdict-allow); }
+.model-status.warn { color: var(--verdict-attention); }
+.model-status.bad { color: var(--verdict-block); }
+.model-metadata { display: flex; flex-wrap: wrap; column-gap: var(--s-4); row-gap: var(--s-1); font-size: var(--fs-3); color: var(--muted); font-variant-numeric: tabular-nums; }
+.document-record .field-help { margin: 0; overflow-wrap: anywhere; }
+
+/* ═══ models ═════════════════════════════════════════════════════════════ */
+
+.models-active { display: grid; gap: var(--s-9); }
+.job-block { display: grid; gap: var(--s-3); }
+.job-block .section-lede { margin: 0 0 var(--s-2); font-size: var(--fs-3); }
+.job-value { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
+.value-menu .menu-list { min-width: 240px; }
+.trigger-name { font-weight: var(--fw-normal); color: var(--ink); }
+.job-warning { margin: 0; font-size: var(--fs-4); color: var(--verdict-attention); }
+.job-note { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.job-note.--allow { color: var(--verdict-allow); }
+.job-note.--block { color: var(--verdict-block); }
+.job-note.--attention { color: var(--verdict-attention); }
+.job-editor, .job-setup-host { margin-top: var(--s-3); }
+.job-setup { display: grid; gap: var(--s-3); }
+.job-task { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; margin-top: var(--s-2); }
+.job-task b { font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
+.job-task-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.setup-steps { display: grid; gap: var(--s-1); margin: 0; padding: 0; list-style: none; font-size: var(--fs-3); color: var(--muted); }
+.setup-steps li { display: flex; align-items: center; gap: var(--s-3); }
+.setup-steps li.--done { color: var(--verdict-allow); }
+.setup-steps .mark { width: 14px; text-align: center; }
+.claude-login-command { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); }
+.claude-login-command > code { padding: var(--s-2) var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-family: var(--mono); font-size: var(--fs-3); }
+.job-setup .disclosures { margin-top: var(--s-3); }
+.ceilings-table .thead, .ceilings-table .trow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ceilings-table .trow { min-height: 44px; border-bottom: 0; }
+.ceilings-table input.field-compact { width: 88px; }
+.inline-editor.--ceilings { min-height: 0; padding-block: 0 var(--s-3); padding-left: calc(var(--w-bleed) + (100% - 2 * var(--w-bleed)) / 4); border-bottom: 0; }
+
+/* The compiler's full settings and the Add model form: a settings column. */
+.model-editor { display: grid; gap: var(--s-5); }
+.model-fields { display: grid; gap: var(--s-5); min-width: 0; margin: 0; padding: 0; border: 0; }
+.model-fields .field .field-help { display: block; }
+.model-form-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s-5); }
+.model-role-fields { display: grid; gap: var(--s-2); min-width: 0; margin: 0; padding: 0; border: 0; }
+.model-role-fields legend { margin-bottom: var(--s-2); font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.model-section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); }
+.claude-setup { display: grid; gap: var(--s-4); padding-top: var(--s-5); border-top: 1px solid var(--line-hairline); }
+.claude-setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); }
+.claude-setup-head h3 { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); }
+.claude-setup-head .field-help { margin: var(--s-2) 0 0; }
+.claude-setup-steps { display: grid; margin: 0; padding-left: var(--s-6); }
+.claude-setup-steps > li { display: grid; gap: var(--s-3); padding: var(--s-4) 0; border-top: 1px solid var(--line-hairline); }
+.claude-setup-steps > li::marker { color: var(--muted); font-size: var(--fs-3); }
+.claude-step-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-4); }
+.claude-step-heading h4 { margin: 0; font-size: var(--fs-4); font-weight: var(--fw-semi); }
+.claude-setup-steps p { margin: 0; font-size: var(--fs-3); color: var(--ink-body); }
+.claude-setup-steps li > .btn, .claude-setup-steps li > a.btn { justify-self: start; }
+.compiler-local-missing { display: grid; justify-items: start; gap: var(--s-3); }
+#compilerFeedback:not(:empty) { margin-top: var(--s-3); }
+
+.library { display: grid; gap: var(--s-5); }
+.library-editor { max-width: var(--w-reading); padding: var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
+.library-table .thead, .library-table .trow { grid-template-columns: minmax(0, 420fr) minmax(0, 200fr) minmax(0, 220fr) minmax(0, 240fr) 40px; }
+.library-table .trow { min-height: 56px; padding-block: var(--s-2); }
+.trow-note { margin: 0; padding: var(--s-3) var(--w-bleed); border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); color: var(--muted); }
+.model-delete-confirm { display: grid; gap: var(--s-3); background: var(--verdict-block-bg); }
+.model-delete-confirm p { margin: 0; color: var(--ink-body); }
+.model-transfers { display: grid; }
+.model-transfer { display: flex; align-items: center; gap: var(--s-5); padding: var(--s-4) 0; border-bottom: 1px solid var(--line-hairline); }
+.model-transfer > div { display: grid; flex: 1; min-width: 0; font-size: var(--fs-4); overflow-wrap: anywhere; }
+.model-transfer > div span { font-size: var(--fs-3); color: var(--muted); }
+.model-transfer progress, .transfer-status progress { width: 120px; accent-color: var(--action); }
+.transfer-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
+.model-file-input { font-size: var(--fs-4); color: var(--ink-body); }
+.model-file-input::file-selector-button { margin-right: var(--s-4); padding: var(--s-2) var(--s-4); border: 1px solid var(--line-accessible); border-radius: var(--r-control); background: var(--surface-page); color: var(--ink); font: inherit; cursor: pointer; }
+
+.prompts-table .thead, .prompts-table .trow { grid-template-columns: minmax(0, 420fr) minmax(0, 200fr) minmax(0, 440fr) 80px; }
+.prompt-back { margin: calc(-1 * var(--s-3)) 0 var(--s-4) calc(-1 * var(--s-4)); }
+.prompt-editor { display: grid; gap: var(--s-5); max-width: var(--w-reading); }
+.prompt-editor h3 { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
+.prompt-editor h4 { margin: 0 0 var(--s-2); font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
+.prompt-editor-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--s-4); }
+.prompt-editor-heading .field-help { margin: var(--s-2) 0 0; }
+.prompt-editor form { display: grid; gap: var(--s-5); }
+.prompt-editor textarea { min-height: 22rem; font-family: var(--mono); font-size: var(--fs-3); line-height: var(--lh-body); tab-size: 2; }
+.prompt-editor textarea[aria-invalid="true"] { border-color: var(--verdict-block); }
+.prompt-errors { margin: 0; padding-left: var(--s-5); font-size: var(--fs-3); color: var(--verdict-block); overflow-wrap: anywhere; }
+.prompt-description { margin: 0; }
+.prompt-variables ul { display: grid; gap: var(--s-3); margin: var(--s-3) 0 0; padding: 0; list-style: none; }
+.prompt-variables li { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); align-items: start; gap: var(--s-4); font-size: var(--fs-3); }
+.prompt-variables li p { margin: var(--s-1) 0 0; color: var(--ink-body); overflow-wrap: anywhere; }
+.prompt-variable-kind { color: var(--muted); font-size: var(--fs-2); }
+.prompt-token code { font-family: var(--mono); font-size: var(--fs-3); overflow-wrap: anywhere; }
+.prompt-reference { border-top: 1px solid var(--line-hairline); padding-top: var(--s-4); }
+.prompt-reference summary { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); cursor: pointer; }
+.prompt-reference pre { max-height: 26rem; overflow: auto; margin: var(--s-3) 0; padding: var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-family: var(--mono); font-size: var(--fs-3); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-body); }
+.prompt-save-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-hairline); }
+.prompt-save-row .actions, .prompt-conflict .actions, .prompt-reset-confirm .actions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.prompt-conflict, .prompt-reset-confirm { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-size: var(--fs-4); }
+.prompt-conflict p, .prompt-reset-confirm p { margin: 0; color: var(--ink-body); }
+.prompt-feedback:empty { display: none; }
+.skeleton-line { display: block; width: 70%; height: 12px; margin: var(--s-2) 0; border-radius: var(--r-control); background: var(--surface-subtle); }
+.skeleton-line.short { width: 45%; }
+
+/* ═══ this device, runtime, red team ═════════════════════════════════════ */
+
+.device-page { display: grid; gap: var(--s-8); }
+.setting-rows { display: grid; gap: var(--s-3); margin-top: var(--s-2); }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); font-size: var(--fs-4); color: var(--ink); }
+.setting-row .status-text, .setting-row .cell-muted { font-size: var(--fs-3); }
+.device-page > .disclosures { margin-top: calc(-1 * var(--s-3)); }
+.public-url { margin: 0; font-size: var(--fs-4); color: var(--ink); overflow-wrap: anywhere; }
+.device-rules { display: grid; gap: var(--s-5); }
+.device-rules-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; }
+.device-rules-head .section-lede { margin-top: var(--s-2); }
+.device-table .trow { grid-template-columns: 110px minmax(0, 1fr) 40px 40px; }
+.device-table .group-band:first-child { border-top: 0; }
+.solo-text { white-space: normal; overflow-wrap: anywhere; }
+.device-add input { max-width: none; }
+.device-note { display: grid; gap: var(--s-3); }
+.runtime-table .thead, .runtime-table .trow { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); }
+.redteam-summary { margin: 0; font-size: var(--fs-5); color: var(--ink); }
+.redteam-table .thead, .redteam-table .trow { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(80px, .6fr); }
+.rate { display: grid; gap: var(--s-1); }
+.rate-bar { display: block; height: 3px; border-radius: 2px; background: var(--surface-subtle); overflow: hidden; }
+.rate-bar i { display: block; height: 100%; }
+.rate-bar.--allow i { background: var(--verdict-allow); }
+.rate-bar.--attention i { background: var(--verdict-attention); }
+.rate-bar.--block i { background: var(--verdict-block); }
+.reading-wide { max-width: var(--w-table); }
+.library-table .mono { font-size: var(--fs-3); font-weight: var(--fw-normal); }
+.library-table .cell-stack small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.prompts-table .mono { font-size: var(--fs-3); color: var(--ink); }
+.prompts-table .trow > span:nth-child(3), .prompts-table .row-menu .btn { font-size: var(--fs-3); }
+.prompts-table .row-menu .btn { color: var(--muted); }
+.device-page .setting-rows { gap: var(--s-4); margin-top: var(--s-5); }
+.device-table .trow { min-height: 52px; padding-block: var(--s-3); }
+.device-table .solo-text.cell-strong, .device-table .solo-text.cell-muted { white-space: normal; font-weight: var(--fw-normal); }
+.device-table .solo-text.cell-strong { color: var(--ink); }
+.list-state-action:empty { display: none; }
+.model-loading { display: grid; gap: var(--s-2); }
+.empty { display: grid; gap: var(--s-3); max-width: var(--w-reading); padding-block: var(--s-12); font-size: var(--fs-4); color: var(--muted); }
+.empty b { font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink); }
+.prompt-template-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+.device-page .disclosure-text { color: var(--muted); }
+
+/* ═══ narrow windows ═════════════════════════════════════════════════════
+   The frames are drawn at 1440 with a 1280 reference; below that nothing may
+   push the page sideways. The sidebar folds to its icons, a table keeps its
+   columns and scrolls inside its own box, and headers let their actions fall
+   under the title. Breakpoints are the two the console already had. */
+
+@media (max-width: 760px) {
+  .sidebar { width: 64px; padding: var(--s-6) var(--s-3); align-items: center; }
+  .sb-brand { justify-content: center; }
+  .sb-brand b, .sb-workspace, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
+  .sb-group { height: var(--s-5); font-size: 0; border-top: 1px solid var(--sidebar-avatar); align-self: stretch; }
+  .sb-item { position: relative; justify-content: center; width: var(--h-nav-row); padding: 0; }
+  .sb-count {
+    position: absolute; top: var(--s-1); right: var(--s-1); min-width: 16px; padding: 0 var(--s-1);
+    border-radius: var(--r-selected); background: var(--sidebar-selected-bg); color: var(--sidebar-selected-text);
+    font-size: var(--fs-1); line-height: 16px; text-align: center;
+  }
+  .pane { padding: 0 var(--s-6); }
+  .context-bar { height: auto; min-height: 64px; flex-wrap: wrap; row-gap: var(--s-1); padding-block: var(--s-4); }
+  .ctx-status, .status-text { white-space: normal; }
+  .page-head { flex-wrap: wrap; align-items: flex-start; min-height: 0; gap: var(--s-4); }
+  .page-actions { flex-wrap: wrap; }
+  .tabs { overflow-x: auto; }
+  .table { overflow-x: auto; }
+  .table > .thead, .table > .trow, .table > .group-band, .table > .inline-editor, .table > .trow-note { min-width: 640px; }
+  .model-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .prompt-variables li { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .page-title { font-size: var(--fs-6); }
+  .setting-row, .job-task, .device-rules-head, .claude-setup-head { flex-wrap: wrap; }
+  .dialog { max-width: calc(100vw - 2 * var(--s-5)); }
+}
+.device-page, .models-active, .test-subject, .job-block, .device-rules { grid-template-columns: minmax(0, 1fr); }
+.test-meta select { min-width: 0; }
