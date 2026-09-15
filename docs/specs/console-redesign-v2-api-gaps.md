@@ -81,7 +81,10 @@ API, qué se implementó.
   boot cargaba todo antes del primer render).
 - **Implementado**: `data.js` registra por lista si está cargando y si la última
   lectura falló, sin cambiar qué pide ni cuándo. El fallo se muestra con el
-  copy del frame y *Retry loading* vuelve a pedir la misma ruta.
+  copy del frame y *Retry loading* vuelve a pedir la misma ruta. People no
+  tiene frame de cargando/fallo: usa el mismo molde (§6.8). Antes un fallo de
+  `/api/people` reemplazaba el directorio por el cuerpo del error; ahora
+  `refreshPeople` conserva el último directorio leído y la lista lo dice.
 
 ### "31 checks" en la actividad de una regla
 
