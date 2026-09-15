@@ -2,6 +2,7 @@ import { captureAttribution, getAttribution } from './vendor/kool/browser.mjs';
 
 const INSTALLERS = new Map([
   ['https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg', 'macos'],
+  ['https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg', 'macos_intel'],
   ['https://github.com/Wardenlabs/warden/releases/latest/download/Warden-Setup.exe', 'windows'],
 ]);
 const mounted = new WeakMap();

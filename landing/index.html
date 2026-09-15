@@ -301,6 +301,12 @@ setTimeout(function () {
           </span>
           <span class="go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg></span>
         </a>
+      <!-- The Mac button above is the Apple Silicon build, because that is what
+           almost every download is. An Intel Mac cannot open it at all, and it
+           finds that out after 282 MB, so the other build is named here rather
+           than left inside the releases page. app.js moves the button itself
+           when the browser can say which chip this is. -->
+      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg">Mac with an Intel chip</a>
       <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <span aria-hidden="true">↗</span></a>
     </div>
         </div>

@@ -3,6 +3,7 @@ import { createKoolClient, KoolApiError } from './sdk-server.mjs';
 export const DOWNLOAD_EVENT = 'warden_download_started';
 export const INSTALLERS = Object.freeze({
   macos: 'https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg',
+  macos_intel: 'https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg',
   windows: 'https://github.com/Wardenlabs/warden/releases/latest/download/Warden-Setup.exe',
 });
 
