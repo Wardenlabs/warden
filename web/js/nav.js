@@ -7,7 +7,41 @@ import { copyText } from './format.js';
 import { ICONS } from './icons.js';
 import { go, toggleSel } from './router.js';
 import { composing } from './rules.js';
+import { menu } from './ui.js';
 import { VIEWS } from './views.js';
+
+/**
+ * The theme, owned by "Your account": three states, and the default is the
+ * operating system's, so someone who never opens this menu keeps the
+ * behaviour the CSS ships with. An explicit choice is `data-theme` on <html>
+ * — the stylesheet's [data-theme] blocks beat the media query — and it is
+ * per browser, not per company: which colours hurt whose eyes is not
+ * administrative state, so it stays out of the directory and in localStorage.
+ * Applied at module load, before the first render, so a dark choice does not
+ * flash the light page first. Everything is guarded: the console tests run
+ * these modules under a document stub with no documentElement and no storage.
+ */
+const THEME_KEY = 'warden-theme';
+
+function storedTheme() {
+  try { const t = localStorage.getItem(THEME_KEY); return t === 'light' || t === 'dark' ? t : 'system'; }
+  catch { return 'system'; }
+}
+
+function applyTheme(t) {
+  const root = typeof document !== 'undefined' ? document.documentElement : null;
+  if (!root?.dataset) return;
+  if (t === 'light' || t === 'dark') root.dataset.theme = t;
+  else delete root.dataset.theme;
+}
+
+function setTheme(t) {
+  try { t === 'system' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, t); } catch { /* private mode: the choice lasts the tab */ }
+  applyTheme(t);
+  renderNav();   // the ✓ moves, and rebuilding the sidebar closes the menu
+}
+
+applyTheme(storedTheme());
 
 /**
  * The navigation: a dark sidebar, three groups, one count.
@@ -105,7 +139,16 @@ export function renderNav() {
       </button>`;
     }).join('')}
     <div class="sb-fill"></div>
-    <div class="sb-profile"><span class="sb-avatar" aria-hidden="true">Y</span><div><b>You</b><span>Your account</span></div></div>`;
+    ${menu([
+      { note: 'Theme' },
+      { label: 'System', attrs: 'data-set-theme="system"', check: storedTheme() === 'system' },
+      { label: 'Light', attrs: 'data-set-theme="light"', check: storedTheme() === 'light' },
+      { label: 'Dark', attrs: 'data-set-theme="dark"', check: storedTheme() === 'dark' }
+    ], {
+      label: 'Your account',
+      trigger: '<span class="sb-avatar" aria-hidden="true">Y</span><div><b>You</b><span>Your account</span></div>',
+      align: 'left', cls: '--up sb-account', triggerCls: 'sb-profile'
+    })}`;
 }
 
 // One delegated listener for the whole document: every navigation is a
@@ -116,6 +159,9 @@ export function renderNav() {
 // menu belongs to the menu: without this the row underneath caught it and the
 // page opened behind the menu the person was using.
 document.addEventListener('click', (e) => {
+  const th = e.target.closest('[data-set-theme]');
+  if (th) { setTheme(th.dataset.setTheme); return; }
+
   const t = e.target.closest('[data-toggle]');
   if (t) { toggleSel(t.dataset.toggle, t.dataset.sel || null); return; }
 

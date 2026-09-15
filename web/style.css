@@ -9,9 +9,13 @@
  *
  * Everything is grey except the verdicts and the role identities. Radius is 6
  * on anything with a box, pills do not exist, and hover is a fill rather than
- * a border. Dark mode follows the operating system: every dark value below is
- * a decision taken in Figma ("Warden · Sistema"), never an automatic inversion,
- * and floating surfaces get lighter than the paper rather than darker.
+ * a border. Dark mode follows the operating system unless the account menu
+ * says otherwise (html[data-theme], three states, system is the default):
+ * every dark value below is a decision taken in Figma ("Warden · Sistema"),
+ * never an automatic inversion, and floating surfaces get lighter than the
+ * paper rather than darker. The dark tokens appear twice — under the media
+ * query and under [data-theme="dark"] — because CSS has no way to share the
+ * block without a build step: edit both or neither.
  *
  * No literal colour and no literal font-size appears outside the two theme
  * blocks of :root. Pick a token by its role, never by its value:
@@ -74,7 +78,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
 
     --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
@@ -109,6 +113,44 @@
     --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
     --scrim: rgba(0, 0, 0, .55);
   }
+}
+
+/* The same dark tokens again, for an explicit choice overriding a light OS.
+   A byte-for-byte copy of the block above — see the note at the top. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
+
+  --surface-page: #16181D;
+  --surface-subtle: #21242B;
+  --surface-disabled: #1C1F24;
+  --surface-raised: #1D2026;
+
+  --line-hairline: #262A31;
+  --line-control: #30353D;
+  --line-accessible: #565C66;
+
+  --action: #E9EAED;
+  --action-ink: #141619;
+  --action-hover: #D9DBDF;
+
+  --verdict-block: #F0708F;     --verdict-block-bg: #391820;
+  --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
+  --verdict-attention: #D9B24B; --verdict-attention-bg: #33290F;
+  --signal-red: #FF5C77;
+
+  --role-admin: #7FA5E8;     --role-admin-bg: #1B2536;
+  --role-employee: #5FB5C4;  --role-employee-bg: #14282C;
+  --role-sales: #A78BE8;     --role-sales-bg: #241D38;
+  --role-solo: #D183B4;      --role-solo-bg: #321F2B;
+  --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
+
+  /* sidebar: deliberately not redefined */
+  --focus-ring: #6E96E8;
+
+  --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
+  --scrim: rgba(0, 0, 0, .55);
 }
 
 :root {
@@ -221,6 +263,10 @@ body {
 .sb-profile div { display: grid; line-height: var(--lh-snug); }
 .sb-profile b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-selected-text); }
 .sb-profile span { font-size: var(--fs-3); color: var(--sidebar-muted); }
+.sb-account { flex: none; }
+.sb-account > .sb-profile { border-radius: var(--r-selected); cursor: pointer; }
+.sb-account > .sb-profile:hover, .sb-account[open] > .sb-profile { background: var(--sidebar-avatar); }
+.sb-account .menu-list { min-width: 176px; }
 
 /* ── the pane ─────────────────────────────────────────────────────────────
    One origin for content: 40px in from the sidebar. Everything left-aligned
