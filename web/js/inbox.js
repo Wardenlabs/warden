@@ -48,21 +48,21 @@ function listPage() {
   const loads = [state.loads.escalations, state.loads.appeals];
   const sub = 'Held requests and blocks people say were wrong — everything that needs a person.';
   if (loads.some((l) => !l || (l.loading && !state.escalations.length && !state.appeals.length))) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Loading the inbox…' })}${pageHead({ title: 'Inbox', sub: 'Checking what needs you…' })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub: 'Checking what needs you…' })}
       ${listState({ title: 'Loading the inbox…', body: 'Fetching the items that are waiting on a person.' })}</div>`;
   }
   if (loads.some((l) => l.error)) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Inbox unavailable' })}${pageHead({ title: 'Inbox', sub: 'Requests are still being judged.' })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub: 'Requests are still being judged.' })}
       ${listState({ tone: 'attention', title: 'Could not load the inbox', body: 'The queue could not be read from this machine. Nothing is lost — held requests stay held until someone answers.', action: button('Retry loading', { kind: 'primary', id: 'retryInbox' }) })}</div>`;
   }
   const waiting = pendingEscalations();
   const answered = state.escalations.filter((e) => e.review);
   if (!waiting.length && !state.appeals.length && !answered.length) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Nothing waiting', tone: 'allow' })}${pageHead({ title: 'Inbox', sub })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub })}
       <div class="empty-center"><b>Nothing waiting</b><span>Requests that need your sign-off land here, next to blocks somebody says were wrong.</span></div></div>`;
   }
   return `<div class="sheet">
-    ${contextBar(crumbs, waiting.length ? { text: `${waiting.length} waiting on you`, tone: 'attention' } : { text: 'Nothing waiting', tone: 'allow' })}
+    ${contextBar(crumbs)}
     ${pageHead({ title: 'Inbox', sub })}
     <div class="table inbox-table" role="table" aria-label="Inbox">
       ${waiting.length ? groupBand('Waiting on you', waiting.length) + waiting.map(heldRow).join('') : ''}

@@ -53,13 +53,6 @@ function todayLine() {
   return `Warden looked at ${plural(rows.length, 'request')} today and stopped ${stopped}. ${people ? `${counted(people, 'person', 'people')} hit a rule.` : 'Nobody hit a rule.'}`;
 }
 
-function logStatus() {
-  if (!state.chain) return null;
-  return state.chain.ok
-    ? { text: `Log verified · ${plural(state.chain.entries, 'record')}`, tone: 'allow' }
-    : { text: 'Log does not verify', tone: 'block' };
-}
-
 function waitingAction() {
   const waiting = pendingEscalations().length;
   return waiting ? button(`${waiting} waiting on you →`, { kind: 'primary', attrs: 'data-go="inbox"' }) : '';
@@ -107,21 +100,21 @@ function listPage() {
   const load = state.loads.audit;
   const crumbs = [{ label: 'Workspace' }, { label: 'Activity' }];
   if (!load || (load.loading && !state.audit.length)) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Loading the log…' })}${pageHead({ title: 'Activity', sub: 'Catching up on today’s decisions…' })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Catching up on today’s decisions…' })}
       ${listState({ title: 'Loading the log…', body: 'Fetching the latest decisions and checking the record against its hashes.' })}</div>`;
   }
   if (load.error) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Log unavailable' })}${pageHead({ title: 'Activity', sub: 'Requests are still being judged.' })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Requests are still being judged.' })}
       ${listState({ tone: 'attention', title: 'Could not load the log', body: 'The record could not be read from this machine. Your rules still apply — requests keep being judged while this page recovers.', action: button('Retry loading', { kind: 'primary', id: 'retryAudit' }) })}</div>`;
   }
   if (!state.audit.length) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'No decisions yet' })}${pageHead({ title: 'Activity', sub: 'Warden hasn’t seen a request yet.' })}
+    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Warden hasn’t seen a request yet.' })}
       ${listState({ title: 'No decisions yet', body: 'The moment a request runs through Warden, its decision lands here — allowed, held, or blocked.' })}</div>`;
   }
   const rows = visibleAudit();
   const who = personById(state.actorFilter);
   return `<div class="sheet">
-    ${contextBar(crumbs, logStatus())}
+    ${contextBar(crumbs)}
     ${pageHead({ title: 'Activity', sub: esc(todayLine()), actions: waitingAction() })}
     ${toolbar()}
     ${rows.length

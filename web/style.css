@@ -448,7 +448,7 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 
 /* ── Page anatomy: context bar, Header / Page, Tabs ──────────────────────── */
 .context-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+  display: flex; align-items: center; gap: var(--s-5);
   height: 64px; font-size: var(--fs-3); color: var(--muted);
 }
 .crumbs { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
@@ -456,14 +456,6 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 button.crumb:hover { color: var(--ink); }
 .crumb.--here { color: var(--muted); cursor: default; overflow: hidden; text-overflow: ellipsis; }
 .crumb-sep { color: var(--muted); }
-.ctx-status { display: inline-flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
-.ctx-status .dot { width: 8px; height: 8px; }
-.ctx-status.--allow { color: var(--verdict-allow); }
-.ctx-status.--allow .dot { background: var(--verdict-allow); }
-.ctx-status.--attention { color: var(--verdict-attention); }
-.ctx-status.--attention .dot { background: var(--verdict-attention); }
-.ctx-status.--block { color: var(--verdict-block); }
-.ctx-status.--block .dot { background: var(--verdict-block); }
 
 .page-head {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-7);
@@ -1179,7 +1171,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
   }
   .pane { padding: 0 var(--s-6); }
   .context-bar { height: auto; min-height: 64px; flex-wrap: wrap; row-gap: var(--s-1); padding-block: var(--s-4); }
-  .ctx-status, .status-text { white-space: normal; }
+  .status-text { white-space: normal; }
   .page-head { flex-wrap: wrap; align-items: flex-start; min-height: 0; gap: var(--s-4); }
   .page-actions { flex-wrap: wrap; }
   .tabs { overflow-x: auto; }

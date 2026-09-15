@@ -219,7 +219,7 @@ function rulesSection() {
 function soloBody() {
   const on = Boolean(state.publicUrl);
   return `<div class="sheet">
-    ${contextBar([{ label: 'This machine' }], { text: `Gateway running · ${state.mock ? 'demo mode' : on ? 'reachable on the internet' : 'this machine only'}`, tone: state.mock ? 'attention' : 'allow' })}
+    ${contextBar([{ label: 'This machine' }])}
     ${pageHead({ title: 'This device', sub: 'Warden runs on this machine. Every request from here passes through it.' })}
     <div class="reading device-page">
       <section class="settings-task">

@@ -17,15 +17,20 @@ import { ICONS } from './icons.js';
 // ── page anatomy ─────────────────────────────────────────────────────────────
 
 /**
- * The 64px bar above every page: where you are on the left, and the one fact
- * about the page that is true right now on the right.
+ * The 64px bar above every page: where you are, and nothing else.
  *
  * `crumbs` is a list of `{ label, go?, sel?, q?, back? }`. A crumb with `back`
  * gets the arrow and is the way out; the last crumb is where you are and is
- * never a link. `status` is `{ text, tone }`, tone one of allow / attention /
- * block, or none for a plain muted line.
+ * never a link.
+ *
+ * It used to carry a dot and a line of status on the right — "12 active
+ * rules", "Loading the log…", "Gateway running · demo mode". Every one of them
+ * repeated something the page already said louder: the count is in the table,
+ * the loading state is the plate in the middle of the screen, and the demo
+ * banner says demo. A status that is never the reason you looked at the corner
+ * is furniture, and it was on every screen.
  */
-export function contextBar(crumbs = [], status = null) {
+export function contextBar(crumbs = []) {
   const parts = crumbs.map((c, i) => {
     const last = i === crumbs.length - 1;
     const label = `${c.back ? '← ' : ''}${esc(c.label)}`;
@@ -34,7 +39,6 @@ export function contextBar(crumbs = [], status = null) {
   });
   return `<div class="context-bar">
     <nav class="crumbs" aria-label="Breadcrumb">${parts.join('<span class="crumb-sep" aria-hidden="true">/</span>')}</nav>
-    ${status ? `<span class="ctx-status${status.tone ? ` --${status.tone}` : ''}" role="status">${status.tone ? '<i class="dot"></i>' : ''}${esc(status.text)}</span>` : ''}
   </div>`;
 }
 
