@@ -1,79 +1,184 @@
 /**
- * The simulator: send a prompt as somebody on the team, and the two ways out of a refusal.
+ * Test: send a request against the active rules as somebody on the team, or against one draft before it is saved.
  */
 import { passRow } from './activity.js';
+import { readable } from './answers.js';
 import { $, attr, esc, post, state } from './core.js';
 import { refreshAppeals } from './data.js';
-import { bindDocuments, clearDocuments, documentAnalysisNotice, documentComposer, documentMetadataMarkup, documentReviewPendingMarkup, documentsBusy, loadDocumentCapabilities, selectedAttachments, selectedMetadata } from './documents.js';
-import { say } from './draft.js';
-import { personById, plural, ruleName, sendOnEnter } from './format.js';
+import {
+  bindDocuments, clearDocuments, documentAnalysisNotice, documentAttachButton, documentChips, documentFeedback,
+  documentMetadataMarkup, documentReviewPendingMarkup, documentsBusy, loadDocumentCapabilities, selectedAttachments, selectedMetadata
+} from './documents.js';
+import { audienceLabel, fileSize, personById, plural, ruleName, sendOnEnter } from './format.js';
 import { disclosure, render } from './render.js';
-import { go } from './router.js';
-import { isExempt, rulesHead, sendAsOptions } from './rules.js';
+import { isExempt, sendAsOptions } from './rules.js';
+import { button, contextBar, fileChip, listState, pageHead, turn } from './ui.js';
 import { VIEWS } from './views.js';
 
-// ═══ SIMULATOR ═══════════════════════════════════════════════════════════════
+// ═══ TEST ════════════════════════════════════════════════════════════════════
+
+/**
+ * Two things are called testing here, and they are different questions.
+ *
+ * "Test rules →" asks what the gateway does with a request: it is sent with a
+ * person's own key through `/api/guard/check`, the same path their tool takes,
+ * against every active rule, documents included, and it is recorded like any
+ * other request. That is the engine this module has always had.
+ *
+ * "Test rule" from an edit or a draft asks what one unsaved rule would do.
+ * The gateway has no way to judge a request against a rule that is not in the
+ * policy except `/api/policy/preview`, which takes text and no files and runs
+ * the rule's own examples beside it. So a draft is tested on text, the file
+ * button is not offered, and nothing is recorded. The frames drew one screen
+ * for both; the API decides which one is true
+ * (docs/specs/console-redesign-v2-api-gaps.md).
+ */
+const draftMode = () => state.query?.draft === '1' && Boolean(state.testDraft);
 
 VIEWS.simulator = {
   railParent: 'policy',
   onEnter: loadDocumentCapabilities,
   flush: true,
-  body: () => `<div class="chatwrap">
-    <div class="sheet chat-head">
-      ${rulesHead()}
-      <div class="send-as">
-        <span class="label">Send as</span>
-        <select class="inline" id="who" aria-label="Employee to send as"${state.company.employees.length ? '' : ' disabled'}>
-          ${sendAsOptions() || '<option value="">No identity set up</option>'}
-        </select>
-      </div>
-    </div>
-    <div class="chat" id="chat">
-      <div class="sheet">
-        ${state.chat.length
-          ? state.chat.map(renderMessage).join('')
-          : state.company.employees.length ? '<div class="empty"><b>See what Warden would do</b><span>Check a prompt, a document, or both as somebody on your team. The same policy and identity checks apply.</span></div>' : '<div class="empty"><b>Set up an identity to check requests</b><span>Choose who Warden should check as. Protect this device to create your own identity, or add people to your team.</span><div class="actions"><button type="button" class="btn --primary" data-go="soloRules">Set up this device</button><button type="button" class="btn" data-go="people">Add people</button></div></div>'}
-        ${documentReviewPendingMarkup(state.chat.at(-1)?.documents, state.sending && state.chat.at(-1)?.from === 'employee')}
-      </div>
-    </div>
-    <div class="composer">
-      <div class="sheet">
-        <div class="hero-box">
-          <textarea id="prompt" rows="2" aria-label="Prompt to check" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Drop a file, or paste a request to test…'}"${state.sending ? ' disabled' : ''}></textarea>
-          <button type="button" class="btn --primary send" id="send"${state.sending || documentsBusy() || !state.company.employees.length ? ' disabled' : ''}>${state.sending ? 'Checking…' : 'Test'}</button>
-        </div>
-        ${documentComposer()}
-      </div>
-    </div>
-  </div>`,
+  body: () => (draftMode() ? draftBody() : policyBody()),
   bind: () => {
-    const send = $('send');
-    if (send) send.onclick = doSend;
-    sendOnEnter($('prompt'), doSend);
-    bindDocuments();
-    bindFollowUps();
+    if (draftMode()) bindDraft(); else bindPolicyTest();
+    bindThread();
   }
 };
 
-function renderMessage(m, i) {
-  if (m.from === 'employee') {
-    return `<div class="msg"><div class="who">${esc(m.who)}</div>${m.text ? `<div class="say">${esc(m.text)}</div>` : ''}${documentMetadataMarkup(m.documents, { submitted: true })}</div>`;
-  }
-  // The pass list travels with the answer instead of living in a side panel —
-  // same disclosure, same place in the hierarchy, as a decision in Activity.
-  const slowest = Math.max(1, ...(m.passes ?? []).map((p) => p.ms ?? 0));
-  const passes = (m.passes ?? []).length ? `<div class="folds">${disclosure(`s:${i}`, 'How it was decided', `
-    <div>${m.passes.map((p) => passRow(p, slowest)).join('')}</div>
-    <div class="note">${((m.totalMs ?? 0) / 1000).toFixed(1)}s${state.mock ? ' · demo mode' : ' · nothing left this machine'}</div>`)}</div>` : '';
+// ── shared pieces ────────────────────────────────────────────────────────────
 
-  return `<div class="msg">
-    <div class="who">Warden</div>
-    <div class="verdict ${esc(m.verdict)}">${esc(m.label)}</div>
-    ${m.why ? `<div class="why">${m.why}</div>` : ''}
-    ${documentMetadataMarkup(m.documents)}
-    ${followUpControls(m, i)}
-    ${passes}
+const seconds = (ms) => `${(Math.max(0, ms ?? 0) / 1000).toFixed(1)} s`;
+const where = () => (state.mock ? 'demo mode' : 'nothing left this machine');
+
+function verdictCard({ tone, glyph, title, meta, line, kicker, reason, extra = '', foot = '', muted = false }) {
+  return `<div class="warden-label">Warden</div>
+    <article class="turn --warden verdict-card${muted ? ' --previous' : ''}">
+      <div class="verdict-head"><h3 class="verdict-title --${tone}">${glyph ? `<span aria-hidden="true">${glyph}</span> ` : ''}${esc(title)}</h3><span class="verdict-meta">${esc(meta)}</span></div>
+      <p class="verdict-line">${line}</p>
+      ${kicker ? `<span class="kicker">${esc(kicker)}</span><div class="verdict-reason">${reason}</div>` : ''}
+      ${extra}
+      ${foot ? `<div class="verdict-foot">${foot}</div>` : ''}
+    </article>`;
+}
+
+function personTurn(m) {
+  const files = (m.documents ?? []).map((d) => fileChip(d.name, fileSize(d.bytes ?? 0))).join('');
+  return turn('person', { who: m.who ? esc(m.who) : '', body: `${m.text ? `<div>${esc(m.text)}</div>` : ''}${files ? `<div class="labels">${files}</div>` : ''}`, end: true });
+}
+
+function emptyLine(text) {
+  return `<div class="thread-empty">${esc(text)}</div>`;
+}
+
+function tries(items) {
+  return items.length ? `<div class="suggestions">${items.map(([label, value, file]) => `<button type="button" class="suggestion" data-try="${esc(value)}"${file ? ' data-try-file="1"' : ''}>Try: ${esc(label)}</button>`).join('')}</div>` : '';
+}
+
+function bindThread() {
+  for (const t of document.querySelectorAll('[data-try]')) t.onclick = () => {
+    const box = $('prompt');
+    if (!box || box.disabled) return;
+    box.value = t.dataset.try;
+    box.dispatchEvent(new Event('input'));
+    box.focus();
+    if (t.dataset.tryFile) $('documentFiles')?.click();
+  };
+  const box = $('prompt');
+  const send = $('send');
+  if (box && send) {
+    const sync = () => { if (!box.disabled && !send.classList.contains('--busy')) send.disabled = (!box.value.trim() && !selectedAttachments().length) || documentsBusy() || send.dataset.blocked === '1'; };
+    box.addEventListener('input', sync);
+    sync();
+  }
+}
+
+// ── the active rules, as a person ────────────────────────────────────────────
+
+let sendAs = '';
+
+function policyBody() {
+  const people = state.company.employees;
+  if (!people.some((p) => p.id === sendAs)) {
+    sendAs = [...people].sort((a, b) => Number(isExempt(a.role)) - Number(isExempt(b.role)))[0]?.id ?? '';
+  }
+  const who = personById(sendAs);
+  const rules = state.policy.rules.length;
+  const head = `${contextBar([{ label: 'Rules', go: 'policy', back: true }, { label: 'Test rules' }])}
+    ${pageHead({ title: 'Test rules' })}
+    <div class="test-subject">
+      <h2 class="section-title --big">Every active rule</h2>
+      <p class="test-meta">${people.length
+        ? `<label for="who">Send as</label> <select id="who" class="select-inline" aria-label="Send as">${sendAsOptions(sendAs)}</select> · ${plural(rules, 'active rule')} · checked like a real request and recorded in Activity`
+        : 'Nobody to send as yet'}</p>
+    </div>
+    <hr class="hairline">`;
+
+  if (!people.length) {
+    return `<div class="chatwrap"><div class="sheet flush-head">${head}</div><div class="chat"><div class="thread">
+      ${listState({ title: 'Set up an identity to check requests', body: 'Choose who Warden should check as. Protect this device to create your own identity, or add people to your team.', action: button('Set up this device', { kind: 'primary', attrs: 'data-go="soloRules"' }) + button('Add people', { attrs: 'data-go="people"' }) })}
+    </div></div></div>`;
+  }
+
+  const thread = state.chat.length
+    ? state.chat.map(renderMessage).join('') + documentReviewPendingMarkup(state.chat.at(-1)?.documents, state.sending && state.chat.at(-1)?.from === 'employee')
+    : emptyLine('No tests yet. Send a request or drop a file to see what the active rules would do.');
+
+  return `<div class="chatwrap">
+    <div class="sheet flush-head">${head}</div>
+    <div class="chat" id="chat"><div class="thread">${thread}${who && isExempt(who.role) ? `<p class="thread-note">${esc(who.name)} is ${esc(who.role)}, exempt from company-wide rules: only rules that name them are applied.</p>` : ''}</div></div>
+    <div class="chat-foot"><div class="thread">
+      ${state.chat.length ? '' : tries([['“¿Puede salir este archivo?” + a file', '¿Puede salir este archivo?', true], ['paste a customer email thread', '']])}
+      <div class="composer --files" id="documentDropzone">
+        <textarea id="prompt" rows="1" aria-label="Request to test" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Write or paste a request to test…'}"${state.sending ? ' disabled' : ''}></textarea>
+        ${documentChips()}
+        <div class="composer-row">${documentAttachButton()}<span class="composer-fill"></span>
+          <button type="button" class="btn --primary${state.sending ? ' --busy' : ''}" id="send"${state.sending || documentsBusy() ? ' disabled' : ''}>${state.sending ? 'Checking…' : 'Run test'}</button></div>
+      </div>
+      ${documentFeedback()}
+    </div></div>
   </div>`;
+}
+
+function bindPolicyTest() {
+  const who = $('who');
+  if (who) who.onchange = () => { sendAs = who.value; render(); };
+  const send = $('send');
+  if (send) send.onclick = doSend;
+  sendOnEnter($('prompt'), doSend);
+  bindDocuments();
+  bindFollowUps();
+}
+
+const LABEL = { ALLOW: ['allow', '✓', 'Allowed'], BLOCK: ['block', '⊘', 'Blocked'], ESCALATE: ['attention', '↗', 'Held for review'] };
+
+function renderMessage(m, i) {
+  if (m.from === 'employee') return personTurn(m);
+  if (m.verdict === 'error') {
+    return verdictCard({
+      tone: 'block', glyph: '⚠', title: 'The test did not finish', meta: 'not checked',
+      line: esc(m.error ?? 'The gateway could not check this request.'),
+      kicker: 'What to do', reason: `Your request${m.hadFiles ? ' and files are' : ' is'} back in the box below. Try again after other checks finish.`,
+      foot: `<span></span>${button('Check the analyzer in Models →', { attrs: 'data-go="models"' })}`
+    });
+  }
+  const [tone, glyph, word] = LABEL[m.verdict] ?? ['muted', '', m.verdict];
+  const docs = m.documents ?? [];
+  const read = docs.filter((d) => d.status === 'read').length;
+  const masked = (m.maskedSpans ?? 0) + docs.reduce((n, d) => n + (d.redactions ?? 0), 0);
+  const docSummary = docs.length ? [read === docs.length ? 'Read completely' : `${read} of ${docs.length} read`, docs.reduce((n, d) => n + (d.pages ?? 0), 0) ? plural(docs.reduce((n, d) => n + (d.pages ?? 0), 0), 'page') : '', masked ? plural(masked, 'secret') + ' masked' : ''].filter(Boolean).join(' · ') : '';
+  const passes = (m.passes ?? []).length
+    ? disclosure(`s:${i}`, 'How it was decided', `<div class="passes">${m.passes.map((p) => passRow(p, Math.max(1, ...m.passes.map((x) => x.ms ?? 0)))).join('')}</div>`, `${plural(m.passes.length, 'pass', 'passes')} · ${seconds(m.totalMs)} · ${where()}`)
+    : '';
+  return verdictCard({
+    tone, glyph,
+    title: m.exemptAllow ? 'Allowed without being judged' : word,
+    meta: `${seconds(m.totalMs)} · ${where()}`,
+    line: m.line,
+    kicker: m.kicker, reason: m.why,
+    extra: `${m.notice ?? ''}${m.extraFacts ?? ''}${followUpControls(m, i)}${m.showReport ? `<div class="extraction-report">${documentMetadataMarkup(docs)}</div>` : ''}${passes ? `<div class="disclosures">${passes}</div>` : ''}`,
+    foot: `<span>${esc(docSummary)}</span><span class="btn-row">${m.auditId ? button('See the full record →', { kind: 'link', attrs: `data-go="activity" data-sel="${attr(m.auditId)}"` }) : ''}${docs.length ? button(m.showReport ? 'Hide extraction report' : 'View extraction report →', { attrs: `data-report="${i}"` }) : ''}</span>`
+  });
 }
 
 /**
@@ -92,32 +197,34 @@ async function doSend() {
   const text = box.value.trim();
   const attachments = selectedAttachments();
   if (!text && !attachments.length) { box.focus(); return; }
-  const who = $('who').value || 'anon';
+  const who = $('who')?.value || sendAs;
   const person = personById(who);
   // Missing identity must not fall through to the console's administrator
   // credential and accidentally exercise the policy's exempt path.
   if (!person?.apiKey) { $('who')?.focus(); return; }
   box.value = '';
 
-  state.chat.push({ from: 'employee', who: person ? `${person.name} · ${person.role}` : who, text, documents: selectedMetadata() });
+  state.chat.push({ from: 'employee', who: `${person.name} · ${person.role}`, text, documents: selectedMetadata() });
   state.sending = true;
+  state.followChat = true;
   render();
 
   try {
-    if (await judge(text, person, who, attachments)) clearDocuments();
+    if (await judge(text, person, attachments)) clearDocuments();
     else if ($('prompt')) $('prompt').value = text;
   } catch {
-    state.chat.push({ from: 'warden', verdict: 'error', label: 'Request was not checked', why: '<div>Warden could not be reached. Your files are still attached. Check the gateway connection and try again.</div>' });
+    state.chat.push({ from: 'warden', verdict: 'error', error: 'Warden could not be reached. Your files are still attached. Check the gateway connection and try again.', hadFiles: attachments.length > 0 });
     if ($('prompt')) $('prompt').value = text;
   } finally {
     state.sending = false;
+    state.followChat = true;
     render();
+    if ($('prompt') && !$('prompt').value) $('prompt').value = state.chat.at(-1)?.verdict === 'error' ? text : '';
     $('prompt')?.focus();
   }
 }
 
-async function judge(text, person, who, attachments) {
-
+async function judge(text, person, attachments) {
   // The person's own API key, exactly as their laptop would send it. The
   // console deliberately has no privileged way to assert an identity — it
   // exercises the same path an employee's tool does, so a break here breaks
@@ -127,57 +234,53 @@ async function judge(text, person, who, attachments) {
   });
 
   if (j?.error === 'unknown_api_key') {
-    state.chat.push({ from: 'warden', verdict: 'BLOCK', label: 'Key not recognised', why: `<div>${esc(j.explanation)}</div>` });
-    render();
+    state.chat.push({ from: 'warden', verdict: 'BLOCK', line: 'Key not recognised.', kicker: 'Why', why: esc(j.explanation) });
     return false;
   }
 
   if (!ok || !['ALLOW', 'ESCALATE', 'BLOCK'].includes(j?.verdict)) {
-    state.chat.push({ from: 'warden', verdict: 'error', label: 'Request was not checked', why: `<div>${esc(typeof j?.error === 'string' ? j.error : 'The gateway could not check this request. Review the files and try again.')}</div>` });
-    render();
+    state.chat.push({ from: 'warden', verdict: 'error', error: typeof j?.error === 'string' ? j.error : 'The gateway could not check this request. Review the files and try again.', hadFiles: attachments.length > 0 });
     return false;
   }
 
   const rule = j.firedRules?.[0];
-  const exempt = person && isExempt(person.role);
-  const label = exempt && j.verdict === 'ALLOW'
-    ? 'Allowed without being judged'
-    : ({ ALLOW: 'Allowed', BLOCK: 'Stopped', ESCALATE: 'Held for a person' }[j.verdict] ?? j.verdict);
+  const exempt = isExempt(person.role);
+  const exemptAllow = exempt && j.verdict === 'ALLOW';
+  const first = person.name.split(' ')[0];
+
+  const line = exemptAllow
+    ? `<b>${esc(person.role)} is exempt from company-wide rules</b>, so none of those were applied and nothing here tells you whether the request would pass. Send it as somebody the policy governs to find out.`
+    : { BLOCK: `The active rules stop this request from ${esc(first)}. It was checked like a real one and is in Activity.`,
+      ESCALATE: `The active rules hold this request for a person to review. It is waiting in your Inbox like a real one.`,
+      ALLOW: `Nothing in the active rules stops this request from ${esc(first)}. It would go through.` }[j.verdict];
 
   let why = '';
-  why += documentAnalysisNotice(j);
-  if (exempt && j.verdict === 'ALLOW') {
-    why += `<div><b>${esc(person.role)} is exempt</b>, so no rule was applied and nothing here tells you
-      whether the prompt would pass. Send it as somebody the policy governs to find out.</div>`;
-  }
+  let kicker = '';
   if (rule) {
     // A refusal that only names the rule leaves the person holding a question
     // with nowhere to take it. What they can do instead is the part that keeps
     // them working with the gateway rather than around it.
-    why += `<div><b>${esc(ruleName(rule.ruleId))}:</b> ${esc(rule.ruleText)}</div>`;
-    why += rule.guidance
-      ? `<div><b>They are told:</b> ${esc(rule.guidance)}</div>`
-      : `<div><b>Why:</b> ${esc(rule.reason)}</div>`;
-    if (rule.allowedExamples?.length) {
-      why += `<div><b>These would go through:</b>${rule.allowedExamples.map((x) => `<div>· ${esc(x)}</div>`).join('')}</div>`;
-    }
+    kicker = j.verdict === 'ESCALATE' ? 'Why it needs a person' : j.verdict === 'BLOCK' ? 'Why it matches' : 'Why it was flagged';
+    why = `<p><b>${esc(ruleName(rule.ruleId))}:</b> ${esc(rule.guidance || rule.reason)}</p>`;
+    if (rule.allowedExamples?.length) why += `<p class="verdict-aside">These would go through: ${rule.allowedExamples.map((x) => `“${esc(x)}”`).join(' · ')}</p>`;
+  } else if (j.verdict !== 'ALLOW' && j.explanation) {
+    kicker = 'Why'; why = `<p>${esc(j.explanation)}</p>`;
   }
-  if (!rule && j.verdict !== 'ALLOW' && j.explanation) why += `<div>${esc(j.explanation)}</div>`;
-  if (j.maskedSpans?.length) why += `<div>${plural(j.maskedSpans.length, 'secret')} masked before checking.</div>`;
-  if (j.quota?.limit) why += `<div>Used ${j.quota.used} of ${j.quota.limit} today.</div>`;
-  if (j.auditId) why += `<div><button type="button" class="linkbtn" data-go="activity" data-sel="${attr(j.auditId)}">See the full record</button></div>`;
+  const facts = [
+    j.maskedSpans?.length ? `${plural(j.maskedSpans.length, 'secret')} masked before checking.` : '',
+    j.quota?.limit ? `Used ${j.quota.used} of ${j.quota.limit} today.` : ''
+  ].filter(Boolean);
 
   // A refusal with nowhere to go is what makes people work around the gateway.
   // These two are the way out, and they belong to the employee: the console
-  // shows them because the simulator is where it stands in for one.
+  // shows them because the tester is where it stands in for one.
   state.chat.push({
-    from: 'warden', verdict: j.verdict, label, why,
-    passes: j.passes, totalMs: j.totalMs, documents: j.documents,
-    ...(j.verdict !== 'ALLOW' && j.auditId && person
-      ? { followUp: { auditId: j.auditId, prompt: text, who: person.id, hasDocuments: Boolean(attachments.length) } }
-      : {})
+    from: 'warden', verdict: j.verdict, exemptAllow, line, kicker, why,
+    notice: documentAnalysisNotice(j) ? `<div class="verdict-notice">${documentAnalysisNotice(j)}</div>` : '',
+    extraFacts: facts.length ? `<p class="verdict-aside">${facts.join(' ')}</p>` : '',
+    passes: j.passes, totalMs: j.totalMs, documents: j.documents, maskedSpans: j.maskedSpans?.length ?? 0, auditId: j.auditId,
+    ...(j.verdict !== 'ALLOW' && j.auditId ? { followUp: { auditId: j.auditId, prompt: text, who: person.id, hasDocuments: Boolean(attachments.length) } } : {})
   });
-  render();
   return true;
 }
 
@@ -193,41 +296,40 @@ const REWRITE_REFUSAL = {
   'already-rewritten': 'One rewrite per block, and you have used this one.'
 };
 
-/** Renders under a refusal in the simulator, on the message that owns it. */
+/** Renders under a refusal, on the message that owns it. */
 function followUpControls(m, i) {
   if (!m.followUp) return '';
   const s = m.rewrite;
-  return `<div class="group" data-follow="${i}">
-    ${s?.suggestion ? `
-      <div class="label">Warden suggests asking it this way</div>
-      <div class="banner">${esc(s.suggestion)}</div>
-      <button type="button" class="btn" data-use-rewrite="${i}">Put this in the box</button>` : ''}
-    ${s?.reason ? `<div class="note">${esc(REWRITE_REFUSAL[s.reason] ?? s.reason)}</div>` : ''}
+  return `<div class="follow-up" data-follow="${i}">
+    ${s?.suggestion ? `<span class="kicker">Warden suggests asking it this way</span><p class="verdict-reason">${esc(s.suggestion)}</p>
+      <div>${button('Put this in the box', { compact: true, attrs: `data-use-rewrite="${i}"` })}</div>` : ''}
+    ${s?.reason ? `<p class="verdict-aside">${esc(REWRITE_REFUSAL[s.reason] ?? s.reason)}</p>` : ''}
     ${m.appealed
-      ? '<div class="note good">Reported. An administrator sees it in their Inbox, next to the rule that stopped you.</div>'
-      : `<div class="chips">
-          ${s || m.followUp.hasDocuments ? '' : `<button type="button" class="btn" data-rewrite="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'rewrite' ? 'Asking…' : 'Suggest a rewrite'}</button>`}
-          <button type="button" class="btn" data-appeal="${i}"${m.busy ? ' disabled' : ''}>This block was wrong</button>
+      ? '<p class="verdict-aside --allow">Reported. An administrator sees it in their Inbox, next to the rule that stopped you.</p>'
+      : `<div class="btn-row">
+          ${s || m.followUp.hasDocuments ? '' : button(m.busy === 'rewrite' ? 'Asking…' : 'Suggest a rewrite', { compact: true, attrs: `data-rewrite="${i}"`, disabled: Boolean(m.busy) })}
+          ${button('This block was wrong', { compact: true, attrs: `data-appeal="${i}"`, disabled: Boolean(m.busy) })}
         </div>
-        ${m.followUp.hasDocuments ? '<div class="note">To revise a document request, update the file and check it again.</div>' : ''}
-        ${m.appealOpen ? `
-          <textarea id="appealNote" rows="2" placeholder="What were you actually trying to do? (optional)"></textarea>
-          <button type="button" class="btn --primary" data-send-appeal="${i}"${m.busy ? ' disabled' : ''}>${m.busy === 'appeal' ? 'Sending…' : 'Send the report'}</button>` : ''}
-        ${m.error ? `<div class="note bad">${esc(m.error)}</div>` : ''}`}
+        ${m.followUp.hasDocuments ? '<p class="verdict-aside">To revise a document request, update the file and check it again.</p>' : ''}
+        ${m.appealOpen ? `<div class="field"><label for="appealNote">What were you actually trying to do? <span class="optional">(optional)</span></label>
+          <textarea id="appealNote" rows="2"></textarea></div>
+          <div>${button(m.busy === 'appeal' ? 'Sending…' : 'Send the report', { kind: 'primary', compact: true, attrs: `data-send-appeal="${i}"`, disabled: Boolean(m.busy) })}</div>` : ''}
+        ${m.error ? `<p class="verdict-aside --block">${esc(m.error)}</p>` : ''}`}
   </div>`;
 }
 
 function bindFollowUps() {
-  const at = (el) => state.chat[Number(el.dataset.rewrite ?? el.dataset.appeal ?? el.dataset.sendAppeal ?? el.dataset.useRewrite)];
+  const at = (el) => state.chat[Number(el.dataset.rewrite ?? el.dataset.appeal ?? el.dataset.sendAppeal ?? el.dataset.useRewrite ?? el.dataset.report)];
   const keyOf = (m) => personById(m.followUp.who)?.apiKey;
 
+  document.querySelectorAll('[data-report]').forEach((b) => { b.onclick = () => { const m = at(b); m.showReport = !m.showReport; state.keepScroll = true; render(); }; });
   document.querySelectorAll('[data-rewrite]').forEach((b) => { b.onclick = () => void askRewrite(at(b)); });
   document.querySelectorAll('[data-appeal]').forEach((b) => {
-    b.onclick = () => { const m = at(b); m.appealOpen = !m.appealOpen; m.error = null; render(); };
+    b.onclick = () => { const m = at(b); m.appealOpen = !m.appealOpen; m.error = null; state.keepScroll = true; render(); };
   });
   document.querySelectorAll('[data-send-appeal]').forEach((b) => { b.onclick = () => void sendAppeal(at(b)); });
   document.querySelectorAll('[data-use-rewrite]').forEach((b) => {
-    b.onclick = () => { const box = $('prompt'); if (box) { box.value = at(b).rewrite.suggestion; box.focus(); } };
+    b.onclick = () => { const box = $('prompt'); if (box) { box.value = at(b).rewrite.suggestion; box.dispatchEvent(new Event('input')); box.focus(); } };
   });
 
   async function askRewrite(m) {
@@ -253,3 +355,133 @@ function bindFollowUps() {
     render();
   }
 }
+
+// ── one draft, before it is saved ────────────────────────────────────────────
+
+/**
+ * The thread of tests for one draft, kept per draft so going back to edit and
+ * returning finds it. Each result is tagged with the draft version it ran
+ * against; when the draft changes, older results stay readable and say whose
+ * they are, because a verdict about v2 is not a verdict about v3.
+ */
+const draftThreads = new Map();
+const draftKey = () => `${state.testDraft.back.sel}|${state.testDraft.rule.id}`;
+const threadOf = () => {
+  const key = draftKey();
+  if (!draftThreads.has(key)) draftThreads.set(key, []);
+  return draftThreads.get(key);
+};
+
+const DRAFT_VERDICT = {
+  BLOCK: { tone: 'block', glyph: '⊘', title: 'Would block', line: 'This draft matches the test input. No live request was blocked.', kicker: 'Why it matches' },
+  ESCALATE: { tone: 'attention', glyph: '↗', title: 'Would escalate', line: 'This draft would hold the request for a person to review. Nothing is sent on until someone decides.', kicker: 'Why it needs a person' },
+  ALLOW: { tone: 'allow', glyph: '●', title: 'Would allow', line: 'This draft does not match the test input. The request would go through.', kicker: 'Why it passes' }
+};
+
+function draftBody() {
+  const t = state.testDraft;
+  const thread = threadOf();
+  const tested = thread.some((m) => m.from === 'warden');
+  const last = [...thread].reverse().find((m) => m.from === 'warden');
+  const stale = last && last.version !== t.version;
+  const aud = audienceLabel(t.rule.appliesTo).replace(/^everyone$/, 'Everyone');
+  const meta = stale
+    ? `Current draft v${t.version} · not tested · the active rule is unchanged.`
+    : tested ? `Draft v${t.version} · Applies to ${aud} · Simulation only. The active rule is unchanged.`
+      : t.unsaved ? 'Testing unsaved changes · The active rule is unchanged.' : 'Testing the saved rule · Nothing is changed or recorded.';
+
+  let lastVersion = null;
+  const items = thread.map((m) => {
+    let divider = '';
+    if (m.from === 'you' && lastVersion !== null && m.version !== lastVersion) divider = `<div class="thread-divider">Draft changed · v${lastVersion} → v${m.version} · previous results belong to v${lastVersion}</div>`;
+    if (m.from === 'you') lastVersion = m.version;
+    return divider + (m.from === 'you' ? personTurn(m) : draftVerdict(m, t));
+  }).join('');
+  const staleNote = stale ? `<div class="thread-divider">Draft changed · the result below belongs to v${last.version}</div>` : '';
+  const examples = t.rule.examples ?? {};
+
+  return `<div class="chatwrap">
+    <div class="sheet flush-head">
+      ${contextBar([{ label: t.back.label, go: t.back.view, sel: t.back.sel, back: true }, { label: 'Test rule' }])}
+      ${pageHead({ title: 'Test rule', actions: button(state.open.has('t:instruction') ? 'Hide instruction' : 'View instruction', { kind: 'link', id: 'viewInstruction' }) })}
+      <div class="test-subject">
+        <h2 class="section-title --big">${esc(ruleName(t.rule))}</h2>
+        <p class="test-meta">${esc(meta)}</p>
+        ${state.open.has('t:instruction') ? `<p class="test-instruction">${esc(t.rule.text)}</p>` : ''}
+      </div>
+      <hr class="hairline">
+    </div>
+    <div class="chat" id="chat"><div class="thread">
+      ${thread.length ? (stale ? staleNote : '') + items : emptyLine('No tests yet. Send a request to see what this draft would do. A draft is tested on text; files are checked against saved rules from Test rules.')}
+      ${state.sending ? `<div class="warden-label">Warden</div>${turn('warden', { body: '<b class="turn-title">Checking the request against this draft…</b><span class="turn-note">The draft is judged on this machine, beside its own examples. A busy analyzer can take a minute.</span>' })}` : ''}
+    </div></div>
+    <div class="chat-foot"><div class="thread">
+      ${thread.length ? '' : tries([examples.violating?.[0], examples.compliant?.[0]].filter(Boolean).map((x) => [`“${x}”`, x]))}
+      <div class="composer">
+        <textarea id="prompt" rows="1" aria-label="Request to test" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Write or paste a request to test…'}"${state.sending ? ' disabled' : ''}></textarea>
+        <div class="composer-row"><span class="composer-fill"></span>
+          <button type="button" class="btn --primary${state.sending ? ' --busy' : ''}" id="send"${state.sending ? ' disabled' : ''}>${state.sending ? 'Checking…' : stale ? 'Test current draft' : 'Run test'}</button></div>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+function draftVerdict(m, t) {
+  if (m.error) {
+    return verdictCard({
+      tone: 'block', glyph: '⚠', title: 'The test did not finish', meta: `${seconds(m.ms)} · failed`,
+      line: `${esc(m.error)} Not every example was checked, so nothing was cleared.`,
+      kicker: 'What to do', reason: 'Your request is back in the box below. Try again after other checks finish.',
+      foot: `<span>Policy analysis did not finish</span>${button('Check the analyzer in Models →', { attrs: 'data-go="models"' })}`
+    });
+  }
+  const v = DRAFT_VERDICT[m.verdict] ?? DRAFT_VERDICT.ALLOW;
+  const previous = m.version !== t.version;
+  // `preview` reports a firing warn rule as ALLOW, which is the verdict the
+  // live guard would give; whether the warning would be attached is not in
+  // what it returns, so the card says that instead of guessing.
+  const warnNote = m.severity === 'warn' && m.verdict === 'ALLOW'
+    ? '<p class="verdict-aside">A warn rule never blocks or holds a request. This simulation cannot tell whether the warning would be shown.</p>' : '';
+  return verdictCard({
+    tone: previous ? 'muted' : v.tone, glyph: previous ? '' : v.glyph,
+    title: previous ? `Previous result · draft v${m.version}` : v.title,
+    meta: `${seconds(m.ms)} · ${where()}`,
+    line: previous ? `Draft v${m.version} ${v.title.toLowerCase()} this request.<br>This result does not describe the current draft.` : v.line,
+    kicker: v.kicker, reason: `<p>${esc(m.reason || 'The judge gave no reason.')}</p>`,
+    extra: warnNote,
+    muted: previous
+  });
+}
+
+function bindDraft() {
+  const t = state.testDraft;
+  const view = $('viewInstruction');
+  if (view) view.onclick = () => { if (state.open.has('t:instruction')) state.open.delete('t:instruction'); else state.open.add('t:instruction'); render(); };
+  const send = async () => {
+    if (state.sending) return;
+    const box = $('prompt');
+    const text = box.value.trim();
+    if (!text) { box.focus(); return; }
+    const thread = threadOf();
+    thread.push({ from: 'you', text, version: t.version });
+    box.value = '';
+    state.sending = true;
+    state.followChat = true;
+    render();
+    const started = performance.now();
+    const { ok, j } = await post('/api/policy/preview', { rule: t.rule, against: [{ prompt: text, expected: 'ALLOW' }] })
+      .catch(() => ({ ok: false, j: { error: 'Warden could not be reached.' } }));
+    const ms = performance.now() - started;
+    const row = ok ? j.rows?.find((r) => r.source === 'log') : null;
+    state.sending = false;
+    state.followChat = true;
+    if (row) thread.push({ from: 'warden', verdict: row.verdict, reason: row.reason, ms, version: t.version, severity: t.rule.severity });
+    else thread.push({ from: 'warden', error: readable(j?.error ?? 'The check did not return a result for this request.'), ms, version: t.version });
+    render();
+    if (!row && $('prompt')) $('prompt').value = text;
+    $('prompt')?.focus();
+  };
+  if ($('send')) $('send').onclick = send;
+  sendOnEnter($('prompt'), send);
+}
+

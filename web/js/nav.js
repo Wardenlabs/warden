@@ -111,12 +111,18 @@ export function renderNav() {
 // One delegated listener for the whole document: every navigation is a
 // `data-go` (+ optional `data-sel` / `data-q`), so nothing has to re-bind after
 // a re-render. `data-toggle` is the in-place open/close.
+//
+// Rows open a page, and a row also holds its own ··· menu. A click inside that
+// menu belongs to the menu: without this the row underneath caught it and the
+// page opened behind the menu the person was using.
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-toggle]');
   if (t) { toggleSel(t.dataset.toggle, t.dataset.sel || null); return; }
 
   const nav = e.target.closest('[data-go]');
-  if (nav) {
+  const inMenu = e.target.closest('details.menu');
+  if (nav && !(inMenu && !inMenu.contains(nav))) {
+    inMenu?.removeAttribute('open');
     const q = nav.dataset.q ? Object.fromEntries(new URLSearchParams(nav.dataset.q)) : undefined;
     go(nav.dataset.go, nav.dataset.sel || null, q);
     return;
@@ -126,5 +132,12 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && state.sel && !composing()) go(state.view);
+  // A row that opens a page is a link to the keyboard too.
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.trow[data-go]')) {
+    e.preventDefault();
+    e.target.click();
+    return;
+  }
+  if (e.key === 'Escape' && document.querySelector('details.menu[open], .dialog-scrim')) return;
+  if (e.key === 'Escape' && state.sel && !composing() && !VIEWS[state.view]?.keepOnEscape?.()) go(state.view);
 });

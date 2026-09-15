@@ -257,81 +257,6 @@ body {
 .toolbar .spacer { flex: 1; }
 .toolbar .label { margin-right: var(--s-2); }
 
-/* ═══ the composer ═══════════════════════════════════════════════════════
-   Geometry taken straight from a fresh chat: one rounded box, room to
-   breathe, the send button inside it at the bottom right, and a question
-   above rather than a page title. */
-
-/* The blank conversation: tabs at the top, the composer floating in what is
-   left. `margin: auto 0` centres it without clipping the top when the viewport
-   is short — which `justify-content: center` would do. */
-.blank { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-/* width:100% matters: a flex item with auto side margins sizes to its content,
-   so without it the sheet shrinks to the width of the tabs and centres them. */
-.blank > .sheet { flex: none; width: 100%; padding-bottom: 0; }
-.blank-fill { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-/* The extra padding underneath is what lifts the box off the geometric centre
-   and onto the optical one. Dead centre reads as fallen. */
-.blank-fill .hero { margin: auto 0; width: 100%; padding-bottom: calc(var(--s-12) * 2); }
-
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  gap: var(--s-5);
-  padding: var(--s-10) var(--s-6);
-  text-align: center;
-}
-.hero-q {
-  margin: 0;
-  font-size: var(--fs-7);
-  font-weight: var(--fw-semi);
-  letter-spacing: -.024em;
-  line-height: var(--lh-tight);
-  color: var(--ink);
-  text-wrap: balance;
-}
-.hero-box {
-  position: relative;
-  width: 100%;
-  max-width: var(--w-reading);
-  border: 1px solid var(--line-control);
-  border-radius: var(--r-control);
-  background: var(--surface-page);
-  padding: var(--s-5) var(--s-5) var(--s-10);
-  text-align: left;
-}
-.hero-box:focus-within { border-color: var(--line-accessible); }
-.hero-box textarea {
-  width: 100%;
-  border: none;
-  padding: 0;
-  background: none;
-  resize: none;
-  font-size: var(--fs-4);
-  line-height: var(--lh-snug);
-  color: var(--ink);
-}
-.hero-box textarea:focus { outline: none; }
-.hero-box .send { position: absolute; right: var(--s-4); bottom: var(--s-4); }
-
-.hero-sugg { display: flex; flex-wrap: wrap; gap: var(--s-2); justify-content: center; max-width: var(--w-reading); }
-.pill {
-  border: 1px solid var(--line-hairline);
-  border-radius: var(--r-control);
-  background: var(--surface-page);
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--fs-2);
-  padding: var(--s-2) var(--s-4);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.pill:hover { background: var(--surface-subtle); color: var(--ink); }
-.pill.on { background: var(--action); border-color: var(--action); color: var(--action-ink); }
-.pill.wrap { white-space: normal; text-align: left; max-width: 100%; }
-
-
 /* ═══ controls ═══════════════════════════════════════════════════════════ */
 
 /* Destructive actions sit under the thing they destroy, not in the toolbar
@@ -725,197 +650,6 @@ body {
 .today .line b { font-weight: var(--fw-semi); }
 .today .cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 
-/* ═══ conversation ═══════════════════════════════════════════════════════ */
-
-.chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-/* The header stays out of the scrolling half. It is the same header on all
-   three tabs and moving between them must not move it — and a conversation
-   that opens scrolled to its newest turn would otherwise take the title with
-   it on the way down. */
-/* width:100% for the same reason `.blank-fill` needs it: a flex item with auto
-   side margins sizes to its content instead of stretching, so the header would
-   be narrower than the conversation under it. */
-.chatwrap > .chat-head { flex: none; width: 100%; padding-bottom: 0; }
-.chat { flex: 1; overflow-y: auto; }
-.chat .sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); align-content: start; }
-
-.msg { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
-.msg .who {
-  font-size: var(--fs-1);
-  font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-/* `overflow-wrap: anywhere` because a prompt is not prose and cannot be relied
-   on to contain a space. Somebody pasted a 900-character run of letters with no
-   break in it and the Activity feed scrolled sideways off the window, taking
-   the verdict and the pass table with it — `max-width` bounds the box, not a
-   word that is wider than the box. Applied here rather than on `.msg` so it
-   governs the untrusted text and nothing else. */
-.msg .say {
-  line-height: var(--lh-body);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-width: var(--prose);
-}
-.msg .say.pending { color: var(--muted); }
-.msg .say.pending::after {
-  content: "";
-  display: inline-block;
-  width: 5px; height: 5px;
-  margin-left: var(--s-2);
-  border-radius: 50%;
-  background: var(--muted);
-  vertical-align: middle;
-  animation: pulse 1.1s ease-in-out infinite;
-}
-@keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
-.msg .say .btn { margin-top: var(--s-3); }
-
-.msg .verdict {
-  display: inline-flex;
-  align-items: center;
-  align-self: start;
-  justify-self: start;
-  border-radius: var(--r-control);
-  padding: var(--s-2) var(--s-4);
-  font-size: var(--fs-3);
-  font-weight: var(--fw-medium);
-}
-.msg .verdict.ALLOW    { background: var(--verdict-allow-bg);    color: var(--verdict-allow); }
-.msg .verdict.BLOCK    { background: var(--verdict-block-bg);    color: var(--verdict-block); }
-.msg .verdict.ESCALATE { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-.msg .why {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3);
-  font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug);
-  max-width: var(--prose);
-}
-.msg .why b { font-weight: var(--fw-medium); color: var(--ink-body); }
-
-/* The rule being built, as a card inside the conversation. */
-.artifact {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--s-5);
-  border: 1px solid var(--line-control);
-  border-radius: var(--r-control);
-  padding: var(--s-6);
-  background: var(--surface-page);
-}
-
-/* A type tag in the corner, so the card reads as one object being created —
-   not a stack of separate-looking notices divided by rules. */
-.artifact .card-header { display: flex; align-items: flex-start; gap: var(--s-4); }
-.artifact .card-header .title-block { flex: 1; min-width: 0; }
-.artifact .card-header .summary { margin: 0; }
-.artifact .card-header .note { margin-top: var(--s-1); }
-.tag {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--r-control);
-  padding: 3px var(--s-2);
-  font-size: 10px;
-  font-weight: var(--fw-semi);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-}
-.tag.rule { background: var(--action); color: var(--action-ink); }
-.tag.issue { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
-
-/* Severity and audience as fields you can see are live controls — a light
-   fill and a chevron, not a sentence describing a default nobody looked at. */
-.artifact .properties { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-.artifact .field {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  border: none;
-  border-radius: var(--r-control);
-  padding: var(--s-2) var(--s-3);
-  font-size: var(--fs-2);
-  font-weight: var(--fw-medium);
-  color: var(--ink);
-  background: var(--surface-subtle);
-  cursor: pointer;
-}
-.artifact .field:hover { background: var(--surface-subtle); }
-.artifact .field .chev { color: var(--muted); font-size: var(--fs-1); }
-
-/* The severity/audience pickers are a full re-render inserting a new row —
-   with no transition that reads as the card lurching, not opening. Scoped to
-   the two picker ids rather than `.chips` itself, which the always-present
-   Activate/Discard and issue-action rows also use and must not replay this
-   on every unrelated re-render. */
-#severityChips, #audienceChips {
-  animation: chips-in .14s ease-out;
-}
-@keyframes chips-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* The one part of the card that is genuinely uncertain — shown with a divider
-   above it and the actual failing prompts, never just a count. */
-.artifact .issue {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--s-3);
-  padding-top: var(--s-4);
-  border-top: 1px solid var(--line-hairline);
-}
-.artifact .issue-head { display: flex; align-items: center; gap: var(--s-3); }
-.artifact .issue-head b { font-weight: var(--fw-medium); color: var(--ink); }
-.artifact .issue-examples { display: grid; gap: 2px; font-size: var(--fs-2); color: var(--muted); }
-
-/* The same composer geometry as the hero, docked to the bottom. */
-
-/* The one line the whole card exists to deliver: did the check find anything.
-   A dot in the verdict palette, the count in ink, the reassurance in muted. */
-.verdict-line {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  flex-wrap: wrap;
-  font-size: var(--fs-3);
-  color: var(--muted);
-}
-.verdict-line .dot { width: 7px; height: 7px; }
-.verdict-line b { font-weight: var(--fw-semi); color: var(--ink); }
-
-/* A result with its own frame, so it reads as evidence attached to the thing
-   rather than one more section of it. */
-.evidence { border: 1px solid var(--line-hairline); border-radius: var(--r-control); overflow: hidden; }
-.evidence .top {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-3) var(--s-4);
-  background: var(--surface-subtle);
-  border-bottom: 1px solid var(--line-hairline);
-  font-size: var(--fs-2);
-  color: var(--muted);
-}
-.evidence .top b { font-weight: var(--fw-semi); color: var(--ink); }
-.evidence .body {
-  padding: var(--s-3) var(--s-4);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--s-3);
-}
-
-.kv .v .btn { margin-left: var(--s-3); vertical-align: baseline; }
-
-.preview-row { display: flex; align-items: baseline; gap: var(--s-3); font-size: var(--fs-2); padding: var(--s-1) 0; }
-.preview-row .p { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.preview-row .v { flex: 0 0 52px; font-family: var(--mono); font-size: var(--fs-1); }
-.preview-row .v.ALLOW    { color: var(--verdict-allow); }
-.preview-row .v.BLOCK    { color: var(--verdict-block); }
-.preview-row .v.ESCALATE { color: var(--verdict-attention); }
-.preview-row.fp .p { color: var(--verdict-block); }
-.preview-row .badge { flex: none; }
-
 /* ═══ red team ═══════════════════════════════════════════════════════════ */
 
 .stats { display: flex; gap: var(--s-10); flex-wrap: wrap; }
@@ -962,7 +696,6 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 /* Offered, and honest about not being there. Still clickable: somebody who is
    about to install Claude Code can set it up first and have it work when they
    do, and refusing the click would only make that a puzzle. */
-.pill.faded { color: var(--muted); border-style: dashed; }
 
 /* The action a banner is about, on the banner. */
 .banner-act { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); flex-wrap: wrap; }
@@ -982,8 +715,6 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* A card in a compiled set that is already active, or lifted out to be
    edited: still on the list as a record, visibly not a decision to make. */
-.artifact.done { opacity: .55; }
-.artifact.done .summary { text-decoration: none; }
 
 /* The record kept a hash, not the text. A bare em dash reads as missing data;
    this reads as a promise being kept. */
@@ -1145,37 +876,6 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
    detail inside a rounded, bordered container has to pretend it is a row —
    hairlines between the rows carry the same structure and let the open one
    breathe. */
-.tbl.rules { margin-top: var(--s-4); border: none; border-radius: 0; }
-.tbl.rules .thead, .tbl.rules .trow { grid-template-columns: minmax(0, 1fr) 150px 130px 220px; }
-.tbl.rules .thead { height: auto; padding: 0 var(--s-4) var(--s-3) var(--s-5); background: none; border-radius: 0; }
-.rule-row { width: 100%; border: none; border-bottom: 1px solid var(--line-hairline); background: none; font: inherit; text-align: left; cursor: pointer; }
-.tbl.rules > .rule-row:last-child { border-bottom: 1px solid var(--line-hairline); border-radius: 0; }
-.rule-row.on { background: var(--surface-subtle); }
-.c-rule { display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; padding: var(--s-3) 0; }
-.c-rule .nm { color: var(--ink); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.c-aud, .c-activity { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.c-activity { color: var(--muted); font-size: var(--fs-2); }
-.tbl.rules .detail { padding: var(--s-5) var(--s-5) var(--s-6); border-bottom: 1px solid var(--line-hairline); }
-
-/* Who the test is sent as, under the header on the Test tab. It is the
-   identity being borrowed, and the rules that apply depend on it, so it stays
-   even though a single-person install has only one answer. */
-.send-as { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-3); padding: 0 var(--s-3); }
-
-/* The counts and the search box, between the tabs and the table. */
-.filters { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; padding: var(--s-6) var(--s-3) var(--s-2); }
-.filter-counts { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
-.filter-count { border: none; background: none; padding: 0; font: inherit; font-size: var(--fs-3); color: var(--muted); cursor: pointer; white-space: nowrap; }
-.filter-count:hover { color: var(--ink); }
-.filter-count.on { color: var(--ink); font-weight: var(--fw-medium); }
-/* Scoped past `input[type="text"]`, which sets width: 100% at the same
-   specificity and would otherwise push the box onto its own line. */
-.filters .rule-search { width: 220px; flex: none; padding: var(--s-2) var(--s-3); font-size: var(--fs-2); }
-
-/* One destructive action, under a hairline, in the colour of what it does. */
-.wipe { margin: var(--s-10) var(--s-3) 0; padding-top: var(--s-6); border-top: 1px solid var(--line-hairline); }
-.linkbtn.danger { color: var(--verdict-block); text-decoration: none; }
-.linkbtn.danger:hover { text-decoration: underline; text-decoration-color: var(--verdict-block); }
 .tbl .thead {
   height: 36px;
   background: var(--surface-subtle);
@@ -1232,7 +932,6 @@ select.mini {
 /* The model picker: bottom-left of the composer, opposite the send button.
    A named button with a menu, because the grey "Drafting with … Change" line
    that used to sit under the box was read as a caption and nobody clicked it. */
-.hero-box .model-pick { position: absolute; left: var(--s-4); bottom: var(--s-4); justify-self: start; }
 .model-pick > summary {
   width: auto; height: 28px; padding: 0 var(--s-3);
   display: inline-flex; align-items: center; gap: var(--s-2);
@@ -1511,7 +1210,6 @@ select.mini {
 .document-record-title b { overflow-wrap: anywhere; font-size: var(--fs-2); font-weight: var(--fw-medium); }
 .document-record > .note { margin: var(--s-2) 0 0; overflow-wrap: anywhere; }
 .attachment-count { flex: none; color: var(--muted); font-size: var(--fs-2); white-space: nowrap; }
-.msg .verdict.error { background: var(--verdict-block-bg); color: var(--verdict-block); }
 
 @media (max-width: 760px) {
   .compiler-setup-nudge, .claude-setup-head { flex-direction: column; align-items: flex-start; }
@@ -1688,12 +1386,12 @@ select {
 .menu { position: relative; flex: none; }
 .menu > summary { list-style: none; cursor: pointer; user-select: none; }
 .menu > summary::-webkit-details-marker { display: none; }
-.menu-trigger:not(.trigger-value) {
+.menu-trigger.--dots {
   display: grid; place-items: center; width: 40px; height: 40px;
   border-radius: var(--r-control); color: var(--muted);
   font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: 1; letter-spacing: .02em;
 }
-.menu-trigger:not(.trigger-value):hover, .menu[open] > .menu-trigger:not(.trigger-value) { background: var(--surface-subtle); color: var(--ink); }
+.menu-trigger.--dots:hover, .menu[open] > .menu-trigger.--dots { background: var(--surface-subtle); color: var(--ink); }
 .menu-list {
   position: absolute; top: calc(100% + 6px); z-index: 20;
   display: grid; min-width: 240px; padding: var(--s-1);
@@ -1983,7 +1681,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .proposal { display: grid; gap: var(--s-4); padding: 18px; border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
 .proposal-head { display: flex; align-items: center; gap: var(--s-4); min-height: 32px; }
 .proposal-head b { flex: 1; min-width: 0; font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
-.proposal-head .menu-trigger:not(.trigger-value) { width: 32px; height: 32px; font-size: var(--fs-4); }
+.proposal-head .menu-trigger.--dots { width: 32px; height: 32px; font-size: var(--fs-4); }
 .proposal-text { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .proposal-check { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
 .proposal-check.--allow { color: var(--verdict-allow); }
@@ -1992,3 +1690,138 @@ button.role-label:hover { background: var(--surface-subtle); }
 .proposal-check.--muted { color: var(--muted); font-weight: var(--fw-normal); }
 .proposal.--excluded { background: var(--surface-page); }
 .proposal.--excluded .proposal-text { color: var(--ink-body); }
+
+/* ═══ views: shared ═══════════════════════════════════════════════════════ */
+
+.shell-notices { display: grid; gap: var(--s-4); margin: calc(-1 * var(--s-3)) 0 var(--s-7); }
+.feedback-actions { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; margin-top: var(--s-4); color: var(--muted); font-size: var(--fs-3); }
+.kicker { font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* Header / Detail's fact lines: state, then labelled values, on one row. */
+.facts { display: flex; align-items: center; flex-wrap: wrap; column-gap: var(--s-7); row-gap: var(--s-3); min-height: 32px; font-size: var(--fs-4); color: var(--ink-body); }
+.facts + .facts { margin-top: var(--s-5); }
+.facts.--second { color: var(--muted); column-gap: var(--s-5); }
+.fact { display: inline-flex; align-items: center; gap: var(--s-5); }
+.fact-k { color: var(--muted); }
+.fact-v { color: var(--muted); }
+.fact-note { margin: var(--s-3) 0 0; font-size: var(--fs-3); color: var(--muted); }
+.facts ~ .hairline { margin: var(--s-7) 0 0; }
+
+.disclosure-text { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.record { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--s-3) var(--s-5); margin: 0; font-size: var(--fs-4); }
+.record dt { color: var(--muted); }
+.record dd { margin: 0; color: var(--ink-body); overflow-wrap: anywhere; }
+
+/* ═══ rules ══════════════════════════════════════════════════════════════ */
+
+.rules-table .thead, .rules-table .trow {
+  grid-template-columns: minmax(0, 540fr) minmax(110px, 140fr) minmax(110px, 130fr) minmax(150px, 230fr) 40px;
+}
+.rule-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rule-name .dot { width: 8px; height: 8px; }
+.rule-activity { font-weight: var(--fw-medium); color: var(--ink-body); }
+.rules-table .labels { flex-wrap: nowrap; overflow: hidden; }
+
+.rule-instruction { display: grid; gap: var(--s-4); margin: var(--s-10) 0 var(--s-8); }
+.rule-instruction p { margin: 0; font-size: var(--fs-5); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.rule-instruction p.rule-means { font-size: var(--fs-3); color: var(--muted); }
+.example-list { display: grid; gap: var(--s-2); }
+.example-list p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); overflow-wrap: anywhere; }
+
+.trigger-value.--effect { padding: var(--s-1) 10px; border-color: var(--line-hairline); gap: var(--s-3); }
+.trigger-value .caret, .audience-trigger .caret { font-style: normal; font-size: var(--fs-1); color: var(--muted); }
+.effect-picker .menu-list, .audience-picker .menu-list { min-width: 200px; }
+.audience-picker .menu-list { max-height: 320px; overflow-y: auto; }
+.audience-trigger { display: inline-flex; align-items: center; gap: var(--s-3); padding: 2px; border-radius: var(--r-control); }
+.audience-trigger:hover, .audience-picker[open] > .audience-trigger { background: var(--surface-subtle); }
+
+.rule-field { margin-top: var(--s-8); max-width: none; }
+.rule-field textarea { min-height: 88px; font-size: var(--fs-5); }
+.page-head + .feedback { margin: calc(-1 * var(--s-3)) 0 var(--s-6); }
+
+/* ── writing rules: the hero, the thread, the composer at the foot ────────── */
+
+.new-rule, .chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.flush-head { flex: none; width: 100%; padding-bottom: 0; }
+.flush-head .page-head { margin-bottom: var(--s-3); }
+.flush-head .hairline { margin-top: var(--s-3); }
+.hero-fill { flex: 1; min-height: 0; overflow-y: auto; display: flex; }
+.hero { margin: auto; width: 100%; max-width: var(--w-reading); display: grid; gap: var(--s-5); justify-items: center; padding: var(--s-10) 0 var(--s-12); text-align: center; }
+.hero-q { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-tight); }
+.hero-sub { margin: 0 0 var(--s-3); font-size: var(--fs-4); color: var(--muted); }
+.hero .composer { text-align: left; }
+.hero .suggestions { justify-self: stretch; }
+
+.chat { flex: 1; min-height: 0; overflow-y: auto; }
+.thread { display: flex; flex-direction: column; gap: var(--s-4); width: 100%; max-width: var(--w-reading); }
+.chat > .thread { min-height: 100%; justify-content: flex-end; padding: var(--s-8) 0 var(--s-5); }
+.chat-foot { flex: none; padding: var(--s-4) 0 var(--s-5); background: var(--surface-page); }
+.chat-foot > .thread { gap: var(--s-4); }
+.thread-empty { margin: auto 0; font-size: var(--fs-4); color: var(--muted); }
+.thread-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.thread-divider { margin: var(--s-5) 0 var(--s-2); font-size: var(--fs-3); color: var(--muted); }
+.thread-page .thread { margin-top: var(--s-8); }
+.thread .turn.--person { font-size: var(--fs-5); }
+.turn-title { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.turn .turn-note { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+.turn.--warden:has(.turn-title) { gap: var(--s-4); }
+.warden-note { display: grid; gap: var(--s-2); }
+.warden-note p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.warden-lead { margin: 0; font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
+.warden-label + .warden-lead { margin-top: calc(-1 * var(--s-2)); }
+.refinement { display: grid; gap: var(--s-2); }
+.refinement p { margin: 0; font-size: var(--fs-5); color: var(--ink-body); }
+.proposals { display: flex; flex-direction: column; gap: var(--s-3); }
+.proposals > .feedback { margin-top: var(--s-2); }
+.proposal-applies { display: flex; align-items: center; gap: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
+.proposal-examples { margin: calc(-1 * var(--s-2)) 0 0; padding-left: var(--s-6); font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.proposal-why { font-size: var(--fs-3); color: var(--muted); }
+.proposal-foot { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; margin-top: var(--s-2); font-size: var(--fs-3); color: var(--muted); }
+.proposal-limits { font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
+.limits-lead { margin: 0; }
+.limit-plan { display: grid; grid-template-columns: max-content max-content; gap: var(--s-1) var(--s-6); margin: var(--s-3) 0 0; font-size: var(--fs-4); }
+.limit-plan dt { color: var(--ink); }
+.limit-plan dd { margin: 0; color: var(--ink-body); }
+.review-list { margin: 0; padding-left: var(--s-6); font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-body); }
+.preset-menu .menu-list { max-height: 360px; overflow-y: auto; min-width: 360px; }
+.preset-menu .menu-item span { white-space: normal; }
+.preset-menu .menu-note { font-size: var(--fs-1); letter-spacing: var(--ls-label); text-transform: uppercase; }
+span.composer-attach { color: var(--muted); cursor: default; }
+
+/* ── Test: a thread of verdicts ──────────────────────────────────────────── */
+
+.test-subject { display: grid; gap: var(--s-3); margin-top: calc(-1 * var(--s-4)); }
+.test-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.test-instruction { margin: 0; font-size: var(--fs-4); color: var(--ink-body); max-width: var(--w-reading); }
+.select-inline { width: auto; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
+.verdict-card { gap: var(--s-4); padding: var(--s-7); }
+.verdict-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
+.verdict-title { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
+.verdict-title.--block { color: var(--verdict-block); }
+.verdict-title.--attention { color: var(--verdict-attention); }
+.verdict-title.--allow { color: var(--verdict-allow); }
+.verdict-title.--muted { color: var(--ink-body); }
+.verdict-meta { font-size: var(--fs-3); color: var(--muted); }
+.verdict-line { margin: 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+.verdict-card .kicker { margin-top: var(--s-1); }
+.verdict-reason { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.verdict-reason p { margin: 0; }
+.verdict-aside { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.verdict-aside.--allow { color: var(--verdict-allow); }
+.verdict-aside.--block { color: var(--verdict-block); }
+.verdict-notice { font-size: var(--fs-4); color: var(--verdict-attention); display: grid; gap: var(--s-2); }
+.verdict-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; padding-top: var(--s-5); border-top: 1px solid var(--line-hairline); font-size: var(--fs-4); color: var(--muted); }
+.verdict-card.--previous .verdict-reason { color: var(--ink-body); }
+.follow-up { display: grid; gap: var(--s-3); }
+.extraction-report .document-records { margin: 0; }
+.composer-notes { display: grid; gap: var(--s-1); margin-top: calc(-1 * var(--s-2)); font-size: var(--fs-3); color: var(--muted); }
+.composer-notes p { margin: 0; }
+.composer-notes .--error { color: var(--verdict-block); }
+.document-selection { display: flex; flex-wrap: wrap; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+.file-chip-remove { margin-left: var(--s-3); padding: 0 var(--s-1); border: 0; border-radius: var(--r-control); background: none; color: var(--muted); cursor: pointer; }
+.file-chip-remove:hover { background: var(--surface-subtle); color: var(--ink); }
+.composer.dragging { outline: 2px dashed var(--line-accessible); outline-offset: 2px; }
+.labels-more { align-self: center; font-size: var(--fs-3); color: var(--muted); }

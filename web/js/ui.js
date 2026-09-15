@@ -29,7 +29,7 @@ export function contextBar(crumbs = [], status = null) {
   const parts = crumbs.map((c, i) => {
     const last = i === crumbs.length - 1;
     const label = `${c.back ? '← ' : ''}${esc(c.label)}`;
-    if (last || !c.go) return `<span class="crumb${last ? ' --here' : ''}">${label}</span>`;
+    if ((last && !c.back) || !c.go) return `<span class="crumb${last ? ' --here' : ''}">${label}</span>`;
     return `<button type="button" class="crumb" data-go="${esc(c.go)}"${c.sel ? ` data-sel="${esc(c.sel)}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${label}</button>`;
   });
   return `<div class="context-bar">
@@ -82,7 +82,7 @@ export function triggerValue(label, { id = '', open = false, attrs = '' } = {}) 
  */
 export function menu(items, { label = 'More actions', trigger = '···', align = 'right', cls = '', triggerCls = '' } = {}) {
   return `<details class="menu --${align}${cls ? ` ${cls}` : ''}">
-    <summary class="menu-trigger${triggerCls ? ` ${triggerCls}` : ''}" aria-label="${esc(label)}">${trigger}</summary>
+    <summary class="menu-trigger${trigger === '···' ? ' --dots' : ''}${triggerCls ? ` ${triggerCls}` : ''}" aria-label="${esc(label)}">${trigger}</summary>
     <div class="menu-list" role="menu">${items.map(menuItem).join('')}</div>
   </details>`;
 }
@@ -175,9 +175,12 @@ export function roleLabel(role, text = role) {
 }
 
 /** An audience as role labels: Everyone, a role, or a person by name. */
-export function audienceLabels(appliesTo, personName) {
+export function audienceLabels(appliesTo, personName, max = Infinity) {
   if (!appliesTo?.length || appliesTo.includes('*')) return roleLabel('everyone', 'Everyone');
-  return appliesTo.map((t) => (t.startsWith('@') ? roleLabel('everyone', personName(t.slice(1))) : roleLabel(t))).join('');
+  const label = (t) => (t.startsWith('@') ? roleLabel('everyone', personName(t.slice(1))) : roleLabel(t));
+  // A table cell has room for one label; the rest are counted, not clipped.
+  if (appliesTo.length > max) return appliesTo.slice(0, max).map(label).join('') + `<span class="labels-more" title="${esc(appliesTo.slice(max).map((t) => (t.startsWith('@') ? personName(t.slice(1)) : t)).join(', '))}">+${appliesTo.length - max}</span>`;
+  return appliesTo.map(label).join('');
 }
 
 const EFFECT = {

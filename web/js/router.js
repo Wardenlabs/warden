@@ -35,8 +35,23 @@ export function go(view, sel, query) {
 /** Selecting the open row again closes it. Nothing else on the page moves. */
 export function toggleSel(view, id) { return go(view, state.sel === id ? null : id); }
 
+/**
+ * A view with unsaved work can hold a navigation back. `holdLeave(next)` gets
+ * where the person was going, keeps it, and returns true to stay; the view
+ * then asks, and resumes with `go` or drops it. The hash is put back so the
+ * address bar keeps saying where the person actually is.
+ */
+let shownHash = '';
+
 export function route() {
   const next = parseHash();
+  const moving = next.view !== state.view || next.sel !== state.sel;
+  if (moving && shownHash && VIEWS[state.view]?.holdLeave?.(next)) {
+    history.replaceState(null, '', shownHash);
+    render();
+    return;
+  }
+  shownHash = location.hash;
   if (next.view !== state.view) VIEWS[state.view]?.onLeave?.();
   Object.assign(state, next);
   render();

@@ -62,6 +62,9 @@ function restoreChat(chat) {
   const el = $('pane').querySelector('.chat');
   if (!el) return;
   if (!chat) { el.scrollTop = el.scrollHeight; return; }   // just opened
+  // Sending is the one moment the reader always wants the bottom, wherever
+  // they had scrolled to: the thing they just sent is down there.
+  if (state.followChat) { state.followChat = false; state.keepScroll = false; requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: SMOOTH() })); return; }
   if (!chat.stick || state.keepScroll) { el.scrollTop = chat.top; state.keepScroll = false; return; }
   requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: SMOOTH() }));
 }
@@ -82,7 +85,16 @@ export function render() {
   // someone in demo mode needs to know nothing here is real no matter which
   // product surface they are looking at.
   const isSoloView = state.view === 'soloRules' || state.view === 'soloSettings';
-  $('pane').innerHTML = compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner()) + view.body();
+  const banners = compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
+  $('pane').innerHTML = view.body();
+  // The shell's notices sit under the page's own header, where the reader has
+  // already learnt which page this is; above it they pushed the breadcrumb and
+  // title down on every screen. A page with no header gets them at the top.
+  if (banners) {
+    const anchor = $('pane').querySelector('.page-head') ?? $('pane').querySelector('.context-bar');
+    if (anchor) anchor.insertAdjacentHTML('afterend', `<div class="shell-notices">${banners}</div>`);
+    else $('pane').insertAdjacentHTML('afterbegin', `<div class="shell-notices">${banners}</div>`);
+  }
 
   restoreFields(fields);
   bindDisclosures();

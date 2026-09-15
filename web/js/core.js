@@ -117,6 +117,9 @@ export const state = {
   sel: null,
   query: {},
 
+  /** Per list: `{ loading, error }`. Absent means never requested yet. */
+  loads: {},
+
   audit: [],
   policy: { rules: [], quotas: [], version: '' },
   company: { name: '', roles: [], employees: [] },

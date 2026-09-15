@@ -30,7 +30,8 @@ export function clearDocuments() { selected = []; errors = []; }
  * whether extraction or an individual rule has already finished. */
 export function documentReviewPendingMarkup(documents = [], sending = false) {
   if (!sending || !documents.length) return '';
-  return '<div class="msg" role="status" aria-live="polite"><div class="who">Warden</div><div class="why"><b>Reading and reviewing documents…</b><div>Files are read first, then checked against the rules. Several rules or a busy analyzer can make this take a few minutes.</div></div></div>';
+  const names = documents.map((d) => d.name).filter(Boolean);
+  return `<div class="warden-label">Warden</div><div class="turn --warden" role="status" aria-live="polite"><b class="turn-title">Reading ${names.length === 1 ? esc(names[0]) : 'and reviewing documents'}…</b><span class="turn-note">Files are read first, then checked against the rules. Several rules or a busy analyzer can make this take a few minutes — nothing leaves this machine.</span></div>`;
 }
 
 /** Model timeouts are separate from unreadable files. Only the actual reading
@@ -88,16 +89,35 @@ export function documentMetadataMarkup(documents = [], { submitted = false } = {
   }).join('')}</ul>`;
 }
 
-export function documentComposer() {
+/**
+ * The attach control and the files waiting to be checked, as parts of the
+ * Composer: the "+" that opens the picker, the file chips above the send row,
+ * and what went wrong reading one. The whole composer is the drop zone.
+ */
+export function documentAttachButton() {
   const { limits, formats } = capabilities ?? defaults;
   const accept = formats.map((format) => `.${format.extension.replace(/^\./, '')}`).join(',');
-  return `<div class="document-composer" id="documentDropzone" aria-busy="${reading}">
-    <div class="document-attach-row"><input id="documentFiles" class="sr-only" type="file" accept="${esc(accept)}" multiple aria-label="Attach documents" aria-describedby="documentLimits"${state.sending || reading ? ' disabled' : ''}><button type="button" class="btn --link" id="attachDocuments"${state.sending || reading ? ' disabled' : ''}><svg class="ui-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7 11 5-5a2 2 0 0 1 3 3l-6 6a4 4 0 0 1-6-6l6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Attach files</button><span class="note" id="documentLimits">or drop here · ${limits.files} files · ${fileSize(limits.fileBytes)} each</span></div>
-    <p class="document-formats">PDF, Word, text, scans and images · ${fileSize(limits.totalBytes)} total</p>
-    ${selected.length ? `<ul class="document-selection" aria-label="Files ready to check">${selected.map((file) => `<li><span class="document-extension" aria-hidden="true">${esc(file.name.split('.').pop().slice(0, 5).toUpperCase())}</span><div><b>${esc(file.name)}</b><span class="note">${fileSize(file.bytes)} · ${state.sending ? 'Checking with your prompt' : 'Ready to check'}</span></div><button type="button" class="btn --link" data-remove-document="${file.id}" aria-label="Remove ${esc(file.name)}"${state.sending || reading ? ' disabled' : ''}><svg class="ui-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></li>`).join('')}</ul>` : ''}
-    <div id="documentFeedback" aria-live="polite">${reading ? '<p class="note" role="status">Preparing attachments…</p>' : ''}${errors.map((error) => `<p class="note bad" role="alert">${esc(error)}</p>`).join('')}</div>
-    ${selected.length ? '<p class="document-privacy">Read locally before policy checks. An unreadable document is held for review.</p>' : ''}
+  const busy = state.sending || reading;
+  return `<input id="documentFiles" class="sr-only" type="file" accept="${esc(accept)}" multiple aria-label="Attach documents" aria-describedby="documentLimits"${busy ? ' disabled' : ''}>
+    <button type="button" class="composer-attach" id="attachDocuments" title="Attach files · ${limits.files} files · ${fileSize(limits.fileBytes)} each"${busy ? ' disabled' : ''}><span aria-hidden="true">+</span><span class="sr-only">Attach files</span></button>`;
+}
+
+export function documentChips() {
+  if (!selected.length) return '';
+  return `<ul class="document-selection" aria-label="Files ready to check">${selected.map((file) => `<li class="file-chip">${esc(file.name)} · ${fileSize(file.bytes)}<button type="button" class="file-chip-remove" data-remove-document="${file.id}" aria-label="Remove ${esc(file.name)}"${state.sending || reading ? ' disabled' : ''}>×</button></li>`).join('')}</ul>`;
+}
+
+export function documentFeedback() {
+  const { limits } = capabilities ?? defaults;
+  return `<div id="documentFeedback" class="composer-notes" aria-live="polite">
+    ${reading ? '<p role="status">Preparing attachments…</p>' : ''}
+    ${errors.map((error) => `<p class="--error" role="alert">${esc(error)}</p>`).join('')}
+    <p id="documentLimits">${selected.length ? 'Read locally before policy checks. An unreadable document is held for review. ' : ''}PDF, Word, text, scans and images · ${limits.files} files · ${fileSize(limits.totalBytes)} total</p>
   </div>`;
+}
+
+export function documentComposer() {
+  return `<div id="documentDropzone">${documentAttachButton()}${documentChips()}${documentFeedback()}</div>`;
 }
 
 function readBase64(file) {
@@ -134,7 +154,7 @@ export function bindDocuments() {
   if ($('attachDocuments')) $('attachDocuments').onclick = () => $('documentFiles')?.click();
   if ($('documentFiles')) $('documentFiles').onchange = (event) => void addFiles(Array.from(event.target.files));
   for (const button of document.querySelectorAll('[data-remove-document]')) button.onclick = () => { selected = selected.filter((file) => file.id !== Number(button.dataset.removeDocument)); errors = []; render(); $('attachDocuments')?.focus(); };
-  const zone = $('documentDropzone');
+  const zone = $('documentDropzone') ?? document.querySelector('.composer.--files');
   if (!zone) return;
   for (const eventName of ['dragenter', 'dragover']) zone.addEventListener(eventName, (event) => { if (!event.dataTransfer?.types.includes('Files')) return; event.preventDefault(); if (!state.sending && !reading) zone.classList.add('dragging'); });
   zone.addEventListener('dragleave', (event) => { if (!zone.contains(event.relatedTarget)) zone.classList.remove('dragging'); });

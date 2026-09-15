@@ -83,6 +83,40 @@ API, qué se implementó.
   lectura falló, sin cambiar qué pide ni cuándo. El fallo se muestra con el
   copy del frame y *Retry loading* vuelve a pedir la misma ruta.
 
+### "31 checks" en la actividad de una regla
+
+- **Frames**: `rules/lista` 266:244 ("Stopped 9 of 31"), `rules/detalle` 266:603
+  ("Today · 31 checks · 9 blocked").
+- **Diseño**: cuántas veces se consultó la regla hoy y cuántas bloqueó.
+- **API**: `GET /api/audit` guarda las reglas que *dispararon* en cada
+  decisión (`firedRules`), no las que se consultaron sin disparar.
+- **Implementado**: la lista dice "Stopped 9 of 31" contando disparos de hoy, y
+  el detalle dice "Today · 31 matches · 9 blocked": *matches*, no *checks*.
+
+### Un draft con efecto Warn, en Test rule
+
+- **Frame**: `rules/test-advertencia-y-version` 272:606 ("! Would allow with a
+  warning").
+- **Diseño**: el tester distingue "permitido" de "permitido con advertencia".
+- **API**: `/api/policy/preview` devuelve `ALLOW` tanto si una regla `warn`
+  disparó como si no (a propósito: es el veredicto que el guard daría) y no
+  dice si la advertencia se adjuntaría.
+- **Implementado**: "Would allow" con la nota "A warn rule never blocks or holds
+  a request. This simulation cannot tell whether the warning would be shown."
+  La razón del modelo se muestra igual.
+
+### Archivos en Test rule de un draft
+
+- **Frames**: `rules/test-en-curso` 199:554, `test-bloqueo` 266:1075,
+  `test-fallida` 209:193 (un `.xlsx` adjunto y "View extraction report →").
+- **Diseño**: un draft se prueba con documentos.
+- **API**: `/api/policy/preview` no acepta adjuntos; solo
+  `/api/guard/check` (política activa) lee documentos.
+- **Implementado**: en modo draft el composer no ofrece `+`, la línea vacía
+  dice que un draft se prueba con texto y que los archivos se prueban contra
+  reglas guardadas desde *Test rules*. En *Test rules* los adjuntos, el reporte
+  de extracción y el fallo con archivo están implementados como en el frame.
+
 ## Team
 
 ### Límite diario y session ceilings en el mismo `PUT`
