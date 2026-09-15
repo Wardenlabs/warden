@@ -10,6 +10,12 @@ un endpoint nuevo) lo pueda cerrar.
 Formato de cada entrada: frame y node-id, qué pide el diseño, qué permite la
 API, qué se implementó.
 
+**Ratificado por el owner el 2026-09-15**, decisión por decisión: el Test
+híbrido, "Remove rule…" en lugar de Deactivate, y recompilar al guardar un
+texto editado. En el mismo pase bendijo el único frame que quedaba "En
+revisión" (Inbox / Fallo al guardar, 276:1213) — el archivo de Figma ya no
+tiene pantallas sin elegir.
+
 ## Rules
 
 ### Probar un draft sin guardar
