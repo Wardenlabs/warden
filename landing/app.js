@@ -306,9 +306,30 @@ if (onWindows) {
   });
   if (alt) { alt.textContent = MAC.other; alt.href = MAC.href; }
 }
-const footerDownloads = document.querySelector('.foot .dl');
+const footerDownloads = document.querySelector('#download .dl');
 const windowsDownload = footerDownloads?.querySelector(`a[href="${WIN.href}"]`);
 if (onWindows && windowsDownload) footerDownloads.prepend(windowsDownload);
+
+// Which chip is in a Mac, when the user agent cannot say. macOS reports "Intel
+// Mac OS X" whatever is inside, so the string is no use; userAgentData knows,
+// in Chromium only. Everywhere else the Apple Silicon build stays the default —
+// it is what the download counts say people take — and the Intel link in the
+// footer is the way out.
+//
+// This only ever moves the button toward Intel, and only on a definitive
+// answer, because the mistake is not symmetric: an Intel Mac cannot open the
+// arm64 build at all, while an Apple Silicon Mac runs the x64 one under
+// Rosetta. Guessing toward Intel costs a translated app; guessing toward Apple
+// Silicon costs a download that does not open.
+const MAC_INTEL = `${LATEST}/download/Warden-x64.dmg`;
+if (!onWindows && navigator.userAgentData?.platform === 'macOS') {
+  navigator.userAgentData.getHighEntropyValues(['architecture']).then(hints => {
+    if (hints.architecture !== 'x86') return;
+    $$('[data-platform-download]').forEach(primary => { primary.href = MAC_INTEL; });
+    const macDownload = footerDownloads?.querySelector(`a[href="${MAC.href}"]`);
+    if (macDownload) macDownload.href = MAC_INTEL;
+  }).catch(() => {});
+}
 
 // WebGL remains independent: failure leaves the static official mark.
 const shieldStages = $$('.shield-stage, .hero-sculpture');
