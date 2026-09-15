@@ -133,6 +133,32 @@ API, qué se implementó.
   "—" y no ofrece editarlos, con la razón en la nota: sin límite diario la API
   no guarda ceilings.
 
+### Reset company: quién se va
+
+- **Frames**: `team/company-reset` 430:2619, `dark/company-reset` 519:219.
+- **Diseño**: "Every person goes and every stored prompt is cleared. You get a
+  fresh admin key — the old ones stop working. Your rules stay."
+- **API**: `POST /api/company/reset` (`clearDemoDirectory` + `forgetAll`)
+  conserva al **primer empleado con rol `admin`** con una clave nueva, borra a
+  todos los demás y los prompts guardados; reglas y roles quedan. La respuesta
+  no devuelve la clave nueva.
+- **Implementado**: "Every person but the first administrator goes, and every
+  stored prompt is cleared. That administrator gets a fresh key — the old ones
+  stop working. Your rules stay." El toast posterior dice que la clave nueva
+  está en la página de esa persona.
+
+### Rol exento: acceso de administrador
+
+- **Frames**: `team/confirmar-rol-exento` 363:1066, `error-cambiar-rol`
+  363:5601, `rol-actualizado` 364:1703.
+- **Diseño**: dos frames dicen "exempt from every rule".
+- **API**: `rulesForActor` (`src/policy/store.ts`) exime a un rol exento solo
+  de las reglas `*`; una regla que nombra el rol o a la persona sigue atando.
+  El spec §6.4 ya lo pide ("NUNCA exempt from all rules").
+- **Implementado**: "exempt from company-wide rules" en todos los casos, y el
+  diálogo de confirmación mantiene "Rules written for admin, or for Ana by
+  name, still apply".
+
 ### "Added today" en el detalle de una persona
 
 - **Frame**: `team/detalle-sin-conectar` 354:683.
