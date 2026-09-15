@@ -66,7 +66,6 @@ export function audienceLabel(appliesTo) {
     .join(', ');
 }
 
-export const isPersonal = (rule) => rule.appliesTo?.some((t) => t.startsWith('@'));
 const ruleById = (id) => state.policy.rules.find((r) => r.id === id) ?? null;
 
 export const TOOL_NAMES = {

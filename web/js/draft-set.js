@@ -247,7 +247,7 @@ export function resultPage() {
         body,
         action: partial
           ? button(failedItems.length === 1 ? 'Retry failed rule' : 'Retry failed rules', { kind: 'primary', id: 'retryFailed' })
-          : button(state.draftFor ? 'Back to person' : 'Back to rules', { kind: 'primary', id: 'backToRules' })
+          : button(state.draftFor ? 'Back to person' : 'Back to rules', { kind: 'primary', id: 'leaveResult' })
       })}
     </div>
   </div>`;
@@ -381,7 +381,7 @@ export function bindSet(resetDraft) {
   if (retry) retry.onclick = () => void activate(set, included(set));
   const retryFailed = $('retryFailed');
   if (retryFailed) retryFailed.onclick = () => { set.result = null; void activate(set, set.items.filter((it) => it.status === 'failed')); };
-  const back = $('backToRules');
+  const back = $('leaveResult');
   if (back) back.onclick = () => { const person = state.draftFor; resetDraft(); if (person) go('people', person); else go('policy'); };
   const regress = $('regressBtn');
   if (regress) regress.onclick = () => void replay(set);

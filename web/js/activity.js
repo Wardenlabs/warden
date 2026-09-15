@@ -19,19 +19,6 @@ import { VIEWS } from './views.js';
  *  dealt with — a badge that never goes down stops being read. */
 export function pendingEscalations() { return state.escalations.filter((e) => !e.review); }
 
-/**
- * The three verdicts, in words rather than in the enum.
- *
- * `ESCALATE` is what the code calls it and it is the right name there — it is
- * a position in a lattice. On a screen it is jargon: nobody outside this repo
- * knows whether an escalated request was refused, and the whole point of that
- * verdict is that it was not. What happened is that it is waiting for a
- * person, so that is what it says.
- */
-export function verdictWord(v) {
-  return { all: 'All', ...VERDICT_WORD }[v] ?? v;
-}
-
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const counted = (n, one, many) => `${NUMBER_WORDS[n] ?? n} ${n === 1 ? one : many}`;
 

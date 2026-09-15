@@ -235,9 +235,9 @@ body {
    view that fills the screen and wrong for anything stacked above it — the
    demo-mode and first-run banners are rendered by the shell, so they became
    direct children and grew to half the window with nothing in them. The
-   compiler-setup nudge is rendered by the same shell line and stretched the
-   same way on the New rule and Test conversations. */
-.pane.flush > .banner, .pane.flush > .compiler-setup-nudge { flex: 0 0 auto; }
+   compiler-setup nudge is a feedback plate from the same shell line and
+   stretched the same way on the New rule and Test conversations. */
+.pane.flush > .banner, .pane.flush > .feedback { flex: 0 0 auto; }
 
 .sheet {
   max-width: var(--w-table);
@@ -281,7 +281,6 @@ button, input, select, textarea { font: inherit; font-size: var(--fs-4); color: 
 .btn.--busy:not(.--primary):disabled { background: var(--surface-page); border-color: var(--line-accessible); color: var(--ink); }
 /* Button / Compact (378:1962): inline editors and section footers. */
 .btn.--compact { height: var(--h-control-compact); padding: 0 var(--s-4); }
-.btn .ui-icon { width: 18px; height: 18px; }
 .btn-row { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 
 /* A word that is a link: "View activity →", "Open person to set up". */
@@ -951,7 +950,6 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .offscreen { position: fixed; top: -1000px; opacity: 0; }
-.ui-icon { width: 18px; height: 18px; flex: none; }
 .form-note { margin: 0; font-size: var(--fs-3); line-height: var(--lh-snug); color: var(--muted); }
 .form-note.--allow { color: var(--verdict-allow); }
 .form-note.--block { color: var(--verdict-block); }

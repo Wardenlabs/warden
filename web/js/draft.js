@@ -216,8 +216,6 @@ function writeRule(text) {
  * spending target, and the honest reply is the screen that holds spending
  * targets, not a prohibition invented to fit the shape.
  */
-export async function sendRuleMessage(text) { return compile(text, false); }
-
 async function compile(text, capable) {
   const clean = String(text ?? '').trim();
   if (!clean || state.ruleBusy) return;

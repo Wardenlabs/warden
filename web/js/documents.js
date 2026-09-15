@@ -116,10 +116,6 @@ export function documentFeedback() {
   </div>`;
 }
 
-export function documentComposer() {
-  return `<div id="documentDropzone">${documentAttachButton()}${documentChips()}${documentFeedback()}</div>`;
-}
-
 function readBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

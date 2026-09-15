@@ -103,10 +103,8 @@ const SEVERITY_MEANS = {
   escalate: 'held for a person to sign off',
   warn: 'the request goes through, with a note saying why it was flagged'
 };
-const SEVERITY_VERB = { block: 'stops', escalate: 'escalates', warn: 'warns about' };
 
 export const severityMeans = (s) => SEVERITY_MEANS[s] ?? `severity “${esc(s)}” — unknown to this console`;
-export const severityVerb = (s) => SEVERITY_VERB[s] ?? 'flags';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 export const attr = (s) => encodeURIComponent(String(s ?? ''));
@@ -136,10 +134,6 @@ export const state = {
   pendingLimits: null,
   // True from the moment a prompt is sent until its verdict is rendered.
   sending: false,
-  /** Role whose limits are open for editing, or null. One at a time. */
-  quotaEdit: null,
-  /** Why the last save of that role's limits was refused, if it was. */
-  quotaError: '',
   /** { days, held, max } while prompt text is kept, null when it is not. */
   prompts: null,
 
@@ -152,8 +146,6 @@ export const state = {
   compilerDraft: null,
   compilerTest: null,
   compilerBusy: false,
-  /** Last thing the Company block did, shown under it until the next render. */
-  orgNote: '',
 
   /**
    * Blocks an employee said were wrong.
@@ -194,31 +186,8 @@ export const state = {
   preview: null,
   ruleChat: [],
   ruleBusy: false,
-  /** The audience editor is a control, not information: it stays shut until
-   *  you say you want to change who a rule binds. */
-  audienceOpen: false,
-  /** Whether a human has actually looked at who this draft binds, rather than
-   *  `sanitiseAudience`'s `['*']` fallback reaching Activate unseen. Every new
-   *  draft starts `false`; touching any chip — including re-confirming what
-   *  the model already proposed — sets it `true`. A draft locked to one
-   *  person's page (`draftFor`) has nothing to confirm, so it starts `true`. */
-  audienceConfirmed: false,
-  /** Set when Activate was pressed before the audience was confirmed, so the
-   *  draft card shows why it opened the editor instead of ratifying. Cleared
-   *  the moment a chip is touched. */
-  audienceWarning: false,
-  /** Same shape as `audienceOpen`, for severity: shut until you say you want
-   *  to change it. Editing it needs no confirm step like audience does — a
-   *  wrong severity does not fail open the way an unconfirmed `['*']` audience
-   *  does, the compiler's guess is a reasonable default either way. */
-  severityOpen: false,
-  /** The check found something and the admin looked at it and chose to
-   *  activate anyway — "Keep as is" on the card. Reset on every fresh check
-   *  so a *new* problem is never hidden behind a dismissal of the old one. */
-  issueDismissed: false,
   /** Set right before `render()` by a toggle that makes the current card
-   *  taller without adding a turn to the conversation — the severity and
-   *  audience pickers, dismissing an issue. Tells `restoreChat` to hold the
+   *  taller without adding a turn to the conversation. Tells `restoreChat` to hold the
    *  scroll position instead of running its normal "new turn arrived, follow
    *  it down" smooth-scroll, which otherwise fired for a click that said
    *  nothing. Consumed (reset to `false`) the moment `restoreChat` reads it. */
@@ -226,7 +195,6 @@ export const state = {
 
   filter: 'all',
   actorFilter: '',
-  presetCat: null,
 
   chat: [],
   rtReport: null,

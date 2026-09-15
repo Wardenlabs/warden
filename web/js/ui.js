@@ -11,7 +11,7 @@
  * component that supplied its own words would put the same sentence on screens
  * that mean different things.
  */
-import { $, attr, esc } from './core.js';
+import { $, esc } from './core.js';
 import { ICONS } from './icons.js';
 
 // ── page anatomy ─────────────────────────────────────────────────────────────
@@ -65,11 +65,6 @@ export function tabs(view, items, current, label) {
 export function button(label, { kind = 'quiet', compact = false, id = '', attrs = '', disabled = false, busy = false } = {}) {
   const cls = ['btn', kind !== 'quiet' ? `--${kind}` : '', compact ? '--compact' : '', busy ? '--busy' : ''].filter(Boolean).join(' ');
   return `<button type="button" class="${cls}"${id ? ` id="${esc(id)}"` : ''}${attrs ? ` ${attrs}` : ''}${disabled || busy ? ' disabled' : ''}${busy ? ' aria-busy="true"' : ''}>${esc(label)}</button>`;
-}
-
-/** Trigger / Value: the value is the control, with the menu hanging from it. */
-export function triggerValue(label, { id = '', open = false, attrs = '' } = {}) {
-  return `<button type="button" class="trigger-value${open ? ' --open' : ''}"${id ? ` id="${esc(id)}"` : ''} aria-haspopup="menu" aria-expanded="${open}"${attrs ? ` ${attrs}` : ''}><span>${esc(label)}</span><i aria-hidden="true">▾</i></button>`;
 }
 
 /**
@@ -203,7 +198,15 @@ export function effectText(severity) {
   return `<span class="effect-text --${EFFECT_TONE[severity] ?? 'muted'}"><i class="dot"></i>${prefix}${esc(e.word)}</span>`;
 }
 
-/** The three verdicts, always in words and never the enum. */
+/**
+ * The three verdicts, in words rather than in the enum.
+ *
+ * `ESCALATE` is what the code calls it and it is the right name there — it is
+ * a position in a lattice. On a screen it is jargon: nobody outside this repo
+ * knows whether an escalated request was refused, and the whole point of that
+ * verdict is that it was not. What happened is that it is waiting for a
+ * person, so that is what it says.
+ */
 export const VERDICT_WORD = { BLOCK: 'Blocked', ESCALATE: 'Held', ALLOW: 'Allowed' };
 export const VERDICT_TONE = { BLOCK: 'block', ESCALATE: 'attention', ALLOW: 'allow' };
 
@@ -294,4 +297,3 @@ export function composer({ id, sendId, placeholder, sendLabel, busy = false, dis
   </div>`;
 }
 
-export const dataAttr = (name, value) => `data-${name}="${attr(value)}"`;

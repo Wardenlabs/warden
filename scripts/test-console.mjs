@@ -12,7 +12,7 @@ globalThis.sessionStorage = { getItem: () => 'administrator-secret' };
 const { api, post, state } = await import('../web/js/core.js');
 const { documentAnalysisNotice, documentMetadataMarkup, documentReason, documentReviewPendingMarkup } = await import('../web/js/documents.js');
 const { library, libraryMarkup } = await import('../web/js/model-library.js');
-const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindModelPicker } = await import('../web/js/compiler.js');
+const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindCompiler } = await import('../web/js/compiler.js');
 const { compileFailure } = await import('../web/js/answers.js');
 const { restoreSoloRuleText } = await import('../web/js/solo.js');
 const { promptEditor, acceptPromptCatalog, hasPromptChanges, validatePromptTemplate, promptEditorMarkup, togglePromptEditor, closePromptEditor, loadPrompts } = await import('../web/js/prompt-editor.js');
@@ -332,20 +332,23 @@ test('existing provider and explicit model preferences survive opening the setup
   }
 });
 
-test('the Claude quick picker opens guided setup with a blank model instead of applying or authenticating', async () => {
+test('choosing Claude Code as the rule writer opens guided setup with a blank model instead of applying or authenticating', () => {
   state.compiler = compilerConfiguration({ provider: 'local', setupRequired: false });
-  const savedQuery = document.querySelectorAll;
-  const savedLocation = globalThis.location;
-  const button = { dataset: { pick: 'claude-cli' }, closest: () => ({ removeAttribute() {} }) };
-  document.querySelectorAll = () => [button];
-  globalThis.location = { hash: '#/policy/new' };
+  state.compilerDraft = null;
+  state.view = 'models';
+  const select = { id: 'cProvider', focus() {} };
+  const pane = { className: '', innerHTML: '', querySelector: () => null, querySelectorAll: () => [], insertAdjacentHTML() {} };
+  elements.set('compilerForm', { querySelectorAll: () => [] }); elements.set('cProvider', select); elements.set('pane', pane); elements.set('sidebar', { innerHTML: '' });
+  const savedQuery = document.querySelector;
+  document.querySelector = () => null;
   globalThis.fetch = () => { throw new Error('Picking Claude must not apply, install or authenticate it.'); };
   try {
-    bindModelPicker(); await button.onclick();
+    bindCompiler();
+    select.onchange({ target: { value: 'claude-cli' } });
     assert.equal(state.compilerDraft.provider, 'claude-cli');
     assert.equal(state.compilerDraft.model, '');
-    assert.equal(location.hash, '#/compiler');
-  } finally { document.querySelectorAll = savedQuery; if (savedLocation === undefined) delete globalThis.location; else globalThis.location = savedLocation; }
+    assert.match(compilerSettings(), /id="cModel"[^>]* value="" placeholder="Claude Code default"/);
+  } finally { document.querySelector = savedQuery; elements.delete('compilerForm'); elements.delete('cProvider'); elements.delete('pane'); elements.delete('sidebar'); }
 });
 
 test('missing local weights offer download only after the local compiler is selected', () => {
@@ -436,4 +439,40 @@ test('document analysis timeouts preserve successful OCR status and stay separat
   assert.equal(documentAnalysisNotice({ documents: [unread], passes: [{ ...timeout, pass: 'documents', detail: { error: 'document-reader-timeout' } }] }), '');
   assert.match(documentMetadataMarkup([unread]), /document reader ran out of time/);
   assert.match(documentAnalysisNotice({ documents: [read], passes: [{ ...timeout, detail: { error: 'Document analysis was cancelled before all content and rules were checked. The document was not cleared.' } }] }), /Policy analysis was cancelled/);
+});
+
+test('saving session ceilings resends the role’s daily limit, because the quota route drops what it is not sent', async () => {
+  const { saveQuota } = await import('../web/js/limits.js');
+  state.policy = { ...state.policy, rules: state.policy?.rules ?? [], quotas: [{ role: 'intern', maxRequestsPerDay: 40, maxSessionOutputTokens: 150000 }] };
+  const sent = [];
+  globalThis.fetch = async (path, init) => {
+    if (init?.method === 'PUT') { sent.push({ path, body: JSON.parse(init.body) }); return new Response('{}'); }
+    return new Response(JSON.stringify(state.policy));
+  };
+  assert.deepEqual(await saveQuota('intern', { maxPromptChars: 9000 }), { ok: true });
+  assert.equal(sent[0].path, '/api/quotas/intern');
+  assert.deepEqual(sent[0].body, { maxRequestsPerDay: 40, maxSessionOutputTokens: 150000, maxContextTokens: null, maxPromptChars: 9000 });
+  assert.equal((await saveQuota('intern', { maxPromptChars: NaN })).ok, false);
+  assert.equal(sent.length, 1);
+});
+
+test('a policy read that fails keeps the rules already shown and says the read failed', async () => {
+  const { refreshPolicy } = await import('../web/js/data.js');
+  state.policy = { ...state.policy, rules: [{ id: 'r-kept' }] };
+  globalThis.fetch = async () => new Response('{"error":"gateway restarting"}', { status: 503 });
+  await refreshPolicy();
+  assert.deepEqual(state.policy.rules.map((r) => r.id), ['r-kept']);
+  assert.deepEqual(state.loads.policy, { loading: false, error: 'gateway restarting' });
+});
+
+test('an exempt person is described as exempt from company-wide rules, never from every rule', async () => {
+  const { sendAsOptions } = await import('../web/js/rules.js');
+  const saved = { company: state.company, policy: state.policy };
+  state.company = { ...state.company, employees: [{ id: 'e1', name: 'Ana', role: 'admin' }, { id: 'e2', name: 'Tomás', role: 'intern' }] };
+  state.policy = { ...state.policy, exemptRoles: ['admin'] };
+  try {
+    const html = sendAsOptions('e1');
+    assert.match(html, /Tomás · intern<\/option>.*Ana · admin · exempt from company-wide rules/s);
+    assert.ok(!/every rule|all rules/i.test(html));
+  } finally { Object.assign(state, saved); }
 });
