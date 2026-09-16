@@ -50,7 +50,15 @@ entre ellas:
 
 ## 1. Usuario y trabajo a resolver
 
-Dos personas distintas que hoy comparten una sola mecánica:
+**Autoaplicarse Warden y gobernar a un equipo son dos usos distintos, no dos
+etapas del mismo** (decisión del dueño, 2026-09-15). Hoy el código los trata
+como etapas: `soloIsPureInstall()` (`web/js/nav.js:66`) define "solo" como *un
+directorio al que todavía nadie agregó gente*, y de ahí sale que sumar a la
+primera persona cambie lo que el dueño ve y deje su propia identidad sin lugar.
+Conviven: alguien puede querer que Warden mire lo que él mismo escribe **y**
+gobernar a diez personas, y ninguna de las dos cosas es un paso hacia la otra.
+
+Dos trabajos distintos, entonces, que hoy comparten una sola mecánica:
 
 - **Quien se protege a sí mismo** (solo, o el admin en su propia máquina):
   *"quiero que Warden mire lo que escribo — y quiero poder apagarlo un rato
@@ -115,6 +123,26 @@ lugar de mandarla a buscar un administrador que es ella misma.
 
 ## 4. Decisiones de producto
 
+- **Dos pantallas, una identidad.** La separación entre autoaplicarse y
+  gobernar vive en la interfaz: This device es la máquina del que administra,
+  Team es la de los demás. Abajo hay una sola persona en el directorio, con su
+  máquina cableada como la de cualquiera, que además tiene permisos de admin.
+  Se descartó darle a la máquina una identidad propia paralela al directorio:
+  son dos credenciales para la misma persona, y una de ellas quedando huérfana
+  es exactamente el bug del §0.
+- **Un admin se autoaplica con reglas dirigidas a él.** Hoy ser admin es estar
+  exento, y estar exento significa que las reglas de toda la empresa (`*`) no
+  te atan; las que nombran a una persona o a un rol sí, exento o no. Así que
+  autoaplicarse funciona, pero solo con reglas escritas hacia uno mismo. No se
+  toca el motor: separar "admin" de "exento" crearía la segunda noción de admin
+  que CLAUDE.md prohíbe, y hacer que las reglas `*` aten a los exentos cambia
+  cómo se elige la política de cada persona, que es el guard y no la consola.
+- **Y por lo tanto: cablear la máquina de un exento sin decírselo es prometer
+  una protección que no se está dando.** Alguien se autoaplica Warden, cablea
+  su máquina, y no se dispara nada nunca, porque todas sus reglas son de
+  empresa y él está exento. Es el mismo género de silencio que este documento
+  existe para eliminar. This device tiene que decirlo **en el momento de
+  cablear**, y decir qué hacer: escribir una regla dirigida a uno mismo.
 - **Un empleado que se desconecta se ve; no se impide.** Es la decisión más
   importante del documento. Impedirlo es imposible y prometerlo sería mentir;
   lo que Warden debe garantizar es que irse **no sea silencioso**. Como dice
@@ -172,6 +200,9 @@ lugar de mandarla a buscar un administrador que es ella misma.
   inmediato, y aparece en el registro administrativo.
 - Desconectar y volver a conectar la propia máquina es reversible y no pierde
   nada más que el cableado.
+- Quien cablea su propia máquina siendo exento **se entera en ese momento** de
+  que las reglas de empresa no lo atan, y sale de la pantalla sabiendo qué
+  escribir para que Warden lo mire de verdad.
 - Cero regresiones: nada de esto cambia un veredicto.
 
 ## 6. Riesgos
@@ -202,23 +233,20 @@ lugar de mandarla a buscar un administrador que es ella misma.
   lo mejora, pero el spec debe decidir si la página aparece siempre o solo
   cuando la consola se abre desde el propio equipo.
 
-## 7. Preguntas que el spec tiene que cerrar
+## 7. Lo que quedó cerrado sobre pausa y nombres
 
-Salieron de revisar esto contra el código y no hacía falta decidirlas para
-acordar la forma, pero ninguna se puede dejar implícita:
-
-- **Qué figura en Activity cuando alguien está pausado.** La propuesta es que
-  el pedido aparezca diciendo *no juzgado · pausado*, y que no cuente contra la
-  cuota diaria de su rol, porque nunca se juzgó. Ninguna de las dos cosas puede
-  quedar librada a la implementación.
-- **Quién puede pausar a quién.** El admin a cualquiera; quien está solo, a sí
-  mismo. Un empleado pausándose a sí mismo es evasión con otro nombre, y no
-  debería existir como acción.
-- **Qué pasa con la identidad "this device" cuando un install solo suma
-  equipo.** Hoy la convivencia está descrita en `docs/specs/solo-mode.md §7`
-  para la navegación, no para el cableado.
-- **Cómo se nombra un equipo** — nombre de host, algo que elige la persona, o
-  un identificador opaco — dado que empieza a viajar con cada pedido.
+- **Un pedido de alguien pausado entra al log diciendo *no juzgado ·
+  pausado*.** Si no entrara, el registro mentiría por omisión: parecería que
+  esa persona no trabajó en toda la tarde. **No cuenta contra la cuota diaria
+  de su rol**, porque la cuota cuenta pedidos juzgados y ese no se juzgó.
+- **El admin pausa a cualquiera; quien se autoaplica Warden se pausa a sí
+  mismo; un empleado no pausa a nadie, ni a sí mismo.** Si pudiera, el botón de
+  apagar Warden vendría incluido en el producto.
+- **El equipo se nombra desde el sistema** (nombre del host). Es automático y
+  no le pide nada a nadie; el costo es que suele llevar el nombre de la persona
+  adentro, y el spec debe decir que ese nombre se trata como dato personal:
+  viaja al gateway de la propia empresa, se muestra en la consola, y no entra
+  al audit log, que guarda hashes y no texto.
 
 ## 8. Fuera de este documento
 
