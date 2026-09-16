@@ -28,7 +28,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { closeSync, constants, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -962,6 +962,361 @@ async function fixMode(agents) {
   process.stdout.write('\n');
 }
 
+/**
+ * `warden-hook --unfix` — the counterpart `--fix` never had.
+ *
+ * Until this existed there was no supported way out. Somebody whose gateway had
+ * stopped, or who was holding a key another installation had issued, had every
+ * prompt refused by a hook they could not turn off, and the only remedy anybody
+ * found was to hunt through `~/.claude/settings.json` by hand or uninstall
+ * Warden entirely. A guard with no off switch does not get trusted with the
+ * on switch; it gets removed. See `docs/prd/wiring-and-unwiring.md` §2.
+ *
+ * The rules it keeps, which are the reason this is careful rather than short:
+ *
+ * - **It removes only what Warden put there.** Other hooks, other events, other
+ *   environment variables and other TOML sections survive untouched. Every
+ *   unwiring is read-modify-write on the parsed file, never a rewrite from a
+ *   template.
+ * - **A file it cannot parse is a file it does not touch**, and it says so.
+ *   The alternative — guessing at broken JSON — is how somebody loses a config
+ *   they spent a year building.
+ * - **It backs up first**, `<file>.warden-bak`, including before a delete.
+ * - **Unwiring is not uninstalling.** `~/.warden-hook.mjs` stays, the shell
+ *   profile stays, and the gateway's rules, people and audit log are not this
+ *   command's business. `--unfix --purge` may exist later; it is out of scope
+ *   in the spec that asked for this.
+ *
+ * Each unwirer returns `{ error }` when it declined, or `{ removed, kept, note }`
+ * describing what it did — `removed` empty means there was nothing of ours.
+ */
+function unfixClaudeCode() {
+  const file = join(homedir(), '.claude', 'settings.json');
+  if (!existsSync(file)) return { removed: [], note: 'no settings.json here' };
+
+  let settings;
+  try {
+    settings = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    return { error: `settings.json is not valid JSON (${err?.message ?? err}) — left untouched` };
+  }
+  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    return { error: 'settings.json is not an object — left untouched' };
+  }
+
+  const removed = [];
+  const kept = [];
+  const isOurs = (h) => String(h?.command ?? '').includes('warden-hook');
+
+  const hooks = settings.hooks && typeof settings.hooks === 'object' && !Array.isArray(settings.hooks) ? settings.hooks : null;
+  const list = hooks && Array.isArray(hooks.UserPromptSubmit) ? hooks.UserPromptSubmit : null;
+  if (list) {
+    const survivors = [];
+    let ours = 0;
+    let theirs = 0;
+    for (const entry of list) {
+      const inner = Array.isArray(entry?.hooks) ? entry.hooks : null;
+      const mine = inner ? inner.filter(isOurs) : [];
+      // An entry holding nothing of ours — including one whose shape this does
+      // not recognise — is copied across exactly as it was found.
+      if (mine.length === 0) { survivors.push(entry); theirs += inner ? inner.length : 1; continue; }
+      ours += mine.length;
+      const rest = inner.filter((h) => !isOurs(h));
+      if (rest.length) { survivors.push({ ...entry, hooks: rest }); theirs += rest.length; }
+    }
+    if (ours) {
+      removed.push(`${ours} UserPromptSubmit hook${ours === 1 ? '' : 's'}`);
+      if (survivors.length) hooks.UserPromptSubmit = survivors;
+      else delete hooks.UserPromptSubmit;
+    }
+    if (theirs) kept.push(`${theirs} UserPromptSubmit hook${theirs === 1 ? '' : 's'} that are not Warden's`);
+  }
+  if (hooks) {
+    const otherEvents = Object.keys(hooks).filter((event) => event !== 'UserPromptSubmit');
+    if (otherEvents.length) kept.push(`the ${otherEvents.join(', ')} hook${otherEvents.length === 1 ? '' : 's'}`);
+    else if (Object.keys(hooks).length === 0) delete settings.hooks;
+  }
+
+  // The two variables `--fix` writes here because a Claude Code opened from the
+  // Dock never sourced a shell profile. They come out the same way they went in.
+  const env = settings.env && typeof settings.env === 'object' && !Array.isArray(settings.env) ? settings.env : null;
+  if (env) {
+    const mine = ['WARDEN_URL', 'WARDEN_API_KEY'].filter((name) => name in env);
+    for (const name of mine) delete env[name];
+    if (mine.length) removed.push(mine.join(' and '));
+    const rest = Object.keys(env);
+    if (rest.length) kept.push(`${rest.length} other environment variable${rest.length === 1 ? '' : 's'}`);
+    else if (mine.length) delete settings.env;
+  }
+
+  if (removed.length === 0) return { removed: [], kept, note: "nothing of Warden's was in it" };
+  if (!backup(file)) return { error: 'backup failed, so nothing was written' };
+  writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
+  return { removed, kept };
+}
+
+/**
+ * Codex keeps its hooks in TOML, and this edits the text rather than parsing it.
+ *
+ * There is no TOML parser here and adding one for this would be a dependency in
+ * the single file whose whole argument is that it has none. What makes text
+ * surgery safe enough is that `--fix` writes a block it marks with a comment,
+ * so this removes exactly the marked region and nothing else. A file that
+ * mentions `warden-hook` without that marker was wired by hand or by a version
+ * that did not mark it: this refuses to guess, leaves the file alone, and says
+ * which lines to remove. Refusing is recoverable; a bad guess at somebody's
+ * config is not.
+ */
+const CODEX_MARK = '# Added by warden-hook --fix';
+
+function unfixCodex() {
+  const file = join(homedir(), '.codex', 'config.toml');
+  if (!existsSync(file)) return { removed: [], note: 'no config.toml here' };
+
+  const body = readFileSync(file, 'utf8');
+  if (!body.includes('warden-hook')) return { removed: [], note: "nothing of Warden's was in it" };
+
+  const lines = body.split('\n');
+  const start = lines.findIndex((line) => line.startsWith(CODEX_MARK));
+  if (start === -1) {
+    return { error: `it mentions warden-hook but not in a block this wrote, so it was left untouched — remove the [[hooks.UserPromptSubmit]] block naming warden-hook in ${file} by hand` };
+  }
+
+  // The block runs to the next section header after the inner `.hooks` table,
+  // which is where whatever Codex configures next begins.
+  let end = start + 1;
+  let passedInner = false;
+  while (end < lines.length) {
+    const line = lines[end].trim();
+    if (line.startsWith('[')) {
+      if (passedInner) break;
+      if (line.startsWith('[[hooks.UserPromptSubmit.hooks]]')) passedInner = true;
+    }
+    end++;
+  }
+  // Trailing blank lines belong to the block, not to what follows it.
+  while (end > start && lines[end - 1].trim() === '') end--;
+
+  const cut = lines.slice(start, end).join('\n');
+  if (!cut.includes('warden-hook')) {
+    return { error: `the marked block does not name warden-hook, which is not a shape this understands — ${file} was left untouched` };
+  }
+
+  if (!backup(file)) return { error: 'backup failed, so nothing was written' };
+  const rest = [...lines.slice(0, start), ...lines.slice(end)];
+  writeFileSync(file, rest.join('\n').replace(/\n{3,}$/, '\n'));
+  const leftover = rest.join('\n').includes('warden-hook');
+  return {
+    removed: ['the UserPromptSubmit block'],
+    kept: leftover ? ['another mention of warden-hook this did not write — check it by hand'] : []
+  };
+}
+
+/**
+ * OpenCode's plugin is a whole file, so unwiring is deleting it.
+ *
+ * "Only if it is the one Warden wrote" is checked against the file's content
+ * and not against the copy the gateway serves today: a gateway upgraded since
+ * the plugin was installed serves a newer one, and comparing the two would
+ * refuse to remove a file this very tool had written. A file at the path Warden
+ * chose that names Warden's own environment variable is Warden's. The backup
+ * is what makes that judgement safe to be wrong about — the file is copied to
+ * `.warden-bak` before it goes, so getting it back is a `mv`.
+ */
+function unfixOpenCode() {
+  const file = join(homedir(), '.config', 'opencode', 'plugin', 'warden.js');
+  if (!existsSync(file)) return { removed: [], note: 'no plugin file here' };
+
+  let body;
+  try {
+    body = readFileSync(file, 'utf8');
+  } catch (err) {
+    return { error: `could not read ${file} (${err?.message ?? err}) — left in place` };
+  }
+  if (!body.includes('WARDEN_API_KEY') && !body.includes('warden-hook')) {
+    return { error: `${file} does not look like the plugin Warden writes — left in place, remove it by hand if you want it gone` };
+  }
+
+  if (!backup(file)) return { error: 'backup failed, so nothing was deleted' };
+  try {
+    unlinkSync(file);
+  } catch (err) {
+    return { error: `could not delete ${file} (${err?.message ?? err})` };
+  }
+  return { removed: ['the plugin file'], kept: [] };
+}
+
+function unfixMode(agents) {
+  process.stdout.write('\nUnwiring what Warden wired\n\n');
+  const unfixers = { 'claude-code': unfixClaudeCode, codex: unfixCodex, opencode: unfixOpenCode };
+  let touched = 0;
+
+  for (const agent of agents) {
+    const unfix = unfixers[agent.id];
+    if (!unfix) continue;
+    // Run whether or not the detector called it wired: the detector looks for
+    // the hook entry, and the `env` block `--fix` also writes can outlive it.
+    let outcome;
+    try {
+      outcome = unfix();
+    } catch (err) {
+      outcome = { error: err?.message ?? String(err) };
+    }
+    const name = agent.name.padEnd(12);
+    if (outcome.error) {
+      process.stdout.write(`  ✗ ${name} ${outcome.error}\n`);
+    } else if (outcome.removed.length === 0) {
+      process.stdout.write(`  · ${name} ${outcome.note ?? 'nothing to remove'}\n`);
+    } else {
+      touched++;
+      process.stdout.write(`  ✓ ${name} removed ${outcome.removed.join(', ')}, restart it to pick this up\n`);
+    }
+    for (const left of outcome.kept ?? []) {
+      process.stdout.write(`    ${' '.repeat(12)} left alone: ${left}\n`);
+    }
+  }
+
+  // What this deliberately did not do, said out loud, because somebody running
+  // it to stop being judged needs to know their key is still on this machine.
+  process.stdout.write('\n  Still here, because unwiring is not uninstalling:\n');
+  process.stdout.write(`    · this hook, at ${hookPath()}\n`);
+  process.stdout.write('    · WARDEN_URL and WARDEN_API_KEY in your shell profile, if the install script put them there\n');
+  process.stdout.write(`    · every backup, at <file>.warden-bak\n`);
+  if (touched) process.stdout.write('\n  Run --fix to wire it back.\n');
+  process.stdout.write('\n');
+}
+
+/**
+ * `warden-hook --status` — the three questions nobody could ask.
+ *
+ * Asked in this order because each one only means something once the one before
+ * it is answered. "My key is not recognised" is a different problem depending on
+ * whether there is a gateway at all, and on *which* gateway answered — that is
+ * the whole of `docs/prd/wiring-and-unwiring.md` §0, where a perfectly good key
+ * was refused by a second Warden that happened to be holding port 8080.
+ *
+ * It writes nothing and judges nothing. Exit 0 only when all three are good, so
+ * this can be the line in a setup script that decides whether to keep going.
+ */
+async function statusMode(timeoutMs) {
+  const out = (line = '') => process.stdout.write(line + '\n');
+  out('\nWarden on this machine');
+  out();
+
+  // 1 — Is there a gateway, and which one?
+  out(`  gateway    ${WARDEN_URL}`);
+  let health = null;
+  let reason = '';
+  try {
+    health = await requestJson(`${WARDEN_URL}/health`, { method: 'GET' }, timeoutMs, validateHealth);
+  } catch (err) {
+    reason = err?.message ?? String(err);
+  }
+  if (health) {
+    const where = health.installation;
+    out(`             answering as "${where?.label ?? 'an installation that does not name itself'}"${where?.version ? ` (v${where.version})` : ''}`);
+    // Present because this call came from the same machine. It is the line that
+    // tells two installations apart when both answer to "localhost:8080".
+    if (where?.dataDir) out(`             its people, keys and rules are in ${where.dataDir}`);
+    if (health.mode === 'baseline') out('             ⚠ running in baseline mode: the guard is switched off');
+  } else {
+    out(`             ✗ no answer (${reason})`);
+    // The fail-open, said out loud. It is the sentence SECURITY.md has always
+    // carried and the one nobody reads until the morning it matters.
+    const failClosed = readState()[WARDEN_URL]?.failClosed === true;
+    out(failClosed
+      ? '             this gateway was last seen set to fail closed, so prompts are being REFUSED'
+      : '             while it is down, every prompt goes through UNCHECKED');
+  }
+
+  // 2 — Does it know me?
+  out();
+  out(`  key        ${API_KEY ? `set, ending ${API_KEY.slice(-4)}` : 'NOT set'}`);
+  let identity = null;
+  if (health && API_KEY) {
+    try {
+      identity = await requestJson(
+        `${WARDEN_URL}/api/identity`,
+        { method: 'GET', headers: { authorization: `Bearer ${API_KEY}` } },
+        timeoutMs,
+        (value) => {
+          if (!value || typeof value !== 'object' || typeof value.id !== 'string') throw new Error('identity response is invalid');
+          return value;
+        }
+      );
+      out(`             recognised as ${identity.name} (${identity.id}), role "${identity.role}"`);
+    } catch (err) {
+      out(`             ✗ this gateway does not recognise it (${err?.message ?? err})`);
+      out(`             a key is only valid in the installation that issued it — claim one at ${WARDEN_URL} under Team → People`);
+    }
+  } else if (!API_KEY) {
+    out('             every prompt will be refused until WARDEN_API_KEY is set');
+  } else {
+    out('             not checked, because the gateway did not answer');
+  }
+
+  // 3 — What is wired, and is it holding the same key?
+  out();
+  out('  tools');
+  const agents = detectAgents();
+  const governable = agents.filter((a) => a.installed && a.governable);
+  for (const agent of agents) {
+    const mark = !agent.installed ? '·' : agent.wired ? '✓' : agent.governable ? '○' : '—';
+    const state = !agent.installed
+      ? 'not found'
+      : agent.wired
+        ? 'wired'
+        : agent.governable
+          ? 'installed, NOT wired — run --fix'
+          : 'installed, and cannot be wired here';
+    out(`    ${mark} ${agent.name.padEnd(12)} ${state}`);
+  }
+
+  /*
+   * The second key, and why it is checked here.
+   *
+   * `--fix` writes WARDEN_API_KEY into the `env` block of
+   * ~/.claude/settings.json as well as the shell profile, because a Claude Code
+   * opened from the Dock never sourced a profile. Two copies of a credential is
+   * two things that can disagree, and when they do, the terminal is judged as
+   * one person and the app as another — or the app is refused outright with a
+   * key the person can see is correct in their shell. Nothing said so.
+   *
+   * Reconciling them is F6 of the spec. Noticing is this cheap and is most of
+   * the value.
+   */
+  const claudeEnvKey = readClaudeEnvKey();
+  const mismatched = claudeEnvKey !== null && API_KEY && claudeEnvKey !== API_KEY;
+  if (mismatched) {
+    out();
+    out('    ⚠ Claude Code has a different key in ~/.claude/settings.json than this shell');
+    out(`      shell ends ${API_KEY.slice(-4)}, settings.json ends ${claudeEnvKey.slice(-4)} — they will be judged as different people`);
+    out('      run --fix from a shell holding the key you want, and it will rewrite that block');
+  }
+
+  const wiredAny = governable.some((a) => a.wired);
+  const good = Boolean(health) && Boolean(identity) && wiredAny && !mismatched;
+  out();
+  if (good) out('  ✓ a gateway, a key it knows, and at least one tool wired to it');
+  else if (!health) out('  ✗ no gateway is answering, so nothing is being judged');
+  else if (!identity) out('  ✗ the gateway is up but does not know this key');
+  else if (!wiredAny) out('  ✗ nothing on this machine is wired — run --fix');
+  else out('  ✗ the wiring disagrees with itself about which key to use');
+  out();
+  process.exitCode = good ? 0 : 1;
+}
+
+/** The key `--fix` wrote into Claude Code's env block, or null if there is none. */
+function readClaudeEnvKey() {
+  try {
+    const settings = JSON.parse(readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'));
+    const value = settings?.env?.WARDEN_API_KEY;
+    return typeof value === 'string' && value ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function detectMode() {
   const agents = detectAgents();
   const hookAt = [join(homedir(), '.warden-hook.mjs'), join(homedir(), '.config', 'warden', 'hook.mjs')]
@@ -1147,12 +1502,26 @@ async function main() {
   // rather than a hook event — and it never blocks anything.
   // Takes no audit id and judges nothing: it reads this machine and prints.
   // `--fix` writes, and only to the three tools that have local wiring.
-  if (process.argv.includes('--detect') || process.argv.includes('--fix')) {
+  // Reads this machine and the gateway, writes nothing, and is the one mode
+  // with a meaningful exit code — a setup script can branch on it.
+  if (process.argv.includes('--status')) return statusMode(healthTimeoutMs);
+
+  if (process.argv.includes('--fix') && process.argv.includes('--unfix')) {
+    process.stderr.write('⚠ warden-hook: --fix and --unfix are opposites. Pick one.\n');
+    process.exitCode = 1;
+    return;
+  }
+
+  if (process.argv.includes('--detect') || process.argv.includes('--fix') || process.argv.includes('--unfix')) {
     detectMode();
     if (process.argv.includes('--fix')) {
       await fixMode(detectAgents());
       // Re-read from disk so the closing inventory is what is actually there
       // now, not what this process believes it wrote.
+      detectMode();
+    }
+    if (process.argv.includes('--unfix')) {
+      unfixMode(detectAgents());
       detectMode();
     }
     return;

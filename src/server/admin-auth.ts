@@ -67,7 +67,12 @@ const INSTALL_TOKEN = /^[0-9a-f]{32}$/;
 const EMPLOYEE_PATHS: ReadonlySet<string> = new Set([
   '/api/guard/check',
   '/api/guard/rewrite',
-  '/api/guard/appeal'
+  '/api/guard/appeal',
+  // Answers "does this gateway know my key", for the key that asked and about
+  // nobody else. `warden-hook --status` is built on it. It reads a credential
+  // the caller already holds and returns what its owner already knows, which is
+  // why it belongs on this side of the line.
+  '/api/identity'
 ]);
 
 /**

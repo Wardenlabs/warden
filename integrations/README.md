@@ -89,6 +89,71 @@ that says *governed* rather than on a sentence telling somebody to go and
 configure three programs by hand. `--detect --json` prints the inventory for a
 script.
 
+## When something is wrong: `--status`
+
+`--detect` reads this machine. `--status` also asks the gateway, in the order
+the three answers depend on each other:
+
+```bash
+node ~/.warden-hook.mjs --status
+```
+
+```
+Warden on this machine
+
+  gateway    http://192.168.1.42:8080
+             answering as "Warden" (v0.2.5)
+             its people, keys and rules are in /Users/fede/Library/Application Support/Warden/data
+
+  key        set, ending 40e2
+             ✗ this gateway does not recognise it (gateway returned 401)
+             a key is only valid in the installation that issued it — claim one
+             at http://192.168.1.42:8080 under Team → People
+
+  tools
+    ✓ Claude Code  wired
+    ○ Codex        installed, NOT wired — run --fix
+
+  ✗ the gateway is up but does not know this key
+```
+
+Which gateway answered is the line that matters, and it is the one that used to
+be missing. Two Wardens on one machine — the desktop app and a checkout — both
+want port 8080 and each one only knows the keys it issued itself, so "your key
+is not recognised" was indistinguishable from "your key is wrong". People spent
+evenings re-issuing a key that was already correct.
+
+It also catches the two copies of the key disagreeing: `--fix` writes
+`WARDEN_API_KEY` into the `env` block of `~/.claude/settings.json` as well as
+your shell profile, because a Claude Code opened from the Dock never sourced a
+profile — and when those two drift, the terminal and the app are judged as
+different people.
+
+It exits 0 only when all three are good, so a setup script can branch on it.
+
+## Turning it off: `--unfix`
+
+```bash
+node ~/.warden-hook.mjs --unfix
+```
+
+The exact counterpart of `--fix`. It removes the `UserPromptSubmit` entry whose
+command names `warden-hook`, the `WARDEN_URL` and `WARDEN_API_KEY` that `--fix`
+wrote into Claude Code's `env` block, Codex's marked TOML block, and the
+OpenCode plugin file. Everything else in those files — other hooks, other
+events, other variables, other sections — survives; each file is read, edited
+and written rather than regenerated, backed up to `<file>.warden-bak` first, and
+a file that does not parse is left byte for byte with a message saying so.
+
+**Unwiring is not uninstalling.** `~/.warden-hook.mjs` stays, your shell profile
+stays, and nothing on the gateway changes — no rules, no people, no audit log.
+`--fix` wires it back.
+
+This exists because it did not, and that was the whole problem: somebody whose
+gateway had stopped, or who held a key from the other installation, had every
+prompt refused by a hook they could not turn off. A guard with no off switch
+does not get trusted with the on switch; it gets deleted.
+
 It has to live here rather than in the console because the console is on
 another computer. The gateway learns a tool exists when a prompt turns up from
 one — that is `activity.ts`, and it is a liveness view, which means it stays

@@ -14,6 +14,7 @@ import { checkQuota } from '../../guard/quota.js';
 import { rewriteGate, suggestRewrite } from '../../guard/rewrite.js';
 import { recordActivity } from '../../policy/activity.js';
 import { recordAppeal } from '../../policy/appeals.js';
+import { actorForCredential } from '../../policy/people.js';
 import { loadPolicy } from '../../policy/store.js';
 import { adapter } from '../../qvac/index.js';
 import { emitDecision } from '../events.js';
@@ -23,6 +24,31 @@ import { evaluateRequest, extractPrompt, resolveActor, unknownKey } from '../ide
 export const guardRoutes = Router();
 
 guardRoutes.get('/api/documents/capabilities', (_req, res) => { res.json(documentCapabilities()); });
+
+/**
+ * "Does this gateway know me?" — the smallest oracle that answers it.
+ *
+ * Until this existed the only way to find out was to submit a prompt and read
+ * the refusal, which is a strange thing to have to do to check a credential,
+ * and useless in a script. It judges nothing, writes nothing, and says nothing
+ * the owner of the key does not already know about themselves: their own id,
+ * their own name, and the role their administrator gave them.
+ *
+ * Deliberately not here: whether the role is exempt, and anything about anyone
+ * else. Exemption is a property of the policy, `exemptRoles` is the most
+ * security-relevant sentence in the spec, and an employee-callable route that
+ * reports on it turns a credential check into a probe of the policy's shape.
+ *
+ * `paused` is always false today. The pause axis is F4 of
+ * `docs/specs/wiring-and-unwiring.md`; the field is here now so that the hook
+ * released with F2 already reads the shape F4 will fill, rather than needing a
+ * second rollout to every laptop to learn about a feature the gateway grew.
+ */
+guardRoutes.get('/api/identity', (req, res) => {
+  const employee = actorForCredential(req.header('authorization'));
+  if (!employee) return res.status(401).json(unknownKey(req));
+  res.json({ id: employee.id, name: employee.name, role: employee.role, paused: false });
+});
 
 guardRoutes.post('/api/guard/check', asyncRoute(async (req, res) => {
   const actor = resolveActor(req);
