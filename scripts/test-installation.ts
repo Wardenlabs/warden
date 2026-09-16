@@ -75,6 +75,7 @@ async function healthSaysWhereItIs(): Promise<void> {
     check(far.installation?.label === near.installation?.label, 'but is still told which installation it reached');
 
     await unknownKeySaysWhichGateway(port, String(near.installation?.label));
+    await identityAnswersForItsOwnKey(port);
   } finally {
     await new Promise((done) => server.close(done));
   }
@@ -107,6 +108,41 @@ async function unknownKeySaysWhichGateway(port: number, label: string): Promise<
   check(far.body.explanation?.includes(label) === true, 'a remote caller is told which gateway too');
   check(far.body.explanation?.includes('administrator') === true, 'but is sent to their administrator, not to a console they cannot open');
   check(far.body.explanation?.includes('localhost') === false, 'and never to a localhost URL that is not theirs', far.body.explanation);
+}
+
+/**
+ * The oracle `--status` is built on. It exists because the only way to ask
+ * "does this gateway know my key" used to be to submit a prompt and read the
+ * refusal — which is a strange thing to have to do to check a credential, and
+ * useless in a script.
+ */
+async function identityAnswersForItsOwnKey(port: number): Promise<void> {
+  console.log('\n/api/identity answers for the key that asked, and for nobody else\n');
+
+  const { upsertEmployee } = await import('../src/policy/people.js');
+  const person = upsertEmployee({ id: 'fede', name: 'Fede', role: 'employee' });
+
+  const ask = async (key: string) => {
+    const answer = await fetch(`http://127.0.0.1:${port}/api/identity`, { headers: { authorization: `Bearer ${key}` } });
+    return { status: answer.status, body: (await answer.json()) as Record<string, unknown> };
+  };
+
+  const mine = await ask(person.apiKey);
+  check(mine.status === 200, 'a key this gateway issued is recognised', `status ${mine.status}`);
+  check(mine.body['id'] === 'fede' && mine.body['name'] === 'Fede' && mine.body['role'] === 'employee', 'and told who its owner is', JSON.stringify(mine.body));
+  check(mine.body['paused'] === false, 'with the pause field F4 will be able to fill');
+  check(!('apiKey' in mine.body), 'the key itself is never echoed back');
+  // Exemption is a property of the policy, and `exemptRoles` is the most
+  // security-relevant sentence in the spec. An employee-callable route must not
+  // turn a credential check into a probe of the policy's shape.
+  check(!('exempt' in mine.body) && !('exemptRoles' in mine.body), 'and nothing about the policy comes with it');
+
+  const stranger = await ask('wk-nobody-0000000000000000');
+  check(stranger.status === 401, 'a key it never issued gets 401, not a guess', `status ${stranger.status}`);
+  check(typeof stranger.body['explanation'] === 'string' && (stranger.body['explanation'] as string).length > 0, 'and the refusal still names this gateway');
+
+  const none = await fetch(`http://127.0.0.1:${port}/api/identity`);
+  check(none.status === 401, 'and no credential at all is refused rather than answered about somebody', `status ${none.status}`);
 }
 
 async function secondGatewayRefusesTheTakenPort(): Promise<void> {
