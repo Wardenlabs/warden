@@ -37,14 +37,61 @@ const COMPANY_PATH = process.env['WARDEN_COMPANY_PATH'] ?? 'data/company.json';
  */
 const SEED_PATH = process.env['WARDEN_COMPANY_SEED'] ?? 'data/seed/company.json';
 
+/**
+ * Warden, switched off for one person, on purpose and with a name on it.
+ *
+ * It lives here — in the directory — and deliberately **not in the policy**.
+ * The policy is hashed, ratified and audited as the set of rules in force, and
+ * a pause is not a rule: it does not judge anything, it says that for now
+ * nothing will be judged. Putting it in the policy would mean every pause and
+ * every unpause rewrote the version that rules are ratified against, and the
+ * one artefact a company can point at to say "this is what we enforce" would
+ * be churned by an operational switch.
+ *
+ * `until` null means until somebody takes it off. Nothing sweeps expired
+ * pauses: a pause is evaluated against the time of the request, so one that has
+ * run out is one that does not exist, and there is no cleanup task that can
+ * fall behind and leave somebody unguarded.
+ *
+ * `by` is the person who decided, because a guard that can be switched off
+ * without a name attached is a guard nobody can ask about afterwards.
+ */
+export const pauseSchema = z.object({
+  until: z.string().nullable(),
+  reason: z.string().max(300).optional(),
+  by: z.string().min(1),
+  at: z.string()
+});
+export type Pause = z.infer<typeof pauseSchema>;
+
 export const employeeSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   role: z.string().min(1),
   /** Identifies the caller on the proxy. Never leaves the gateway machine. */
-  apiKey: z.string().min(1)
+  apiKey: z.string().min(1),
+  paused: pauseSchema.optional()
 });
 export type Employee = z.infer<typeof employeeSchema>;
+
+/**
+ * The pause in force for this person at this instant, or null.
+ *
+ * Takes the time rather than reading the clock, so that one request is judged
+ * against one instant everywhere it is asked about — and so a test can ask
+ * about a moment other than now without moving the machine's clock.
+ */
+export function activePause(employee: Pick<Employee, 'paused'>, at: Date = new Date()): Pause | null {
+  const paused = employee.paused;
+  if (!paused) return null;
+  if (paused.until === null) return paused;
+  const until = Date.parse(paused.until);
+  // An unparseable `until` is treated as expired. The direction matters: the
+  // error that costs something is a malformed date leaving somebody unguarded
+  // forever, not one that puts them back under the guard a minute early.
+  if (!Number.isFinite(until)) return null;
+  return until > at.getTime() ? paused : null;
+}
 
 export const directorySchema = z.object({
   name: z.string().default(''),
@@ -365,6 +412,54 @@ export function rotateApiKey(id: string): Employee | null {
   save({ ...dir, employees: dir.employees.map((e) => (e.id === id ? updated : e)) });
   markPendingReconnect(id);
   return updated;
+}
+
+/**
+ * Switch the guard off for one person, until a moment or until told otherwise.
+ *
+ * Returns null when there is no such person. An `until` in the past is refused
+ * rather than stored: it would be a pause that never pauses, and the
+ * administrator who set it would believe they had done something.
+ */
+export function setPause(id: string, input: { until?: string | null; reason?: string; by: string }): Employee | null {
+  const dir = loadDirectory();
+  const existing = dir.employees.find((e) => e.id === id);
+  if (!existing) return null;
+
+  let until: string | null = null;
+  if (input.until !== undefined && input.until !== null) {
+    const parsed = Date.parse(input.until);
+    if (!Number.isFinite(parsed)) throw new Error('until must be a date, or absent for "until somebody takes it off"');
+    if (parsed <= Date.now()) throw new Error('that moment has already passed');
+    until = new Date(parsed).toISOString();
+  }
+
+  const paused: Pause = {
+    until,
+    // Same treatment as a name: this is interpolated into a console and into
+    // onboarding text, and a control character in it would be executable there.
+    ...(input.reason ? { reason: input.reason.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 300) } : {}),
+    by: input.by,
+    at: new Date().toISOString()
+  };
+  const updated: Employee = { ...existing, paused };
+  save({ ...dir, employees: dir.employees.map((e) => (e.id === id ? updated : e)) });
+  return updated;
+}
+
+/** Put the guard back. Returns null when there is no such person. */
+export function clearPause(id: string): Employee | null {
+  const dir = loadDirectory();
+  const existing = dir.employees.find((e) => e.id === id);
+  if (!existing) return null;
+  const { paused: _gone, ...rest } = existing;
+  save({ ...dir, employees: dir.employees.map((e) => (e.id === id ? rest : e)) });
+  return rest;
+}
+
+/** Everyone whose guard is off right now. The console shows a band while this is not empty. */
+export function pausedNow(at: Date = new Date()): Employee[] {
+  return loadDirectory().employees.filter((e) => activePause(e, at) !== null);
 }
 
 // ── roles ──────────────────────────────────────────────────────────────────────

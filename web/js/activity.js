@@ -9,7 +9,7 @@ import { disclosure, render } from './render.js';
 import { go } from './router.js';
 import {
   VERDICT_TONE, VERDICT_WORD, badgeEffect, button, contextBar, fileChip, filters, groupBand,
-  listState, pageHead, turn, verdictText
+  listState, outcome, outcomeText, pageHead, turn, verdictText
 } from './ui.js';
 import { VIEWS } from './views.js';
 
@@ -27,10 +27,15 @@ export function promptMarkup(text) {
   return esc(text).replace(/\[REDACTED:([^\]]*)\]/g, (_m, kind) => `<span class="masked" role="img" aria-label="${kind} masked" title="${kind} masked before checking"></span>`);
 }
 
-function visibleAudit() {
+export function visibleAudit() {
   return state.audit.filter((a) => {
     const d = a.decision ?? {};
-    if (state.filter !== 'all' && d.verdict !== state.filter) return false;
+    // A paused request is not in any verdict bucket. It carries ALLOW and was
+    // never judged, so counting it under "Allowed" would put it behind the one
+    // filter an administrator uses to mean "the policy looked and found
+    // nothing".
+    const unjudged = Boolean(d.notJudged);
+    if (state.filter === 'paused' ? !unjudged : state.filter !== 'all' && (unjudged || d.verdict !== state.filter)) return false;
     if (state.actorFilter && a.actor?.id !== state.actorFilter) return false;
     if (state.query.rule && !(d.firedRules ?? []).some((r) => r.ruleId === state.query.rule)) return false;
     return true;
@@ -48,9 +53,17 @@ function todayLine() {
   const today = dayKey(new Date().toISOString());
   const rows = state.audit.filter((a) => dayKey(a.ts) === today);
   if (!rows.length) return 'Nothing has come through Warden today yet.';
-  const stopped = rows.filter((a) => a.decision?.verdict === 'BLOCK').length;
-  const people = new Set(rows.filter((a) => a.decision?.verdict !== 'ALLOW').map((a) => a.actor?.id)).size;
-  return `Warden looked at ${plural(rows.length, 'request')} today and stopped ${stopped}. ${people ? `${counted(people, 'person', 'people')} hit a rule.` : 'Nobody hit a rule.'}`;
+  // A request that arrived while somebody was paused was not looked at, so it
+  // is not in the number that says how much Warden looked at. Saying it out
+  // loud on the same line, when there are any, is the difference between a
+  // console that reports coverage and one that reports traffic.
+  const judged = rows.filter((a) => !a.decision?.notJudged);
+  const skipped = rows.length - judged.length;
+  const stopped = judged.filter((a) => a.decision?.verdict === 'BLOCK').length;
+  const people = new Set(judged.filter((a) => a.decision?.verdict !== 'ALLOW').map((a) => a.actor?.id)).size;
+  const rule = people ? `${counted(people, 'person', 'people')} hit a rule.` : 'Nobody hit a rule.';
+  const paused = skipped ? ` ${plural(skipped, 'request')} went through unchecked while Warden was paused.` : '';
+  return `Warden looked at ${plural(judged.length, 'request')} today and stopped ${stopped}. ${rule}${paused}`;
 }
 
 function waitingAction() {
@@ -58,13 +71,27 @@ function waitingAction() {
   return waiting ? button(`${waiting} waiting on you →`, { kind: 'primary', attrs: 'data-go="inbox"' }) : '';
 }
 
+/**
+ * What each filter's number means.
+ *
+ * Judged records only, for the same reason the filter excludes them: "Allowed
+ * 40" has to mean forty requests the policy cleared, not thirty-nine plus one
+ * that arrived while the guard was switched off.
+ */
+export function activityToolbarCounts() {
+  const count = (v) => state.audit.filter((a) => !a.decision?.notJudged && a.decision?.verdict === v).length;
+  return { ALLOW: count('ALLOW'), BLOCK: count('BLOCK'), ESCALATE: count('ESCALATE'), unjudged: state.audit.filter((a) => a.decision?.notJudged).length };
+}
+
 /** Filters live with the list they filter, not in the app chrome. */
 function toolbar() {
-  const count = (v) => state.audit.filter((a) => a.decision?.verdict === v).length;
+  // Counted over judged records only, for the same reason the filter excludes
+  // them: "Allowed 40" has to mean forty requests the policy cleared.
+  const { unjudged, ...count } = activityToolbarCounts();
   const person = personById(state.actorFilter);
   const items = [{ id: '', name: 'Everyone' }, ...state.company.employees];
   return `<div class="toolbar-v2">
-    ${filters([['all', `All ${state.audit.length}`], ['BLOCK', `Blocked ${count('BLOCK')}`], ['ESCALATE', `Held ${count('ESCALATE')}`], ['ALLOW', `Allowed ${count('ALLOW')}`]], state.filter, 'verdict')}
+    ${filters([['all', `All ${state.audit.length}`], ['BLOCK', `Blocked ${count.BLOCK}`], ['ESCALATE', `Held ${count.ESCALATE}`], ['ALLOW', `Allowed ${count.ALLOW}`], ...(unjudged ? [['paused', `Not judged ${unjudged}`]] : [])], state.filter, 'verdict')}
     <details class="menu --right person-filter">
       <summary class="menu-trigger person-trigger" aria-label="Filter by person"><span>Person · ${esc(person?.name ?? 'Everyone')}</span><i class="caret" aria-hidden="true">▾</i></summary>
       <div class="menu-list" role="menu">${items.map((p) => `<button type="button" role="menuitemradio" aria-checked="${(state.actorFilter || '') === p.id}" class="menu-item" data-actor="${esc(p.id)}"><span>${esc(p.name)}</span>${(state.actorFilter || '') === p.id ? '<b class="menu-check">✓</b>' : ''}</button>`).join('')}</div>
@@ -84,12 +111,12 @@ function decisionRows(entries) {
     const fired = d.firedRules?.[0];
     const files = d.documents?.length ? ` · ${plural(d.documents.length, 'file')}` : '';
     out += `<div class="trow --link" role="row" tabindex="0" data-go="activity" data-sel="${attr(a.auditId)}">
-      <span class="who-cell"><i class="dot --${VERDICT_TONE[d.verdict] ?? 'muted'}"></i><span class="cell-strong">${esc(actorName(a.actor))}</span></span>
+      <span class="who-cell"><i class="dot --${outcome(d).tone}"></i><span class="cell-strong">${esc(actorName(a.actor))}</span></span>
       ${d.maskedPrompt
         ? `<span class="cell-clip request-cell">“${promptMarkup(clip(d.maskedPrompt, 140))}”${files}</span>`
         : `<span class="cell-muted" title="The audit log keeps this prompt's SHA-256, not its text.">Not stored — the log keeps the hash, not the text${files}</span>`}
       <span class="cell-muted">${fired ? esc(ruleName(fired.ruleId)) : '—'}</span>
-      <span>${verdictText(d.verdict)}</span>
+      <span>${outcomeText(d)}</span>
       <span class="cell-muted num">${esc(hhmm(a.ts))}</span>
     </div>`;
   }
@@ -257,15 +284,23 @@ function detailPage(entry) {
   if (!entry) return missingDecision('Activity', 'activity');
   const d = entry.decision ?? {};
   const v = d.verdict;
-  const title = v === 'ESCALATE' ? 'Held for review' : VERDICT_WORD[v] ?? v;
+  // A paused request never reached a pass. Every sentence below that describes
+  // judging has to go, or this page tells somebody the policy was applied.
+  const unjudged = d.notJudged === 'paused';
+  const title = unjudged ? 'Not judged' : v === 'ESCALATE' ? 'Held for review' : VERDICT_WORD[v] ?? v;
   const held = v === 'ESCALATE' ? state.escalations.find((e) => e.auditId === entry.auditId) : null;
   const firstName = actorName(entry.actor).split(' ')[0];
   const person = personById(entry.actor?.id);
   const action = v === 'ESCALATE' && held && !held.review
     ? button('Answer in Inbox', { attrs: `data-go="inbox" data-sel="${attr(entry.auditId)}"` })
-    : d.firedRules?.[0] && v !== 'ALLOW' ? button('Open the rule', { attrs: `data-go="policy" data-sel="${attr(d.firedRules[0].ruleId)}"` }) : '';
+    : d.firedRules?.[0] && v !== 'ALLOW' && !unjudged ? button('Open the rule', { attrs: `data-go="policy" data-sel="${attr(d.firedRules[0].ruleId)}"` }) : '';
   let after = '';
-  if (v === 'ALLOW') {
+  if (unjudged) {
+    const until = d.pausedUntil
+      ? `until ${esc(whenLine(d.pausedUntil))}`
+      : 'until somebody turns it back on';
+    after = `<p class="exchange-note">Warden was paused for ${esc(firstName)} ${until}, so this request went out without being checked against any rule. It is here because it happened, not because it was cleared.</p>`;
+  } else if (v === 'ALLOW') {
     after = person
       ? `<p class="exchange-note">Checked against the ${plural(person.ruleCount ?? 0, 'rule')} that apply to ${esc(firstName)} — none matched.</p>`
       : '<p class="exchange-note">No rule in the policy matched it.</p>';
@@ -275,11 +310,17 @@ function detailPage(entry) {
       : `<p class="exchange-note">Waiting in your Inbox since ${esc(hhmm(held.at))} — ${esc(firstName)} sees “held for review” until someone answers.</p>`;
   }
   return `<div class="sheet">
-    ${contextBar([{ label: 'Activity', go: 'activity', back: true }, { label: `${VERDICT_WORD[v] ?? v} at ${hhmm(entry.ts)}` }])}
-    ${verdictHead({ tone: VERDICT_TONE[v], glyph: GLYPH[v], title, sub: `${whenLine(entry.ts)} · judged in ${seconds(d.totalMs)}`, action })}
+    ${contextBar([{ label: 'Activity', go: 'activity', back: true }, { label: `${title} at ${hhmm(entry.ts)}` }])}
+    ${verdictHead({
+      tone: unjudged ? 'muted' : VERDICT_TONE[v],
+      glyph: unjudged ? '⏸' : GLYPH[v],
+      title,
+      sub: unjudged ? `${whenLine(entry.ts)} · no rule was run` : `${whenLine(entry.ts)} · judged in ${seconds(d.totalMs)}`,
+      action
+    })}
     <div class="exchange reading">
       ${requestTurn(entry)}
-      ${v === 'ALLOW' ? '' : ruleCard(d)}
+      ${v === 'ALLOW' || unjudged ? '' : ruleCard(d)}
     </div>
     ${after}
     ${decisionFolds(entry)}

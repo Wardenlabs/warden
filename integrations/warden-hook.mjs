@@ -1245,6 +1245,14 @@ async function statusMode(timeoutMs) {
         }
       );
       out(`             recognised as ${identity.name} (${identity.id}), role "${identity.role}"`);
+      // The one state in which everything else on this page says "fine" and
+      // nothing is being checked. It has to be said here or --status becomes a
+      // report that the wiring is perfect on a machine that is not guarded.
+      if (identity.paused) {
+        const until = identity.pausedUntil ? `until ${identity.pausedUntil}` : 'until somebody turns it back on';
+        out(`             ⏸ Warden is PAUSED for you ${until}`);
+        out('             prompts go through without being checked against any rule');
+      }
     } catch (err) {
       out(`             ✗ this gateway does not recognise it (${err?.message ?? err})`);
       out(`             a key is only valid in the installation that issued it — claim one at ${WARDEN_URL} under Team → People`);
@@ -1295,13 +1303,19 @@ async function statusMode(timeoutMs) {
   }
 
   const wiredAny = governable.some((a) => a.wired);
-  const good = Boolean(health) && Boolean(identity) && wiredAny && !mismatched;
+  // A pause is not a fault — somebody chose it, deliberately, and it has their
+  // name on it. It is still not "good": this command exists so a script and a
+  // person can both ask "is this machine guarded", and while it is paused the
+  // answer is no. Its own line below says which of the two it is.
+  const paused = identity?.paused === true;
+  const good = Boolean(health) && Boolean(identity) && wiredAny && !mismatched && !paused;
   out();
   if (good) out('  ✓ a gateway, a key it knows, and at least one tool wired to it');
   else if (!health) out('  ✗ no gateway is answering, so nothing is being judged');
   else if (!identity) out('  ✗ the gateway is up but does not know this key');
   else if (!wiredAny) out('  ✗ nothing on this machine is wired — run --fix');
-  else out('  ✗ the wiring disagrees with itself about which key to use');
+  else if (mismatched) out('  ✗ the wiring disagrees with itself about which key to use');
+  else out('  ⏸ wired and connected, but paused — nothing is being checked until it is turned back on');
   out();
   process.exitCode = good ? 0 : 1;
 }

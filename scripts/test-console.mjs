@@ -476,3 +476,44 @@ test('an exempt person is described as exempt from company-wide rules, never fro
     assert.ok(!/every rule|all rules/i.test(html));
   } finally { Object.assign(state, saved); }
 });
+
+/*
+ * A paused request carries ALLOW and was never looked at. The console has one
+ * job here and it is not cosmetic: an administrator reading their own log must
+ * not be told the policy was applied and found nothing, on a request no pass
+ * ever touched. `notJudged` exists so the two can be told apart years later;
+ * these are the places that promise is kept or broken.
+ */
+test('a request that arrived while Warden was paused never reads as allowed', async () => {
+  const { outcome, outcomeText } = await import('../web/js/ui.js');
+
+  assert.deepEqual(outcome({ verdict: 'ALLOW' }), { word: 'Allowed', tone: 'allow', judged: true });
+  const paused = outcome({ verdict: 'ALLOW', notJudged: 'paused' });
+  assert.equal(paused.judged, false);
+  assert.match(paused.word, /Not judged/);
+  assert.ok(!/allowed/i.test(paused.word), 'the word "allowed" must not appear on a request nobody judged');
+  // Muted, never the green a cleared request gets. Nothing about it is a pass.
+  assert.equal(paused.tone, 'muted');
+  assert.ok(!/--allow/.test(outcomeText({ verdict: 'ALLOW', notJudged: 'paused' })));
+});
+
+test('the Allowed count and filter mean requests the policy cleared, not requests nobody read', async () => {
+  const { visibleAudit, activityToolbarCounts } = await import('../web/js/activity.js');
+  const saved = { audit: state.audit, filter: state.filter, actorFilter: state.actorFilter, query: state.query };
+  state.audit = [
+    { auditId: 'a', ts: '2026-09-16T10:00:00.000Z', actor: { id: 'ana' }, decision: { verdict: 'ALLOW' } },
+    { auditId: 'b', ts: '2026-09-16T10:01:00.000Z', actor: { id: 'ana' }, decision: { verdict: 'ALLOW', notJudged: 'paused' } },
+    { auditId: 'c', ts: '2026-09-16T10:02:00.000Z', actor: { id: 'ana' }, decision: { verdict: 'BLOCK' } }
+  ];
+  state.actorFilter = '';
+  state.query = {};
+  try {
+    state.filter = 'ALLOW';
+    assert.deepEqual(visibleAudit().map((a) => a.auditId), ['a'], 'the paused one is not behind the Allowed filter');
+    state.filter = 'paused';
+    assert.deepEqual(visibleAudit().map((a) => a.auditId), ['b'], 'it has a bucket of its own');
+    state.filter = 'all';
+    assert.deepEqual(visibleAudit().map((a) => a.auditId), ['a', 'b', 'c'], 'and "All" still means all of them');
+    assert.deepEqual(activityToolbarCounts(), { ALLOW: 1, BLOCK: 1, ESCALATE: 0, unjudged: 1 });
+  } finally { Object.assign(state, saved); }
+});

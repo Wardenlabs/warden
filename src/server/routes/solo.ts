@@ -12,7 +12,7 @@ import { evaluate } from '../../guard/pipeline.js';
 import { activityFor } from '../../policy/activity.js';
 import { compileRule, isDeclined } from '../../policy/compile.js';
 import { ratifyRule, removeRule } from '../../policy/ratify.js';
-import { addRole, loadDirectory, upsertEmployee, type Employee } from '../../policy/people.js';
+import { addRole, clearPause, loadDirectory, setPause, upsertEmployee, type Employee } from '../../policy/people.js';
 import { isExempt, loadPolicy, rulesForActor } from '../../policy/store.js';
 import type { Rule } from '../../policy/types.js';
 import { adapter } from '../../qvac/index.js';
@@ -90,6 +90,40 @@ function withActivity(identity: Employee): Employee & { connected: ReturnType<ty
 
 soloRoutes.post('/api/solo/setup', (_req, res) => {
   res.json(withActivity(resolveSoloIdentity()));
+});
+
+/**
+ * Warden, switched off for the person sitting at this keyboard.
+ *
+ * The one pause somebody may set on themselves, and it is only that because of
+ * who `resolveSoloIdentity()` resolves to: an exempt role, which is to say the
+ * person who writes the rules in the first place. Somebody who can only be
+ * governed cannot reach this — the route is administrative like every other one
+ * outside `EMPLOYEE_PATHS`, and it ignores whatever id a caller might send.
+ *
+ * This screen is where a pause is most obviously legitimate. Somebody
+ * protecting their own machine will hit a rule of their own at the worst
+ * possible moment, and the choice the product gave them until now was to keep
+ * fighting it or to unwire Warden — and unwiring is the one they never undo.
+ * An hour with their own name on it is the answer.
+ */
+soloRoutes.post('/api/solo/pause', (req, res) => {
+  const me = resolveSoloIdentity();
+  try {
+    const paused = setPause(me.id, {
+      until: req.body?.until === undefined || req.body.until === null ? null : String(req.body.until),
+      ...(req.body?.reason ? { reason: String(req.body.reason) } : {}),
+      by: me.id
+    });
+    res.json(withActivity(paused ?? me));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+soloRoutes.delete('/api/solo/pause', (_req, res) => {
+  const me = resolveSoloIdentity();
+  res.json(withActivity(clearPause(me.id) ?? me));
 });
 
 /**

@@ -12,7 +12,9 @@ import { activityFor, connectedCount } from '../../policy/activity.js';
 import { devicesFor } from '../../policy/devices.js';
 import { bindsActor, describeAudience } from '../../policy/audience.js';
 import {
+  actorForCredential,
   addRole,
+  clearPause,
   findEmployee,
   loadDirectory,
   normaliseRole,
@@ -20,6 +22,7 @@ import {
   removeRole,
   roles,
   rotateApiKey,
+  setPause,
   upsertEmployee
 } from '../../policy/people.js';
 import { loadPolicy, rulesForActor, savePolicy } from '../../policy/store.js';
@@ -99,6 +102,47 @@ peopleRoutes.post('/api/people/:id/key', asyncRoute(async (req, res) => {
   if (!rotated) return res.status(404).json({ error: 'no such employee' });
   res.json(rotated);
 }));
+
+/**
+ * Switch the guard off for one person, and back on.
+ *
+ * Administrative, and there is no employee path to either: somebody who can
+ * pause their own guard does not have one. `/api/solo/pause` is the exception
+ * that proves it — it resolves through `resolveSoloIdentity()`, which requires
+ * an exempt role, so the person switching it off is the person who writes the
+ * rules in the first place.
+ *
+ * `by` is taken from the administrator's own credential when there is one and
+ * falls back to naming the loopback console, because that is the honest answer:
+ * a gateway treats its own machine as administrative, so "whoever was sitting
+ * at it" is genuinely all that is known. It is never read from the body — a
+ * name a caller can type is a name that proves nothing.
+ */
+peopleRoutes.post('/api/people/:id/pause', asyncRoute(async (req, res) => {
+  try {
+    const paused = setPause(String(req.params['id']), {
+      until: req.body?.until === undefined ? null : req.body.until === null ? null : String(req.body.until),
+      ...(req.body?.reason ? { reason: String(req.body.reason) } : {}),
+      by: adminName(req)
+    });
+    if (!paused) return res.status(404).json({ error: 'no such employee' });
+    res.json(paused);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}));
+
+peopleRoutes.delete('/api/people/:id/pause', asyncRoute(async (req, res) => {
+  const resumed = clearPause(String(req.params['id']));
+  if (!resumed) return res.status(404).json({ error: 'no such employee' });
+  res.json(resumed);
+}));
+
+/** Who is switching this off, from their credential or from where they are sitting. */
+function adminName(req: Parameters<typeof gatewayUrl>[0]): string {
+  const employee = actorForCredential(req.header('authorization'));
+  return employee ? employee.id : 'the console on this machine';
+}
 
 peopleRoutes.delete('/api/people/:id', asyncRoute(async (req, res) => {
   const { removed, orphanedRules } = removeEmployee(String(req.params['id']), loadPolicy().rules);
