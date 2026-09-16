@@ -14,16 +14,28 @@ interruptor que solo existe del lado del gateway no se puede implementar en
 El 2026-09-15, durante la sesión que cerró el rediseño, **el propio Warden
 bloqueó todos los prompts del dueño de Warden**. La secuencia completa:
 
-- Se levantó un gateway local para mirar la consola nueva.
-- La `WARDEN_API_KEY` del dueño era `wk-you-…`, de un *solo setup* anterior.
-  El directorio que ese gateway carga tiene otras personas; esa identidad ya
-  no existe.
+- **Hay dos Warden en esa máquina.** La app empaquetada
+  (`/Applications/Warden.app`), corriendo desde hacía días con sus datos en
+  `~/Library/Application Support/Warden/data/`, y el repo de desarrollo con los
+  suyos en `operations-aleph/data/`. Son dos directorios de personas distintos
+  y **los dos quieren el puerto 8080**.
+- La `WARDEN_API_KEY` del dueño, `wk-you-…`, es perfectamente válida — en la
+  app. El directorio del repo nunca la tuvo.
+- Se levantó un gateway de desarrollo para mirar la consola nueva. El hook,
+  que apunta a `localhost:8080` y no tiene forma de saber a cuál de los dos le
+  está hablando, le habló al equivocado.
 - Clave desconocida → `UNKNOWN_KEY` (`src/server/identity.ts:27`) → el hook
   frenó cada prompt en su terminal.
 - El mensaje dijo *"Ask your administrator for a current one"*. El dueño **es**
-  el administrador.
+  el administrador, y su clave no tenía nada de malo.
 - La única salida que encontró, y no por primera vez, fue matar el gateway —
   que no arregla nada: explota el fail-open del hook.
+
+**Nada estaba roto: estaba hablando con el Warden equivocado, y ninguna de las
+dos pantallas se lo podía decir.** Media hora después, con la app respondiendo
+otra vez, el mismo hook bloqueó un prompt por una regla de credenciales —
+funcionando exactamente como debe. Entre un bloqueo legítimo y hablarle a otra
+instalación, lo único que cambia es un texto en la terminal.
 
 Ninguna de las piezas está rota por separado. El problema es lo que falta
 entre ellas:
@@ -140,6 +152,13 @@ nombra, porque puede no ser la de la clave con la que esa persona trabaja.
 deja a la persona adivinando: dice qué gateway la rechazó, y **si ese gateway
 está en la propia máquina, dice que abra la consola y reclame una clave** en
 lugar de mandarla a buscar un administrador que es ella misma.
+
+**Y cada Warden dice cuál es.** Una instalación tiene nombre y el hook lo
+repite cuando rechaza algo, porque "no reconozco tu clave" y "le estás
+hablando a otra instalación" son el mismo mensaje hoy y son problemas
+distintos. Dos gateways peleando por un puerto es una situación normal en la
+máquina de quien desarrolla Warden, y va a serlo para cualquiera que pruebe
+una versión nueva al lado de la que usa.
 
 ## 4. Decisiones de producto
 
