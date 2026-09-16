@@ -97,6 +97,28 @@ echo "Downloading the Warden hook…"
 curl -fsSL "${url}/warden-hook.mjs" -o "$HOOK"
 chmod +x "$HOOK"
 
+# The source of truth, written before anything that copies from it.
+#
+# The profile block below and the \`env\` block --fix writes into Claude Code's
+# settings both still exist — a Claude Code opened from the Dock never sourced
+# a profile, and its env block is static JSON that cannot point at a file — but
+# since this file exists they are copies rather than three separate opinions,
+# and \`--status\` says which one has drifted. See docs/specs/wiring-and-unwiring.md §7.
+#
+# umask before the write, not chmod after: a chmod leaves an instant where the
+# file exists and anybody on the machine can read the key out of it.
+mkdir -p "$HOME/.warden"
+chmod 700 "$HOME/.warden" 2>/dev/null || true
+(
+  umask 077
+  cat > "$HOME/.warden/credentials.json" <<'WARDEN_CREDENTIALS'
+{
+  "url": "${url}",
+  "apiKey": "${person.apiKey}"
+}
+WARDEN_CREDENTIALS
+)
+
 # $BASH_VERSION is not "the shell chose bash": on macOS /bin/sh is bash
 # under the hood, so it is set here even though this ran as sh, and every
 # install used to land in ~/.bashrc — a file zsh (the default shell since
@@ -124,7 +146,7 @@ export WARDEN_API_KEY=${person.apiKey}
 WARDEN_BLOCK
 
 echo ""
-echo "Done. Hook at $HOOK, environment in $PROFILE."
+echo "Done. Hook at $HOOK, key at $HOME/.warden/credentials.json, environment in $PROFILE."
 echo "Open a new terminal (or: source $PROFILE)."
 
 # What is on this machine, and then wiring it. --fix adds the hook to the tools

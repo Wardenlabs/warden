@@ -2,12 +2,12 @@
  * "This device": the machine Warden runs on — its tools, its address, its data — and the rules that protect it.
  */
 import { $, api, attr, del, esc, post, state } from './core.js';
-import { refreshChain } from './data.js';
-import { TOOL_NAMES, plural } from './format.js';
-import { soloIsPureInstall } from './nav.js';
+import { refreshHealth } from './data.js';
+import { TOOL_NAMES, modelLabel, plural } from './format.js';
 import { render } from './render.js';
+import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
-import { button, contextBar, dialog, disclosureRow, effectText, feedback, listState, menu, pageHead, statusText } from './ui.js';
+import { button, conditionBlock, contextBar, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ THIS DEVICE ═════════════════════════════════════════════════════════════
@@ -60,7 +60,10 @@ async function refreshSoloRules() {
  */
 async function onEnterSolo() {
   await post('/api/solo/setup').catch(() => null);
-  await Promise.all([refreshSoloPresets(), refreshSoloRules(), refreshChain()]);
+  // `/health` too: the conditions name which installation is running and
+  // whether the mock is standing in for a judge, and both can have changed
+  // since boot — the desktop app restarts the gateway to leave demo mode.
+  await Promise.all([refreshSoloPresets(), refreshSoloRules(), refreshHealth()]);
   render();
 }
 
@@ -76,23 +79,55 @@ async function onEnterSolo() {
  */
 const HOOK_OF = { claude: 'claude-code', codex: 'codex', opencode: 'opencode', 'cursor-agent': 'cursor' };
 
-function toolRows() {
+/**
+ * The three facts about one tool, kept apart all the way to the screen.
+ *
+ * `found` is "this program is installed here" — the compiler's own CLI probe.
+ * `wired` is what the machine reported about its own configuration, from
+ * `devices`, on disk. `connected` is traffic the gateway actually judged, in
+ * memory. A tool can be any combination of the three, and collapsing them is
+ * how "installed but never wired" and "wired but quiet since Friday" ended up
+ * wearing the same sentence.
+ *
+ * Wiring that was never reported is **absent**, not false: `wired === null`
+ * means nobody knows, which is a different thing from "not wired" and gets a
+ * different sentence.
+ */
+function toolState() {
   const found = state.compiler?.cliTools ?? [];
   const connected = state.soloIdentity?.connected ?? [];
+  const devices = state.soloIdentity?.devices ?? [];
   const rows = new Map();
+  const at = (id, patch) => rows.set(id, { name: TOOL_NAMES[id] ?? id, wired: null, ...(rows.get(id) ?? {}), ...patch });
+
   for (const t of found) {
     const hook = HOOK_OF[t.tool];
     if (!hook) continue;
     if (!t.found && !['claude', 'codex'].includes(t.tool)) continue;
-    rows.set(hook, { name: TOOL_NAMES[hook] ?? t.label, found: t.found });
+    at(hook, { name: TOOL_NAMES[hook] ?? t.label, found: t.found });
   }
-  for (const c of connected) rows.set(c.tool, { ...(rows.get(c.tool) ?? { name: TOOL_NAMES[c.tool] ?? c.tool, found: true }), connected: c });
-  return [...rows.values()].map((r) => {
-    const status = r.connected
-      ? statusText(`Judging requests · verified ${ago(Date.parse(r.connected.at))}`, 'allow')
-      : r.found ? '<span class="cell-muted">Installed · not judged by Warden yet</span>' : '<span class="cell-muted">Not found on this machine</span>';
-    return `<div class="setting-row"><span>${esc(r.name)}</span>${status}</div>`;
-  }).join('');
+  // Newest report first, so an older machine cannot overwrite a fresher answer.
+  for (const d of [...devices].reverse()) for (const t of d.tools ?? []) at(t.id, { wired: t.wired, reportedAt: d.reportedAt, device: d.name });
+  for (const c of connected) at(c.tool, { connected: c });
+  return [...rows.entries()].map(([id, r]) => ({ id, ...r }));
+}
+
+const wiredTools = () => toolState().filter((t) => t.wired === true);
+const judgedTools = () => toolState().filter((t) => t.connected);
+
+function toolLine(t) {
+  if (t.wired === true) {
+    return t.connected
+      ? statusText(`Wired · last judged ${ago(Date.parse(t.connected.at))}`, 'allow')
+      : `<span class="cell-muted">Wired · nothing judged through it yet</span>`;
+  }
+  if (t.wired === false) return statusText('Not wired · the hook is not in its settings', 'attention');
+  if (t.connected) return statusText(`Judging requests · last seen ${ago(Date.parse(t.connected.at))}`, 'allow');
+  return `<span class="cell-muted">${t.found ? 'Installed · has not reported its wiring' : 'Not found on this device'}</span>`;
+}
+
+function toolRows() {
+  return toolState().map((t) => `<div class="setting-row"><span>${esc(t.name)}</span>${toolLine(t)}</div>`).join('');
 }
 
 function ago(ts) {
@@ -104,63 +139,14 @@ function ago(ts) {
   return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 }
 
-/**
- * The public address. Asking for a tunnel is a 202 — asked, not done — and the
- * gateway restarts behind it, so the page says it asked, and watches /health
- * until the address appears or goes.
+/*
+ * The public address and what is kept on disk used to live here, as two
+ * disclosures under the tool list. Both are facts about the server, not about
+ * this computer, and putting them on the page titled "This device" meant the
+ * one screen that answers "is my machine wired up" also answered "is the
+ * company's gateway on the internet". They moved to `gateway.js` whole,
+ * including the 202 handling the tunnel needs.
  */
-const expose = { asked: null, error: '', timer: null };
-
-async function watchAddress(want) {
-  clearTimeout(expose.timer);
-  const started = Date.now();
-  const tick = async () => {
-    const health = await api('/health').catch(() => null);
-    if (health?.ok) state.publicUrl = health.j?.publicUrl ?? null;
-    const done = want ? Boolean(state.publicUrl) : !state.publicUrl;
-    if (done || Date.now() - started > 120000) {
-      expose.asked = null;
-      if (!done) expose.error = want ? 'The tunnel did not open within two minutes. Try again.' : 'The tunnel did not close within two minutes. Try again.';
-      if (state.view === 'soloRules') render();
-      return;
-    }
-    expose.timer = setTimeout(tick, 3000);
-  };
-  expose.timer = setTimeout(tick, 3000);
-}
-
-function addressBlock() {
-  const on = Boolean(state.publicUrl);
-  const datum = expose.asked === 'open' ? 'Opening…' : expose.asked === 'close' ? 'Closing…' : on ? '<span class="status-text --allow">Reachable on the internet</span>' : 'This machine only';
-  let body;
-  if (expose.asked) {
-    body = `<p class="disclosure-text">Anyone with the address reaches the gateway; they still need a key. It changes every time the tunnel restarts.</p>
-      ${statusText(expose.asked === 'open' ? 'Asked the tunnel to open — usually under a minute. The address will appear here.' : 'Asked the tunnel to close — the address stops working when the gateway is back.', 'attention')}`;
-  } else if (on) {
-    body = `<p class="mono public-url">${esc(state.publicUrl)}</p>
-      <p class="disclosure-text">It changes every time the tunnel restarts. Anyone with the address reaches the gateway; they still need a key.</p>
-      <div class="btn-row">${button('Copy address', { attrs: `data-copy="${attr(state.publicUrl)}"` })}${button('Stop exposing', { id: 'stopExpose', disabled: !state.canLeaveDemo })}</div>`;
-  } else {
-    body = `<p class="disclosure-text">Anyone with the address reaches the gateway; they still need a key. It changes every time the tunnel restarts.</p>
-      ${state.canLeaveDemo
-        ? `<div>${button('Put it on the internet', { id: 'startExpose', disabled: state.mock })}</div>${state.mock ? '<p class="disclosure-text muted">Not while Warden is in demo mode: nothing here is really judged.</p>' : ''}`
-        : '<p class="disclosure-text muted">Open a tunnel from the Warden app, or put your own proxy in front of it.</p>'}`;
-  }
-  if (expose.error) body += feedback({ tone: 'error', icon: true, title: 'The address did not change', body: esc(expose.error) });
-  return disclosureRow('d:address', 'Public address', datum, body, { open: state.open.has('d:address') || Boolean(expose.asked) });
-}
-
-function dataBlock() {
-  const chain = state.chain;
-  const p = state.prompts;
-  const datum = chain ? `Log · ${plural(chain.entries, 'record')} · ${chain.ok ? 'verified' : 'does not verify'}` : 'Log';
-  return disclosureRow('d:data', 'Data on this machine', datum, `
-    <dl class="record">
-      <dt>Decision log</dt><dd>${chain ? `${plural(chain.entries, 'record')}, each linked to the one before; ${chain.ok ? 'every record still matches its hash' : 'a record was altered or removed after it was written'}. Prompts are stored as hashes, not text.` : 'Could not be verified right now.'}</dd>
-      <dt>Prompt text</dt><dd>${p ? `Masked text kept ${plural(p.days, 'day')} so an administrator can read what was blocked; ${plural(p.held, 'prompt')} held now.` : 'Not kept: only hashes are stored.'}</dd>
-    </dl>
-    <div>${button('Open Activity →', { kind: 'link', attrs: 'data-go="activity"' })}</div>`, { open: state.open.has('d:data') });
-}
 
 // ── the rules ────────────────────────────────────────────────────────────────
 
@@ -168,15 +154,10 @@ let removing = null;
 
 function rulesSection() {
   const identity = state.soloIdentity;
-  const connected = identity?.connected ?? [];
-  const isProtected = connected.length > 0;
   const onRules = state.soloRules.filter((r) => r.applies !== false);
   const exemptRules = state.soloRules.filter((r) => r.applies === false);
   const offPresets = state.soloPresets.filter((p) => !p.active);
   const loading = !identity && !state.soloLoadError;
-  const protectLine = isProtected
-    ? statusText(`Protected · ${connected.map((c) => `${TOOL_NAMES[c.tool] ?? c.tool} · ${plural(c.count, 'request')} today`).join(', ')}`, 'allow')
-    : statusText('Not protected yet · no tool on this machine has sent a request through Warden', 'attention');
 
   const row = (r, on) => {
     const busy = state.soloToggling === r.id;
@@ -189,11 +170,6 @@ function rulesSection() {
   };
 
   return `<section class="device-rules">
-    <div class="device-rules-head">
-      <div><h2 class="section-title --big">Rules on this device</h2><p class="section-lede">${protectLine}${!soloIsPureInstall() && identity ? ` <span class="muted">· ${esc(identity.role)}${roleExempt(identity.role) ? ', exempt from company-wide rules' : ''}</span>` : ''}</p></div>
-      ${isProtected ? '' : button(state.soloProtecting ? 'Setting up…' : 'Protect this device', { kind: 'primary', id: 'soloProtect', busy: state.soloProtecting })}
-    </div>
-    ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
     ${state.soloToggleError ? feedback({ tone: 'error', icon: true, title: 'That rule did not change', body: esc(state.soloToggleError) }) : ''}
     ${state.soloLoadError && !onRules.length && !offPresets.length
       ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
@@ -217,19 +193,196 @@ function rulesSection() {
   </section>`;
 }
 
+// ── what is true of this device ──────────────────────────────────────────────
+
+/**
+ * The pause in force right now, or null. Same rule the server applies: an
+ * `until` of null is indefinite, an unparseable one is treated as expired.
+ */
+function pausedNow() {
+  const p = state.soloIdentity?.paused;
+  if (!p) return null;
+  if (p.until === null || p.until === undefined) return p;
+  const t = Date.parse(p.until);
+  return Number.isFinite(t) && t > Date.now() ? p : null;
+}
+
+/**
+ * Five conditions, and the headline is their conclusion.
+ *
+ * This replaced a page that led with `isProtected = connected.length > 0` —
+ * protection defined as traffic seen. Somebody who installed the hook,
+ * downloaded the model and wrote a rule was told *"Not protected yet · no
+ * tool on this machine has sent a request through Warden"*, in amber, until
+ * they went and sent a prompt; and a gateway restart said it to everybody at
+ * once, because the traffic lived in a Map. Wiring is now its own fact, read
+ * from what the machine reported about itself, and traffic is the separate
+ * line "last judged".
+ *
+ * Two of these conditions were invisible before and are the reason the block
+ * exists rather than a status line. **The judge**: with no weights downloaded
+ * the mock adapter answers, which is a stand-in and not a judgement, and every
+ * screen looked identical. **Rules for you**: an exempt role is bound by no
+ * company-wide rule, so a perfectly wired machine whose owner is exempt and
+ * has written nothing is a machine nothing protects.
+ */
+function conditions() {
+  const identity = state.soloIdentity;
+  const where = state.health?.installation ?? {};
+  const wired = wiredTools();
+  const judged = judgedTools();
+  const onRules = state.soloRules.filter((r) => r.applies !== false);
+  const exemptRules = state.soloRules.filter((r) => r.applies === false);
+  const exempt = identity && roleExempt(identity.role);
+
+  const rows = [
+    {
+      label: 'Warden',
+      value: `Running · ${where.label ? `“${esc(where.label)}”` : 'this installation'}${where.version ? ` v${esc(where.version)}` : ''} · on this device`
+    },
+    identity
+      ? { label: 'You', value: `${esc(identity.name || identity.id)} · ${esc(identity.role)} · this gateway knows your key` }
+      : { label: 'You', tone: 'attention', value: 'This gateway did not answer with an identity for you' },
+    wiringRow(wired, judged),
+    state.mock
+      ? { label: 'The judge', tone: 'attention', value: 'Mock adapter · a stand-in answers, no model reads your prompts' }
+      : { label: 'The judge', value: `${esc(judgeName())} · on this device, nothing leaves it` },
+    rulesRow(onRules, exemptRules, exempt)
+  ];
+
+  const paused = pausedNow();
+  const gaps = rows.filter((r) => r.tone === 'attention');
+  return conditionBlock({
+    key: 'dev:conditions',
+    claim: paused ? 'Paused · nothing of yours is being judged' : gaps.length ? 'Not judging you yet' : 'Judging requests',
+    tone: paused || gaps.length ? 'attention' : 'allow',
+    summary: esc(`${wired.map((t) => t.name).join(' and ')} wired, judged by ${judgeName()} on this device, against ${plural(onRules.length, 'rule')} addressed at you.`),
+    rows: paused ? [{ label: 'Paused', tone: 'attention', value: pauseLine(paused) }, ...rows] : rows,
+    action: headlineAction(paused, gaps),
+    open: state.open.has('dev:conditions')
+  });
+}
+
+function pauseLine(paused) {
+  const until = paused.until ? `until ${new Date(paused.until).toLocaleString()}` : 'until you turn it back on';
+  return `Requests go through unchecked ${esc(until)}. Each one is still recorded, marked not judged.`;
+}
+
+/**
+ * Wiring and traffic in one row, in that order, because they fail differently.
+ * Nothing wired is a gap. Wired and quiet is not: a machine that has not been
+ * asked anything today has nothing wrong with it, and calling that a fault is
+ * exactly the old bug with a new coat of paint.
+ */
+function wiringRow(wired, judged) {
+  if (!wired.length) {
+    const reported = toolState().some((t) => t.wired !== null);
+    return {
+      label: 'Your tools',
+      tone: 'attention',
+      value: reported
+        ? 'Nothing on this device is wired to Warden'
+        : 'No tool has reported its wiring yet'
+    };
+  }
+  const last = judged.map((t) => Date.parse(t.connected.at)).filter(Number.isFinite).sort((a, b) => b - a)[0];
+  return {
+    label: 'Your tools',
+    value: `${esc(wired.map((t) => t.name).join(', '))} · wired · ${last ? `last judged ${ago(last)}` : 'nothing judged through them yet'}`
+  };
+}
+
+/**
+ * What actually binds the person at this keyboard. An exempt role gets its own
+ * sentence: company-wide rules exist and do not judge them, so a count of
+ * "rules in the policy" would be the most reassuring possible way to be wrong.
+ */
+function rulesRow(onRules, exemptRules, exempt) {
+  if (onRules.length) {
+    const blocks = onRules.filter((r) => r.severity === 'block').length;
+    const escalates = onRules.filter((r) => r.severity === 'escalate').length;
+    const parts = [blocks ? `${blocks} block` : '', escalates ? `${escalates} escalate${escalates === 1 ? 's' : ''}` : ''].filter(Boolean);
+    return { label: 'Rules for you', value: `${plural(onRules.length, 'rule')} on${parts.length ? ` · ${esc(parts.join(', '))}` : ''}` };
+  }
+  return {
+    label: 'Rules for you',
+    tone: 'attention',
+    value: exempt && exemptRules.length
+      ? `None. ${plural(exemptRules.length, 'company-wide rule')} exist and your role is exempt from them, so nothing judges you.`
+      : 'None. Nothing is addressed at you, so there is nothing to judge a request against.'
+  };
+}
+
+/**
+ * One action, and it belongs to the headline.
+ *
+ * A row whose gap this button resolves does not also carry a button — two ways
+ * to do the same thing is how somebody presses the wrong one. Turning Warden
+ * off is `POST /api/solo/pause` with no end date, which is what an indefinite
+ * pause is: off until somebody turns it on, recorded, with a name on it.
+ */
+function headlineAction(paused, gaps) {
+  if (paused) return button('Turn Warden on', { kind: 'primary', id: 'soloResume', busy: state.soloPausing });
+  const first = gaps[0];
+  if (!first) return button(state.soloPausing ? 'Turning off…' : 'Turn Warden off', { id: 'soloPause', busy: state.soloPausing });
+  if (first.label === 'Your tools') return button(state.soloProtecting ? 'Setting up…' : 'Protect this device', { kind: 'primary', id: 'soloProtect', busy: state.soloProtecting });
+  if (first.label === 'The judge') return button('Get a judge', { kind: 'primary', attrs: 'data-go="models"' });
+  if (first.label === 'Rules for you') return button('Write a rule for yourself', { kind: 'primary', id: 'soloFocusRule' });
+  return '';
+}
+
+function judgeName() {
+  const a = state.adjudicator;
+  const id = a?.inForce ?? a?.model ?? null;
+  if (!id) return 'the local adjudicator';
+  return a.choices?.find((c) => c.id === id)?.label ?? modelLabel(id);
+}
+
+// ── the page ─────────────────────────────────────────────────────────────────
+
+const TABS = [['', 'Rules'], ['tools', 'Tools'], ['identity', 'Identity']];
+const tabOf = () => (state.sel === 'tools' || state.sel === 'identity' ? state.sel : '');
+
+function toolsTab() {
+  return `<section class="settings-task">
+    <p class="section-lede">Warden judges a tool’s requests only while that tool is wired to it. Each machine reports its own wiring; the gateway cannot read your home directory.</p>
+    <div class="setting-rows">${toolRows() || '<div class="setting-row"><span class="cell-muted">No supported tool was found on this device.</span></div>'}</div>
+    <p class="disclosure-text muted">To unwire one, run <code>warden-hook --unfix</code> on this device. It is a file in your own settings, so Warden can see it go and cannot put it back.</p>
+  </section>`;
+}
+
+function identityTab() {
+  const identity = state.soloIdentity;
+  if (!identity) return feedback({ tone: 'attention', title: 'This gateway did not say who you are', body: 'Reload the page, or check that the gateway is still running.' });
+  const exempt = roleExempt(identity.role);
+  return `<section class="settings-task">
+    <p class="section-lede">Nothing you type identifies you here. The key does, and only the key — which is why an administrator can change what your role means without you touching this device.</p>
+    <dl class="record">
+      <dt>Name</dt><dd>${esc(identity.name || identity.id)}</dd>
+      <dt>Role</dt><dd>${esc(identity.role)}${exempt ? ' · exempt from company-wide rules' : ''}</dd>
+      <dt>Key</dt><dd><span class="mono">${esc(maskKey(identity.apiKey))}</span>${identity.apiKey ? button('Copy key', { compact: true, attrs: `data-copy="${attr(`export WARDEN_API_KEY=${identity.apiKey}`)}"` }) : ''}</dd>
+    </dl>
+  </section>`;
+}
+
+/** A key, with the middle hidden. The prefix says whose, the tail says which. */
+const maskKey = (key) => {
+  const k = String(key ?? '');
+  const cut = k.indexOf('-', 3);
+  return cut > 0 && k.length > cut + 12 ? `${k.slice(0, cut + 1)}${'•'.repeat(16)}${k.slice(-6)}` : k || 'not issued yet';
+};
+
 function soloBody() {
-  const on = Boolean(state.publicUrl);
+  const tab = tabOf();
   return `<div class="sheet">
-    ${contextBar([{ label: 'This machine' }])}
-    ${pageHead({ title: 'This device', sub: 'Warden runs on this machine. Every request from here passes through it.' })}
+    ${contextBar([{ label: 'This device' }])}
+    ${pageHead({ title: 'This device', sub: 'One device: yours. What is wired here, and what is judging you.' })}
     <div class="reading device-page">
-      <section class="settings-task">
-        <h2 class="section-title">Tools on this machine</h2>
-        <p class="section-lede">Warden judges a tool’s requests only while that tool is wired to it. Checked automatically.</p>
-        <div class="setting-rows">${toolRows() || '<div class="setting-row"><span class="cell-muted">No supported tool was found on this machine.</span></div>'}</div>
-      </section>
-      <div class="disclosures">${addressBlock()}${dataBlock()}</div>
-      ${rulesSection()}
+      ${conditions()}
+      ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
+      ${state.soloPauseError ? feedback({ tone: 'error', icon: true, title: 'Warden did not change', body: esc(state.soloPauseError) }) : ''}
+      ${tabs('soloRules', TABS, tab, 'This device sections')}
+      ${tab === 'tools' ? toolsTab() : tab === 'identity' ? identityTab() : rulesSection()}
     </div>
   </div>`;
 }
@@ -335,26 +488,48 @@ function bindSolo() {
       render();
       return;
     }
-    // `connected` only turns true once a real prompt has actually gone
-    // through the freshly-wired hook — this deliberately does not claim
-    // success on setup's say-so alone. A new terminal, then a real prompt,
-    // is what moves the line from "Not protected yet" to "Protected".
+    // The wiring row moves as soon as this machine reports what it wrote,
+    // which the hook does on its next prompt; it no longer waits for traffic
+    // before admitting the setup worked.
     await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
     render();
   };
 
-  const askExpose = async (enabled) => {
-    expose.error = '';
-    const { ok, j } = await post('/api/gateway/expose', { enabled }).catch(() => ({ ok: false, j: null }));
-    if (!ok) { expose.error = j?.error ?? 'Warden could not be reached.'; render(); return; }
-    // 202: asked, not done. The gateway restarts behind the tunnel and the
-    // console learns the address from /health once it is back.
-    expose.asked = enabled ? 'open' : 'close';
+  /**
+   * The switch, which is an indefinite pause and not a second mechanism.
+   *
+   * `until: null` is off until somebody turns it on, and it goes through
+   * `setPause`, so it carries a name and a time and every request that goes
+   * out meanwhile is recorded as not judged. There is no path here that stops
+   * the gateway: the console is served by it, and a button that killed the
+   * process would take the page with it.
+   */
+  const switchWarden = async (off) => {
+    state.soloPausing = true;
+    state.soloPauseError = '';
     render();
-    void watchAddress(enabled);
+    const r = off
+      ? await post('/api/solo/pause', { until: null }).catch(() => ({ ok: false, j: null }))
+      : await del('/api/solo/pause').catch(() => ({ ok: false, j: null }));
+    state.soloPausing = false;
+    if (!r.ok) {
+      state.soloPauseError = r.j?.error ?? `Could not turn Warden ${off ? 'off' : 'on'} — the gateway did not answer.`;
+      render();
+      return;
+    }
+    await refreshSoloRules();
+    render();
   };
-  if ($('startExpose')) $('startExpose').onclick = () => void askExpose(true);
-  if ($('stopExpose')) $('stopExpose').onclick = () => void askExpose(false);
+  if ($('soloPause')) $('soloPause').onclick = () => void switchWarden(true);
+  if ($('soloResume')) $('soloResume').onclick = () => void switchWarden(false);
+
+  // The gap is "nothing is addressed at you"; the fix is the field on the
+  // Rules tab, so the headline's button goes there and puts the caret in it.
+  const focusRule = $('soloFocusRule');
+  if (focusRule) focusRule.onclick = () => {
+    if (tabOf() !== '') { go('soloRules'); return; }
+    $('soloRuleText')?.focus();
+  };
 }
 
 /**
@@ -385,12 +560,7 @@ async function removeSoloRule(id, isPreset) {
   render();
 }
 
-VIEWS.soloRules = {
-  body: soloBody,
-  bind: bindSolo,
-  onEnter: onEnterSolo,
-  onLeave: () => clearTimeout(expose.timer)
-};
+VIEWS.soloRules = { body: soloBody, bind: bindSolo, onEnter: onEnterSolo };
 
 // ── Settings, on a pure solo install ─────────────────────────────────────────
 

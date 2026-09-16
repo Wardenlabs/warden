@@ -35,9 +35,71 @@ const exemptRoles = () => new Set(state.policy.exemptRoles ?? ['admin']);
 const isExemptRole = (role) => exemptRoles().has(role);
 const firstName = (p) => String(p?.name ?? '').split(' ')[0];
 const toolsOf = (e) => (e.connected ?? []).map((c) => TOOL_NAMES[c.tool] ?? c.tool);
-const requestsOf = (e) => (e.connected ?? []).reduce((n, c) => n + (c.count ?? 0), 0);
 const isConnected = (e) => Boolean(e.connected?.length);
 const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? null;
+
+/**
+ * What this person's machines said about themselves, which is a different
+ * question from what the gateway saw them send.
+ *
+ * The column used to read `connected` alone — traffic, in memory, gone on a
+ * restart — and so one sentence, "Not connected yet", covered three situations
+ * an administrator needs to tell apart: somebody who never installed the hook,
+ * somebody who installed it and took it out, and somebody who is wired and has
+ * been on holiday. The first needs a setup message, the second needs a
+ * conversation, and the third needs nothing at all.
+ *
+ * `wiring` is the classification; `heardAt` is the separate fact of when any
+ * of their machines last spoke to the gateway, which survives a restart
+ * because it comes off disk.
+ */
+const devicesOf = (e) => e.devices ?? [];
+const heardAt = (e) => devicesOf(e).map((d) => Date.parse(d.lastSeen)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? lastActiveAt(e);
+
+function wiring(e) {
+  const devices = devicesOf(e);
+  if (!devices.length) return { kind: 'never' };
+
+  const pending = devices.filter((d) => d.pendingSince);
+  const reported = devices.filter((d) => Array.isArray(d.tools));
+  const tools = new Map();
+  for (const d of reported) for (const t of d.tools) tools.set(t.id, { wired: t.wired, device: d.name || d.machineId });
+  const wired = [...tools.entries()].filter(([, t]) => t.wired);
+  const unwired = [...tools.entries()].filter(([, t]) => !t.wired);
+
+  // A rotated key outranks everything else in the column: until each machine
+  // comes back with the new one, every request from this person is refused,
+  // and that is the state somebody has to act on today.
+  if (pending.length) return { kind: 'pending', since: Date.parse(pending[0].pendingSince), devices: pending.length };
+  if (!reported.length) return { kind: 'silent', devices: devices.length };
+  if (wired.length) {
+    return {
+      kind: 'wired',
+      tools: wired.map(([id]) => TOOL_NAMES[id] ?? id),
+      devices: reported.length,
+      hookVersion: reported[0].hookVersion ?? null
+    };
+  }
+  return { kind: 'unwired', tools: unwired.map(([id]) => TOOL_NAMES[id] ?? id), device: unwired[0]?.[1]?.device ?? '' };
+}
+
+/** The column, in the two lines it has: what was reported, and the detail. */
+function wiringCell(e) {
+  const w = wiring(e);
+  if (w.kind === 'wired') {
+    return `<span class="cell-strong">${esc(w.tools.join(', '))}</span><small>${esc(`${plural(w.devices, 'device')}${w.hookVersion ? ` · hook v${w.hookVersion}` : ''}`)}</small>`;
+  }
+  if (w.kind === 'unwired') {
+    return `<span class="cell-strong --attention">${esc(`Unwired on ${w.device || 'their device'}`)}</span><small>${esc(`${w.tools.join(', ')} removed from its settings`)}</small>`;
+  }
+  if (w.kind === 'pending') {
+    return `<span class="cell-strong --attention">Waiting for the new key</span><small>${esc(`${plural(w.devices, 'device')} since the key was rotated`)}</small>`;
+  }
+  if (w.kind === 'silent') {
+    return `<span class="cell-strong">Seen, but has not reported</span><small>An older hook that does not say what it wired</small>`;
+  }
+  return '<span class="cell-muted">Never reported</span><small>No device has ever checked in</small>';
+}
 
 /** "2h ago" beats a timestamp in a column meant to be swept, not read. */
 function ago(ts) {
@@ -185,6 +247,31 @@ function dialogMarkup() {
           ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The role was not created', body: esc(dlg.error) }) : ''}`,
         actions: button('Cancel', { attrs: 'data-dialog-close="newRole"' }) + button(dlg.busy ? 'Creating…' : 'Create role', { kind: 'primary', id: 'confirmNewRole', busy: dlg.busy })
       });
+    /**
+     * A pause asks for the three things `setPause` accepts, and it asks for
+     * them because they are what makes it explainable six months later.
+     * "Nothing was judged between the 3rd and the 11th" with no author and no
+     * reason is a hole in the governance record; with both, it is a decision.
+     *
+     * The body says what a pause actually does, so nobody reads it as "stop
+     * logging": the requests still go out and still land in the log, marked
+     * as not judged, which is the sentence `recordUnjudged` writes.
+     */
+    case 'pause': {
+      const choices = [['1h', 'One hour'], ['today', 'Until the end of today'], ['forever', 'Until I turn it back on']];
+      const pick = dlg.until ?? '1h';
+      return dialog({
+        id: 'pausePerson', title: `Pause Warden for ${p ? esc(p.name) : 'this person'}?`,
+        body: `<p>While ${first} is paused, ${first}’s requests go through without being checked against any rule. Each one is still recorded and marked “not judged”, with your name on it.</p>
+          <div class="field"><span class="field-label">For how long</span>
+            <div class="role-choices" role="radiogroup" aria-label="For how long">${choices.map(([id, label]) => `<button type="button" role="radio" aria-checked="${id === pick}" class="role-choice${id === pick ? ' --chosen' : ''}" data-choose-until="${id}">${id === pick ? '✓ ' : ''}${esc(label)}</button>`).join('')}</div>
+            ${pick === 'forever' ? '<span class="field-help --attention">With no end date this lasts until somebody turns it back on. Every screen that lists people will say so meanwhile.</span>' : ''}
+          </div>
+          <div class="field"><label for="pauseReason">Why (optional)</label><input type="text" id="pauseReason" placeholder="Debugging their own rule" autocomplete="off" value="${esc(dlg.reason ?? '')}"><span class="field-help">It shows in the log beside your name.</span></div>
+          ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'Warden was not paused', body: esc(dlg.error) }) : ''}`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="pausePerson"' }) + button(dlg.busy ? 'Pausing…' : 'Pause', { kind: 'primary', id: 'confirmPause', busy: dlg.busy })
+      });
+    }
     case 'reset':
       return dialog({
         id: 'resetCompany', title: 'Reset this company?',
@@ -219,6 +306,22 @@ function bindDialogs() {
     if (!ok) { dlg.busy = false; dlg.error = 'failed'; render(); return; }
     await refreshPeople();
     openDialog('keyDone', { id: dlg.id });
+  };
+
+  for (const b of document.querySelectorAll('[data-choose-until]')) b.onclick = () => { dlg.until = b.dataset.chooseUntil; render(); };
+  const reason = $('pauseReason');
+  if (reason) reason.oninput = () => { dlg.reason = reason.value; };
+  const pause = $('confirmPause');
+  if (pause) pause.onclick = async () => {
+    const p = personById(dlg.id);
+    dlg.busy = true; render();
+    const body = { until: untilISO(dlg.until ?? '1h'), ...(dlg.reason?.trim() ? { reason: dlg.reason.trim() } : {}) };
+    const { ok, j } = await post(`/api/people/${encodeURIComponent(dlg.id)}/pause`, body).catch(() => ({ ok: false, j: null }));
+    if (!ok) { dlg.busy = false; dlg.error = j?.error ?? 'The gateway did not answer.'; render(); return; }
+    dlg = null;
+    await refreshPeople();
+    render();
+    showToast(`Warden is paused for ${firstName(p)}`, 'Their requests go out unchecked and are recorded as not judged.');
   };
 
   const remove = $('confirmRemove');
@@ -290,18 +393,33 @@ function roleMenu(p) {
 }
 
 function personActions(p) {
+  const paused = activePause(p);
   return [
     { label: `Write a rule for ${firstName(p)}`, act: 'write-rule', attrs: `data-id="${attr(p.id)}"` },
+    paused
+      ? { label: 'Resume judging', act: 'resume', attrs: `data-id="${attr(p.id)}"` }
+      : { label: `Pause Warden for ${firstName(p)}…`, act: 'pause', attrs: `data-id="${attr(p.id)}"` },
     { label: 'New key', act: 'key', attrs: `data-id="${attr(p.id)}"` },
     { label: 'Remove from team', act: 'remove', attrs: `data-id="${attr(p.id)}"`, destructive: true }
   ];
 }
 
+/**
+ * Two problems, two counts, because they have different answers: somebody who
+ * never set up gets a setup message, and somebody who took the hook out gets a
+ * conversation. One number over both of them hid the second behind the first.
+ */
+function needsAttention(e) {
+  const k = wiring(e).kind;
+  return k === 'never' ? 'never' : k === 'unwired' ? 'unwired' : k === 'pending' ? 'pending' : '';
+}
+
 function peopleTab() {
   const only = state.query.only === 'unsetup';
   const all = state.company.employees;
-  const unsetup = all.filter((e) => !isConnected(e)).length;
-  const shown = only ? all.filter((e) => !isConnected(e)) : all;
+  const counts = { never: 0, unwired: 0, pending: 0 };
+  for (const e of all) { const k = needsAttention(e); if (k) counts[k]++; }
+  const shown = only ? all.filter((e) => needsAttention(e)) : all;
   const load = state.loads.people;
   if (load?.error) {
     return listState({ title: 'Could not load the team', body: 'We could not confirm who is on the team. Retry to load the latest list.', icon: true, action: button('Retry loading', { kind: 'primary', id: 'retryPeople' }) });
@@ -312,14 +430,81 @@ function peopleTab() {
   if (!all.length) {
     return listState({ title: 'Nobody yet', body: 'Add people and Warden issues each of them a connection key.', action: button('Add people', { kind: 'primary', id: 'openAddEmpty' }) });
   }
-  return `<div class="subhead">
-      <span class="subhead-count">${only ? `${plural(shown.length, 'person', 'people')} without setup` : plural(all.length, 'person', 'people')}</span>
-      ${only ? button('Show everyone', { attrs: 'data-go="people"' }) : unsetup ? button(`${unsetup} without setup →`, { attrs: 'data-go="people" data-q="only=unsetup"' }) : ''}
+  const gaps = [
+    counts.unwired ? `${counts.unwired} unwired` : '',
+    counts.pending ? `${counts.pending} waiting for a new key` : '',
+    counts.never ? `${counts.never} never set up` : ''
+  ].filter(Boolean);
+  return `${pausedBand()}
+    <div class="subhead">
+      <span class="subhead-count">${only ? `${plural(shown.length, 'person', 'people')} to look at` : plural(all.length, 'person', 'people')}</span>
+      ${only ? button('Show everyone', { attrs: 'data-go="people"' }) : gaps.length ? button(`${gaps.join(' · ')} →`, { attrs: 'data-go="people" data-q="only=unsetup"' }) : ''}
     </div>
     <div class="table people-table" role="table" aria-label="People">
-      <div class="thead" role="row"><span>Person</span><span>Role</span><span>Connected tools</span><span>Last active</span><span></span></div>
+      <div class="thead" role="row"><span>Person</span><span>Role</span><span>Wired</span><span>Last heard from</span><span></span></div>
       ${shown.map(personRow).join('')}
     </div>`;
+}
+
+/**
+ * While anybody is paused, every screen that lists people says so.
+ *
+ * A gateway that is not judging somebody must not look like one that is, and
+ * a pause with no end date is the one most likely to be forgotten — which is
+ * exactly why the band names who, until when, and offers the way back.
+ */
+function pausedBand() {
+  const paused = state.company.employees.filter((e) => activePause(e));
+  if (!paused.length) return '';
+  const names = paused.map((p) => esc(p.name)).join(', ');
+  const one = paused.length === 1 ? activePause(paused[0]) : null;
+  const until = one ? (one.until ? `until ${new Date(one.until).toLocaleString()}` : 'until somebody turns it back on') : '';
+  return feedback({
+    tone: 'attention',
+    icon: true,
+    title: `${names} ${paused.length === 1 ? 'is' : 'are'} paused — ${paused.length === 1 ? 'their' : 'those'} requests are going through unchecked`,
+    body: esc(`${one ? `Paused ${until}${one.by ? ` by ${one.by}` : ''}${one.reason ? `: “${one.reason}”` : ''}. ` : ''}Every request is still recorded, marked not judged.`)
+  });
+}
+
+/**
+ * The three durations, as an instant the server will accept. `setPause`
+ * refuses an `until` in the past, so "the end of today" is the end of today
+ * and never a time that has already gone; null is the indefinite one.
+ */
+function untilISO(choice) {
+  if (choice === 'forever') return null;
+  if (choice === 'today') {
+    const end = new Date();
+    end.setHours(23, 59, 59, 0);
+    return (end.getTime() > Date.now() ? end : new Date(Date.now() + 3600000)).toISOString();
+  }
+  return new Date(Date.now() + 3600000).toISOString();
+}
+
+/**
+ * The line under a person's name: what is wired, then when they were last
+ * heard from. Never "Not connected yet" off the back of traffic — a person
+ * who wired two machines on Friday and has not worked since is set up, and
+ * telling their administrator otherwise sends them to fix nothing.
+ */
+function personLine(p) {
+  const w = wiring(p);
+  const heard = heardAt(p) ? `last heard from ${ago(heardAt(p))}` : 'never heard from';
+  if (w.kind === 'wired') return `${p.role} · ${w.tools.join(', ')} on ${plural(w.devices, 'device')} · ${heard}`;
+  if (w.kind === 'unwired') return `${p.role} · unwired on ${w.device || 'their device'} · ${heard}`;
+  if (w.kind === 'pending') return `${p.role} · waiting for the new key · ${heard}`;
+  if (w.kind === 'silent') return `${p.role} · ${plural(w.devices, 'device')} seen, wiring not reported · ${heard}`;
+  return `${p.role} · no device has reported yet`;
+}
+
+/** The pause in force right now, or null — the same rule the server applies. */
+function activePause(e) {
+  const p = e?.paused;
+  if (!p) return null;
+  if (p.until === null || p.until === undefined) return p;
+  const t = Date.parse(p.until);
+  return Number.isFinite(t) && t > Date.now() ? p : null;
 }
 
 /**
@@ -328,12 +513,17 @@ function peopleTab() {
  * actually sweeps a list of people for.
  */
 function personRow(e) {
-  const on = isConnected(e);
+  const paused = activePause(e);
   return `<div class="trow --link" role="row" tabindex="0" data-go="people" data-sel="${attr(e.id)}">
     <span class="cell-strong person-name">${esc(e.name)}</span>
     <span class="role-cell">${roleMenu(e)}${isExemptRole(e.role) ? '<span class="exempt-note">Exempt from company-wide rules</span>' : ''}</span>
-    <span class="cell-stack">${on ? `<span class="cell-strong">${esc(toolsOf(e).join(', '))}</span><small>${plural(requestsOf(e), 'request')}</small>` : '<span class="cell-strong">Not connected yet</span><small>Open person to set up</small>'}</span>
-    <span class="cell-muted">${ago(lastActiveAt(e))}</span>
+    <span class="cell-stack">${wiringCell(e)}</span>
+    ${paused
+      // While somebody is paused, when they were last heard from does not mean
+      // what the column says: their requests keep arriving and nothing judges
+      // them. The cell says the thing that is true instead.
+      ? `<span class="status-text --attention">${esc(paused.until ? `Paused until ${new Date(paused.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Paused')}</span>`
+      : `<span class="cell-muted">${ago(heardAt(e))}</span>`}
     <span class="row-menu">${menu(personActions(e), { label: `Actions for ${e.name}` })}</span>
   </div>`;
 }
@@ -382,6 +572,81 @@ function bindPeople() {
 
 // ── one person ───────────────────────────────────────────────────────────────
 
+/**
+ * The one thing about this person that needs a person, above everything else.
+ *
+ * A rotated key is invisible today: the old one stops working instantly —
+ * there is no grace period, by decision — so the only signal anybody gets is
+ * the employee discovering they are refused. `pendingSince` turns that into
+ * something the administrator can see on the screen where they pressed the
+ * button, and it clears itself on the first request that arrives with the new
+ * key, so nobody has to remember to dismiss it.
+ *
+ * The unwired notice is worded against what the product can actually do.
+ * Warden sees the hook go; it cannot put it back, because it is a file in
+ * somebody else's settings and there is no agent on that machine. Offering a
+ * button that implied otherwise would be promising a lock this is not.
+ */
+function personNotice(p) {
+  const paused = activePause(p);
+  if (paused) {
+    const until = paused.until ? `until ${new Date(paused.until).toLocaleString()}` : 'until somebody turns it back on';
+    return feedback({
+      tone: 'attention', icon: true,
+      title: `Warden is paused for ${firstName(p)} ${esc(until)}`,
+      body: esc(`Their requests go through without being checked against any rule${paused.by ? `. Paused by ${paused.by}` : ''}${paused.reason ? `: “${paused.reason}”` : ''}. Every one is still recorded, marked not judged.`)
+    });
+  }
+  const w = wiring(p);
+  if (w.kind === 'pending') {
+    return feedback({
+      tone: 'attention', icon: true,
+      title: `${firstName(p)}’s key was rotated and no device has used the new one yet`,
+      body: `Until each machine checks in with it, every request from ${esc(firstName(p))} is refused. The old key stopped working immediately — there is no grace period, by decision.`
+    });
+  }
+  if (w.kind === 'unwired') {
+    return feedback({
+      tone: 'attention', icon: true,
+      title: `The hook is gone from ${esc(w.device || 'their device')}`,
+      body: `${esc(w.tools.join(', '))} reported that Warden is no longer in its settings. Warden can see this; it cannot put it back — the hook is a file on their machine. Send the setup again, or talk to ${esc(firstName(p))}.`
+    });
+  }
+  return '';
+}
+
+/**
+ * One row per machine, because "this person is connected" was never the
+ * question an administrator had. What each machine reported about its own
+ * wiring, with what it reported it, and when it was last heard from — and
+ * wired-and-quiet stays in ordinary ink, because a laptop nobody asked
+ * anything today is not a fault.
+ */
+function devicesSection(p) {
+  const devices = devicesOf(p);
+  if (!devices.length) return '';
+  return `<section class="person-devices">
+    <h2 class="section-title">Devices</h2>
+    <p class="section-lede">What each machine reported about its own wiring. Warden cannot see a machine it has not heard from.</p>
+    <div class="setting-rows">${devices.map((d) => {
+      const tools = (d.tools ?? []);
+      const wired = tools.filter((t) => t.wired).map((t) => TOOL_NAMES[t.id] ?? t.id);
+      const gone = tools.filter((t) => !t.wired).map((t) => TOOL_NAMES[t.id] ?? t.id);
+      const line = d.pendingSince
+        ? `<span class="status-text --attention">Has not come back with the new key</span>`
+        : !tools.length
+          ? '<span class="cell-muted">Has not reported its wiring</span>'
+          : wired.length
+            ? `<span class="cell-strong">${esc(wired.join(', '))} · wired</span>`
+            : `<span class="status-text --attention">${esc(gone.join(', '))} · not wired</span>`;
+      return `<div class="setting-row">
+        <span class="mono">${esc(d.name || d.machineId)}</span>
+        <span class="cell-stack device-cell">${line}<small>${esc(`${d.hookVersion ? `hook v${d.hookVersion} · ` : ''}last heard from ${ago(Date.parse(d.lastSeen))}`)}</small></span>
+      </div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
 function personPage(p) {
   if (!p) {
     return `<div class="sheet">${contextBar([{ label: 'Team', go: 'people', back: true }, { label: 'Removed' }])}
@@ -402,11 +667,13 @@ function personPage(p) {
     ${contextBar([{ label: 'Team', go: 'people', back: true }, { label: p.name }])}
     ${pageHead({
       title: p.name,
-      sub: on ? `${esc(toolsOf(p).join(', '))} · Last active ${ago(lastActiveAt(p))}` : 'Not connected yet',
+      sub: esc(personLine(p)),
       actions: menu(personActions(p), { label: `Actions for ${p.name}` })
     })}
     <div class="facts person-role">${roleMenu(p)}<span class="fact-v">Role determines which rules apply.</span></div>
+    ${personNotice(p)}
     ${summary}
+    ${devicesSection(p)}
     <div class="reading-wide">
       ${disclosureRow('p:setup', 'Connection & setup', '', `
         <div class="setup-share">
@@ -530,6 +797,19 @@ function bindActions() {
       case 'key':
         if (p) openDialog('key', { id });
         return;
+      case 'pause':
+        if (p) openDialog('pause', { id, until: '1h' });
+        return;
+      // Resuming needs no dialog: it takes nothing away and leaves the record
+      // of the pause exactly where it was.
+      case 'resume': {
+        const { ok, j } = await del(`/api/people/${encodeURIComponent(id)}/pause`).catch(() => ({ ok: false, j: null }));
+        if (!ok) { showToast('Warden was not resumed', j?.error ?? 'Warden could not be reached.'); return; }
+        await refreshPeople();
+        render();
+        showToast(`Judging ${firstName(p)} again`, 'Requests from now on are checked against the rules in force.');
+        return;
+      }
       case 'remove':
         if (p) openDialog('remove', { id });
         return;

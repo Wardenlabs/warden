@@ -10,6 +10,7 @@ import { Router } from 'express';
 import { readAudit } from '../../audit/log.js';
 import { evaluate } from '../../guard/pipeline.js';
 import { activityFor } from '../../policy/activity.js';
+import { devicesFor } from '../../policy/devices.js';
 import { compileRule, isDeclined } from '../../policy/compile.js';
 import { ratifyRule, removeRule } from '../../policy/ratify.js';
 import { addRole, clearPause, loadDirectory, setPause, upsertEmployee, type Employee } from '../../policy/people.js';
@@ -75,17 +76,26 @@ function resolveSoloIdentity(): Employee {
 }
 
 /**
- * The identity, plus which tools have actually been seen using it.
+ * The identity, plus the two separate facts about the tools on this machine.
  *
- * "Protected" on this screen means one thing: a real request from a real tool
- * reached the gateway and was judged. `activityFor` is that evidence — it is
- * built from `/api/guard/check` calls that already succeeded, never from a
- * one-off test the console ran on itself — so this is the same signal Team's
- * "connected" badge reads for everyone else, not a second, weaker one invented
- * for solo installs.
+ * `connected` is traffic: requests from a real tool that reached the gateway
+ * and were judged, built from `/api/guard/check` calls that already succeeded
+ * and never from a test the console ran on itself. It lives in memory and
+ * resets with the process, which is honest for a liveness view.
+ *
+ * `devices` is configuration: what each machine reported about its own wiring,
+ * on disk, surviving a restart. They are sent separately because the screen
+ * has to be able to say which one it has. "Protected" used to mean the first
+ * one alone, so a perfect setup reported *"not protected yet"* until somebody
+ * sent a prompt, and a gateway restart un-protected everybody at once. A
+ * machine that is wired and quiet and a machine that was never wired are
+ * different sentences and now have different data behind them.
  */
-function withActivity(identity: Employee): Employee & { connected: ReturnType<typeof activityFor> } {
-  return { ...identity, connected: activityFor(identity.id) };
+function withActivity(identity: Employee): Employee & {
+  connected: ReturnType<typeof activityFor>;
+  devices: ReturnType<typeof devicesFor>;
+} {
+  return { ...identity, connected: activityFor(identity.id), devices: devicesFor(identity.id) };
 }
 
 soloRoutes.post('/api/solo/setup', (_req, res) => {

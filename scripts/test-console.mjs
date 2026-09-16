@@ -517,3 +517,239 @@ test('the Allowed count and filter mean requests the policy cleared, not request
     assert.deepEqual(activityToolbarCounts(), { ALLOW: 1, BLOCK: 1, ESCALATE: 0, unjudged: 1 });
   } finally { Object.assign(state, saved); }
 });
+
+/**
+ * Gateway. Four behaviours the frames settled and the screen has to keep:
+ * the headline is about judging and not about being alive, a gap takes the
+ * fold away with it, the hook contract is stated in words, and the public
+ * address is no longer on the page about somebody's laptop.
+ */
+const gatewayState = () => ({
+  health: { ok: true, mock: false, mode: 'warden', deadlines: { decisionMs: 90000 }, failClosed: false, installation: { label: 'warden', version: '0.2.5' } },
+  mock: false, publicUrl: null, canLeaveDemo: true, chain: { ok: true, entries: 214 },
+  prompts: { days: 7, held: 214, max: 5000 }, adjudicator: null, view: 'gateway', sel: null
+});
+
+test('Gateway leads with whether it is judging, not with whether it is running', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState());
+    const healthy = VIEWS.gateway.body();
+    assert.match(healthy, /Judging every request/);
+    // If the page renders at all the gateway is up: saying so is furniture.
+    assert.ok(!/Running and enforcing|>Running</.test(healthy), 'the headline must not claim liveness the page already proves');
+    assert.match(healthy, /<details[^>]*conditions-fold/, 'all clear folds away');
+
+    Object.assign(state, gatewayState(), { mock: true, health: { ...gatewayState().health, mock: true } });
+    const blind = VIEWS.gateway.body();
+    assert.match(blind, /Not judging anything/);
+    assert.ok(!/conditions-fold/.test(blind), 'a gap must leave no control to fold the evidence away');
+    assert.match(blind, /stand-in/, 'and it has to say that nothing is reading the prompts');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Gateway states the deadline and what happens when it passes', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState());
+    const open = VIEWS.gateway.body();
+    assert.match(open, /90 s/, 'the deadline comes from /health, never from a constant here');
+    assert.match(open, /goes through unchecked/, 'fail-open is said in words, not implied');
+
+    Object.assign(state, gatewayState(), { health: { ...gatewayState().health, failClosed: true, deadlines: { decisionMs: 45000 } } });
+    const closed = VIEWS.gateway.body();
+    assert.match(closed, /45 s/);
+    assert.match(closed, /refused/);
+    assert.ok(!/goes through unchecked/.test(closed), 'a fail-closed gateway must not be described as letting prompts through');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Gateway names baseline mode as the guard being off', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState(), { health: { ...gatewayState().health, mode: 'baseline' } });
+    const body = VIEWS.gateway.body();
+    assert.match(body, /Not judging anything/);
+    assert.match(body, /the guard is off/);
+    assert.match(body, /exactly like one that is working/, 'the whole point is that it is indistinguishable from a healthy one');
+  } finally { Object.assign(state, saved); }
+});
+
+test('the public address left This device, because it is a fact about the server', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState(), { sel: 'tools' });
+    const device = VIEWS.soloRules.body();
+    assert.ok(!/Public address|public-url|startExpose/.test(device), 'This device must not carry the tunnel any more');
+    assert.ok(!/Data on this machine/.test(device), 'nor what the gateway keeps on disk');
+    // And the word the product settled on, which is "device" and not "machine".
+    assert.ok(!/this machine/i.test(device), 'the copy says device, never machine');
+  } finally { Object.assign(state, saved); }
+});
+
+/**
+ * This device. The rewrite exists to kill one line — protection defined as
+ * traffic seen — so the tests are about the states that line got wrong.
+ */
+const deviceState = (patch = {}) => ({
+  ...gatewayState(),
+  view: 'soloRules',
+  sel: null,
+  open: new Set(),
+  soloIdentity: {
+    id: 'you', name: 'You', role: 'solo', apiKey: 'wk-you-abcdef0123456789',
+    connected: [], devices: [{ name: 'mbp', reportedAt: '2026-09-16T10:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }]
+  },
+  soloRules: [{ id: 'solo-1', text: 'Never paste a key', severity: 'block', applies: true }],
+  soloPresets: [], soloLoadError: '', soloToggling: null, soloBusy: false, soloRuleNote: '',
+  soloProtecting: false, soloProtectError: '', soloPausing: false, soloPauseError: '',
+  policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+  compiler: null,
+  ...patch
+});
+
+test('a wired device with no traffic yet is protected, not "not protected yet"', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    // Wired, judge present, a rule addressed at them, and nothing sent yet.
+    Object.assign(state, deviceState());
+    const body = VIEWS.soloRules.body();
+    assert.match(body, /Judging requests/, 'setup done is setup done, with or without a prompt having been sent');
+    assert.ok(!/Not protected yet/.test(body), 'the sentence that broke the first install must not come back');
+    assert.match(body, /nothing judged through them yet/, 'and the absence of traffic is still reported, just not as a fault');
+    assert.match(body, /conditions-fold/, 'all clear folds away');
+  } finally { Object.assign(state, saved); }
+});
+
+test('nothing wired is the gap, and the headline carries its fix', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState({
+      soloIdentity: { id: 'you', name: 'You', role: 'solo', connected: [], devices: [{ name: 'mbp', tools: [{ id: 'claude-code', wired: false }] }] }
+    }));
+    const body = VIEWS.soloRules.body();
+    assert.match(body, /Not judging you yet/);
+    assert.match(body, /Nothing on this device is wired/);
+    assert.match(body, /Protect this device/);
+    assert.ok(!/conditions-fold/.test(body), 'a gap leaves no control to fold the evidence away');
+  } finally { Object.assign(state, saved); }
+});
+
+test('the two invisible conditions are on the screen: the mock judge and an exempt role nothing binds', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState({ mock: true }));
+    const blind = VIEWS.soloRules.body();
+    assert.match(blind, /Mock adapter/, 'a stand-in answering is not a judgement and has to say so');
+    assert.match(blind, /Get a judge/);
+
+    Object.assign(state, deviceState({
+      soloIdentity: { id: 'you', name: 'You', role: 'admin', connected: [], devices: [{ name: 'mbp', tools: [{ id: 'claude-code', wired: true }] }] },
+      soloRules: [{ id: 'r1', text: 'Company rule', severity: 'block', applies: false }]
+    }));
+    const exempt = VIEWS.soloRules.body();
+    assert.match(exempt, /your role is exempt from them/, 'wiring alone protects nobody whom no rule binds');
+    assert.match(exempt, /Write a rule for yourself/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('turning Warden off is a recorded pause, not a way to stop the gateway', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState());
+    assert.match(VIEWS.soloRules.body(), /Turn Warden off/);
+
+    Object.assign(state, deviceState({
+      soloIdentity: { ...deviceState().soloIdentity, paused: { until: null, by: 'you', at: '2026-09-16T10:00:00.000Z' } }
+    }));
+    const off = VIEWS.soloRules.body();
+    assert.match(off, /Paused · nothing of yours is being judged/);
+    assert.match(off, /still recorded, marked not judged/, 'a pause is a gap in judging, never a gap in the record');
+    assert.match(off, /Turn Warden on/);
+    assert.ok(!/conditions-fold/.test(off), 'being paused is not something to fold away either');
+  } finally { Object.assign(state, saved); }
+});
+
+/**
+ * Team. The list used to answer one question — has traffic been seen — and
+ * called the answer "connected", so three different situations wore the same
+ * sentence and a gateway restart said it about everybody.
+ */
+const teamState = (employees) => ({
+  view: 'people', sel: null, query: {}, open: new Set(),
+  company: { name: 'Acme', roles: ['employee', 'admin'], employees },
+  policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+  loads: { people: { loading: false, error: '' } },
+  audit: []
+});
+const person = (patch) => ({ id: 'ana', name: 'Ana López', role: 'employee', connected: [], devices: [], ...patch });
+
+test('Team tells "never installed" from "took the hook out" from "wired and quiet"', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ id: 'never', name: 'Never Set', devices: [] }),
+      person({ id: 'quiet', name: 'Quiet One', devices: [{ machineId: 'm1', name: 'quiet-mbp', lastSeen: '2026-09-16T09:00:00.000Z', hookVersion: '0.2.5', tools: [{ id: 'claude-code', wired: true }] }] }),
+      person({ id: 'gone', name: 'Gone Away', devices: [{ machineId: 'm2', name: 'gone-mbp', lastSeen: '2026-09-13T09:00:00.000Z', tools: [{ id: 'claude-code', wired: false }] }] })
+    ]));
+    const list = VIEWS.people.body();
+    assert.match(list, /Never reported/, 'nobody has ever checked in for this one');
+    assert.match(list, /Unwired on gone-mbp/, 'and this one broke the seal, which is not the same thing');
+    assert.match(list, /Claude Code/, 'the wired one names what it wired');
+    assert.ok(!/Not connected yet/.test(list), 'the sentence that covered all three is gone');
+    // Two problems with two answers, counted apart.
+    assert.match(list, /1 unwired/);
+    assert.match(list, /1 never set up/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('a rotated key is visible to the administrator who rotated it', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-16T09:00:00.000Z', pendingSince: '2026-09-16T08:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }] })
+    ]), { sel: 'ana' });
+    const page = VIEWS.people.body();
+    assert.match(page, /key was rotated and no device has used the new one yet/);
+    assert.match(page, /there is no grace period/, 'the reason the employee is being refused right now');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Team says an unwired hook is seen and cannot be put back', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-13T09:00:00.000Z', tools: [{ id: 'claude-code', wired: false }] }] })
+    ]), { sel: 'ana' });
+    const page = VIEWS.people.body();
+    assert.match(page, /it cannot put it back/, 'Warden detects; it does not enforce, and the copy may not pretend otherwise');
+    assert.ok(!/Force|Reinstall/i.test(page), 'no control may imply a power the product does not have');
+  } finally { Object.assign(state, saved); }
+});
+
+test('while anybody is paused, the list says so and stops reporting a last-seen that means nothing', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ paused: { until: null, by: 'marce', reason: 'debugging her own rule', at: '2026-09-16T08:00:00.000Z' },
+        devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-16T09:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }] })
+    ]));
+    const list = VIEWS.people.body();
+    assert.match(list, /is paused/, 'a gateway judging nobody must not look like one that is');
+    assert.match(list, /still recorded, marked not judged/);
+    assert.match(list, /by marce/, 'a pause nobody can attribute is a hole in the record');
+    assert.match(list, /Paused<\/span>/, 'and the last-heard column says the thing that is true instead');
+  } finally { Object.assign(state, saved); }
+});

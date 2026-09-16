@@ -137,6 +137,24 @@ export const state = {
   /** { days, held, max } while prompt text is kept, null when it is not. */
   prompts: null,
 
+  /** True while the switch on This device is in flight, and what it said if
+   *  it refused. Off is an indefinite pause, so both ways go through it. */
+  soloPausing: false,
+  soloPauseError: '',
+
+  /**
+   * Everything `/health` last said, kept whole for the Gateway screen.
+   *
+   * The fields beside this one are the four the rest of the console reads, and
+   * they stay. What the payload also carries and nobody was reading is the
+   * part that only Gateway shows: which installation answered (`installation`,
+   * from F1 — two Warden on one machine used to be indistinguishable), whether
+   * the guard is switched off (`mode`), and the pair every hook obeys,
+   * `deadlines.decisionMs` with `failClosed`. That pair decides whether a hook
+   * lets a prompt through unchecked and it was on no screen at all.
+   */
+  health: null,
+
   /**
    * Where rule compilation runs. Never holds the API key — the server returns
    * `hasKey` and the last four characters, so this page can say "a key is

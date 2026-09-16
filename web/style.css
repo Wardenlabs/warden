@@ -956,6 +956,13 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .codewrap .btn { position: absolute; top: var(--s-2); right: var(--s-2); }
 .person-rules { margin-top: var(--s-8); display: grid; gap: var(--s-4); }
 .person-rules-table .thead, .person-rules-table .trow { grid-template-columns: minmax(0, 660fr) minmax(0, 280fr) minmax(100px, 180fr); }
+/* One row per machine: the name on the left, what it reported on the right,
+   with when it was last heard from under it. Wired and quiet is ink. */
+.person-devices { margin-top: var(--s-7); display: grid; gap: var(--s-2); max-width: var(--w-reading); }
+.person-devices .setting-rows { margin-top: var(--s-3); }
+.person-devices .setting-row { align-items: flex-start; }
+.device-cell { text-align: right; justify-items: end; }
+.cell-strong.--attention { color: var(--verdict-attention); }
 
 .roles-table .thead, .roles-table .trow { grid-template-columns: minmax(0, 310fr) minmax(90px, 170fr) minmax(0, 350fr) minmax(90px, 260fr) 40px; }
 .roles-table .trow.--editing { background: var(--surface-subtle); border-bottom: 0; }
@@ -1110,7 +1117,35 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .skeleton-line { display: block; width: 70%; height: 12px; margin: var(--s-2) 0; border-radius: var(--r-control); background: var(--surface-subtle); }
 .skeleton-line.short { width: 45%; }
 
-/* ═══ this device, runtime, red team ═════════════════════════════════════ */
+/* ═══ this device, gateway, runtime, red team ════════════════════════════ */
+
+/* The conditions block: headline is the conclusion, rows are the evidence.
+   A gap renders without the <details> around it, so there is nothing to fold
+   it back with — that is the whole behaviour and it lives in conditionBlock. */
+.conditions { display: grid; gap: var(--s-2); }
+.conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: 40px; }
+.conditions-claim { display: inline-flex; align-items: center; gap: var(--s-3); margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
+.conditions-claim.--attention { color: var(--verdict-attention); }
+.conditions-claim .dot { width: 10px; height: 10px; }
+.conditions-rows { grid-template-columns: 180px minmax(0, 1fr); margin-top: var(--s-2); }
+.conditions-rows dd.--attention { color: var(--verdict-attention); }
+.conditions-rows dd .btn { margin-left: var(--s-3); }
+.conditions-summary { font-size: var(--fs-4); color: var(--ink-body); }
+.conditions-fold { border-bottom: 0; }
+.conditions-fold > summary { padding: 0; }
+.conditions-fold > .disclosure-body { padding-bottom: 0; }
+
+/* Gateway. The tab content is bands of label/value rows: everything on this
+   screen is something the gateway says about itself, and only one of them
+   (the tunnel) is a control. */
+.gw-page { display: grid; gap: var(--s-6); }
+.gw-rows { display: grid; }
+.gw-record { grid-template-columns: 180px minmax(0, 1fr); padding: var(--s-4) 0; }
+.gw-record dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); }
+.gw-record dd.--attention { color: var(--verdict-attention); }
+.gw-note { flex-basis: 100%; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.gw-block { display: grid; justify-items: start; gap: var(--s-3); padding: var(--s-5) 0; }
+.gw-line { margin: 0; font-size: var(--fs-4); color: var(--ink); }
 
 .device-page { display: grid; gap: var(--s-8); }
 .setting-rows { display: grid; gap: var(--s-3); margin-top: var(--s-2); }
