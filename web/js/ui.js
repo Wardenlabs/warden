@@ -162,6 +162,48 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
   </details>`;
 }
 
+/**
+ * The block This device and Gateway both lead with: a headline that is the
+ * conclusion and rows that are the evidence for it.
+ *
+ * **The content decides the folding, not the reader.** With every condition
+ * satisfied the block is two lines and offers to open; with a gap it is open
+ * and has no control to close it. Someone can put away good news. Nobody gets
+ * to put away the fact that no model is judging.
+ *
+ * It replaced a four-step setup wizard, which was the obvious design and the
+ * wrong one twice over: the panel dies when the steps finish, taking the
+ * vocabulary it taught with it, and the four things are not steps anyway —
+ * a model can be downloaded before a tool is wired. These are conditions.
+ * The same rows before and after; what changes is the values and whether
+ * there is anything to press.
+ *
+ * `rows` is `[{ label, value, tone }]`, where `value` is already-safe HTML so
+ * a row can carry its own action, and `tone: 'attention'` is what makes a row
+ * a gap. The headline's action slot takes one action, the one the headline
+ * implies; a row whose gap that action resolves does not also carry a button.
+ */
+export function conditionBlock({ key, claim, tone = 'allow', summary = '', rows = [], action = '', open = false }) {
+  const gap = rows.some((r) => r.tone === 'attention');
+  const head = `<div class="conditions-head">
+      <p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>
+      ${action}
+    </div>`;
+  const list = `<dl class="record conditions-rows">${rows.map((r) => `
+      <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`;
+
+  if (gap) return `<section class="conditions">${head}${list}</section>`;
+  return `<section class="conditions">${head}
+    <details class="disclosure conditions-fold" data-key="${esc(key)}"${open ? ' open' : ''}>
+      <summary>
+        <span class="conditions-summary">${summary}</span>
+        <span class="disclosure-datum"><span>Details</span><i class="chev" aria-hidden="true"></i></span>
+      </summary>
+      <div class="disclosure-body">${list}</div>
+    </details>
+  </section>`;
+}
+
 // ── identity and verdicts ────────────────────────────────────────────────────
 
 const ROLE_TONES = new Set(['admin', 'employee', 'sales', 'solo']);

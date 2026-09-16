@@ -73,6 +73,16 @@ const TEAM_NAV = [
 ];
 
 const SOLO_NAV_ITEM = { view: 'soloRules', label: 'This device', icon: 'device' };
+/**
+ * The server, under the machine, on both sides of the solo line.
+ *
+ * It answers a different question from the one above it — "This device" is
+ * about the computer somebody is sitting at, "Gateway" is about the process
+ * that holds the rules, the keys and the log — and a solo install has one of
+ * each just as much as a company does. What it took from This device is the
+ * public address and what is kept on disk: both are properties of the server.
+ */
+const GATEWAY_NAV_ITEM = { view: 'gateway', label: 'Gateway', icon: 'gateway' };
 const SOLO_SETTINGS_NAV_ITEM = { view: 'soloSettings', label: 'Settings', icon: 'settings' };
 
 /**
@@ -109,8 +119,8 @@ export function soloIsPureInstall() {
  */
 function navItems() {
   return soloIsPureInstall()
-    ? [{ group: 'Manage' }, { view: 'models', label: 'Models', icon: 'models' }, { group: 'Local' }, SOLO_NAV_ITEM, SOLO_SETTINGS_NAV_ITEM]
-    : [...TEAM_NAV, { group: 'Local' }, SOLO_NAV_ITEM];
+    ? [{ group: 'Manage' }, { view: 'models', label: 'Models', icon: 'models' }, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM, SOLO_SETTINGS_NAV_ITEM]
+    : [...TEAM_NAV, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM];
 }
 
 /**

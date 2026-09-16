@@ -517,3 +517,76 @@ test('the Allowed count and filter mean requests the policy cleared, not request
     assert.deepEqual(activityToolbarCounts(), { ALLOW: 1, BLOCK: 1, ESCALATE: 0, unjudged: 1 });
   } finally { Object.assign(state, saved); }
 });
+
+/**
+ * Gateway. Four behaviours the frames settled and the screen has to keep:
+ * the headline is about judging and not about being alive, a gap takes the
+ * fold away with it, the hook contract is stated in words, and the public
+ * address is no longer on the page about somebody's laptop.
+ */
+const gatewayState = () => ({
+  health: { ok: true, mock: false, mode: 'warden', deadlines: { decisionMs: 90000 }, failClosed: false, installation: { label: 'warden', version: '0.2.5' } },
+  mock: false, publicUrl: null, canLeaveDemo: true, chain: { ok: true, entries: 214 },
+  prompts: { days: 7, held: 214, max: 5000 }, adjudicator: null, view: 'gateway', sel: null
+});
+
+test('Gateway leads with whether it is judging, not with whether it is running', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState());
+    const healthy = VIEWS.gateway.body();
+    assert.match(healthy, /Judging every request/);
+    // If the page renders at all the gateway is up: saying so is furniture.
+    assert.ok(!/Running and enforcing|>Running</.test(healthy), 'the headline must not claim liveness the page already proves');
+    assert.match(healthy, /<details[^>]*conditions-fold/, 'all clear folds away');
+
+    Object.assign(state, gatewayState(), { mock: true, health: { ...gatewayState().health, mock: true } });
+    const blind = VIEWS.gateway.body();
+    assert.match(blind, /Not judging anything/);
+    assert.ok(!/conditions-fold/.test(blind), 'a gap must leave no control to fold the evidence away');
+    assert.match(blind, /stand-in/, 'and it has to say that nothing is reading the prompts');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Gateway states the deadline and what happens when it passes', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState());
+    const open = VIEWS.gateway.body();
+    assert.match(open, /90 s/, 'the deadline comes from /health, never from a constant here');
+    assert.match(open, /goes through unchecked/, 'fail-open is said in words, not implied');
+
+    Object.assign(state, gatewayState(), { health: { ...gatewayState().health, failClosed: true, deadlines: { decisionMs: 45000 } } });
+    const closed = VIEWS.gateway.body();
+    assert.match(closed, /45 s/);
+    assert.match(closed, /refused/);
+    assert.ok(!/goes through unchecked/.test(closed), 'a fail-closed gateway must not be described as letting prompts through');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Gateway names baseline mode as the guard being off', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState(), { health: { ...gatewayState().health, mode: 'baseline' } });
+    const body = VIEWS.gateway.body();
+    assert.match(body, /Not judging anything/);
+    assert.match(body, /the guard is off/);
+    assert.match(body, /exactly like one that is working/, 'the whole point is that it is indistinguishable from a healthy one');
+  } finally { Object.assign(state, saved); }
+});
+
+test('the public address left This device, because it is a fact about the server', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState(), { view: 'soloRules', soloIdentity: null, soloRules: [], soloPresets: [], soloLoadError: '', open: new Set() });
+    const device = VIEWS.soloRules.body();
+    assert.ok(!/Public address|public-url|startExpose/.test(device), 'This device must not carry the tunnel any more');
+    assert.ok(!/Data on this machine/.test(device), 'nor what the gateway keeps on disk');
+    // And the word the product settled on, which is "device" and not "machine".
+    assert.match(device, /Tools on this device/);
+  } finally { Object.assign(state, saved); }
+});

@@ -10,15 +10,7 @@ import { route } from './router.js';
 
 export async function boot() {
   const health = await api('/health').catch(() => null);
-  state.mock = Boolean(health?.j?.mock);
-  // Whether a desktop shell is listening that could actually fetch the models.
-  // False in a browser against a checkout, where the honest offer is a command.
-  state.canLeaveDemo = Boolean(health?.j?.canLeaveDemo);
-  // The address the team reaches this gateway at, when a tunnel is up.
-  state.publicUrl = health?.j?.publicUrl ?? null;
-  // How long prompt text stays readable. Shown on the screen that shows it,
-  // because a retention policy nobody can see is one nobody can rely on.
-  state.prompts = health?.j?.prompts ?? null;
+  takeHealth(health?.j);
   if (!health?.ok) {
     $('pane').innerHTML = '<div class="sheet"><div class="empty"><b>The gateway is not answering</b><span>Start it with <code>pnpm run dev</code> and reload this page.</span></div></div>';
     return;
@@ -35,6 +27,38 @@ export async function boot() {
   for (const list of lists) void list.then(() => render());
   await Promise.allSettled(lists);
   subscribe();
+}
+
+/**
+ * What `/health` said, spread into the fields the console reads.
+ *
+ * One place, because the same payload is now read at boot, every time the
+ * Gateway screen is opened, and every three seconds while a tunnel is coming
+ * up — and three copies of "which of these fields matter" is how one of them
+ * drifts. A failed read leaves the previous answer alone rather than blanking
+ * the screen: a gateway that did not reply to one poll has not changed what it
+ * is running.
+ */
+function takeHealth(j) {
+  if (!j) return;
+  state.health = j;
+  state.mock = Boolean(j.mock);
+  // Whether a desktop shell is listening that could actually fetch the models.
+  // False in a browser against a checkout, where the honest offer is a command.
+  state.canLeaveDemo = Boolean(j.canLeaveDemo);
+  // The address the team reaches this gateway at, when a tunnel is up.
+  state.publicUrl = j.publicUrl ?? null;
+  // How long prompt text stays readable. Shown on the screen that shows it,
+  // because a retention policy nobody can see is one nobody can rely on.
+  state.prompts = j.prompts ?? null;
+}
+
+/** Ask the gateway again what it is. Used on entering Gateway, and while a
+ *  tunnel is opening — `/api/gateway/expose` answers "asked", never "done". */
+export async function refreshHealth() {
+  const { ok, j } = await api('/health').catch(() => ({ ok: false, j: null }));
+  if (ok) takeHealth(j);
+  return ok;
 }
 
 /**

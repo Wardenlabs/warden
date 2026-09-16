@@ -2,12 +2,11 @@
  * "This device": the machine Warden runs on — its tools, its address, its data — and the rules that protect it.
  */
 import { $, api, attr, del, esc, post, state } from './core.js';
-import { refreshChain } from './data.js';
 import { TOOL_NAMES, plural } from './format.js';
 import { soloIsPureInstall } from './nav.js';
 import { render } from './render.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
-import { button, contextBar, dialog, disclosureRow, effectText, feedback, listState, menu, pageHead, statusText } from './ui.js';
+import { button, contextBar, dialog, effectText, feedback, listState, menu, pageHead, statusText } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ THIS DEVICE ═════════════════════════════════════════════════════════════
@@ -60,7 +59,7 @@ async function refreshSoloRules() {
  */
 async function onEnterSolo() {
   await post('/api/solo/setup').catch(() => null);
-  await Promise.all([refreshSoloPresets(), refreshSoloRules(), refreshChain()]);
+  await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
   render();
 }
 
@@ -104,63 +103,14 @@ function ago(ts) {
   return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 }
 
-/**
- * The public address. Asking for a tunnel is a 202 — asked, not done — and the
- * gateway restarts behind it, so the page says it asked, and watches /health
- * until the address appears or goes.
+/*
+ * The public address and what is kept on disk used to live here, as two
+ * disclosures under the tool list. Both are facts about the server, not about
+ * this computer, and putting them on the page titled "This device" meant the
+ * one screen that answers "is my machine wired up" also answered "is the
+ * company's gateway on the internet". They moved to `gateway.js` whole,
+ * including the 202 handling the tunnel needs.
  */
-const expose = { asked: null, error: '', timer: null };
-
-async function watchAddress(want) {
-  clearTimeout(expose.timer);
-  const started = Date.now();
-  const tick = async () => {
-    const health = await api('/health').catch(() => null);
-    if (health?.ok) state.publicUrl = health.j?.publicUrl ?? null;
-    const done = want ? Boolean(state.publicUrl) : !state.publicUrl;
-    if (done || Date.now() - started > 120000) {
-      expose.asked = null;
-      if (!done) expose.error = want ? 'The tunnel did not open within two minutes. Try again.' : 'The tunnel did not close within two minutes. Try again.';
-      if (state.view === 'soloRules') render();
-      return;
-    }
-    expose.timer = setTimeout(tick, 3000);
-  };
-  expose.timer = setTimeout(tick, 3000);
-}
-
-function addressBlock() {
-  const on = Boolean(state.publicUrl);
-  const datum = expose.asked === 'open' ? 'Opening…' : expose.asked === 'close' ? 'Closing…' : on ? '<span class="status-text --allow">Reachable on the internet</span>' : 'This machine only';
-  let body;
-  if (expose.asked) {
-    body = `<p class="disclosure-text">Anyone with the address reaches the gateway; they still need a key. It changes every time the tunnel restarts.</p>
-      ${statusText(expose.asked === 'open' ? 'Asked the tunnel to open — usually under a minute. The address will appear here.' : 'Asked the tunnel to close — the address stops working when the gateway is back.', 'attention')}`;
-  } else if (on) {
-    body = `<p class="mono public-url">${esc(state.publicUrl)}</p>
-      <p class="disclosure-text">It changes every time the tunnel restarts. Anyone with the address reaches the gateway; they still need a key.</p>
-      <div class="btn-row">${button('Copy address', { attrs: `data-copy="${attr(state.publicUrl)}"` })}${button('Stop exposing', { id: 'stopExpose', disabled: !state.canLeaveDemo })}</div>`;
-  } else {
-    body = `<p class="disclosure-text">Anyone with the address reaches the gateway; they still need a key. It changes every time the tunnel restarts.</p>
-      ${state.canLeaveDemo
-        ? `<div>${button('Put it on the internet', { id: 'startExpose', disabled: state.mock })}</div>${state.mock ? '<p class="disclosure-text muted">Not while Warden is in demo mode: nothing here is really judged.</p>' : ''}`
-        : '<p class="disclosure-text muted">Open a tunnel from the Warden app, or put your own proxy in front of it.</p>'}`;
-  }
-  if (expose.error) body += feedback({ tone: 'error', icon: true, title: 'The address did not change', body: esc(expose.error) });
-  return disclosureRow('d:address', 'Public address', datum, body, { open: state.open.has('d:address') || Boolean(expose.asked) });
-}
-
-function dataBlock() {
-  const chain = state.chain;
-  const p = state.prompts;
-  const datum = chain ? `Log · ${plural(chain.entries, 'record')} · ${chain.ok ? 'verified' : 'does not verify'}` : 'Log';
-  return disclosureRow('d:data', 'Data on this machine', datum, `
-    <dl class="record">
-      <dt>Decision log</dt><dd>${chain ? `${plural(chain.entries, 'record')}, each linked to the one before; ${chain.ok ? 'every record still matches its hash' : 'a record was altered or removed after it was written'}. Prompts are stored as hashes, not text.` : 'Could not be verified right now.'}</dd>
-      <dt>Prompt text</dt><dd>${p ? `Masked text kept ${plural(p.days, 'day')} so an administrator can read what was blocked; ${plural(p.held, 'prompt')} held now.` : 'Not kept: only hashes are stored.'}</dd>
-    </dl>
-    <div>${button('Open Activity →', { kind: 'link', attrs: 'data-go="activity"' })}</div>`, { open: state.open.has('d:data') });
-}
 
 // ── the rules ────────────────────────────────────────────────────────────────
 
@@ -218,17 +168,15 @@ function rulesSection() {
 }
 
 function soloBody() {
-  const on = Boolean(state.publicUrl);
   return `<div class="sheet">
-    ${contextBar([{ label: 'This machine' }])}
-    ${pageHead({ title: 'This device', sub: 'Warden runs on this machine. Every request from here passes through it.' })}
+    ${contextBar([{ label: 'This device' }])}
+    ${pageHead({ title: 'This device', sub: 'One device: yours. What is wired here, and what is judging you.' })}
     <div class="reading device-page">
       <section class="settings-task">
-        <h2 class="section-title">Tools on this machine</h2>
+        <h2 class="section-title">Tools on this device</h2>
         <p class="section-lede">Warden judges a tool’s requests only while that tool is wired to it. Checked automatically.</p>
-        <div class="setting-rows">${toolRows() || '<div class="setting-row"><span class="cell-muted">No supported tool was found on this machine.</span></div>'}</div>
+        <div class="setting-rows">${toolRows() || '<div class="setting-row"><span class="cell-muted">No supported tool was found on this device.</span></div>'}</div>
       </section>
-      <div class="disclosures">${addressBlock()}${dataBlock()}</div>
       ${rulesSection()}
     </div>
   </div>`;
@@ -343,18 +291,6 @@ function bindSolo() {
     render();
   };
 
-  const askExpose = async (enabled) => {
-    expose.error = '';
-    const { ok, j } = await post('/api/gateway/expose', { enabled }).catch(() => ({ ok: false, j: null }));
-    if (!ok) { expose.error = j?.error ?? 'Warden could not be reached.'; render(); return; }
-    // 202: asked, not done. The gateway restarts behind the tunnel and the
-    // console learns the address from /health once it is back.
-    expose.asked = enabled ? 'open' : 'close';
-    render();
-    void watchAddress(enabled);
-  };
-  if ($('startExpose')) $('startExpose').onclick = () => void askExpose(true);
-  if ($('stopExpose')) $('stopExpose').onclick = () => void askExpose(false);
 }
 
 /**
@@ -385,12 +321,7 @@ async function removeSoloRule(id, isPreset) {
   render();
 }
 
-VIEWS.soloRules = {
-  body: soloBody,
-  bind: bindSolo,
-  onEnter: onEnterSolo,
-  onLeave: () => clearTimeout(expose.timer)
-};
+VIEWS.soloRules = { body: soloBody, bind: bindSolo, onEnter: onEnterSolo };
 
 // ── Settings, on a pure solo install ─────────────────────────────────────────
 
