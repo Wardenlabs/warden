@@ -194,6 +194,7 @@ function rulesSection() {
       ${isProtected ? '' : button(state.soloProtecting ? 'Setting up…' : 'Protect this device', { kind: 'primary', id: 'soloProtect', busy: state.soloProtecting })}
     </div>
     ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
+    ${state.soloToggleError ? feedback({ tone: 'error', icon: true, title: 'That rule did not change', body: esc(state.soloToggleError) }) : ''}
     ${state.soloLoadError && !onRules.length && !offPresets.length
       ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
       : loading ? feedback({ title: 'Loading the rules for this device…', body: 'Fetching what is turned on and what is suggested.' })
@@ -248,9 +249,15 @@ function bindSolo() {
     if (preset) {
       const id = decodeURIComponent(preset.dataset.preset);
       state.soloToggling = id;
+      state.soloToggleError = '';
       render();
-      await post(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, { active: true });
+      const r = await post(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, { active: true });
       state.soloToggling = null;
+      // A checkbox that goes back to where it was is the whole report a failed
+      // toggle used to make. It reads as a control that does not work, which is
+      // indistinguishable from a click the page never received, and both look
+      // like the product is broken rather than like something went wrong.
+      if (!r.ok) { state.soloToggleError = toggleFailure(r, 'turn that rule on'); render(); return; }
       await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
       render();
       return;
@@ -350,13 +357,30 @@ function bindSolo() {
   if ($('stopExpose')) $('stopExpose').onclick = () => void askExpose(false);
 }
 
+/**
+ * What to say when a toggle does not take.
+ *
+ * The gateway's own words when it sent any, because it knows what happened and
+ * this function does not; the status only when nothing else is available, and
+ * a 0 means the request never left the browser, which is its own diagnosis.
+ */
+function toggleFailure(r, attempt) {
+  const said = typeof r.j?.error === 'string' ? r.j.error : '';
+  if (said) return `Could not ${attempt}: ${said}`;
+  if (!r.status) return `Could not ${attempt} — the gateway did not answer. It may have stopped.`;
+  return `Could not ${attempt} — the gateway answered ${r.status}.`;
+}
+
 /** Shared by the checkbox and the "···" menu — same action, two doors in. */
 async function removeSoloRule(id, isPreset) {
   state.soloToggling = id;
+  state.soloToggleError = '';
   render();
-  if (isPreset) await post(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, { active: false });
-  else await del(`/api/solo/rules/${encodeURIComponent(id)}`);
+  const r = isPreset
+    ? await post(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, { active: false })
+    : await del(`/api/solo/rules/${encodeURIComponent(id)}`);
   state.soloToggling = null;
+  if (!r.ok) { state.soloToggleError = toggleFailure(r, 'turn that rule off'); render(); return; }
   await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
   render();
 }
