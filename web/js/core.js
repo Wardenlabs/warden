@@ -137,6 +137,11 @@ export const state = {
   /** { days, held, max } while prompt text is kept, null when it is not. */
   prompts: null,
 
+  /** True while the switch on This device is in flight, and what it said if
+   *  it refused. Off is an indefinite pause, so both ways go through it. */
+  soloPausing: false,
+  soloPauseError: '',
+
   /**
    * Everything `/health` last said, kept whole for the Gateway screen.
    *

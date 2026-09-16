@@ -582,11 +582,98 @@ test('the public address left This device, because it is a fact about the server
   await import('../web/js/solo.js');
   const saved = { ...state };
   try {
-    Object.assign(state, gatewayState(), { view: 'soloRules', soloIdentity: null, soloRules: [], soloPresets: [], soloLoadError: '', open: new Set() });
+    Object.assign(state, deviceState(), { sel: 'tools' });
     const device = VIEWS.soloRules.body();
     assert.ok(!/Public address|public-url|startExpose/.test(device), 'This device must not carry the tunnel any more');
     assert.ok(!/Data on this machine/.test(device), 'nor what the gateway keeps on disk');
     // And the word the product settled on, which is "device" and not "machine".
-    assert.match(device, /Tools on this device/);
+    assert.ok(!/this machine/i.test(device), 'the copy says device, never machine');
+  } finally { Object.assign(state, saved); }
+});
+
+/**
+ * This device. The rewrite exists to kill one line — protection defined as
+ * traffic seen — so the tests are about the states that line got wrong.
+ */
+const deviceState = (patch = {}) => ({
+  ...gatewayState(),
+  view: 'soloRules',
+  sel: null,
+  open: new Set(),
+  soloIdentity: {
+    id: 'you', name: 'You', role: 'solo', apiKey: 'wk-you-abcdef0123456789',
+    connected: [], devices: [{ name: 'mbp', reportedAt: '2026-09-16T10:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }]
+  },
+  soloRules: [{ id: 'solo-1', text: 'Never paste a key', severity: 'block', applies: true }],
+  soloPresets: [], soloLoadError: '', soloToggling: null, soloBusy: false, soloRuleNote: '',
+  soloProtecting: false, soloProtectError: '', soloPausing: false, soloPauseError: '',
+  policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+  compiler: null,
+  ...patch
+});
+
+test('a wired device with no traffic yet is protected, not "not protected yet"', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    // Wired, judge present, a rule addressed at them, and nothing sent yet.
+    Object.assign(state, deviceState());
+    const body = VIEWS.soloRules.body();
+    assert.match(body, /Judging requests/, 'setup done is setup done, with or without a prompt having been sent');
+    assert.ok(!/Not protected yet/.test(body), 'the sentence that broke the first install must not come back');
+    assert.match(body, /nothing judged through them yet/, 'and the absence of traffic is still reported, just not as a fault');
+    assert.match(body, /conditions-fold/, 'all clear folds away');
+  } finally { Object.assign(state, saved); }
+});
+
+test('nothing wired is the gap, and the headline carries its fix', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState({
+      soloIdentity: { id: 'you', name: 'You', role: 'solo', connected: [], devices: [{ name: 'mbp', tools: [{ id: 'claude-code', wired: false }] }] }
+    }));
+    const body = VIEWS.soloRules.body();
+    assert.match(body, /Not judging you yet/);
+    assert.match(body, /Nothing on this device is wired/);
+    assert.match(body, /Protect this device/);
+    assert.ok(!/conditions-fold/.test(body), 'a gap leaves no control to fold the evidence away');
+  } finally { Object.assign(state, saved); }
+});
+
+test('the two invisible conditions are on the screen: the mock judge and an exempt role nothing binds', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState({ mock: true }));
+    const blind = VIEWS.soloRules.body();
+    assert.match(blind, /Mock adapter/, 'a stand-in answering is not a judgement and has to say so');
+    assert.match(blind, /Get a judge/);
+
+    Object.assign(state, deviceState({
+      soloIdentity: { id: 'you', name: 'You', role: 'admin', connected: [], devices: [{ name: 'mbp', tools: [{ id: 'claude-code', wired: true }] }] },
+      soloRules: [{ id: 'r1', text: 'Company rule', severity: 'block', applies: false }]
+    }));
+    const exempt = VIEWS.soloRules.body();
+    assert.match(exempt, /your role is exempt from them/, 'wiring alone protects nobody whom no rule binds');
+    assert.match(exempt, /Write a rule for yourself/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('turning Warden off is a recorded pause, not a way to stop the gateway', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState());
+    assert.match(VIEWS.soloRules.body(), /Turn Warden off/);
+
+    Object.assign(state, deviceState({
+      soloIdentity: { ...deviceState().soloIdentity, paused: { until: null, by: 'you', at: '2026-09-16T10:00:00.000Z' } }
+    }));
+    const off = VIEWS.soloRules.body();
+    assert.match(off, /Paused · nothing of yours is being judged/);
+    assert.match(off, /still recorded, marked not judged/, 'a pause is a gap in judging, never a gap in the record');
+    assert.match(off, /Turn Warden on/);
+    assert.ok(!/conditions-fold/.test(off), 'being paused is not something to fold away either');
   } finally { Object.assign(state, saved); }
 });
