@@ -113,10 +113,16 @@ async function secondGatewayRefusesTheTakenPort(): Promise<void> {
   console.log('\na gateway will not start on a port another Warden holds\n');
 
   // A stand-in for the other installation: it only has to answer `/health` the
-  // way a Warden does, which is exactly what the starting gateway asks it.
+  // way a Warden does, which is exactly what the starting gateway asks it. The
+  // escape sequence in the label is the reason those strings are scrubbed
+  // before printing — whatever is on that port wrote them, and the boot message
+  // hands them straight to a terminal that reads control bytes as instructions.
   const holder = createServer((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, installation: { label: 'the-other-warden', version: '9.9.9', dataDir: '/somewhere/else/data' } }));
+    res.end(JSON.stringify({
+      ok: true,
+      installation: { label: 'the-other-\u001b[2Kwarden', version: '9.9.9', dataDir: '/somewhere/else/data' }
+    }));
   });
   holder.listen(0, '127.0.0.1');
   await new Promise((done) => holder.once('listening', done));
@@ -138,7 +144,10 @@ async function secondGatewayRefusesTheTakenPort(): Promise<void> {
 
     check(status !== 0, 'it exits non-zero instead of coming up half-started', `exit ${status}`);
     check(!said.includes('open the local or network URL'), 'and never prints the banner that says it came up');
-    check(said.includes('the-other-warden'), 'it names the installation holding the port', said.slice(-400));
+    // The escape is gone; the printable text around it stays, so the person
+    // still reads a name rather than a blank where one used to be.
+    check(said.includes('the-other-[2Kwarden'), 'it names the installation holding the port', said.slice(-400));
+    check(!/[\u0000-\u0008\u000b-\u001f\u007f]/.test(said), 'with the control bytes that other gateway chose stripped out');
     check(said.includes('/somewhere/else/data'), 'and says where that one keeps its keys');
     check(said.includes('WARDEN_PORT'), 'and says how to start this one anyway');
   } finally {

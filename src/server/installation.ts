@@ -103,6 +103,21 @@ export function portAvailable(port: number, host: string): Promise<boolean> {
 }
 
 /**
+ * Safe to print in somebody's terminal.
+ *
+ * Whatever answered that port wrote these strings, and the only thing the boot
+ * message does with them is `console.error`. A terminal reads control bytes as
+ * instructions — an escape sequence can repaint the line above it, so a field
+ * saying "Warden" could sit on top of a message that had said something else.
+ * Nothing legitimate needs a control character in a directory name, so the
+ * whole class goes, and the length is bounded because the other end chose it.
+ */
+function printable(value: string): string {
+  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').slice(0, 120);
+  return clean || 'unnamed';
+}
+
+/**
  * Ask whatever is already on this port whether it is a Warden, and which one.
  *
  * Null covers every way the answer can fail to be a Warden gateway — nothing
@@ -118,9 +133,9 @@ export async function portHolder(port: number): Promise<Installation | null> {
     const held = body?.installation;
     if (body?.ok !== true || typeof held?.label !== 'string') return null;
     return {
-      label: held.label,
-      version: typeof held.version === 'string' ? held.version : 'unknown',
-      ...(typeof held.dataDir === 'string' ? { dataDir: held.dataDir } : {})
+      label: printable(held.label),
+      version: typeof held.version === 'string' ? printable(held.version) : 'unknown',
+      ...(typeof held.dataDir === 'string' ? { dataDir: printable(held.dataDir) } : {})
     };
   } catch {
     return null;
