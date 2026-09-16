@@ -16,7 +16,7 @@ import { rewriteGate, suggestRewrite } from '../../guard/rewrite.js';
 import { recordActivity } from '../../policy/activity.js';
 import { recordAppeal } from '../../policy/appeals.js';
 import { recordMachineSeen, recordWiringReport, toolReportSchema } from '../../policy/devices.js';
-import { actorForCredential } from '../../policy/people.js';
+import { actorForCredential, activePause } from '../../policy/people.js';
 import { loadPolicy } from '../../policy/store.js';
 import { adapter } from '../../qvac/index.js';
 import { emitDecision } from '../events.js';
@@ -49,7 +49,16 @@ guardRoutes.get('/api/documents/capabilities', (_req, res) => { res.json(documen
 guardRoutes.get('/api/identity', (req, res) => {
   const employee = actorForCredential(req.header('authorization'));
   if (!employee) return res.status(401).json(unknownKey(req));
-  res.json({ id: employee.id, name: employee.name, role: employee.role, paused: false });
+  // Real since F4. The hook shows it in --status, so somebody wondering why
+  // nothing is being checked reads the answer instead of guessing at it.
+  const paused = activePause(employee);
+  res.json({
+    id: employee.id,
+    name: employee.name,
+    role: employee.role,
+    paused: paused !== null,
+    ...(paused ? { pausedUntil: paused.until } : {})
+  });
 });
 
 /**

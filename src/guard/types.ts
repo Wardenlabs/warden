@@ -137,6 +137,25 @@ export type Decision = {
    * can see the concern instead of guessing at it.
    */
   warnings?: FiredRule[];
+  /**
+   * Why nothing was judged, when nothing was.
+   *
+   * Present only on a request that never reached the pipeline — today, one
+   * whose actor was paused. It is what keeps `ALLOW` meaning what it has always
+   * meant: a request that went through every pass and came out the other side.
+   * A record carrying this one never ran a pass, never consulted a model and
+   * never charged a quota, and the console must render it as *not judged*
+   * rather than as allowed. The two are the same verdict and completely
+   * different facts, and a company reading its own log has to be able to tell
+   * them apart years later.
+   *
+   * It is not an exception to the invariant in CLAUDE.md. Nothing here is a
+   * model clearing a request: a pause is ordinary code cutting in front of the
+   * pipeline, decided by a person, recorded with their name on it.
+   */
+  notJudged?: 'paused';
+  /** When the pause ends, or null for "until somebody takes it off". */
+  pausedUntil?: string | null;
   /** Human-readable summary of why, shown to the employee on a block. */
   explanation: string;
 };

@@ -218,6 +218,30 @@ export function verdictText(verdict) {
   return `<span class="verdict-text --${VERDICT_TONE[verdict] ?? 'muted'}">${esc(VERDICT_WORD[verdict] ?? verdict)}</span>`;
 }
 
+/**
+ * What happened to a request, which is not always its verdict.
+ *
+ * A request that arrived while Warden was paused for that person carries
+ * `ALLOW`, because nothing stopped it — and it was never looked at. Rendering
+ * it as "Allowed" would tell an administrator reading their own log that the
+ * policy had been applied and had found nothing, which is the one thing it
+ * cannot say. `notJudged` is on the record precisely so the two can be told
+ * apart, years later, by somebody who was not here; this is where that promise
+ * is kept on screen.
+ *
+ * Muted rather than green, and deliberately so: nothing about it is a pass.
+ */
+export function outcome(decision) {
+  const d = decision ?? {};
+  if (d.notJudged === 'paused') return { word: 'Not judged · paused', tone: 'muted', judged: false };
+  return { word: VERDICT_WORD[d.verdict] ?? d.verdict, tone: VERDICT_TONE[d.verdict] ?? 'muted', judged: true };
+}
+
+export function outcomeText(decision) {
+  const { word, tone } = outcome(decision);
+  return `<span class="verdict-text --${tone}">${esc(word)}</span>`;
+}
+
 /** Badge / Verdict: tinted, in words. */
 export function badgeVerdict(verdict) {
   const glyph = { BLOCK: '⊘ ', ESCALATE: '↗ ', ALLOW: '● ' }[verdict] ?? '';

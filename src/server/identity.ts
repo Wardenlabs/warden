@@ -11,7 +11,8 @@
 import type { Request } from 'express';
 import { evaluate } from '../guard/pipeline.js';
 import type { Actor, Decision, ReportedUsage } from '../guard/types.js';
-import { actorForCredential } from '../policy/people.js';
+import { recordDecision } from '../audit/log.js';
+import { actorForCredential, activePause, type Pause } from '../policy/people.js';
 import { loadPolicy } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 import { parseDocumentAttachments } from '../documents/index.js';
@@ -129,11 +130,60 @@ export function reportedUsage(body: unknown): ReportedUsage | undefined {
 /**
  * Run the guard for a request, whatever shape it arrived in. The caller has
  * already resolved the actor; this only assembles the input the pipeline wants.
+ *
+ * Except when the actor is paused, which is decided here and nowhere else —
+ * before the policy is read, before a document is parsed, and before a single
+ * pass exists to be influenced. That placement is the whole point: a pause that
+ * short-circuited somewhere inside the pipeline would be a thing that makes a
+ * verdict, and the one rule this codebase does not bend is that verdicts come
+ * out of `aggregate()` and out of nothing else. This never produces a verdict;
+ * it produces a record that says none was made.
  */
-export function evaluateRequest(req: Request, actor: Actor, signal?: AbortSignal): Promise<Decision> {
+export async function evaluateRequest(req: Request, actor: Actor, signal?: AbortSignal): Promise<Decision> {
+  const employee = actorForCredential(req.header('authorization'));
+  const paused = employee ? activePause(employee) : null;
+  if (paused) return recordUnjudged(actor, extractPrompt(req.body), paused);
+
   return evaluate(
     adapter(),
     { actor, prompt: extractPrompt(req.body), usage: reportedUsage(req.body), documents: parseDocumentAttachments(req.body?.attachments), signal },
     loadPolicy()
   );
+}
+
+/**
+ * The record a paused request leaves.
+ *
+ * Shaped like every other decision so that the hook, the proxy and the log all
+ * read it without a special case — and carrying `notJudged`, which is the one
+ * field that says it is not like the others. No pass ran, so `passes` is empty
+ * and `totalMs` is the time this function took rather than a judging time it
+ * would be dishonest to report. No quota is charged: `quota.ts` is never
+ * reached, because a request nobody examined should not spend somebody's day's
+ * allowance.
+ *
+ * The prompt still gets hashed into the log, exactly as it would have been. A
+ * pause is a gap in what was judged, not a gap in what happened, and the
+ * governance record has to show that these requests went out.
+ */
+function recordUnjudged(actor: Actor, prompt: string, paused: Pause): Decision {
+  const started = Date.now();
+  const until = paused.until
+    ? `until ${paused.until}`
+    : 'until somebody turns it back on';
+  const partial = {
+    verdict: 'ALLOW' as const,
+    notJudged: 'paused' as const,
+    pausedUntil: paused.until,
+    policyVersion: loadPolicy().version,
+    totalMs: Date.now() - started,
+    firedRules: [],
+    passes: [],
+    maskedPrompt: '',
+    maskedSpans: [],
+    quota: { used: 0, limit: 0 },
+    explanation: `Warden is paused for you ${until}, so this request was not checked against any rule.`
+  };
+  const entry = recordDecision(actor, prompt, partial);
+  return { ...partial, auditId: entry.auditId };
 }
