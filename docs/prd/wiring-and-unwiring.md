@@ -226,6 +226,20 @@ una versión nueva al lado de la que usa.
 - **El mensaje de clave desconocida se bifurca** según el camino: local dice
   cómo arreglarlo uno mismo; de equipo mantiene "pedile una clave a tu admin",
   que ahí sí es la verdad.
+- **Una instalación no se nombra: se identifica por dónde viven sus datos.**
+  Pedirle a alguien que bautice su gateway es ceremonia que nadie quiere y que
+  la mayoría dejaría en el default, justo cuando más falta hace distinguirlos.
+  El gateway ya sabe quién es — conoce su directorio de datos y su versión — y
+  lo único que falta es que lo diga: en `/health`, en la consola, y sobre todo
+  **en el rechazo del hook**, que hoy dice "no reconozco tu clave" sin decir
+  quién es el que no la reconoce.
+- **Dos gateways a la vez son un accidente, no una función.** Un usuario
+  normal tiene uno; dos es la situación de quien desarrolla Warden o prueba una
+  versión nueva al lado de la que usa. Así que el segundo **se niega a arrancar
+  cuando el puerto ya lo tiene otro Warden, y dice cuál** — en vez de fallar de
+  forma oscura o, peor, quedarse con la puerta. Querer dos sigue siendo posible
+  eligiendo otro puerto a propósito, y ahí lo de arriba es lo que evita volver
+  a confundirlos.
 
 ## 5. Métricas de éxito
 
