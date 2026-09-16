@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join, resolve } from 'node:path';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 type HookResult = { code: number | null; stdout: string; stderr: string };
@@ -368,6 +368,10 @@ async function main(): Promise<void> {
     assert.match(good.said, /the-other-warden/, 'it names which installation answered');
     assert.match(good.said, /\/elsewhere\/data/, 'and where that one keeps its state');
     assert.match(good.said, /Fede/, 'and who the gateway thinks this key is');
+    // A machine set up before F6 has copies and nothing for them to be copies
+    // of. That is not a failure — it still exits zero — but it is worth saying
+    // once, because it is the difference between drift being caught and not.
+    assert.match(good.said, /no .*credentials\.json yet/);
 
     const stranger = await status(url, 'wk-someone-else');
     assert.notEqual(stranger.code, 0, 'a key the gateway does not know is not a pass');
@@ -380,7 +384,24 @@ async function main(): Promise<void> {
     // is judged as one person and the app as another, and nothing said so.
     const split = await status(url, 'wk-fede-bbbb');
     assert.notEqual(split.code, 0);
-    assert.match(split.said, /different key/);
+    assert.match(split.said, /do not agree/);
+    assert.match(split.said, /settings\.json ends aaaa/, 'it names which copy and by its last four only');
+    assert.doesNotMatch(split.said, /wk-fede-aaaa/, 'never a whole key in output people paste into chat');
+
+    /*
+     * F6: once the file exists it is what every copy is measured against.
+     * Here the shell holds the key the gateway knows and the file holds an
+     * older one — which is the shape a rotation leaves behind — and the
+     * report has to point at the file rather than at Claude Code, because
+     * that is where `--fix` will read from next.
+     */
+    mkdirSync(join(statusHome, '.warden'), { recursive: true });
+    writeFileSync(join(statusHome, '.warden', 'credentials.json'), JSON.stringify({ url, apiKey: 'wk-fede-dddd' }));
+    const drifted = await status(url, 'wk-fede-aaaa');
+    assert.notEqual(drifted.code, 0, 'copies that disagree is not a pass, even when this shell is the right one');
+    assert.match(drifted.said, /this shell ends aaaa/);
+    assert.match(drifted.said, /credentials\.json/, 'and it names the file as what they are copies of');
+    rmSync(join(statusHome, '.warden'), { recursive: true, force: true });
   });
 
   const down = await status('http://127.0.0.1:1', 'wk-fede-aaaa');
@@ -434,6 +455,73 @@ async function main(): Promise<void> {
     });
     console.log('✓ outside the desktop app no dialog is opened');
   }
+
+  /*
+   * F6. The key lives in one file and everything else copies it.
+   *
+   * The case that matters is a process that sourced no profile — which is
+   * every Claude Code opened from the Dock, and this test — reaching the
+   * gateway with the right key anyway. The second half is the override: an
+   * exported key still wins, because somebody testing against a second
+   * gateway sets it for one command and means it.
+   */
+  const credHome = mkdtempSync(join(tmpdir(), 'warden-cred-'));
+  let sawKey: string | null = null;
+  const watching: Handler = (req, res) => {
+    if (req.url === '/health') return json(res, { ok: true });
+    if (req.url === '/api/guard/check') {
+      sawKey = /Bearer\s+(.+)/.exec(req.headers.authorization ?? '')?.[1] ?? null;
+      return json(res, allow);
+    }
+    res.writeHead(404).end();
+  };
+
+  await withServer(watching, async (url) => {
+    mkdirSync(join(credHome, '.warden'), { recursive: true });
+    writeFileSync(join(credHome, '.warden', 'credentials.json'), JSON.stringify({ url, apiKey: 'wk-fede-fromfile' }));
+
+    const child = spawn(process.execPath, [hook], {
+      // No WARDEN_URL and no WARDEN_API_KEY: the file is the only source.
+      env: { PATH: process.env.PATH ?? '', HOME: credHome, WARDEN_HEALTH_TIMEOUT_MS: '2000', WARDEN_TIMEOUT_MS: '2000' },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    child.stdin.end(JSON.stringify({ prompt: 'how do I request leave?' }));
+    const [code] = await once(child, 'close') as [number | null];
+    assert.equal(code, 0);
+    assert.equal(sawKey, 'wk-fede-fromfile', 'a process that sourced no profile still reaches the gateway as the right person');
+
+    sawKey = null;
+    await runHook({ prompt: 'hello' }, url, { HOME: credHome, WARDEN_API_KEY: 'wk-fede-exported' });
+    assert.equal(sawKey, 'wk-fede-exported', 'and an exported key still overrides the file');
+  });
+  console.log('✓ the hook reads its key from ~/.warden/credentials.json, and an exported one still wins');
+
+  /*
+   * `--fix` writes the source before the copies, and writes it 0600. The mode
+   * is the point: this file is a credential, and a chmod after the write
+   * leaves an instant where anybody on the machine can read it.
+   */
+  const fixHome = mkdtempSync(join(tmpdir(), 'warden-fixcred-'));
+  mkdirSync(join(fixHome, '.claude'), { recursive: true });
+  writeFileSync(join(fixHome, '.claude', 'settings.json'), '{}');
+  const fixRun = spawn(process.execPath, [hook, '--fix'], {
+    env: { PATH: process.env.PATH ?? '', HOME: fixHome, WARDEN_URL: 'http://gateway.test:8080', WARDEN_API_KEY: 'wk-fede-written' },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  let fixSaid = '';
+  fixRun.stdout.setEncoding('utf8').on('data', (chunk) => { fixSaid += chunk; });
+  await once(fixRun, 'close');
+  const credFile = join(fixHome, '.warden', 'credentials.json');
+  assert.ok(existsSync(credFile), '--fix writes the source of truth');
+  assert.equal(statSync(credFile).mode & 0o777, 0o600, 'a credential is not world-readable, not even for an instant');
+  const written = JSON.parse(readFileSync(credFile, 'utf8'));
+  assert.equal(written.apiKey, 'wk-fede-written');
+  assert.equal(written.url, 'http://gateway.test:8080');
+  assert.ok(written.updatedAt, 'and says when, so a stale copy can be recognised as one');
+  assert.match(fixSaid, /the copies below are written from it/, 'and says which direction the copying goes');
+  const claudeAfter = JSON.parse(readFileSync(join(fixHome, '.claude', 'settings.json'), 'utf8'));
+  assert.equal(claudeAfter.env.WARDEN_API_KEY, 'wk-fede-written', 'the copy in Claude Code matches the source');
+  console.log('✓ --fix writes ~/.warden/credentials.json 0600 first, then derives the copies from it');
 }
 
 main().catch((err) => {

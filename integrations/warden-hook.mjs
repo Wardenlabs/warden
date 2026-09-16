@@ -15,9 +15,15 @@
  * Install — your admin gives you the link, which already has your key in it:
  *   curl -fsSL http://192.168.1.42:8080/install/<you> | sh
  *
+ * That writes ~/.warden/credentials.json (0600), which is where the key lives
+ * and what every other copy of it is written from.
+ *
  * Or by hand, in ~/.zshrc or ~/.bashrc:
  *   export WARDEN_URL=http://192.168.1.42:8080   # the gateway machine
  *   export WARDEN_API_KEY=wk-fede-8b1d40e2       # issued by your admin
+ *
+ * An exported value still wins over the file, so a second gateway is one
+ * command away; `warden-hook --status` says when a copy has drifted from it.
  *
  * The key is the whole identity. There is no name to set and no role to set:
  * your admin decides what your key means and can change it without you touching
@@ -33,8 +39,68 @@ import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const WARDEN_URL = process.env.WARDEN_URL ?? 'http://localhost:8080';
-const API_KEY = process.env.WARDEN_API_KEY ?? '';
+/**
+ * `~/.warden/credentials.json` — where the key lives, and the one place it is
+ * authoritative.
+ *
+ * Before this there were three copies and no original: the shell profile, the
+ * `env` block of `~/.claude/settings.json`, and whatever was exported in the
+ * terminal you happened to be in. Nothing said which was right, so when they
+ * disagreed the terminal was judged as one person and the desktop app as
+ * another — or the app was refused outright with a key the person could see
+ * was correct in their shell, and no message anywhere connected the two.
+ *
+ * The copies do not go away, and cannot: a Claude Code opened from the Dock
+ * never sourced a profile, and its `env` block is static JSON that cannot
+ * point at a file. What changes is that they stop being originals. `--fix`
+ * writes this file first and rewrites the copies from it, and `--status`
+ * names any copy that has drifted instead of leaving somebody to find it by
+ * being refused. See docs/specs/wiring-and-unwiring.md §7.
+ */
+const CREDENTIALS_PATH = join(homedir(), '.warden', 'credentials.json');
+
+function readCredentials() {
+  try {
+    const raw = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
+    if (!raw || typeof raw !== 'object') return null;
+    const url = typeof raw.url === 'string' ? raw.url : '';
+    const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey : '';
+    const updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : '';
+    return url || apiKey ? { url, apiKey, updatedAt } : null;
+  } catch {
+    // A missing file is the ordinary case on a machine set up before this
+    // existed, and an unreadable one must not take the hook down with it:
+    // either way the environment still answers, and that is the older path.
+    return null;
+  }
+}
+
+/**
+ * Write the source of truth, `0600`, in a directory only its owner can enter.
+ *
+ * The mode is set at creation rather than after, so there is no instant where
+ * the file exists and is world-readable. Returns what went wrong, or null.
+ */
+function writeCredentials({ url, apiKey }) {
+  try {
+    mkdirSync(dirname(CREDENTIALS_PATH), { recursive: true, mode: 0o700 });
+    const body = JSON.stringify({ url, apiKey, updatedAt: new Date().toISOString() }, null, 2) + '\n';
+    writeFileSync(CREDENTIALS_PATH, body, { mode: 0o600 });
+    return null;
+  } catch (err) {
+    return err?.message ?? String(err);
+  }
+}
+
+const CREDENTIALS = readCredentials();
+/*
+ * Environment first, so an override still works — somebody testing against a
+ * second gateway sets the variable for one command and means it. Then the
+ * file. `||` and not `??`: an empty string is somebody who unset it, not
+ * somebody who chose "".
+ */
+const WARDEN_URL = process.env.WARDEN_URL || CREDENTIALS?.url || 'http://localhost:8080';
+const API_KEY = process.env.WARDEN_API_KEY || CREDENTIALS?.apiKey || '';
 
 /*
  * How long the hook waits for `/health` before treating the gateway as gone.
@@ -855,10 +921,15 @@ function fixClaudeCode() {
   // is written there too. It is the key in a second file, in the same home
   // directory, read by the same person; the alternative was a guard that
   // guarded the terminal and not the app.
+  //
+  // Since F6 the values written here are the resolved ones — the environment
+  // if this shell has it, otherwise `~/.warden/credentials.json` — rather than
+  // `process.env` alone. That is what makes this block a copy rather than a
+  // fourth opinion: run `--fix` from a terminal that never sourced a profile
+  // and it still writes the right key, because it reads the file.
   const env = settings.env && typeof settings.env === 'object' && !Array.isArray(settings.env) ? settings.env : {};
   const wanted = {};
-  for (const name of ['WARDEN_URL', 'WARDEN_API_KEY']) {
-    const value = process.env[name];
+  for (const [name, value] of [['WARDEN_URL', WARDEN_URL], ['WARDEN_API_KEY', API_KEY]]) {
     if (value && env[name] !== value) wanted[name] = value;
   }
   if (entryOk && Object.keys(wanted).length === 0) return null;
@@ -929,6 +1000,21 @@ async function fixOpenCode() {
 
 async function fixMode(agents) {
   process.stdout.write('\nWiring what can be wired\n\n');
+
+  /*
+   * The source of truth is written before anything derived from it.
+   *
+   * Only when this run actually has a key: `--fix` is also how somebody
+   * repairs a timeout on a machine that is already set up, and running it from
+   * a terminal with nothing exported must not blank the file every copy is
+   * about to be rewritten from.
+   */
+  if (API_KEY) {
+    const failed = writeCredentials({ url: WARDEN_URL, apiKey: API_KEY });
+    if (failed) process.stdout.write(`  ✗ ${'credentials'.padEnd(12)} could not be written to ${CREDENTIALS_PATH} (${failed})\n`);
+    else process.stdout.write(`  ✓ ${'credentials'.padEnd(12)} ${CREDENTIALS_PATH}, 0600 — the copies below are written from it\n`);
+  }
+
   const fixers = { 'claude-code': fixClaudeCode, codex: fixCodex, opencode: fixOpenCode };
 
   for (const agent of agents) {
@@ -1181,6 +1267,7 @@ function unfixMode(agents) {
   process.stdout.write('\n  Still here, because unwiring is not uninstalling:\n');
   process.stdout.write(`    · this hook, at ${hookPath()}\n`);
   process.stdout.write('    · WARDEN_URL and WARDEN_API_KEY in your shell profile, if the install script put them there\n');
+  if (CREDENTIALS) process.stdout.write(`    · your key, at ${CREDENTIALS_PATH} — delete that file to remove it from this machine\n`);
   process.stdout.write(`    · every backup, at <file>.warden-bak\n`);
   if (touched) process.stdout.write('\n  Run --fix to wire it back.\n');
   process.stdout.write('\n');
@@ -1293,13 +1380,17 @@ async function statusMode(timeoutMs) {
    * Reconciling them is F6 of the spec. Noticing is this cheap and is most of
    * the value.
    */
-  const claudeEnvKey = readClaudeEnvKey();
-  const mismatched = claudeEnvKey !== null && API_KEY && claudeEnvKey !== API_KEY;
+  const drifted = keyCopies();
+  const mismatched = drifted.length > 0;
   if (mismatched) {
     out();
-    out('    ⚠ Claude Code has a different key in ~/.claude/settings.json than this shell');
-    out(`      shell ends ${API_KEY.slice(-4)}, settings.json ends ${claudeEnvKey.slice(-4)} — they will be judged as different people`);
-    out('      run --fix from a shell holding the key you want, and it will rewrite that block');
+    out('    ⚠ the copies of your key do not agree, so the same person is judged as two');
+    for (const copy of drifted) out(`      ${copy.where} ends ${copy.value.slice(-4)}, ${copy.against} ends ${copy.expected.slice(-4)}`);
+    out('      run --fix from a shell holding the key you want; it rewrites every copy from the file');
+  } else if (!CREDENTIALS) {
+    out();
+    out(`    · no ${CREDENTIALS_PATH} yet — the key is only in your profile and in each tool`);
+    out('      run --fix once to write it; after that the copies are derived from it');
   }
 
   const wiredAny = governable.some((a) => a.wired);
@@ -1318,6 +1409,35 @@ async function statusMode(timeoutMs) {
   else out('  ⏸ wired and connected, but paused — nothing is being checked until it is turned back on');
   out();
   process.exitCode = good ? 0 : 1;
+}
+
+/**
+ * Every copy of the key that disagrees with the one it is a copy of.
+ *
+ * With a credentials file, that file is what each copy is measured against —
+ * it is the original and the rest are derived from it. Without one, the
+ * comparison is the older, weaker one this check started as: the shell against
+ * Claude Code's `env` block, which at least catches the case that sent
+ * somebody hunting for a bad key when the real problem was two good ones.
+ *
+ * Nothing here prints a whole key. The last four characters are enough to tell
+ * two apart and not enough to use, and `--status` output ends up pasted into
+ * chat threads by people asking for help.
+ */
+function keyCopies() {
+  const claudeEnvKey = readClaudeEnvKey();
+  const source = CREDENTIALS?.apiKey ?? '';
+  const drifted = [];
+  if (source) {
+    const shellKey = process.env.WARDEN_API_KEY ?? '';
+    if (shellKey && shellKey !== source) drifted.push({ where: 'this shell', value: shellKey, against: CREDENTIALS_PATH, expected: source });
+    if (claudeEnvKey && claudeEnvKey !== source) drifted.push({ where: '~/.claude/settings.json', value: claudeEnvKey, against: CREDENTIALS_PATH, expected: source });
+    return drifted;
+  }
+  if (claudeEnvKey && API_KEY && claudeEnvKey !== API_KEY) {
+    drifted.push({ where: '~/.claude/settings.json', value: claudeEnvKey, against: 'this shell', expected: API_KEY });
+  }
+  return drifted;
 }
 
 /** The key `--fix` wrote into Claude Code's env block, or null if there is none. */
