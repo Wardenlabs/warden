@@ -222,6 +222,10 @@ export const state = {
   soloLoadError: '',
   /** The preset id currently mid-toggle, so its switch can disable itself. */
   soloToggling: null,
+  /** Why the last toggle did not take, or ''. A checkbox that springs back is
+   *  the same picture as a click the page never saw, so the difference has to
+   *  be said in words. */
+  soloToggleError: '',
   soloBusy: false,
   /** Rendered HTML for the last thing the free-text field said back, or ''. */
   soloRuleNote: '',

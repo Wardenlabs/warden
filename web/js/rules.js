@@ -123,15 +123,15 @@ function listPage() {
   const crumbs = [{ label: 'Workspace' }, { label: 'Rules' }];
 
   if (!load || (load.loading && !rules.length)) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Loading rules…' })}${listHead()}
+    return `<div class="sheet">${contextBar(crumbs)}${listHead()}
       ${listState({ title: 'Loading workspace rules…', body: 'Fetching the current rules and their activity.' })}</div>`;
   }
   if (load.error) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'Rule status unavailable' })}${listHead(false)}
+    return `<div class="sheet">${contextBar(crumbs)}${listHead(false)}
       ${listState({ title: 'Could not load the rules', body: 'We could not confirm the current policy state. Retry to load the latest rules.', icon: true, action: button('Retry loading', { kind: 'primary', id: 'retryRules' }) })}</div>`;
   }
   if (!rules.length) {
-    return `<div class="sheet">${contextBar(crumbs, { text: 'No workspace rules' })}${listHead()}
+    return `<div class="sheet">${contextBar(crumbs)}${listHead()}
       ${listState({ title: 'No workspace rules yet', body: 'Describe what Warden should detect to create your first rule.' })}</div>`;
   }
 
@@ -155,7 +155,7 @@ function listPage() {
     });
 
   return `<div class="sheet">
-    ${contextBar(crumbs, { text: plural(rules.length, 'active rule'), tone: 'allow' })}
+    ${contextBar(crumbs)}
     ${listHead()}
     ${toolbar}
     ${body}

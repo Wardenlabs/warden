@@ -72,27 +72,6 @@ function writerState() {
   return { text: c.provider === 'local' ? 'drafting on this machine' : `drafting ${where ? `· ${where}` : 'through the configured compiler'}`, tone: 'allow' };
 }
 
-function statusLine(tab) {
-  if (tab === 'library') {
-    const models = library.catalog?.models ?? [];
-    const builtIn = state.adjudicator?.choices?.length ?? 0;
-    const active = models.filter((model) => (model.activeRoles ?? []).length).length;
-    return { text: `${plural(models.length + builtIn, 'model')} · ${active} of yours active · ${builtIn} built-in` };
-  }
-  if (tab === 'prompts') {
-    const templates = promptEditor.catalog?.templates ?? [];
-    const customized = templates.filter((item) => item.custom).length;
-    return { text: `${plural(templates.length, 'template')} · ${customized ? `${customized} customized` : 'defaults intact'}` };
-  }
-  const judge = judgeState();
-  const writer = writerState();
-  if (judge.tone === 'block') return { text: 'Judge unavailable · requests are held', tone: 'block' };
-  if (writer.tone === 'block') return { text: 'Rule writer needs attention', tone: 'block' };
-  if (compilerNeedsSetup()) return { text: `Judge ${state.models?.mock ? 'in demo mode' : 'ready'} · rule writer needs setup`, tone: 'attention' };
-  if (state.models?.mock) return { text: '2 jobs · demo mode', tone: 'attention' };
-  return { text: '2 jobs · both configured', tone: 'allow' };
-}
-
 const SUBS = {
   '': 'Two jobs run Warden: one writes rules, one judges requests.',
   library: 'Saved weights and connections, shared by this installation.',
@@ -292,7 +271,7 @@ function promptRow(item) {
 function modelsPage() {
   const tab = tabOf();
   return `<div class="sheet models-page">
-    ${contextBar([{ label: 'Your workspace' }], statusLine(tab))}
+    ${contextBar([{ label: 'Your workspace' }])}
     ${pageHead({ title: 'Models', sub: SUBS[tab], actions: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '' })}
     ${tabs('models', TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), tab, 'Models sections')}
     ${tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()}
