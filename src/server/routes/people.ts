@@ -9,6 +9,7 @@
 import { Router } from 'express';
 import { onboardingFor, supportedTools } from '../../onboarding/index.js';
 import { activityFor, connectedCount } from '../../policy/activity.js';
+import { devicesFor } from '../../policy/devices.js';
 import { bindsActor, describeAudience } from '../../policy/audience.js';
 import {
   addRole,
@@ -45,7 +46,20 @@ peopleRoutes.get('/api/people', (_req, res) => {
         quota: policy.quotas.find((q) => q.role === e.role)?.maxRequestsPerDay ?? null,
         // What they were told to install is not what they installed. Every hook
         // call names its tool, so this is observed rather than asserted.
-        connected: activityFor(e.id)
+        connected: activityFor(e.id),
+        /*
+         * The machines, which is a different fact from the one above and is
+         * kept separate all the way to the screen.
+         *
+         * `connected` is traffic the gateway saw, in memory, gone on restart.
+         * `devices` is what each machine reported about its own wiring plus
+         * when it was last heard from, on disk. A machine can be wired and
+         * silent, or sending and never have reported — and a console that
+         * collapsed the two would have to guess which, so it does not get
+         * them collapsed. Wiring that was never reported is absent here, not
+         * false: "unknown" and "not wired" are different sentences.
+         */
+        devices: devicesFor(e.id)
       };
     })
   });

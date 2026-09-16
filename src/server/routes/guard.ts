@@ -8,12 +8,14 @@
  */
 import { createHash } from 'node:crypto';
 import { Router } from 'express';
+import { z } from 'zod';
 import { DocumentInputError, documentCapabilities, withoutDocumentText } from '../../documents/index.js';
 import { findDecision } from '../../audit/log.js';
 import { checkQuota } from '../../guard/quota.js';
 import { rewriteGate, suggestRewrite } from '../../guard/rewrite.js';
 import { recordActivity } from '../../policy/activity.js';
 import { recordAppeal } from '../../policy/appeals.js';
+import { recordMachineSeen, recordWiringReport, toolReportSchema } from '../../policy/devices.js';
 import { actorForCredential } from '../../policy/people.js';
 import { loadPolicy } from '../../policy/store.js';
 import { adapter } from '../../qvac/index.js';
@@ -50,6 +52,59 @@ guardRoutes.get('/api/identity', (req, res) => {
   res.json({ id: employee.id, name: employee.name, role: employee.role, paused: false });
 });
 
+/**
+ * Everything an employee's machine sends about itself, cleaned before it is
+ * believed.
+ *
+ * It arrives from a laptop, so it is read the way every other client claim is:
+ * shapes checked, lengths bounded, anything unrecognised dropped. The id is
+ * required to look like the salted hash the hook makes — 16 hex characters —
+ * because it is a map key that an administrator will see grouped under a
+ * person's name, and a machine that can choose an arbitrary one can make that
+ * list unreadable.
+ *
+ * `name` is `os.hostname()` and is personal data. Control and format
+ * characters come out for the same reason they come out of an employee's name
+ * in `people.ts`: it is interpolated into a console the administrator reads,
+ * and nothing legitimate is lost by removing them.
+ */
+function readMachine(value: unknown): { id: string; name: string } | null {
+  const raw = value as { id?: unknown; name?: unknown } | undefined;
+  const id = typeof raw?.id === 'string' ? raw.id.trim().toLowerCase() : '';
+  if (!/^[0-9a-f]{16}$/.test(id)) return null;
+  const name = typeof raw?.name === 'string' ? raw.name.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 200) : '';
+  return { id, name };
+}
+
+/**
+ * What this machine found when it looked at its own configuration.
+ *
+ * The gateway cannot read an employee's home directory, so wiring is the one
+ * fact here it can never check for itself. It does not infer it either: a
+ * machine that has not reported leaves wiring unknown, which is a different
+ * sentence in the console from "not wired", and getting those two confused
+ * costs somebody an afternoon fixing what was never broken.
+ *
+ * Called after `--fix`, after `--unfix`, and piggybacked on an ordinary check
+ * at most once an hour — never as a heartbeat. A background process that phones
+ * home on its own schedule is a different product from a hook that runs when
+ * somebody presses Enter.
+ */
+guardRoutes.post('/api/devices/report', (req, res) => {
+  const actor = resolveActor(req);
+  if (!actor) return res.status(401).json(unknownKey(req));
+
+  const machine = readMachine(req.body?.machine);
+  if (!machine) return res.status(400).json({ error: 'machine.id must be 16 hex characters' });
+
+  const parsed = z.array(toolReportSchema).max(32).safeParse(req.body?.tools);
+  if (!parsed.success) return res.status(400).json({ error: 'tools must be a list of { id, wired }' });
+
+  const hookVersion = typeof req.body?.hookVersion === 'string' ? req.body.hookVersion.slice(0, 64) : undefined;
+  recordWiringReport(actor.id, machine, parsed.data, hookVersion);
+  res.json({ ok: true });
+});
+
 guardRoutes.post('/api/guard/check', asyncRoute(async (req, res) => {
   const actor = resolveActor(req);
   if (!actor) return res.status(401).json(unknownKey(req));
@@ -68,6 +123,14 @@ guardRoutes.post('/api/guard/check', asyncRoute(async (req, res) => {
   // gateway issued, so it is an employee by construction — the id no longer
   // arrives on a header that could inflate the count with strangers.
   recordActivity(actor.id, typeof req.body?.source === 'string' ? req.body.source : undefined);
+  // The same sighting, kept per machine and across restarts. It answers the two
+  // questions the in-memory view cannot — whether this machine ever connected,
+  // and how long it has been quiet — and it is the only thing that clears a
+  // rotation's "pending" mark, because a check arriving under the current key
+  // is the proof that this machine picked the new one up. Traffic only: what is
+  // wired is reported separately and never inferred from a request.
+  const machine = readMachine(req.body?.machine);
+  if (machine) recordMachineSeen(actor.id, machine);
   emitDecision(decision);
   res.json(withoutDocumentText(decision));
 }));

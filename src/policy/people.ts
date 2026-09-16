@@ -21,6 +21,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
+import { markPendingReconnect } from './devices.js';
 
 const COMPANY_PATH = process.env['WARDEN_COMPANY_PATH'] ?? 'data/company.json';
 
@@ -345,13 +346,24 @@ export function removeEmployee(
   return { removed, orphanedRules };
 }
 
-/** Issue a new key for someone, invalidating the old one. */
+/**
+ * Issue a new key for someone, invalidating the old one.
+ *
+ * Every machine this person has is marked as waiting to reconnect, here rather
+ * than in the route, so that a rotation from the console, from `/install`, or
+ * from anywhere added later leaves the same mark. There is no grace period —
+ * the old key stops working the instant this returns, by decision — which
+ * means that without the mark the only signal anybody gets is the employee
+ * discovering, some hours later, that they are being refused. A machine clears
+ * its own mark by sending one check with the new key.
+ */
 export function rotateApiKey(id: string): Employee | null {
   const dir = loadDirectory();
   const existing = dir.employees.find((e) => e.id === id);
   if (!existing) return null;
   const updated: Employee = { ...existing, apiKey: newApiKey(id) };
   save({ ...dir, employees: dir.employees.map((e) => (e.id === id ? updated : e)) });
+  markPendingReconnect(id);
   return updated;
 }
 

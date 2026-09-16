@@ -47,6 +47,8 @@ const CASES: Case[] = [
   { path: '/api/identity', admin: false, why: 'the key asks about its own owner; --status calls it' },
   { path: '/API/IDENTITY', admin: false, why: 'same endpoint, upper case' },
   { path: '/api/identity/fede', admin: true, why: 'asking about somebody else is not that' },
+  { path: '/api/devices/report', admin: false, why: 'the machine says what it found in its own configuration' },
+  { path: '/api/devices', admin: true, why: 'reading the whole inventory is not an employee question' },
   { path: '/api/guard/check/', admin: false, why: 'same endpoint, trailing slash' },
   { path: '/API/GUARD/CHECK', admin: false, why: 'same endpoint, upper case' },
 

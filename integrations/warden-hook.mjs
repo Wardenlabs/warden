@@ -27,9 +27,9 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { closeSync, constants, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1473,13 +1473,112 @@ function readState() {
 }
 
 function rememberGateway(url, failClosed) {
+  writeState((state) => {
+    state[url] = { ...(state[url] ?? {}), failClosed: failClosed === true, at: new Date().toISOString() };
+  });
+}
+
+/** Read, mutate, write. Best effort: a read-only home never stops a prompt. */
+function writeState(mutate) {
   try {
     const state = readState();
-    state[url] = { failClosed: failClosed === true, at: new Date().toISOString() };
-    writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + '\n');
+    mutate(state);
+    writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 });
   } catch {
     /* a read-only home is not a reason to refuse a prompt */
   }
+}
+
+/**
+ * Which machine this is, without telling the gateway which machine this is.
+ *
+ * The console has to be able to say "Ana has Warden on two laptops and one of
+ * them stopped reporting in March", and that needs a stable key per machine.
+ * The hostname is stable and is also personal data — `ana-macbook` is a name —
+ * so what travels as the key is `sha256(hostname + salt)` cut to 16 hex, with
+ * the salt generated once here and never sent. Nobody holding the id can walk
+ * it back to a hostname, not even by guessing hostnames, because they do not
+ * have the salt.
+ *
+ * The hostname itself travels too, as `name`, because an administrator looking
+ * at a list of machines needs to know which one is which. The difference is
+ * where each one is allowed to land: the name goes to the device inventory that
+ * the console reads, and the id is what would go into the audit log if a
+ * decision ever needed a machine attached to it. See `src/policy/devices.ts`.
+ *
+ * A home directory that cannot be written gets a fresh salt every run, so the
+ * machine looks like a new one each time. That is a degraded inventory and not
+ * a broken guard, which is the right way round.
+ */
+function machineIdentity() {
+  const state = readState();
+  let salt = typeof state['machineSalt'] === 'string' ? state['machineSalt'] : '';
+  if (!/^[0-9a-f]{32}$/.test(salt)) {
+    salt = randomBytes(16).toString('hex');
+    writeState((next) => { next['machineSalt'] = salt; });
+  }
+  const name = hostname();
+  return { id: createHash('sha256').update(`${salt}:${name}`).digest('hex').slice(0, 16), name };
+}
+
+/**
+ * This file's own bytes, as its version.
+ *
+ * There is no version string in here and putting one in would be a number
+ * somebody forgets to bump on the release where it mattered. What the console
+ * actually needs to answer is "is this laptop running the hook this gateway
+ * serves, or one from four releases ago" — and the gateway has the file it
+ * serves, so comparing digests answers it exactly, for free, and cannot drift.
+ */
+function hookVersion() {
+  try {
+    return createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 12);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Tell the gateway what this machine found when it looked at itself.
+ *
+ * Wiring is the one fact the gateway can never check: it cannot read an
+ * employee's home directory. So it is reported — after `--fix`, after
+ * `--unfix`, and piggybacked on an ordinary check at most once an hour. Never
+ * as a heartbeat. A background process that phones home on its own schedule is
+ * a different product from a hook that runs when somebody presses Enter, and
+ * the moment it exists somebody has to explain what it sends while they sleep.
+ *
+ * Failure is silent by design. This is inventory for a screen; it must never be
+ * the reason a prompt is delayed or refused, and there is no version of "your
+ * request was stopped because we could not update a dashboard" worth shipping.
+ */
+async function reportWiring(timeoutMs = 5_000) {
+  if (!API_KEY) return;
+  try {
+    const machine = machineIdentity();
+    const tools = detectAgents()
+      .filter((agent) => agent.installed && agent.governable)
+      .map((agent) => ({ id: agent.id, wired: agent.wired, how: agent.how }));
+    await requestJson(
+      `${WARDEN_URL}/api/devices/report`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify({ machine, tools, hookVersion: hookVersion() })
+      },
+      timeoutMs,
+      (value) => value
+    );
+    writeState((state) => { state[WARDEN_URL] = { ...(state[WARDEN_URL] ?? {}), reportedAt: Date.now() }; });
+  } catch {
+    /* inventory is never a reason to be in somebody's way */
+  }
+}
+
+/** An hour since the last report to this gateway, or never. */
+function reportIsDue() {
+  const last = readState()[WARDEN_URL]?.reportedAt;
+  return !(typeof last === 'number' && Date.now() - last < 60 * 60 * 1000);
 }
 
 async function main() {
@@ -1519,10 +1618,17 @@ async function main() {
       // Re-read from disk so the closing inventory is what is actually there
       // now, not what this process believes it wrote.
       detectMode();
+      // Wiring just changed, and this is the moment the console is most likely
+      // to be open: somebody is watching to see whether it worked.
+      await reportWiring();
     }
     if (process.argv.includes('--unfix')) {
       unfixMode(detectAgents());
       detectMode();
+      // Especially here. Somebody unwiring and then vanishing from the console
+      // is exactly the picture that has to say "not wired" rather than "went
+      // quiet", and the gateway learns the difference only if it is told.
+      await reportWiring();
     }
     return;
   }
@@ -1608,6 +1714,21 @@ async function main() {
     // nobody stated would brick a CLI over a typo'd URL.
     failClosed = health?.failClosed === true;
     rememberGateway(WARDEN_URL, failClosed);
+    /*
+     * The hourly wiring report, started here rather than after the decision.
+     *
+     * It overlaps a call that takes orders of magnitude longer — a small POST
+     * against a 90-second adjudication — so the person waits for nothing, and
+     * on the other fifty-nine minutes it does not run at all. After the
+     * decision it would have been pure added latency on somebody's keystroke;
+     * before the health call it would have run against a gateway not yet known
+     * to be up.
+     *
+     * Not awaited, and it never rejects: inventory for a screen must not be
+     * able to delay, refuse, or crash a prompt. Its own deadline bounds how
+     * long it can keep the process alive after the verdict is delivered.
+     */
+    if (reportIsDue()) reportWiring();
     res = await requestJson(
       `${WARDEN_URL}/api/guard/check`,
       {
@@ -1616,7 +1737,12 @@ async function main() {
           'content-type': 'application/json',
           authorization: `Bearer ${API_KEY}`
         },
-        body: JSON.stringify({ prompt, source: tool, usage, ...(attachments.length ? { attachments } : {}) })
+        // The machine travels with every check because that sighting is what
+        // tells "this laptop has been quiet since March" from "this laptop has
+        // never once connected", and it is the only thing that clears the mark
+        // a key rotation leaves. It is an id and a hostname; nothing about it
+        // reaches the audit log, which stores hashes.
+        body: JSON.stringify({ prompt, source: tool, usage, machine: machineIdentity(), ...(attachments.length ? { attachments } : {}) })
       },
       decisionTimeoutMs,
       validateDecision,

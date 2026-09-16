@@ -72,7 +72,13 @@ const EMPLOYEE_PATHS: ReadonlySet<string> = new Set([
   // nobody else. `warden-hook --status` is built on it. It reads a credential
   // the caller already holds and returns what its owner already knows, which is
   // why it belongs on this side of the line.
-  '/api/identity'
+  '/api/identity',
+  // The machine saying what it found in its own configuration. It has to be
+  // employee-callable because the employee's machine is the only thing that can
+  // see it — the gateway cannot read somebody's home directory. It writes only
+  // under the id of the key that sent it, so a report is a statement about
+  // yourself and cannot be one about anybody else.
+  '/api/devices/report'
 ]);
 
 /**
