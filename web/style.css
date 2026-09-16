@@ -956,6 +956,13 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .codewrap .btn { position: absolute; top: var(--s-2); right: var(--s-2); }
 .person-rules { margin-top: var(--s-8); display: grid; gap: var(--s-4); }
 .person-rules-table .thead, .person-rules-table .trow { grid-template-columns: minmax(0, 660fr) minmax(0, 280fr) minmax(100px, 180fr); }
+/* One row per machine: the name on the left, what it reported on the right,
+   with when it was last heard from under it. Wired and quiet is ink. */
+.person-devices { margin-top: var(--s-7); display: grid; gap: var(--s-2); max-width: var(--w-reading); }
+.person-devices .setting-rows { margin-top: var(--s-3); }
+.person-devices .setting-row { align-items: flex-start; }
+.device-cell { text-align: right; justify-items: end; }
+.cell-strong.--attention { color: var(--verdict-attention); }
 
 .roles-table .thead, .roles-table .trow { grid-template-columns: minmax(0, 310fr) minmax(90px, 170fr) minmax(0, 350fr) minmax(90px, 260fr) 40px; }
 .roles-table .trow.--editing { background: var(--surface-subtle); border-bottom: 0; }

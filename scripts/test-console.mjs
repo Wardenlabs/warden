@@ -677,3 +677,79 @@ test('turning Warden off is a recorded pause, not a way to stop the gateway', as
     assert.ok(!/conditions-fold/.test(off), 'being paused is not something to fold away either');
   } finally { Object.assign(state, saved); }
 });
+
+/**
+ * Team. The list used to answer one question — has traffic been seen — and
+ * called the answer "connected", so three different situations wore the same
+ * sentence and a gateway restart said it about everybody.
+ */
+const teamState = (employees) => ({
+  view: 'people', sel: null, query: {}, open: new Set(),
+  company: { name: 'Acme', roles: ['employee', 'admin'], employees },
+  policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+  loads: { people: { loading: false, error: '' } },
+  audit: []
+});
+const person = (patch) => ({ id: 'ana', name: 'Ana López', role: 'employee', connected: [], devices: [], ...patch });
+
+test('Team tells "never installed" from "took the hook out" from "wired and quiet"', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ id: 'never', name: 'Never Set', devices: [] }),
+      person({ id: 'quiet', name: 'Quiet One', devices: [{ machineId: 'm1', name: 'quiet-mbp', lastSeen: '2026-09-16T09:00:00.000Z', hookVersion: '0.2.5', tools: [{ id: 'claude-code', wired: true }] }] }),
+      person({ id: 'gone', name: 'Gone Away', devices: [{ machineId: 'm2', name: 'gone-mbp', lastSeen: '2026-09-13T09:00:00.000Z', tools: [{ id: 'claude-code', wired: false }] }] })
+    ]));
+    const list = VIEWS.people.body();
+    assert.match(list, /Never reported/, 'nobody has ever checked in for this one');
+    assert.match(list, /Unwired on gone-mbp/, 'and this one broke the seal, which is not the same thing');
+    assert.match(list, /Claude Code/, 'the wired one names what it wired');
+    assert.ok(!/Not connected yet/.test(list), 'the sentence that covered all three is gone');
+    // Two problems with two answers, counted apart.
+    assert.match(list, /1 unwired/);
+    assert.match(list, /1 never set up/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('a rotated key is visible to the administrator who rotated it', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-16T09:00:00.000Z', pendingSince: '2026-09-16T08:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }] })
+    ]), { sel: 'ana' });
+    const page = VIEWS.people.body();
+    assert.match(page, /key was rotated and no device has used the new one yet/);
+    assert.match(page, /there is no grace period/, 'the reason the employee is being refused right now');
+  } finally { Object.assign(state, saved); }
+});
+
+test('Team says an unwired hook is seen and cannot be put back', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-13T09:00:00.000Z', tools: [{ id: 'claude-code', wired: false }] }] })
+    ]), { sel: 'ana' });
+    const page = VIEWS.people.body();
+    assert.match(page, /it cannot put it back/, 'Warden detects; it does not enforce, and the copy may not pretend otherwise');
+    assert.ok(!/Force|Reinstall/i.test(page), 'no control may imply a power the product does not have');
+  } finally { Object.assign(state, saved); }
+});
+
+test('while anybody is paused, the list says so and stops reporting a last-seen that means nothing', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamState([
+      person({ paused: { until: null, by: 'marce', reason: 'debugging her own rule', at: '2026-09-16T08:00:00.000Z' },
+        devices: [{ machineId: 'm1', name: 'ana-mbp', lastSeen: '2026-09-16T09:00:00.000Z', tools: [{ id: 'claude-code', wired: true }] }] })
+    ]));
+    const list = VIEWS.people.body();
+    assert.match(list, /is paused/, 'a gateway judging nobody must not look like one that is');
+    assert.match(list, /still recorded, marked not judged/);
+    assert.match(list, /by marce/, 'a pause nobody can attribute is a hole in the record');
+    assert.match(list, /Paused<\/span>/, 'and the last-heard column says the thing that is true instead');
+  } finally { Object.assign(state, saved); }
+});
