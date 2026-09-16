@@ -47,6 +47,17 @@ entre ellas:
 - **La clave vive en hasta cuatro lugares** — perfil de shell más el bloque
   `env` de cada herramienta (`install.ts:107-121`, `warden-hook.mjs:722`) —
   y nada verifica que coincidan. La deriva es cuestión de tiempo.
+- **La pantalla puede estar hablando de otra identidad que la del teclado.**
+  `resolveSoloIdentity()` (`src/server/routes/solo.ts:62`) devuelve **el primer
+  empleado exento por orden alfabético de id**, no a quien pertenece la clave
+  con la que esa persona trabaja. En el directorio donde apareció este problema
+  eso significa que This device mostraba las reglas de *"Gastón (operador del
+  gateway)"* mientras la terminal mandaba `wk-you-…`: dos identidades, una
+  pantalla, y nada que lo dijera.
+- **Entrar a This device no propone un camino.** No hay un orden de pasos ni
+  una tarea siguiente: hay un botón que corre un script y una tabla que
+  después no confirma si sirvió. Quien llega sin saber qué es un hook no tiene
+  de dónde agarrarse.
 
 ## 1. Usuario y trabajo a resolver
 
@@ -105,6 +116,15 @@ abstracto. Es lo que vuelve honesto todo lo demás: sin esto, "cableada" y
 **This device habla de esta computadora y de nada más.** Las herramientas, su
 cableado y el interruptor. La dirección pública y los datos en disco son
 propiedades del gateway — del servicio — y se mudan a donde se hable de él.
+
+**Y propone un camino, no un tablero.** La pantalla tiene una tarea siguiente
+visible en cada estado: sin cablear, es cablear; recién cableado, es escribir
+la primera regla dirigida a uno mismo; funcionando, es el estado y el
+interruptor. Quien entra sin saber qué es un hook debe poder salir protegido
+siguiendo lo que la pantalla le propone, sin buscar documentación.
+
+**Y dice de quién está hablando.** La identidad que la pantalla muestra se
+nombra, porque puede no ser la de la clave con la que esa persona trabaja.
 
 **Dos interruptores, porque son dos cosas:**
 
