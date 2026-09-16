@@ -46,6 +46,9 @@ data/escalations.json
 # administrators' answers to held prompts. The queue itself is derived from the
 # audit log; only the answers live here.
 data/escalations.jsonl
+# which machines each person has Warden on. Hostnames are personal data — they
+# usually carry somebody's name — so this is 0600 and never committed.
+data/devices.json
 data/cache/
 
 # Generated reports (REPORT.md and BENCHMARKS.md ARE committed — they are deliverables)
