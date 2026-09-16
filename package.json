@@ -38,6 +38,7 @@
     "benchmark": "tsx scripts/benchmark.ts",
     "test:vote": "tsx scripts/test-vote.ts",
     "test:hook": "tsx scripts/test-hook.ts",
+    "test:installation": "tsx scripts/test-installation.ts",
     "test:cli": "tsx scripts/test-cli-compiler.ts",
     "test:compiler-setup": "tsx scripts/test-claude-setup.ts",
     "test:schema": "tsx scripts/test-draft-schema.ts",

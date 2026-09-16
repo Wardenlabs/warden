@@ -15,6 +15,9 @@ import { actorForCredential } from '../policy/people.js';
 import { loadPolicy } from '../policy/store.js';
 import { adapter } from '../qvac/index.js';
 import { parseDocumentAttachments } from '../documents/index.js';
+import { isLoopback } from './admin-auth.js';
+import { PORT } from './config.js';
+import { installationReport } from './installation.js';
 
 /**
  * What an unrecognised key gets back.
@@ -23,19 +26,43 @@ import { parseDocumentAttachments } from '../documents/index.js';
  * they render any other refusal, and worded for the person reading it in their
  * terminal — who is far more likely to have a stale key after a rotation than
  * to be an intruder.
+ *
+ * Built per request rather than held as a constant, because the two things that
+ * make this sentence useful are both properties of the request. **Which
+ * gateway** refused, by name and version: a key is only valid in the
+ * installation that minted it, and a machine running both the desktop app and a
+ * checkout has two of them fighting over one port, so "not recognised" without
+ * a name sends people looking for a bad key instead of the other Warden.
+ * **Where they are**: from this machine the fix is to open the console and
+ * claim a key, and from another machine it is to ask the administrator, and
+ * giving somebody the wrong one of those costs them the afternoon.
  */
-export const UNKNOWN_KEY = {
-  verdict: 'BLOCK' as const,
-  auditId: 'no-key',
-  error: 'unknown_api_key',
-  firedRules: [],
-  passes: [],
-  maskedPrompt: '',
-  maskedSpans: [],
-  explanation:
-    'Your Warden API key is not recognised by this gateway. ' +
-    'Ask your administrator for a current one — they can issue a new key from People.'
-};
+export function unknownKey(req: Request) {
+  const loopback = isLoopback(req);
+  const where = installationReport(loopback);
+  const said = [`The gateway "${where.label}" (v${where.version}) does not recognise this API key.`];
+  if (loopback) {
+    // It is on this machine, so the console is one click away and the person
+    // reading this is very likely the administrator of it.
+    said.push(
+      `That gateway is running here: open http://localhost:${PORT} and claim a key in Team → People.`,
+      'A key another Warden issued — the desktop app, or a second checkout — will not work in this one.'
+    );
+  } else {
+    said.push('Ask your administrator for a current one — they can issue a new key from People.');
+  }
+  return {
+    verdict: 'BLOCK' as const,
+    auditId: 'no-key',
+    error: 'unknown_api_key',
+    firedRules: [],
+    passes: [],
+    maskedPrompt: '',
+    maskedSpans: [],
+    // One paragraph, no newlines: the hook word-wraps this string as it is.
+    explanation: said.join(' ')
+  };
+}
 
 /**
  * Null means refuse. There is no default identity and no assumed role: a caller

@@ -18,7 +18,7 @@ import { loadPolicy } from '../../policy/store.js';
 import { adapter } from '../../qvac/index.js';
 import { emitDecision } from '../events.js';
 import { asyncRoute } from '../http.js';
-import { evaluateRequest, extractPrompt, resolveActor, UNKNOWN_KEY } from '../identity.js';
+import { evaluateRequest, extractPrompt, resolveActor, unknownKey } from '../identity.js';
 
 export const guardRoutes = Router();
 
@@ -26,7 +26,7 @@ guardRoutes.get('/api/documents/capabilities', (_req, res) => { res.json(documen
 
 guardRoutes.post('/api/guard/check', asyncRoute(async (req, res) => {
   const actor = resolveActor(req);
-  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+  if (!actor) return res.status(401).json(unknownKey(req));
 
   const controller = new AbortController();
   const abort = () => { if (!res.writableEnded) controller.abort(); };
@@ -73,7 +73,7 @@ const rewritten = new Set<string>();
  */
 guardRoutes.post('/api/guard/rewrite', asyncRoute(async (req, res) => {
   const actor = resolveActor(req);
-  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+  if (!actor) return res.status(401).json(unknownKey(req));
 
   const auditId = typeof req.body?.auditId === 'string' ? req.body.auditId.trim() : '';
   const prompt = extractPrompt(req.body);
@@ -151,7 +151,7 @@ guardRoutes.post('/api/guard/rewrite', asyncRoute(async (req, res) => {
  */
 guardRoutes.post('/api/guard/appeal', asyncRoute(async (req, res) => {
   const actor = resolveActor(req);
-  if (!actor) return res.status(401).json(UNKNOWN_KEY);
+  if (!actor) return res.status(401).json(unknownKey(req));
 
   const auditId = typeof req.body?.auditId === 'string' ? req.body.auditId.trim() : '';
   const note = typeof req.body?.note === 'string' ? req.body.note : undefined;

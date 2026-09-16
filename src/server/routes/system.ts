@@ -11,8 +11,10 @@ import { selections } from '../../models/manager.js';
 import { findModel } from '../../models/store.js';
 import { setupModelDownloads } from '../../setup/catalog.js';
 import { isMock, remoteCompiler } from '../../qvac/index.js';
+import { isLoopback } from '../admin-auth.js';
 import { shellAttached, tellShell } from '../desktop-bridge.js';
 import { asyncRoute } from '../http.js';
+import { installationReport } from '../installation.js';
 import { modelState } from '../lifecycle.js';
 
 export const systemRoutes = Router();
@@ -38,10 +40,22 @@ function hookDecisionDeadlineMs(): number {
 // `mode` is surfaced for the same reason `mock` is: a gateway running with the
 // guard switched off (`WARDEN_MODE=baseline`) must not present an identical
 // green UI to one that is enforcing.
-systemRoutes.get('/health', (_req, res) =>
+systemRoutes.get('/health', (req, res) =>
   res.json({
     ok: true,
     mock: isMock(),
+    /*
+     * Which Warden answered.
+     *
+     * The one fact that was missing everywhere it mattered. Two installations
+     * on one machine — the desktop app and a checkout — each hold their own
+     * people and their own keys, and nothing they said named which of them a
+     * hook, a console or a `curl` had just reached. `installation.ts` has the
+     * whole account. `dataDir` rides along only for a caller on this machine,
+     * because it is a path inside somebody's home and this route answers
+     * through the tunnel too.
+     */
+    installation: installationReport(isLoopback(req)),
     // How long an administrator can read a prompt for. On /health because it
     // is a property of this deployment, and the console has to be able to say
     // it out loud on the screen where the text is shown.
