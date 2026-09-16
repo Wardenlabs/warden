@@ -10,6 +10,7 @@ import { createApp } from './app.js';
 import { HOST, PORT, seedPath } from './config.js';
 import { lanAddresses } from './http.js';
 import { installExitHandlers, preloadModels } from './lifecycle.js';
+import { portAvailable, portHolder } from './installation.js';
 
 /*
  * Nothing is seeded at boot. A fresh install has no company, no people and no
@@ -28,6 +29,41 @@ try {
   dropUnrequestedSample(seedPath('policies.seed.json'), seedPath('company.json'));
 } catch {
   /* a migration must never be the reason the gateway will not start */
+}
+
+/*
+ * The port is already taken: say by whom, and stop.
+ *
+ * Almost always the other Warden. The desktop app and a checkout both default
+ * to 8080, each holds its own people and its own keys because writable state is
+ * cwd-relative, and what the second one printed was Node's bind error —
+ * `EADDRINUSE`, a stack trace, nothing that names Warden. Worse is what came
+ * next: whoever started it read the banner that had already printed, assumed it
+ * had come up, pointed a hook at localhost, and every prompt went to the
+ * *other* installation, which refused a key it had never issued. That is the
+ * incident `docs/prd/wiring-and-unwiring.md` opens with, and the whole of the
+ * cure is naming the gateway that answered.
+ *
+ * Asked before listening rather than off the listen error, because the banner
+ * prints from the listening callback and Node emits both — so the failure path
+ * had "Warden local http://localhost:8080" three lines above "did not start",
+ * which is the same wrong belief this is here to prevent. A port free during
+ * this check and taken a millisecond later still fails the way it always did.
+ */
+if (!(await portAvailable(PORT, HOST))) {
+  const held = await portHolder(PORT);
+  console.error(`\nWarden did not start: port ${PORT} is already in use.\n`);
+  if (held) {
+    console.error(`  It is held by the Warden installation "${held.label}" (v${held.version}).`);
+    if (held.dataDir) console.error(`  That one keeps its people, keys and rules in ${held.dataDir}.`);
+    console.error('\n  Two gateways cannot share a port, and neither knows the other\'s keys.');
+    console.error('  Stop that gateway, or give this one a port of its own:\n');
+  } else {
+    console.error('  Something that is not Warden is holding it.');
+    console.error('  Stop it, or give this gateway a port of its own:\n');
+  }
+  console.error(`    WARDEN_PORT=${PORT + 1} pnpm run dev\n`);
+  process.exit(1);
 }
 
 const server = createApp().listen(PORT, HOST, () => {
