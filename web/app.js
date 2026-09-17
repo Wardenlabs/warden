@@ -30,6 +30,7 @@ import './js/team.js';
 import './js/simulator.js';
 import './js/redteam.js';
 import './js/solo.js';
+import './js/first-run.js';
 import './js/gateway.js';
 import './js/nav.js';
 import { boot } from './js/data.js';

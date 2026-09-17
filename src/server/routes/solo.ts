@@ -16,7 +16,7 @@ import { ratifyRule, removeRule } from '../../policy/ratify.js';
 import { addRole, clearPause, loadDirectory, setPause, upsertEmployee, type Employee } from '../../policy/people.js';
 import { isExempt, loadPolicy, rulesForActor } from '../../policy/store.js';
 import type { Rule } from '../../policy/types.js';
-import { verifiedFor, withdrawVerification } from '../../policy/verification.js';
+import { completedFirstRun, verifiedFor, withdrawVerification } from '../../policy/verification.js';
 import { adapter } from '../../qvac/index.js';
 import { PORT, seedPath } from '../config.js';
 import { asyncRoute, readJsonFile } from '../http.js';
@@ -96,11 +96,17 @@ function withActivity(identity: Employee): Employee & {
   connected: ReturnType<typeof activityFor>;
   devices: ReturnType<typeof devicesFor>;
   verified: ReturnType<typeof verifiedFor>;
+  completedFirstRun: boolean;
 } {
   return {
     ...identity,
     connected: activityFor(identity.id),
     devices: devicesFor(identity.id),
+    // Sent separately from `verified` because they answer different questions
+    // and the console needs both: "is anything verified right now" decides what
+    // This device says, and "was the first run ever finished" decides whether
+    // it opens at all. Withdrawing every verification leaves this true.
+    completedFirstRun: completedFirstRun(identity.id),
     // The third fact, and the narrowest of the three. `connected` is traffic,
     // `devices` is what the machine says it wrote, and this is a rule having
     // decided a real request from that tool. A row can have the first two and

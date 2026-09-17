@@ -7,6 +7,7 @@ import { TOOL_NAMES, modelLabel, plural } from './format.js';
 import { render } from './render.js';
 import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
+import { soloIsPureInstall } from './nav.js';
 import { button, conditionBlock, contextBar, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
@@ -52,6 +53,34 @@ async function refreshSoloRules() {
 }
 
 /**
+ * Whether the first run should take over instead of this screen.
+ *
+ * Four conditions, and each one is a way of not asking somebody a question
+ * that has already been answered:
+ *
+ * - **A pure solo install.** Somebody who chose the team console at the splash
+ *   is setting up a directory, not this machine, and must not be handed a
+ *   recipe for wiring their own laptop. (Known gap: an empty directory reads as
+ *   pure solo, so a team admin who has added nobody yet sees this once. The
+ *   splash's answer is not written anywhere the gateway can read — see
+ *   docs/specs/first-run-and-theme.md §2.2.)
+ * - **Not demo.** Demo mode is the splash's other door, and it guards nothing,
+ *   so there is no protection to verify. Leaving demo brings this back on its
+ *   own: `/health` is re-read on every entry here.
+ * - **Never completed.** Completion is durable and survives every withdrawal.
+ *   Unwiring a tool changes what this screen says; it does not reopen setup.
+ * - **The gateway answered.** With no identity there is nothing to ask about,
+ *   and redirecting on a failed fetch would trap somebody on a screen whose own
+ *   retry button lives here.
+ */
+function firstRunIsDue() {
+  if (!soloIsPureInstall()) return false;
+  if (state.mock) return false;
+  if (!state.soloIdentity) return false;
+  return !state.soloIdentity.completedFirstRun;
+}
+
+/**
  * `/api/solo/setup` is idempotent and cheap by design (spec §6) — it returns
  * an existing identity untouched in the coexistence case and only creates one
  * the first time a pure install has nobody in it yet — so this always calls
@@ -64,6 +93,12 @@ async function onEnterSolo() {
   // whether the mock is standing in for a judge, and both can have changed
   // since boot — the desktop app restarts the gateway to leave demo mode.
   await Promise.all([refreshSoloPresets(), refreshSoloRules(), refreshHealth()]);
+  // Everything the decision needs is now loaded, which is why it is made here
+  // and not in the router: the desktop app opens `#soloRules` explicitly and a
+  // browser with no hash lands here too, so both paths come through this
+  // function without desktop/main.ts having to know the flow exists. Coming
+  // back from the flow re-runs this, finds the verification, and stays.
+  if (firstRunIsDue()) { go('firstRun'); return; }
   render();
 }
 

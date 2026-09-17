@@ -1263,3 +1263,106 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 }
 .device-page, .models-active, .test-subject, .job-block, .device-rules { grid-template-columns: minmax(0, 1fr); }
 .test-meta select { min-width: 0; }
+
+/* ── the first run ────────────────────────────────────────────────────────────
+   A screen with no sidebar, no breadcrumb and one thing to do. `body[data-bare]`
+   is set by render() for a view that declares `bare`, and the first run is the
+   only one. The column is 880 centred in the window, with the wordmark and its
+   rule in a band above it at the page margin — the proportions come from the
+   Figma frames at 1440 (see docs/specs/first-run-and-theme.md §5.6). */
+body[data-bare] .sidebar { display: none; }
+body[data-bare] .pane { padding: 0; }
+
+.first-run { min-height: 100vh; }
+.first-run > header {
+  padding: var(--s-9) var(--s-10) var(--s-6);
+  border-bottom: 1px solid var(--line-hairline);
+}
+/* The wordmark is the way out, and the only one. Styled as the mark rather than
+   as a button because that is what it is; it keeps a button's focus ring and a
+   button's keyboard behaviour, which a div with a click handler does not. */
+.first-run-mark {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; font-size: var(--fs-5); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); color: var(--ink); cursor: pointer;
+}
+.first-run-mark:hover { color: var(--ink-body); }
+
+.first-run-body {
+  width: min(880px, 100% - 2 * var(--s-10));
+  margin: 0 auto;
+  padding: var(--s-11) 0 var(--s-10);
+  display: flex; flex-direction: column;
+  /* The gaps between blocks are set on the blocks, not here: the rail sits
+     closer to its label than the cards sit to each other. */
+  gap: 0;
+}
+.first-run-eyebrow {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-body h1 {
+  margin-top: var(--s-4);
+  font-size: var(--fs-7); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
+}
+.first-run-lede { margin-top: var(--s-3); color: var(--ink-body); }
+
+.first-run-rail { margin-top: var(--s-9); }
+.first-run-rail p {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-rail > div { display: flex; gap: var(--s-6); margin-top: var(--s-4); }
+/* Three equal segments sharing the column, rather than the file's five fixed
+   at 160px. Reached and not reached; the label above says which one is now,
+   and the file draws no third state. */
+.first-run-rail i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-control); }
+.first-run-rail i.--done { background: var(--action); }
+
+.first-run-cards { margin-top: var(--s-8); display: flex; flex-direction: column; gap: var(--s-7); }
+
+/* Two on every screen. On steps 1 and 2 they are choices and `--lead` is the
+   selected one; from step 3 on they are a state and an instruction, and
+   `--lead` is the one carrying the state. The tone is about the outcome, never
+   about the verdict: the confirmation is green under a card that says
+   "Blocked", because blocking was the good ending. */
+.choice-card {
+  min-height: 132px;
+  padding: var(--s-7) var(--s-7) var(--s-7) 26px;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface-page);
+}
+.choice-card b { font-size: var(--fs-5); font-weight: var(--fw-semi); }
+.choice-card span { font-size: var(--fs-3); color: var(--ink-body); }
+[data-choice] { cursor: pointer; }
+[data-choice]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* The border goes 1px → 2px as well as changing colour, so the selection is
+   legible without colour at all. Padding compensates so nothing shifts. */
+.choice-card.--lead {
+  border-width: 2px; border-color: var(--action);
+  background: var(--surface-subtle);
+  padding: calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) 25px;
+}
+.choice-card.--lead.--block { border-color: var(--verdict-block); background: var(--verdict-block-bg); }
+.choice-card.--lead.--block b { color: var(--verdict-block); }
+.choice-card.--lead.--allow { border-color: var(--verdict-allow); background: var(--verdict-allow-bg); }
+.choice-card.--lead.--allow b { color: var(--verdict-allow); }
+
+.first-run-note { margin-top: var(--s-7); font-size: var(--fs-3); color: var(--muted); }
+.first-run-actions {
+  margin-top: var(--s-9);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+}
+.first-run-back {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; color: var(--ink-body); cursor: pointer;
+}
+.first-run-back:hover { color: var(--ink); }
+
+@media (max-width: 900px) {
+  .first-run > header { padding: var(--s-7) var(--s-6) var(--s-5); }
+  .first-run-body { width: calc(100% - 2 * var(--s-6)); padding-top: var(--s-9); }
+  .first-run-rail > div { gap: var(--s-4); }
+}

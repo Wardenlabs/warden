@@ -753,3 +753,131 @@ test('while anybody is paused, the list says so and stops reporting a last-seen 
     assert.match(list, /Paused<\/span>/, 'and the last-heard column says the thing that is true instead');
   } finally { Object.assign(state, saved); }
 });
+
+// ═══ THE FIRST RUN ═══════════════════════════════════════════════════════════
+//
+// The five outcomes of the last step have to stay five distinct sentences, and
+// none of the four that are not "verified" may finish the flow. The screen is
+// the last place these can go wrong quietly: the server refuses to write a
+// verification that has not been earned, but nothing stops a screen from
+// *saying* one has been.
+
+const firstRun = await import('../web/js/first-run.js');
+
+/** A world the flow can read: what is on the machine, what is wired, what is on. */
+function world({ found = ['claude', 'codex'], wired = [], rules = [], verified = [], reported = null } = {}) {
+  Object.assign(state, {
+    compiler: { cliTools: found.map((tool) => ({ tool, label: tool, found: true })) },
+    soloRules: rules.map((text, i) => ({ id: `r${i}`, text, severity: 'block' })),
+    soloPresets: [{ id: 'solo-security-1', text: 'Credentials, API keys, access tokens and passwords must never be requested or shared.' }],
+    soloIdentity: {
+      id: 'you',
+      verified: verified.map((tool) => ({ tool, auditId: 'a1', verdict: 'BLOCK', ruleIds: ['r0'], at: new Date().toISOString() })),
+      connected: [],
+      devices: [{
+        machineId: 'm1',
+        tools: reported ?? wired.map((id) => ({ id, wired: true })),
+        reportedAt: new Date().toISOString()
+      }]
+    },
+    firstRun: { tool: null, rule: 'preset', step: null, busy: false, error: '', seen: false, allowed: false, late: false }
+  });
+}
+
+test('the step is read off the machine, never off a saved cursor', () => {
+  world();
+  assert.equal(firstRun.stepOf(), 1, 'nothing wired: connect a tool');
+  world({ wired: ['claude-code'] });
+  assert.equal(firstRun.stepOf(), 2, 'wired but no rule: turn one on');
+  world({ wired: ['claude-code'], rules: ['no credentials'] });
+  assert.equal(firstRun.stepOf(), 3, 'wired and a rule on: verify');
+});
+
+test('an installation that is already set up arrives at the last step, not the first', () => {
+  // The upgrade case: somebody who has been using Warden for months has wiring
+  // and rules already, and must not be walked through creating them again.
+  world({ wired: ['claude-code'], rules: ['no credentials'] });
+  assert.equal(firstRun.stepOf(), 3);
+});
+
+test('the five outcomes of the last step are five different things', () => {
+  const seen = new Set();
+  world({ wired: ['claude-code'], rules: ['x'] });
+  seen.add(firstRun.outcomeOf());                                   // waiting
+
+  world({ wired: ['claude-code'], rules: ['x'], verified: ['claude-code'] });
+  seen.add(firstRun.outcomeOf());                                   // verified
+
+  world({ wired: ['claude-code'], rules: ['x'] });
+  state.firstRun.tool = 'claude-code'; state.firstRun.seen = true; state.firstRun.allowed = true;
+  seen.add(firstRun.outcomeOf());                                   // allowed
+
+  world({ wired: ['claude-code'], rules: ['x'] });
+  state.firstRun.tool = 'claude-code'; state.firstRun.seen = true; state.firstRun.late = true;
+  seen.add(firstRun.outcomeOf());                                   // no-decision
+
+  world({ rules: ['x'], reported: [{ id: 'claude-code', wired: false }] });
+  state.firstRun.tool = 'claude-code';
+  seen.add(firstRun.outcomeOf());                                   // disconnected
+
+  assert.equal(seen.size, 5, [...seen].join(', '));
+});
+
+test('an allowed request does not finish the flow: it proves the path, not the rule', () => {
+  world({ wired: ['claude-code'], rules: ['x'] });
+  state.firstRun.tool = 'claude-code';
+  state.firstRun.seen = true;
+  state.firstRun.allowed = true;
+  assert.equal(firstRun.outcomeOf(), 'allowed');
+  assert.notEqual(firstRun.outcomeOf(), 'verified');
+});
+
+test('a hook that timed out does not finish the flow either', () => {
+  world({ wired: ['claude-code'], rules: ['x'] });
+  state.firstRun.tool = 'claude-code';
+  state.firstRun.seen = true;
+  state.firstRun.late = true;
+  assert.equal(firstRun.outcomeOf(), 'no-decision');
+});
+
+test('the last step ignores a decision from a tool that was not the one chosen', () => {
+  world({ wired: ['claude-code', 'codex'], rules: ['x'] });
+  state.firstRun.tool = 'claude-code';
+  // Codex verified, Claude Code not. The screen is about Claude Code.
+  state.soloIdentity.verified = [{ tool: 'codex', auditId: 'a', verdict: 'BLOCK', ruleIds: ['r0'], at: '2026-01-01' }];
+  assert.equal(firstRun.outcomeOf(), 'waiting', 'somebody else\'s traffic is not this tool\'s proof');
+});
+
+test('nobody having reported is not the same as reporting "not wired"', () => {
+  // `wired === null` is silence. Only a machine that looked and said no gets
+  // the connection-failed screen; the other case keeps waiting.
+  world({ rules: ['x'], reported: [{ id: 'claude-code', wired: null }] });
+  state.firstRun.tool = 'claude-code';
+  assert.equal(firstRun.outcomeOf(), 'waiting');
+  world({ rules: ['x'], reported: [{ id: 'claude-code', wired: false }] });
+  state.firstRun.tool = 'claude-code';
+  assert.equal(firstRun.outcomeOf(), 'disconnected');
+});
+
+test('the credential preset is taken by its text, not by an id that is really a position', () => {
+  // `solo-security-1` is built as solo-<category>-<position>, so reordering the
+  // seed file points it somewhere else. Activating "whatever is first in
+  // security" would be silent and wrong.
+  world();
+  assert.ok(firstRun.credentialPreset(), 'the real credential preset is offered');
+  state.soloPresets = [{ id: 'solo-security-1', text: 'Production access must not be granted or escalated.' }];
+  assert.equal(firstRun.credentialPreset(), null, 'a different rule under that id is refused');
+});
+
+test('a tool with no prompt hook is never offered as something to connect', () => {
+  world({ found: ['claude', 'cursor-agent'] });
+  assert.ok(!firstRun.connectable().some((t) => t.id === 'cursor'), 'the first screen has no dead ends');
+});
+
+test('no control in the first run says Force, Reinstall or Guarantee', () => {
+  world({ wired: ['claude-code'], rules: ['x'] });
+  const html = VIEWS.firstRun.body();
+  for (const word of ['Force', 'Reinstall', 'Guarantee']) {
+    assert.ok(!html.includes(word), `${word} is a promise no screen here can keep`);
+  }
+});
