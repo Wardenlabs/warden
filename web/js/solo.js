@@ -550,12 +550,23 @@ function firstBlockBand() {
   });
 }
 
+/**
+ * The wide column, not the 760px reading one.
+ *
+ * Every content block in the three This device frames measures 1120 — the
+ * condition rows, the tab strip and the tab content alike — which is the
+ * --w-table token, and the same width `.sheet` around it already uses. The
+ * rule list is where the old width showed: a rule is a row carrying a badge, a
+ * sentence, a checkbox and a menu, and at 760 the sentence wrapped while a
+ * third of the window sat empty beside it. The reading width is for prose, and
+ * this page is a table of facts.
+ */
 function soloBody() {
   const tab = tabOf();
   return `<div class="sheet">
     ${contextBar([{ label: 'This device' }])}
     ${pageHead({ title: 'This device', sub: 'One device: yours. What is wired here, and what is judging you.' })}
-    <div class="reading device-page">
+    <div class="reading-wide device-page">
       ${conditions()}
       ${firstBlockBand()}
       ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
