@@ -164,19 +164,40 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
 
 /**
  * The block This device and Gateway both lead with: a headline that is the
- * conclusion and rows that are the evidence for it.
+ * conclusion, and under it the things that are not true yet.
  *
- * **The content decides the folding, not the reader.** With every condition
- * satisfied the block is two lines and offers to open; with a gap it is open
- * and has no control to close it. Someone can put away good news. Nobody gets
- * to put away the fact that no model is judging.
+ * **It shows the gaps, not the conditions.** One row per thing that is
+ * missing: one missing, one row; three missing, three rows. Everything that is
+ * satisfied folds behind the control, in the order the conditions are named.
+ * So the block's height is the size of the problem, which is the one thing it
+ * was not saying before — it stood 230px tall whether one condition was unmet
+ * or four, and that is why the tab strip under it sat halfway down the page on
+ * a device that only needed a rule written.
+ *
+ * The rule this settles is **good news folds, bad news does not**. It used to
+ * be "good news folds unless there is bad news, in which case the good news is
+ * forced open too", which is backwards: five rows where four of them say the
+ * machine is fine is the reassurance layout applied to the fault case. Nobody
+ * reading *"Not judging you yet"* needs to be told Warden is running — the
+ * page they are reading is being served by it.
+ *
+ * What does not change is that a gap cannot be put away. The control is back
+ * in this state, and what it hides is the evidence that everything else is in
+ * order; the gap rows are outside it and stay on screen.
+ *
+ * The rows are still the whole point and are not collapsible into a label.
+ * Two of the five conditions exist precisely because they were invisible
+ * before — a mock adapter standing in for a judge, and a role that no
+ * company-wide rule binds — and both need their sentence to be told apart from
+ * "you have not written a rule". A bare *"something is missing"* would put the
+ * three back in one bucket.
  *
  * It replaced a four-step setup wizard, which was the obvious design and the
  * wrong one twice over: the panel dies when the steps finish, taking the
  * vocabulary it taught with it, and the four things are not steps anyway —
  * a model can be downloaded before a tool is wired. These are conditions.
- * The same rows before and after; what changes is the values and whether
- * there is anything to press.
+ * The same rows before and after; what changes is the values, which side of
+ * the fold they are on, and whether there is anything to press.
  *
  * `rows` is `[{ label, value, tone }]`, where `value` is already-safe HTML so
  * a row can carry its own action, and `tone: 'attention'` is what makes a row
@@ -184,45 +205,44 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
  * implies; a row whose gap that action resolves does not also carry a button.
  */
 export function conditionBlock({ key, claim, tone = 'allow', summary = '', rows = [], action = '', open = false }) {
-  const gap = rows.some((r) => r.tone === 'attention');
-  const list = `<dl class="record conditions-rows">${rows.map((r) => `
-      <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`;
+  const gaps = rows.filter((r) => r.tone === 'attention');
+  const rest = rows.filter((r) => r.tone !== 'attention');
+  const list = (items, cls = '') => (items.length
+    ? `<dl class="record conditions-rows${cls ? ` ${cls}` : ''}">${items.map((r) => `
+      <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`
+    : '');
   const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>`;
 
-  // A gap opens the block and takes the control away with it. Nobody gets to
-  // put away the fact that no model is judging, and a button that could hide it
-  // is worse than no button — so this branch has no toggle at all, not a
-  // disabled one.
-  if (gap) return `<section class="conditions">
-    <div class="conditions-head">${claimLine}${action}</div>${list}</section>`;
-
   /*
-   * Healthy: the rows fold away behind a text control that sits in the
-   * headline row, to the left of the action.
+   * The control is a button with `aria-expanded`, and that is a bug fix rather
+   * than a preference. It was a <details> whose <summary> sat nested inside the
+   * headline row; only a <summary> that is the first child of its <details> is
+   * the disclosure's control, so the browser ignored it, generated a summary of
+   * its own reading "Details", and hid everything else in the element — which
+   * is to say the claim and the action button. The healthy state of This device
+   * and of Gateway rendered as a bare disclosure triangle with no headline and
+   * no way to pause Warden. Nobody caught it because it only appeared once
+   * every condition was met.
    *
-   * It was a <details> with the summary sentence inside the <summary>, which
-   * put the control at the far right of its own line and made the summary
-   * compete with the headline directly above it for the same job. The redesign
-   * drops the summary line and moves the control up beside the action, where
-   * the two things you can do to this block are together. `summary` is still
-   * accepted and no longer rendered — it is one sentence restating five rows
-   * that are one click away.
-   *
-   * Still a <details>, so `state.open` keeps working and the block survives a
-   * re-render open; what changed is where the <summary> is drawn.
+   * A button is the disclosure pattern anyway, it lets the action stay a
+   * sibling instead of a button nested inside a <summary>, and `state.open`
+   * still carries the open state across a re-render — the markup is produced
+   * open or closed from it, and `bindDisclosures` keeps it.
    */
+  const bodyId = `fold-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const toggle = rest.length
+    ? `<button type="button" class="conditions-toggle" data-fold="${esc(key)}" aria-expanded="${open}" aria-controls="${esc(bodyId)}">
+        <span class="--show">Show details</span><span class="--hide">Hide details</span>
+        <i class="chev" aria-hidden="true"></i>
+      </button>`
+    : '';
+
   return `<section class="conditions">
-    <details class="disclosure conditions-fold" data-key="${esc(key)}"${open ? ' open' : ''}>
-      <div class="conditions-head">
-        ${claimLine}
-        <summary class="conditions-toggle">
-          <span class="--show">Show details</span><span class="--hide">Hide details</span>
-          <i class="chev" aria-hidden="true"></i>
-        </summary>
-        ${action}
-      </div>
-      <div class="disclosure-body">${list}</div>
-    </details>
+    <div class="conditions-head">${claimLine}${toggle}${action}</div>
+    <div class="conditions-evidence">
+      ${list(gaps, 'conditions-gaps')}
+      ${rest.length ? `<div class="disclosure-body conditions-body" id="${esc(bodyId)}"${open ? '' : ' hidden'}>${list(rest)}</div>` : ''}
+    </div>
   </section>`;
 }
 

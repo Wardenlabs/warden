@@ -326,7 +326,7 @@ function gatewayBody() {
   return `<div class="sheet">
     ${contextBar([{ label: 'Gateway' }])}
     ${pageHead({ title: 'Gateway', sub: 'The server that holds the rules, the people, the keys and the log. One per company.' })}
-    <div class="reading gw-page">
+    <div class="reading-wide gw-page">
       ${conditions()}
       ${alarm()}
       ${tabs('gateway', TABS, tab, 'Gateway sections')}

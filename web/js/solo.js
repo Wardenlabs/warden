@@ -209,10 +209,24 @@ function rulesSection() {
     ${state.soloLoadError && !onRules.length && !offPresets.length
       ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
       : loading ? feedback({ title: 'Loading the rules for this device…', body: 'Fetching what is turned on and what is suggested.' })
+        /*
+         * No empty sentence, and the reason is not the layout.
+         *
+         * It read as orphaned because it was: an empty list here means no rule
+         * is addressed at you, which is a gap, which means the conditions
+         * block above is open and its `Rules for you` row is already saying
+         * *"None. Nothing is addressed at you, so there is nothing to judge a
+         * request against"* in amber, with the button that fixes it beside the
+         * headline. `rulesRow` returns `tone: 'attention'` on every path where
+         * this list can be empty, so the two are never apart.
+         *
+         * A second grey sentence a hundred pixels below the first, saying the
+         * same thing with less of the reason, is not an empty state. The
+         * Suggested band and a column of unchecked boxes are the empty state.
+         */
         : `<div class="table device-table" role="table" aria-label="Rules on this device">
           ${onRules.map((r) => row(r, true)).join('')}
           ${exemptRules.map((r) => `<div class="trow" role="row"><span>${effectText(r.severity)}</span><span class="cell-stack"><span class="cell-muted solo-text">${esc(r.text)}</span><small>everyone · not judged for you</small></span><span></span><span></span></div>`).join('')}
-          ${!onRules.length && !exemptRules.length ? '<div class="trow"><span></span><span class="cell-muted">Nothing turned on yet. Turn on a suggestion below, or write your own.</span></div>' : ''}
           ${offPresets.length ? `<div class="group-band">Suggested · ${offPresets.length}</div>${offPresets.map((p) => row(p, false)).join('')}` : ''}
         </div>
         <div class="inline-form device-add">
