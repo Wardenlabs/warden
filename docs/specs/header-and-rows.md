@@ -83,6 +83,39 @@ una decisión: `min-height: 0`, `align-items: flex-start`, y margen extra sobre
 la `sub`. Es exactamente el caso de §2.2 resuelto a mano y antes. El modificador
 se borra: con `meta` en el componente deja de hacer falta.
 
+### 2.4 `.sheet` no puede seguir siendo un grid
+
+El header es sticky (PRD §6: «El header no se va con el scroll»), y **el bloque
+contenedor de un grid item es su propia grid area**. La fila del header mide
+exactamente lo que mide el header, así que `position: sticky` no tiene por
+dónde moverse y el header se va con el scroll igual. El bloque contenedor de un
+flex item, en cambio, es el contenedor entero.
+
+`.sheet` pasa a `display: flex; flex-direction: column`, con el mismo
+`gap: var(--s-block)` y la misma regla de que los bloques no llevan margen. Lo
+único que se pierde es `align-content: start`, que en columna es el default de
+`justify-content`.
+
+### 2.5 Las dos sublíneas de `solo.js` que no se pueden borrar
+
+§7 manda `mitad → found` para `wired === false` y para `t.found` con
+`wired === null`. Las dos comparten la línea de arriba —`Not connected · no
+request judged`— así que reducir las dos a `Found` deja dos estados
+indistinguibles, y son justamente los dos que el módulo separa a propósito:
+silencio no es ausencia. Se quedan, acortadas: `Found · not in its settings` y
+`Found · wiring not reported`. El criterio de §7 supone que la línea de arriba
+ya carga la distinción; acá no.
+
+### 2.6 El `Cancel` de `draft.js` no es el de `rules.js`
+
+§6 pide verificarlo al migrar. No se repite el patrón: la propuesta y el editor
+de un draft son **la misma ruta** (`policy/new`) y lo que las distingue es
+`set.editing`. `go('policy', 'new')` desde ahí deja `location.hash` igual,
+`route()` no ve movimiento y el editor se vuelve a dibujar — o sea que el crumb
+sería un botón que no hace nada. El botón se saca igual, pero el crumb se lleva
+el trabajo: `crumbs` acepta un `id` sin `go` para que la vista lo ligue. Queda
+un quiet y un primary, como en todos lados.
+
 ## 3. `web/js/ui.js`
 
 ### 3.1 `pageHead` — reemplaza `contextBar` y `tabs`
@@ -357,17 +390,24 @@ alcance, anotado para su propio rediseño.
 
 ## 8. Orden
 
-Cuatro commits. El tercero es el único que requiere criterio.
+**Esto se escribió mal y se implementó en un commit.** `tsconfig.json` excluye
+`web/`, así que borrar `sub` no rompe ningún typecheck: los call sites
+aparecieron por el error de import de `contextBar` y por grep. Y los cuatro
+commits no se pueden separar de todos modos — un call site no se puede migrar
+primero por su copy y después por sus acciones, porque para llamar al `pageHead`
+nuevo hay que decidir las dos cosas a la vez.
 
-1. **`ui.js` + `style.css`.** El `pageHead` nuevo, el CSS de §4, el token
-   `--surface-selected`. Borrar `sub` rompe los 20 call sites y el typecheck
-   dice dónde: no hay que ir a buscarlos.
-2. **Las 20 descripciones.** Catorce se borran, cuatro pasan a `meta`
-   (§2.2), y las que son prosa de orientación bajan a lede de su primera
-   sección. Es el único commit que toca copy.
-3. **Las acciones de las 28 vistas** bajo la regla uno + uno + resto, y el
-   borrado de `Cancel` (§6).
-4. **Las filas** de §7, más el punto de pendiente en `solo.js:588`.
+Lo que sí se separó: el trabajo de ritmo de página y del bloque de condiciones
+que ya estaba sin commitear en el árbol fue a su propio commit antes de este,
+para que el diff del header se lea solo.
+
+Lo que se implementó, entonces:
+
+1. **El componente y la hoja de estilos.** `pageHead` nuevo, `contextBar`
+   borrado, `tabs` como card, el CSS de §4, `--surface-selected`, `--h-page-row`.
+2. **Los 28 call sites**, con sus crumbs, su `meta`, sus acciones bajo la regla
+   uno + uno + resto, y las catorce descripciones borradas o bajadas a lede.
+3. **Las filas** de §7, el chip de exención y el punto de pendiente.
 
 ## 9. Lo que no está acá
 
@@ -380,5 +420,10 @@ Cuatro commits. El tercero es el único que requiere criterio.
   (`Hooks` y `Reach` contra `Decision deadline` y `If it cannot answer`). Está
   decidido sacarlo y mover `Devices` al bloque, pero es un cambio de contenido y
   merece su propia pasada.
-- **Los tests.** `web/` no tiene suite. La verificación es abrir las 131
-  pantallas del archivo y compararlas.
+- **Una suite de navegador para `web/`.** Sigue sin haberla. Lo que sí hay, y
+  esta spec no lo había visto, es `scripts/test-console.mjs` (`pnpm run
+  test:console`): 61 tests que importan los módulos y comparan el HTML que
+  devuelven. Tocan las sublíneas de `solo.js` y hubo que actualizarlos.
+  La verificación del layout se hizo renderizando cada vista en cada selección
+  bajo Chrome headless, en los dos temas, más un scroll de la lista de reglas
+  para confirmar que el header efectivamente se queda.
