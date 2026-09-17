@@ -42,6 +42,28 @@
  * --action ↔ action/graphite, --action-ink ↔ action/on-graphite; the rest share
  * a name. Figma writes them --warden-ink-default and so on; renaming 1200 lines
  * of stylesheet to gain a prefix buys nothing, so the names here stay.
+ *
+ * **Every number below is Figma's, and Figma is where it gets changed.** The
+ * same collection now carries the sizes and the spacing as well as the colour,
+ * in two layers: `primitive/space-N` is the raw ramp, hidden from the picker,
+ * and `space/inset-*` and `space/stack-*` are what a component actually binds
+ * to. That split is the one this file makes too — `--s-1` to `--s-4` are the
+ * air inside a thing and do not move with the scale, `--s-5` upward is the
+ * distance between things and does. The type is Figma's ten text styles rather
+ * than variables, which is why the sizes here have no counterpart to bind to
+ * and are matched by hand:
+ *
+ *   --fs-1 11 Label · --fs-2 12 Code / Small · --fs-3 12 Caption
+ *   --fs-4 13 UI and Secondary · --fs-5 15 Body · --fs-6 18 Heading
+ *   --fs-7 22 Title
+ *
+ * --fs-2 and --fs-3 hold the same 12 and are still two names, for the same
+ * reason --sidebar-bg and --surface-subtle hold the same #F4F5F4: one is mono
+ * metadata and the other is prose, and they will not stay equal forever.
+ * The heights map one to one: --h-control ↔ size/control, --h-page-row ↔
+ * size/page-row, --h-tabs ↔ size/tabs, --h-record-row ↔ size/record-row,
+ * --w-sidebar ↔ size/sidebar, --w-reading ↔ size/reading, --w-table ↔
+ * size/table, --w-bleed ↔ size/bleed, and .trow ↔ size/row.
  */
 
 :root {
@@ -230,7 +252,7 @@
    * enthusiasm to spare.
    */
   --fs-1: 11px;  /* kickers and column headers, uppercase */
-  --fs-2: 11px;  /* chips, mono metadata */
+  --fs-2: 12px;  /* chips, mono metadata — Figma's "Code / Small" */
   --fs-3: 12px;  /* secondary: datums, helpers, notes beside a value */
   --fs-4: 13px;  /* the body: labels, values, rows, buttons, menus, ledes */
   --fs-5: 15px;  /* block title, and the prose you stop to read */
