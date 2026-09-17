@@ -66,11 +66,30 @@ export function withRememberedPrompts(entries: unknown): unknown {
   });
 }
 
-/** Broadcast a decision to every connected trace viewer. */
-export function emitDecision(decision: unknown): void {
+/**
+ * Broadcast a decision to every connected trace viewer.
+ *
+ * `envelope` is for the console and goes beside the decision, never inside it.
+ * The `Decision` is what the hook is answered with and what the audit log is
+ * built from; neither needs to know which tool asked, and adding a field there
+ * to satisfy a screen is how an audit record grows columns nobody audits.
+ *
+ * `source` exists because the first-run flow has to tell "a request arrived
+ * from the tool this person just connected" from "a request arrived". Without
+ * it the screen celebrates on any traffic at all, and tells somebody their
+ * setup is verified when what it saw was a different tool entirely. See
+ * docs/specs/first-run-and-theme.md §4.2.
+ *
+ * `late` is the gateway noticing its own slowness: a decision that took longer
+ * than the hook's deadline reached the hook after it had already let the
+ * prompt through. Nothing about the verdict changes — it is recorded and it is
+ * real — but the prompt it describes was not actually guarded, and the flow's
+ * "Warden did not respond" outcome is the one screen that can say so.
+ */
+export function emitDecision(decision: unknown, envelope?: { source?: string; late?: boolean }): void {
   if (decision && typeof decision === 'object') decision = withoutDocumentText(decision);
   rememberPrompt(decision);
-  const payload = `data: ${JSON.stringify({ type: 'decision', decision })}\n\n`;
+  const payload = `data: ${JSON.stringify({ type: 'decision', decision, ...envelope })}\n\n`;
   for (const client of sseClients) {
     // One dead viewer must not turn a finished guard decision into a 500.
     try {

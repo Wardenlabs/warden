@@ -18,7 +18,9 @@ import { recordAppeal } from '../../policy/appeals.js';
 import { recordMachineSeen, recordWiringReport, toolReportSchema } from '../../policy/devices.js';
 import { actorForCredential, activePause } from '../../policy/people.js';
 import { loadPolicy } from '../../policy/store.js';
+import { recordVerified } from '../../policy/verification.js';
 import { adapter } from '../../qvac/index.js';
+import { hookDecisionDeadlineMs } from '../config.js';
 import { emitDecision } from '../events.js';
 import { asyncRoute } from '../http.js';
 import { evaluateRequest, extractPrompt, resolveActor, unknownKey } from '../identity.js';
@@ -140,7 +142,25 @@ guardRoutes.post('/api/guard/check', asyncRoute(async (req, res) => {
   // wired is reported separately and never inferred from a request.
   const machine = readMachine(req.body?.machine);
   if (machine) recordMachineSeen(actor.id, machine);
-  emitDecision(decision);
+  // The durable half of the same sighting, and a much narrower claim than the
+  // two above: not "this tool spoke to us" but "this tool's request was
+  // decided by a rule". `recordVerified` refuses everything short of that —
+  // see its header for the three conditions and why each one is there. This is
+  // the only thing the first-run flow will accept as proof.
+  const source = typeof req.body?.source === 'string' ? req.body.source : undefined;
+  recordVerified(actor.id, {
+    tool: source,
+    auditId: decision.auditId,
+    verdict: decision.verdict,
+    ruleIds: decision.firedRules.map((rule) => rule.ruleId),
+    policyVersion: decision.policyVersion
+  });
+  // A decision slower than the hook's own deadline arrived after the hook had
+  // already released the prompt. The verdict stands and is recorded; what is
+  // no longer true is that the prompt it describes was checked before it went
+  // out. The gateway cannot see a client-side timeout, but it can see this,
+  // and it is the same event from the other end.
+  emitDecision(decision, { source, late: decision.totalMs > hookDecisionDeadlineMs() });
   res.json(withoutDocumentText(decision));
 }));
 

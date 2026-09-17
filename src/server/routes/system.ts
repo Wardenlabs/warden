@@ -12,6 +12,7 @@ import { findModel } from '../../models/store.js';
 import { setupModelDownloads } from '../../setup/catalog.js';
 import { isMock, remoteCompiler } from '../../qvac/index.js';
 import { isLoopback } from '../admin-auth.js';
+import { hookDecisionDeadlineMs } from '../config.js';
 import { shellAttached, tellShell } from '../desktop-bridge.js';
 import { asyncRoute } from '../http.js';
 import { installationReport } from '../installation.js';
@@ -22,20 +23,10 @@ export const systemRoutes = Router();
 /**
  * The decision deadline this deployment hands to its hooks.
  *
- * 90 seconds by default, which is what `integrations/warden-hook.mjs` falls
- * back to when a gateway is too old to say. Raise it on the gateway when the
- * adjudicator is slower than the deadline — the optional 8B was measured at
- * 46 s on four CPU cores — and every hook picks it up on its next prompt
- * without anybody editing a shell profile.
+ * It moved to `server/config.ts` when the guard started comparing decisions
+ * against it too — see `hookDecisionDeadlineMs` there, and
+ * docs/specs/first-run-and-theme.md §4.4.
  */
-function hookDecisionDeadlineMs(): number {
-  const raw = process.env['WARDEN_HOOK_TIMEOUT_MS'];
-  if (raw === undefined) return 90_000;
-  const value = Number(raw);
-  // A deadline nobody can parse is not a reason to invent a shorter one: the
-  // shorter it is, the sooner the hook stops checking.
-  return Number.isFinite(value) && value > 0 ? value : 90_000;
-}
 
 // `mode` is surfaced for the same reason `mock` is: a gateway running with the
 // guard switched off (`WARDEN_MODE=baseline`) must not present an identical
