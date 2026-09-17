@@ -100,13 +100,13 @@ function presetMenu() {
 }
 
 function heroPage() {
-  return `<div class="new-rule">
+  return `<div class="new-rule --centred">
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="hero-fill">
       <div class="hero">
         <h2 class="hero-q">What should Warden protect?</h2>
-        <p class="hero-sub">Write it like you would say it. One worry at a time works best.${scopeNote()}</p>
-        ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'What shouldn’t happen? Write it in your own words…', sendLabel: 'Draft rules', disabled: true, attach: presetMenu(), rows: 2 })}
+        ${scopeNote() ? `<p class="hero-sub">${scopeNote().trim()}</p>` : ''}
+        ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'What shouldn’t happen? Write it in your own words…', sendLabel: 'Draft rules', disabled: true, attach: presetMenu() })}
         <div class="suggestions">${TRIES.map((t) => `<button type="button" class="suggestion" data-try="${esc(t)}">Try: “${esc(t)}”</button>`).join('')}</div>
       </div>
     </div>
@@ -138,8 +138,9 @@ function composerFor() {
 
 /**
  * The conversation pane: the header that does not scroll, the thread that
- * does, and the composer docked under it. The New rule hero is the only
- * centred thing in the product; once a message is sent the box docks.
+ * does, and the composer docked under it. The whole flow is the product's one
+ * centred column (`.--centred`), so sending a sentence slides the box down
+ * the column rather than moving it across the screen.
  */
 export function ruleChatPane() {
   const set = state.set;
@@ -148,7 +149,7 @@ export function ruleChatPane() {
   if (!state.ruleChat.length && !set) return heroPage();
   const revising = set?.revision;
   const said = state.ruleChat.filter((t) => !(revising?.set && t.from === 'warden'));
-  return `<div class="chatwrap">
+  return `<div class="chatwrap --centred">
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="chat" id="ruleChat">
       <div class="thread">

@@ -51,7 +51,7 @@ function listPage() {
   // fourth time, on a page somebody opens every day.
   if (loads.some((l) => !l || (l.loading && !state.escalations.length && !state.appeals.length))) {
     return `<div class="sheet">${pageHead({ title: 'Inbox' })}
-      ${listState({ title: 'Loading the inbox…', body: 'Fetching the items that are waiting on a person.' })}</div>`;
+      ${listState({ title: 'Loading the inbox…' })}</div>`;
   }
   if (loads.some((l) => l.error)) {
     return `<div class="sheet">${pageHead({ title: 'Inbox' })}
@@ -177,17 +177,17 @@ function heldPage(e) {
     })}
     <div class="exchange reading">
       ${request}
-      ${ruleCard(d, { note: '<p class="turn-meta">This request did not reach the assistant. Your answer will not resume it.</p>' })}
+      ${ruleCard(d)}
     </div>
     <hr class="hairline">
     <section class="reading answer-block" aria-labelledby="answerTitle">
       <h2 class="section-title --big" id="answerTitle">Record your answer</h2>
       ${failed ? feedback({ tone: 'error', icon: true, title: `${outcomeWord(failed.outcome)} couldn’t be saved`, body: `Your ${outcomeWord(failed.outcome).toLowerCase()} was not recorded. This request is still waiting for review.<br>Your note is preserved below — try saving again.${failed.why ? `<br>${esc(failed.why)}` : ''}` }) : ''}
-      <p class="answer-lead">${failed ? `Once your answer is saved, ${esc(first)} must send a new request.` : `${esc(first)} must send a new request after reading your answer.`} Every new request is checked again.</p>
+      <p class="answer-lead">Recording an answer does not resume this request. ${esc(first)} must send a new request; Warden will check it again.</p>
       <div class="field">
         <label for="reviewNote">Note to ${esc(first)} <span class="optional">(optional)</span></label>
         <textarea id="reviewNote" rows="3" placeholder="Add context for your answer…"${saving ? ' readonly' : ''}>${esc(a.note)}</textarea>
-        <span class="field-help">${saving ? 'Saving your answer…' : failed ? 'Your note was preserved. Try saving again.' : 'Your note is kept if saving fails.'}</span>
+        ${saving ? '<span class="field-help">Saving your answer…</span>' : ''}
       </div>
       <div class="btn-row">
         ${button(saving === 'approved' ? 'Saving approval…' : failed?.outcome === 'approved' ? 'Retry saving approval' : 'Record approval', { kind: 'primary', attrs: `data-review="approved" data-id="${attr(e.auditId)}"`, busy: saving === 'approved', disabled: Boolean(saving) })}

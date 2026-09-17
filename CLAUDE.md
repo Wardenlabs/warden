@@ -341,3 +341,14 @@ Warden was built fast and the repo says so rather than pretending otherwise.
 
 If you fix one of these, add the row to `docs/MEASUREMENTS.md` with the run
 behind it.
+
+## Console copy
+
+Page and section headings have no explanatory subtitle by default. Remove text
+that repeats a title, tab, loading state or visible action; do not move the same
+introduction into the content or replace it with an information icon. Keep record
+metadata, rule scope, error recovery and action consequences where they matter.
+When text is absent, omit its element and spacing. Figma and `web/` are the shared
+reference, including dark variants; standalone layout artifacts are not. This
+supersedes the historical decisions to move header descriptions into section
+ledes. Verify copy changes with `pnpm run test:console` and browser renders.

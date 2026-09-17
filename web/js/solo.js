@@ -316,18 +316,44 @@ function conditions() {
   const gaps = rows.filter((r) => r.tone === 'attention');
   return conditionBlock({
     key: 'dev:conditions',
-    claim: paused ? 'Paused · nothing of yours is being judged' : gaps.length ? 'Not judging you yet' : 'Protection is on',
-    tone: paused || gaps.length ? 'attention' : 'allow',
+    /*
+     * Paused says itself once.
+     *
+     * It used to say itself four times over: an amber claim reading "Paused ·
+     * nothing of yours is being judged", an amber gap row repeating it with the
+     * consequence spelled out, an amber dot, and a primary button. Four alarms
+     * for a state the person had just chosen on purpose, and amber elsewhere in
+     * this console means something is wrong — which a pause is not. So: the
+     * claim is the word, the detail is how long it lasts, and the tone is muted.
+     * What the pause actually costs you is a fact like the other five, and it
+     * sits with them in the evidence rather than shouting over the headline.
+     */
+    claim: paused ? 'Paused' : gaps.length ? 'Not judging you yet' : 'Protection is on',
+    detail: paused ? pauseDetail(paused) : '',
+    tone: paused ? 'muted' : gaps.length ? 'attention' : 'allow',
     summary: esc(`${wired.map((t) => t.name).join(' and ')} wired, judged by ${judgeName()} on this device, against ${plural(onRules.length, 'rule')} addressed at you.`),
-    rows: paused ? [{ label: 'Paused', tone: 'attention', value: pauseLine(paused) }, ...rows] : rows,
+    rows: paused ? [pauseRow(), ...rows] : rows,
     action: headlineAction(paused, gaps),
     open: state.open.has('dev:conditions')
   });
 }
 
-function pauseLine(paused) {
-  const until = paused.until ? `until ${new Date(paused.until).toLocaleString()}` : 'until you turn it back on';
-  return `Requests go through unchecked ${esc(until)}. Each one is still recorded, marked not judged.`;
+/** How long the pause lasts — the only qualifier the headline carries. */
+function pauseDetail(paused) {
+  return paused.until ? `until ${new Date(paused.until).toLocaleString()}` : 'until you turn it back on';
+}
+
+/**
+ * What a pause costs, carried as evidence and not as an alarm.
+ *
+ * No `tone`, so it folds away with the other conditions instead of sitting
+ * open in amber: somebody who just pressed Pause knows they paused it, and
+ * somebody who comes back to the page opens the details to find out what that
+ * means. The sentence is unchanged — it is the recording that makes a pause
+ * safe to offer at all, and it stays written down.
+ */
+function pauseRow() {
+  return { label: 'Paused', value: esc('Requests go through unchecked. Each one is still recorded, marked not judged.') };
 }
 
 /**
@@ -395,7 +421,10 @@ function rulesRow(onRules, exemptRules, exempt) {
  * pause is: off until somebody turns it on, recorded, with a name on it.
  */
 function headlineAction(paused, gaps) {
-  if (paused) return button('Resume protection', { kind: 'primary', id: 'soloResume', busy: state.soloPausing });
+  // Resume weighs the same as Pause. It was `kind: 'primary'`, which made the
+  // one button on a paused page the loudest thing on the screen; the pair is
+  // one switch and a switch does not get louder in one of its positions.
+  if (paused) return button(state.soloPausing ? 'Resuming…' : 'Resume', { id: 'soloResume', busy: state.soloPausing });
   const first = gaps[0];
   // "Pause protection" rather than "Turn Warden off": same POST, same
   // indefinite pause, same record with a name on it. The word changed because
@@ -516,7 +545,6 @@ function toolsTab() {
   }).join('');
 
   return `<section class="settings-task">
-    <p class="section-lede">A tool is configured when it reports its wiring. It is verified after a real request reaches Warden.</p>
     ${state.soloWireError ? feedback({ tone: 'error', icon: true, title: 'That tool did not change', body: esc(state.soloWireError) }) : ''}
     <div class="tool-rows">${rows || '<div class="tool-row"><span class="cell-muted">No supported tool was found on this device.</span></div>'}</div>
   </section>`;
@@ -527,7 +555,6 @@ function identityTab() {
   if (!identity) return feedback({ tone: 'attention', title: 'This gateway did not say who you are', body: 'Reload the page, or check that the gateway is still running.' });
   const exempt = roleExempt(identity.role);
   return `<section class="settings-task">
-    <p class="section-lede">Nothing you type identifies you here. The key does, and only the key — which is why an administrator can change what your role means without you touching this device.</p>
     <dl class="record">
       <dt>Name</dt><dd>${esc(identity.name || identity.id)}</dd>
       <dt>Role</dt><dd>${esc(identity.role)}${exempt ? ' · exempt from company-wide rules' : ''}</dd>
@@ -543,39 +570,24 @@ const maskKey = (key) => {
   return cut > 0 && k.length > cut + 12 ? `${k.slice(0, cut + 1)}${'•'.repeat(16)}${k.slice(-6)}` : k || 'not issued yet';
 };
 
-/**
- * The band that says the protection just worked, once.
+/*
+ * There is no band here saying a request was just blocked, and that is a
+ * decision rather than an omission.
  *
- * The same fact that closed the first run, shown again in the place it lives
- * from now on. It is drawn from the verification record rather than from a
- * fixed string, so it can only appear when something really was blocked.
+ * There was one: drawn from the verification record, shown for a day, green.
+ * The trouble is where it was shown. The person who made that block happen was
+ * sitting in Claude Code or Cursor when their prompt came back refused — they
+ * already watched it happen, in the window it happened in, with the rule's own
+ * sentence attached. This page then told them about it again, hours later, in
+ * the one place on the screen that is supposed to say what is true *now*, and
+ * it stayed there while they read the five conditions underneath it.
  *
- * **It ages out**, and that is the point of it: a permanent green banner is
- * decoration, and the five condition rows are where the durable version of
- * this lives. A day is the cutoff — long enough to survive somebody closing
- * the window after setup, short enough that it is never the thing telling you
- * about protection you set up last month.
- *
- * The design's second line reads "Credential request · blocked just now". This
- * one does not name what was requested, because the console does not know: the
- * audit log stores a hash and not the prompt, deliberately, and a category
- * invented here would be the one sentence on the screen with nothing behind it.
+ * What a block leaves behind belongs in the record, not in the headline:
+ * Activity has every one of them with its rule and its time, and "last judged"
+ * in the conditions block is the live version of the same fact. If proof that
+ * setup worked is wanted again, it belongs to first run, which is where that
+ * question is actually being asked.
  */
-function firstBlockBand() {
-  const recent = (state.soloIdentity?.verified ?? [])
-    .filter((v) => v.verdict !== 'ALLOW')
-    .sort((a, b) => b.at.localeCompare(a.at))[0];
-  if (!recent) return '';
-  const at = Date.parse(recent.at);
-  if (!Number.isFinite(at) || Date.now() - at > 24 * 60 * 60 * 1000) return '';
-  const name = TOOL_NAMES[recent.tool] ?? recent.tool;
-  return feedback({
-    tone: 'success',
-    icon: true,
-    title: `Your rule blocked a request from ${esc(name)}`,
-    body: `Blocked ${esc(ago(at))}, before it left ${esc(name)}.`
-  });
-}
 
 /**
  * The wide column, not the 760px reading one.
@@ -603,7 +615,6 @@ function soloBody() {
     ${pageHead({ title: 'This device' })}
     <div class="reading-wide device-page">
       ${conditions()}
-      ${firstBlockBand()}
       ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
       ${state.soloPauseError ? feedback({ tone: 'error', icon: true, title: 'Warden did not change', body: esc(state.soloPauseError) }) : ''}
       ${tabs('soloRules', TABS.map(([sel, label]) => [sel, label, gaps[sel || 'rules']]), tab, 'This device sections')}
@@ -869,12 +880,10 @@ function soloSettingsBody() {
         <!-- The header's sentence, moved to the section it is about. Prose
              belongs in the reading column under a heading, not in a header
              where it has to be true of the whole page forever. -->
-        <p class="section-lede">Warden is protecting one device: yours. Nobody else's prompts are checked, and nothing here is visible to anyone else.</p>
         <div>${button('Manage the rule writer and the judge', { attrs: 'data-go="models"' })}</div>
       </section>
       <section class="settings-task">
         <h2 class="section-title">Managing a team too?</h2>
-        <p class="section-lede">Add people, send each their install link, and write rules for them. What you've set up here keeps working as it does now.</p>
         <div>${button('Add people', { kind: 'primary', id: 'soloGoTeam' })}</div>
       </section>
     </div>

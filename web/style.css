@@ -17,7 +17,8 @@
  * to sit closer says so on its container (`.flush-head`), never on itself.
  *
  * Everything is grey except the verdicts and the role identities. Radius is 6
- * on anything with a box, pills do not exist, and hover is a fill rather than
+ * on anything with a box — the composer is the one exception and says why at
+ * `--r-composer` — pills do not exist, and hover is a fill rather than
  * a border. Dark mode follows the operating system unless the account menu
  * says otherwise (html[data-theme], three states, system is the default):
  * every dark value below is a decision taken in Figma ("Warden · Sistema"),
@@ -293,6 +294,15 @@
 
   --r-control: 6px;   /* everything with a box */
   --r-selected: 8px;  /* the sidebar's selection band, and nothing else */
+  /* The composer, and the only box in the product that is not 6.
+     Corners read as concentric when the outer radius clears the inner one by
+     the inset between them, and the composer is the one place the product
+     nests a control inside a box: a 6px attach and a 6px button sit 14px in
+     from its edge. At 6 and 6 the two corners fight, which is what reads as
+     a stiff 2015 form field rather than a place to write. 10 is the smallest
+     step that resolves it while still belonging to the 6px family — 12 works
+     too and 16 starts arguing with the turn bubbles above it. */
+  --r-composer: 10px;
   --r-avatar: 17px;
 
   --h-control: 34px;
@@ -393,7 +403,8 @@ body {
 
 /* ── the pane ─────────────────────────────────────────────────────────────
    One origin for content: 40px in from the sidebar. Everything left-aligned
-   at that edge; the only centred thing in the product is the New rule hero. */
+   at that edge; the one exception is the New rule conversation, which is
+   centred end to end (`.--centred`, see "writing rules" below). */
 
 .pane { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; padding: 0 var(--s-10); }
 .pane:focus { outline: none; }
@@ -945,21 +956,25 @@ button.role-label:hover { background: var(--surface-subtle); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-4); flex-wrap: wrap; }
 
 /* ── Composer (263:479) ────────────────────────────────────────────────── */
+/* The line stays `--line-accessible` and the surface stays the page's own.
+   Both were tried the other way: on `--line-control` the box vanishes in dark
+   and stops reading as somewhere to type, and filled with `--surface-subtle`
+   it becomes the person's own turn bubble, which is that exact grey. */
 .composer {
-  display: grid; gap: var(--s-4); width: 100%; max-width: var(--w-reading);
-  padding: var(--s-4) var(--s-5) var(--s-5);
-  border: 1px solid var(--line-accessible); border-radius: var(--r-control); background: var(--surface-page);
+  display: grid; gap: var(--s-5); width: 100%; max-width: var(--w-reading);
+  padding: var(--s-5);
+  border: 1px solid var(--line-accessible); border-radius: var(--r-composer); background: var(--surface-page);
 }
 .composer:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
-.composer textarea { min-height: 28px; padding: 0; border: 0; background: none; resize: none; font-size: var(--fs-5); line-height: var(--lh-snug); }
+.composer textarea { min-height: var(--h-control-compact); padding: 0; border: 0; background: none; resize: none; font-size: var(--fs-5); line-height: var(--lh-snug); }
 .composer textarea:focus-visible { outline: none; }
 .composer textarea:disabled { background: none; }
 .composer-row { display: flex; align-items: center; gap: var(--s-4); }
 .composer-fill { flex: 1; }
 .composer-attach {
-  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center; width: var(--h-control); height: var(--h-control); flex: none;
   border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-page);
-  font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); cursor: pointer;
+  font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink-body); cursor: pointer;
 }
 .composer-attach:hover { background: var(--surface-subtle); }
 .composer-attach:disabled { color: var(--muted); cursor: default; }
@@ -1042,7 +1057,29 @@ button.role-label:hover { background: var(--surface-subtle); }
 
 /* ── writing rules: the hero, the thread, the composer at the foot ────────── */
 
-.new-rule, .chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* Capped at the table's width like `.sheet`, so the centred column below
+   centres inside the same 1120 box the rest of the product is drawn in and
+   not inside whatever the window happens to be. Without it a wide screen
+   centres the conversation and the activation result in two different
+   places, which is the travel this whole block exists to remove. */
+.new-rule, .chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; max-width: var(--w-table); }
+
+/*
+ * The one centred column in the product, and it is the whole New rule flow
+ * rather than just its opening frame.
+ *
+ * The hero was centred and the thread under it was not, so the composer left
+ * the middle of the screen and reappeared at the bottom-left corner the
+ * moment a sentence was sent — a 180px sideways jump in the middle of the
+ * one interaction the screen exists for. The box now keeps its x and its
+ * width from the empty frame through the conversation to the activation
+ * result; sending only slides it down the column it was already in.
+ *
+ * The page header stays at the content origin. A title that travelled with
+ * the thread would be a second convention, and the crumb above it has to line
+ * up with every other crumb in the product.
+ */
+.--centred .thread { margin-inline: auto; }  /* `.hero` centres itself */
 /* A conversation's header sits tight above its hairline, so the container
    says 12 rather than the page's 24. The blocks themselves stay margin-free. */
 .flush-head { flex: none; width: 100%; padding-bottom: 0; gap: var(--s-4); }
@@ -1424,7 +1461,16 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
 .conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
 .conditions-claim { display: inline-flex; align-items: center; gap: var(--s-3); margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
 .conditions-claim.--attention { color: var(--verdict-attention); }
+/* A deliberate state — Warden paused on purpose — keeps ink text and takes a
+   grey dot. Amber on this line means Warden is not doing what it was set up to
+   do; a pause is the person doing exactly what they meant to. `--line-control`
+   is the default muted dot and disappears at 10px, so it steps up to `--muted`. */
+.conditions-claim.--muted { color: var(--ink); }
 .conditions-claim .dot { width: 10px; height: 10px; }
+.conditions-claim .dot.--muted { background: var(--muted); }
+/* The qualifier after the claim: how long the pause lasts, and nothing else.
+   Secondary size and weight so the headline still reads as one word. */
+.conditions-detail { font-size: var(--fs-3); font-weight: var(--fw-normal); color: var(--muted); }
 /*
  * Condition / * — one fact, a label and a value, 38px tall.
  *
@@ -1606,7 +1652,6 @@ body[data-bare] .pane { padding: 0; }
   font-size: var(--fs-7); font-weight: var(--fw-semi);
   letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
 }
-.first-run-lede { margin-top: var(--s-3); color: var(--ink-body); }
 
 .first-run-rail { margin-top: var(--s-9); }
 .first-run-rail p {

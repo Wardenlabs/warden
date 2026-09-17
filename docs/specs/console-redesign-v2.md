@@ -280,14 +280,22 @@ con el sistema (página de settings de 760, patrón §6.4), sin frame propio.
   páginas de detalle y flujos (Workspace / Rules / …).
 - **Columna de lectura 760** para conversaciones y páginas de settings,
   alineada a la izquierda en x=280. La ÚNICA excepción centrada del producto
-  es el hero de New rule.
+  es New rule, y desde 2026-09-17 lo es de punta a punta: el hero, el hilo,
+  el composer y la página de resultado comparten una columna centrada dentro
+  del bloque de 1120 (`.--centred`). Antes sólo el hero estaba centrado y el
+  hilo caía en x=280, así que el composer saltaba 180px al costado en cuanto
+  se mandaba la primera frase. El header de página NO se mueve: sigue en
+  x=280 como en toda vista.
 - **Tablas**: bloque de 1120 en x=280; las filas, headers de columna, bandas
   de grupo y divisores miden 1160 y sangran simétricamente 20px por lado
   (hover y focus ring pisan el gutter; el texto queda en la grilla).
   Headers de columna UPPERCASE `--fs-1`. El padding lateral interno de la
   fila (20px) devuelve el texto a x=280.
-- **Composer** al pie en Test (fijo abajo, 760); hero centrado solo en New
-  rule.
+- **Composer** al pie en Test (fijo abajo, 760, en x=280); en New rule es el
+  mismo box de una línea en los dos estados — centrado y a media altura
+  mientras la conversación está vacía, centrado y al pie una vez empezada.
+  Misma x y mismo ancho siempre; lo único que cambia es la altura a la que
+  está.
 
 ## 4. Componentes → clases CSS
 
