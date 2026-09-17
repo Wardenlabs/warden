@@ -217,6 +217,36 @@ function dialogMarkup() {
         body: `<p>${first} is now ${/^[aeiou]/i.test(dlg.to) ? 'an' : 'a'} ${esc(dlg.to)} and exempt from company-wide rules. Rules that name ${esc(dlg.to)} or ${first} still apply.</p>`,
         actions: button('Done', { kind: 'primary', attrs: 'data-dialog-close="roleDone"' })
       });
+    /*
+     * Renaming, which the console could not do.
+     *
+     * A role could be changed in place from the row and a person could be
+     * removed, but a name — the one field every list here sorts and searches
+     * by — could only be fixed by editing the directory file by hand. The API
+     * always supported it: `POST /api/people` with an existing id updates the
+     * name and keeps the key, which is the same call `changeRole` already
+     * makes with the role swapped instead.
+     *
+     * The dialog says what does *not* change, because that is the question
+     * somebody renaming a colleague actually has: the key keeps working, so
+     * nobody has to re-wire anything, and rules that name this person by name
+     * follow the id rather than the text and keep applying.
+     */
+    case 'rename': {
+      const value = dlg.name ?? p?.name ?? '';
+      const unchanged = value.trim() === (p?.name ?? '').trim();
+      return dialog({
+        id: 'renamePerson', title: `Rename ${first}?`,
+        body: `<div class="field">
+            <label for="newName">Name</label>
+            <input type="text" id="newName" autocomplete="off" value="${esc(value)}">
+            <span class="field-help">Their key keeps working, and rules written for them by name keep applying — those follow the person, not the text.</span>
+          </div>
+          ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The name was not changed', body: `${first} is still called “${esc(p?.name ?? '')}”. ${esc(dlg.error)}` }) : ''}`,
+        actions: button('Cancel', { attrs: 'data-dialog-close="renamePerson"' })
+          + button(dlg.busy ? 'Saving…' : dlg.error ? 'Try again' : 'Save name', { kind: 'primary', id: 'confirmRename', disabled: !value.trim() || unchanged, busy: dlg.busy })
+      });
+    }
     case 'key':
       return dialog({
         id: 'newKey', title: 'Generate a new key?',
@@ -296,6 +326,20 @@ function bindDialogs() {
   for (const b of document.querySelectorAll('[data-choose-role]')) b.onclick = () => { dlg.role = b.dataset.chooseRole; render(); };
   const add = $('confirmAdd');
   if (add) add.onclick = () => void addPeople();
+
+  const newName = $('newName');
+  if (newName) {
+    newName.oninput = () => {
+      dlg.name = newName.value;
+      const ok = $('confirmRename');
+      // Disabled while it is blank or still the name they already have: a
+      // dialog whose primary action does nothing is worse than no dialog.
+      if (ok) ok.disabled = !newName.value.trim() || newName.value.trim() === (personById(dlg.id)?.name ?? '').trim();
+    };
+    if (!dlg.focused) { newName.focus(); newName.select(); dlg.focused = true; }
+  }
+  const rename = $('confirmRename');
+  if (rename) rename.onclick = () => void renamePerson(dlg.id, dlg.name ?? '');
 
   const role = $('confirmRole');
   if (role) role.onclick = () => void changeRole(dlg.id, dlg.to, true);
@@ -400,6 +444,7 @@ function personActions(p) {
     paused
       ? { label: 'Resume judging', act: 'resume', attrs: `data-id="${attr(p.id)}"` }
       : { label: `Pause Warden for ${firstName(p)}…`, act: 'pause', attrs: `data-id="${attr(p.id)}"` },
+    { label: 'Rename…', act: 'rename', attrs: `data-id="${attr(p.id)}"` },
     { label: 'New key', act: 'key', attrs: `data-id="${attr(p.id)}"` },
     { label: 'Remove from team', act: 'remove', attrs: `data-id="${attr(p.id)}"`, destructive: true }
   ];
@@ -561,6 +606,29 @@ async function changeRole(id, to, confirmed = false) {
   await refreshPeople();
   if (isExemptRole(to) && !isExemptRole(p.role)) openDialog('roleDone', { id, to });
   else { dlg = null; render(); showToast('Role updated', `${p.name} is now ${to}.`); }
+}
+
+/**
+ * The rename itself. `POST /api/people` upserts on the id, so the role has to
+ * be sent back unchanged — leaving it out would fail the route's own
+ * validation, not quietly clear it, but sending the current value is what says
+ * "only the name is moving".
+ */
+async function renamePerson(id, name) {
+  const p = personById(id);
+  const wanted = name.trim();
+  if (!p || !wanted || wanted === p.name) return;
+  if (dlg) { dlg.busy = true; dlg.error = ''; render(); }
+  const { ok, j } = await post('/api/people', { id: p.id, name: wanted, role: p.role }).catch(() => ({ ok: false, j: null }));
+  if (!ok) {
+    if (dlg) { dlg.busy = false; dlg.error = j?.error ?? 'Warden could not be reached.'; render(); }
+    return;
+  }
+  const was = p.name;
+  await refreshPeople();
+  dlg = null;
+  render();
+  showToast('Name updated', `${was} is now ${wanted}.`);
 }
 
 function bindPeople() {
@@ -796,6 +864,9 @@ function bindActions() {
         resetDraft();
         state.draftFor = id;
         go('policy', 'new');
+        return;
+      case 'rename':
+        if (p) openDialog('rename', { id, name: p.name });
         return;
       case 'key':
         if (p) openDialog('key', { id });
