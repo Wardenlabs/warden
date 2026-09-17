@@ -54,8 +54,9 @@
  * and are matched by hand:
  *
  *   --fs-1 11 Label · --fs-2 12 Code / Small · --fs-3 12 Caption
- *   --fs-4 13 UI and Secondary · --fs-5 15 Body · --fs-6 18 Heading
- *   --fs-7 22 Title
+ *   --fs-4 13 UI and Secondary · --fs-5 15 Body
+ *   --fs-6 18 Heading, the dominant thing inside a block
+ *   --fs-7 22 Title, the page's own name
  *
  * --fs-2 and --fs-3 hold the same 12 and are still two names, for the same
  * reason --sidebar-bg and --surface-subtle hold the same #F4F5F4: one is mono
@@ -257,7 +258,7 @@
   --fs-4: 13px;  /* the body: labels, values, rows, buttons, menus, ledes */
   --fs-5: 15px;  /* block title, and the prose you stop to read */
   --fs-6: 18px;  /* section title, page title, the dominant verdict */
-  --fs-7: 22px;  /* the one h1 of the first run */
+  --fs-7: 22px;  /* the page's own name, and the first-run h1 */
 
   --fw-normal: 400; --fw-medium: 500; --fw-semi: 600;
   --lh-tight: 1.25; --lh-snug: 1.45; --lh-body: 1.6;
@@ -631,10 +632,22 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 }
 button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); }
 .page-sep { color: var(--muted); }
-/* 20, not 26. `--fs-7` is left with one user in the whole stylesheet,
-   `.first-run-body h1`, which is the screen you see once per installation. */
+/*
+ * `--fs-7`, and the reason is that `--fs-6` was never the page title's size.
+ *
+ * Five other things use 18: a section title, a section disclosure, the
+ * confirmation card's headline, the tester's verdict card, and the ··· glyph.
+ * What they have in common is being the dominant thing inside *a block*. The
+ * page's own name is not one of those — it outranks everything in every block
+ * on the page — and at 18 it tied with "Rule instruction" two blocks below it,
+ * which is a hierarchy that says nothing.
+ *
+ * It costs no height: the header row is a fixed `--h-page-row` of 48 and a
+ * 22/28 title sits in it with ten pixels to spare. Figma's Header / Page v4
+ * carries the same change, on the Title style rather than Heading.
+ */
 .page-title {
-  margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi);
+  margin: 0; font-size: var(--fs-7); font-weight: var(--fw-semi);
   line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
