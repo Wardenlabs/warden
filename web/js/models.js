@@ -141,14 +141,12 @@ function writerBlock() {
   if (compilerNeedsSetup()) {
     return `<section class="job-block" aria-labelledby="compilerTitle">
       <h2 class="section-title" id="compilerTitle">Rule writer</h2>
-      <p class="section-lede">Turns the policies you write into enforceable rules. It only ever sees your own instructions — never employee requests or documents.</p>
       <p class="job-warning">Needs setup — rules can't be written yet.</p>
       <div class="job-setup-host">${compilerSettings()}</div>
     </section>`;
   }
   return `<section class="job-block" aria-labelledby="compilerTitle">
     <h2 class="section-title" id="compilerTitle">Rule writer</h2>
-    <p class="section-lede">Writes rules from what you say. Only ever sees your instructions — never your team’s requests.</p>
     <div class="job-value">${valueMenu('compiler', writerChoices(), 'Change the rule writer')}${statusText(s.text, s.tone)}</div>
     ${c?.configurationError ? feedback({ tone: 'error', icon: true, title: 'Compiler configuration needs attention', body: esc(c.configurationError) }) : ''}
     ${writerOpen ? `<div class="job-editor">${compilerSettings()}</div>` : ''}
@@ -166,17 +164,15 @@ function judgeBlock() {
       // While the rule writer is still being set up, the judge is the settled
       // half of the page: its state reads as one line and the change is a
       // button beside it, so the one open task stays the setup above.
-      ? `<p class="section-lede">Checks every employee request and document against your rules. Always runs on this machine — what your team writes never leaves it.</p>
-        <div class="job-task">${statusText(`${switching ? switching.label : inForceName('adjudicator')} · ${switching ? `loading… requests already being judged finish on ${switching.from}; new ones wait until it is ready` : s.text}`, switching ? 'attention' : s.tone)}${valueMenu('adjudicator', judgeChoices(), 'Change the request judge', 'Change model')}</div>`
-      : `<p class="section-lede">Judges every request against your rules. Runs here — your team’s work never leaves this machine.</p>
-        <div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge')}${switching
+      ? `<div class="job-task">${statusText(`${switching ? switching.label : inForceName('adjudicator')} · ${switching ? `loading… requests already being judged finish on ${switching.from}; new ones wait until it is ready` : s.text}`, switching ? 'attention' : s.tone)}${valueMenu('adjudicator', judgeChoices(), 'Change the request judge', 'Change model')}</div>`
+      : `<div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge')}${switching
           ? statusText(`Loading ${switching.label}… requests already being judged finish on ${switching.from}; new ones wait until it is ready.`, 'attention')
           : statusText(s.text, s.tone)}</div>`}
     ${!a ? feedback({ tone: 'error', icon: true, title: 'Analyzer choices could not be loaded', body: 'Refresh Models to try again.' }) : ''}
     ${a?.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment', body: `${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.` }) : ''}
     ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. ${state.canLeaveDemo ? '<button type="button" class="linkish js-get-models">Download models</button>' : 'Run the model setup on the gateway to download it.'}</p>` : ''}
     ${judgeNote ? `<p class="job-note --${judgeNote.ok ? 'allow' : 'block'}" role="${judgeNote.ok ? 'status' : 'alert'}">${esc(judgeNote.text)}</p>` : ''}
-    <p class="job-note">PDFs, Word files, text, scans and images are read on this machine before the same rules are applied to them. <button type="button" class="linkish" data-go="engine">Runtime details</button></p>
+    <div><button type="button" class="linkish" data-go="engine">Runtime details</button></div>
   </section>`;
 }
 
@@ -240,7 +236,7 @@ function promptsTab() {
   }
   if (!templates.length) {
     return promptEditor.loading
-      ? feedback({ title: 'Loading prompt templates…', body: 'Fetching the templates each job uses.' })
+      ? feedback({ title: 'Loading prompt templates…' })
       : `${feedback({ tone: 'attention', title: 'Could not load the prompt templates', body: esc(promptEditor.error || 'No prompt templates are available.') })}<div class="list-state-action">${button('Retry loading', { kind: 'primary', id: 'refreshPrompts' })}</div>`;
   }
   /*
@@ -253,7 +249,6 @@ function promptsTab() {
    * only ever visible while this tab was open anyway.
    */
   return `${promptEditor.error ? feedback({ tone: 'error', icon: true, title: 'Prompts could not be refreshed', body: `${esc(promptEditor.error)} Your drafts are kept.` }) : ''}
-    <p class="section-lede">Full templates each job uses. Edits apply to new work only; defaults stay untouched until you change them.</p>
     <div class="table prompts-table" role="table" aria-label="Prompt templates">
       <div class="thead" role="row"><span>Template</span><span>Job</span><span>Status</span><span></span></div>
       ${templates.map(promptRow).join('')}

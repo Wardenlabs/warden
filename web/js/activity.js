@@ -139,7 +139,7 @@ function listPage() {
    */
   if (!load || (load.loading && !state.audit.length)) {
     return `<div class="sheet">${pageHead({ title: 'Activity' })}
-      ${listState({ title: 'Loading the log…', body: 'Fetching the latest decisions and checking the record against its hashes.' })}</div>`;
+      ${listState({ title: 'Loading the log…' })}</div>`;
   }
   if (load.error) {
     return `<div class="sheet">${pageHead({ title: 'Activity' })}

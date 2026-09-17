@@ -138,7 +138,7 @@ function listPage() {
 
   if (!load || (load.loading && !rules.length)) {
     return `<div class="sheet">${listHead()}
-      ${listState({ title: 'Loading workspace rules…', body: 'Fetching the current rules and their activity.' })}</div>`;
+      ${listState({ title: 'Loading workspace rules…' })}</div>`;
   }
   if (load.error) {
     return `<div class="sheet">${listHead(false)}
@@ -293,7 +293,7 @@ function testRule(rule) {
 function missingRule() {
   return `<div class="sheet">
     ${pageHead({ title: 'This rule is not in the policy', crumbs: [{ label: 'Rules', go: 'policy' }] })}
-    ${listState({ title: state.loads.policy?.loading ? 'Loading the policy…' : 'Nothing to show', body: state.loads.policy?.loading ? 'Fetching the current rules.' : 'It was removed, or the link is from another installation.' })}</div>`;
+    ${listState({ title: state.loads.policy?.loading ? 'Loading the policy…' : 'Nothing to show', body: state.loads.policy?.loading ? '' : 'It was removed, or the link is from another installation.' })}</div>`;
 }
 
 /** A gateway error as a sentence, so the copy after it does not run on from it. */

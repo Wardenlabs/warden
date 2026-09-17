@@ -696,7 +696,6 @@ function devicesSection(p) {
   if (!devices.length) return '';
   return `<section class="person-devices">
     <h2 class="section-title">Devices</h2>
-    <p class="section-lede">What each machine reported about its own wiring. Warden cannot see a machine it has not heard from.</p>
     <div class="setting-rows">${devices.map((d) => {
       const tools = (d.tools ?? []);
       const wired = tools.filter((t) => t.wired).map((t) => TOOL_NAMES[t.id] ?? t.id);
@@ -731,7 +730,7 @@ function personPage(p) {
     ? `<div class="person-card"><div><h2 class="section-title --big">Exempt from company-wide rules</h2><p>${first}’s ${esc(p.role)} role is not judged by company-wide rules. Rules that name the role or ${first} still apply. Previous activity remains available.</p></div>${seeActivity}</div>`
     : on || hits.length
       ? `<div class="person-card"><div><h2 class="section-title --big">${plural(hits.length, 'request')} seen</h2><p>${count('ALLOW')} allowed · ${count('BLOCK')} blocked · ${count('ESCALATE')} held for review</p></div>${seeActivity}</div>`
-      : `<div class="person-card --setup"><div><h2 class="section-title --big">${first} hasn’t connected yet</h2><p>Share their setup message. It includes their connection key and instructions for each tool.</p></div><div>${button('Copy setup message', { kind: 'primary', attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}</div></div>`;
+      : `<div class="person-card --setup"><div><h2 class="section-title --big">${first} hasn’t connected yet</h2><p>The setup message includes their connection key.</p></div><div>${button('Copy setup message', { kind: 'primary', attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}</div></div>`;
   return `<div class="sheet">
     ${pageHead({
       title: p.name,
@@ -741,14 +740,14 @@ function personPage(p) {
       meta: personLine(p),
       more: personActions(p)
     })}
-    <div class="facts person-role">${roleMenu(p)}<span class="fact-v">Role determines which rules apply.</span></div>
+    <div class="facts person-role">${roleMenu(p)}</div>
     ${personNotice(p)}
     ${summary}
     ${devicesSection(p)}
     <div class="reading-wide">
       ${disclosureRow('p:setup', 'Connection & setup', '', `
         <div class="setup-share">
-          <div><b>Share setup with ${first}</b><p>Copy a message with their connection key and setup instructions, then send it to them.</p></div>
+          <div><b>Share setup with ${first}</b><p>The setup message includes their connection key.</p></div>
           ${button('Copy setup message', { compact: true, attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}
         </div>
         ${disclosure('p:key', 'View connection key', `<div class="key-row"><span class="mono" title="Their identity. A new one revokes the old.">${esc(maskKey(p.apiKey))}</span>${button('Copy key', { compact: true, attrs: `data-copy="${attr(`export WARDEN_API_KEY=${p.apiKey}`)}"` })}</div>`)}
@@ -1019,7 +1018,6 @@ function companyTab() {
   return `<div class="reading settings-page">
     <section class="settings-task">
       <h2 class="section-title">Company name</h2>
-      <p class="section-lede">Everyone in Team belongs to this company. The name is a label — changing it doesn't change who is judged or which rules apply.</p>
       <div class="inline-form">
         <input type="text" id="orgInput" value="${esc(value)}" placeholder="Your company's name" autocomplete="off">
         ${button('Save name', { id: 'orgSave', disabled: !value.trim() || value.trim() === saved })}

@@ -1424,7 +1424,16 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
 .conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
 .conditions-claim { display: inline-flex; align-items: center; gap: var(--s-3); margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
 .conditions-claim.--attention { color: var(--verdict-attention); }
+/* A deliberate state — Warden paused on purpose — keeps ink text and takes a
+   grey dot. Amber on this line means Warden is not doing what it was set up to
+   do; a pause is the person doing exactly what they meant to. `--line-control`
+   is the default muted dot and disappears at 10px, so it steps up to `--muted`. */
+.conditions-claim.--muted { color: var(--ink); }
 .conditions-claim .dot { width: 10px; height: 10px; }
+.conditions-claim .dot.--muted { background: var(--muted); }
+/* The qualifier after the claim: how long the pause lasts, and nothing else.
+   Secondary size and weight so the headline still reads as one word. */
+.conditions-detail { font-size: var(--fs-3); font-weight: var(--fw-normal); color: var(--muted); }
 /*
  * Condition / * — one fact, a label and a value, 38px tall.
  *
@@ -1606,7 +1615,6 @@ body[data-bare] .pane { padding: 0; }
   font-size: var(--fs-7); font-weight: var(--fw-semi);
   letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
 }
-.first-run-lede { margin-top: var(--s-3); color: var(--ink-body); }
 
 .first-run-rail { margin-top: var(--s-9); }
 .first-run-rail p {

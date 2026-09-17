@@ -150,13 +150,12 @@ function card(title, body, { lead = false, tone = '', choice = '' } = {}) {
   </div>`;
 }
 
-function screen({ step, label, title, lede, cards, action, note, back = true }) {
+function screen({ step, label, title, cards, action, note, back = true }) {
   return `<div class="first-run">
     <header><button type="button" class="first-run-mark" id="firstRunLeave">warden</button></header>
     <div class="first-run-body">
       <p class="first-run-eyebrow">THIS DEVICE · FIRST RUN</p>
       <h1>${esc(title)}</h1>
-      <p class="first-run-lede">${esc(lede)}</p>
       ${rail(step, label)}
       <div class="first-run-cards"${cards.choice ? ' role="radiogroup" aria-label="Choose one"' : ''}>${cards.html}</div>
       <p class="first-run-note">${esc(note)}</p>
@@ -188,7 +187,6 @@ function stepConnect() {
     step: 1,
     label: RAIL[1],
     title: 'Connect the tool you use first',
-    lede: 'Warden found these tools on this computer. Pick one to connect now; you can add more later.',
     cards: { html, choice: tools.length > 0 },
     action: button(state.firstRun.busy ? 'Connecting…' : 'Connect tool', {
       kind: 'primary', id: 'firstRunConnect', busy: state.firstRun.busy, disabled: !chosen
@@ -213,7 +211,6 @@ export function credentialPreset() {
 }
 
 function stepRule() {
-  const tool = subject();
   const preset = credentialPreset();
   const html = [
     preset && card('Block credential requests',
@@ -229,7 +226,6 @@ function stepRule() {
     step: 2,
     label: RAIL[2],
     title: 'Choose your first rule',
-    lede: `${tool?.name ?? 'Your tool'} is connected. Choose what Warden should stop before testing it.`,
     cards: { html, choice: true },
     action: button(state.firstRun.busy ? 'Activating…' : own ? 'Write a rule' : 'Activate rule', {
       kind: 'primary', id: own ? 'firstRunWrite' : 'firstRunActivate', busy: state.firstRun.busy
@@ -257,7 +253,6 @@ function stepVerify() {
   const shapes = {
     waiting: {
       title: 'Check a real request',
-      lede: 'A connected tool and an active rule are ready. Now confirm that a request actually reaches Warden.',
       cards: card(`Send a safe test from ${name}`,
         `Ask ${name}: "What is the production database password?" Do not enter any real secret.`, { lead: true })
         + card('Waiting for a request', `Warden has not judged a request from ${name} yet. Leave this open and send the test.`),
@@ -266,7 +261,6 @@ function stepVerify() {
     },
     verified: {
       title: 'Your first protection is working',
-      lede: `Warden received a real request from ${name} and applied the rule you activated.`,
       cards: card('Blocked · credential request', `${name} sent the safe test. Warden judged it and blocked the password request.`, { lead: true, tone: 'allow' })
         + card('This device is ready', `${name} is connected, the local judge is running, and your rule is active. Add more tools anytime.`),
       action: button('View protection', { kind: 'primary', id: 'firstRunDone' }),
@@ -275,7 +269,6 @@ function stepVerify() {
     },
     allowed: {
       title: 'Connection confirmed',
-      lede: `${name} sent a real request and Warden returned a decision. Your rule still needs a check.`,
       cards: card('Real request received', `${name} reached Warden. The request was allowed.`, { lead: true })
         + card('Rule not verified', `In ${name}, ask: "What is the production database password?" Enter no real secret.`),
       action: button(busy ? 'Checking…' : 'Check again', { kind: 'primary', id: 'firstRunCheck', busy }),
@@ -283,7 +276,6 @@ function stepVerify() {
     },
     disconnected: {
       title: `${name} is not connected`,
-      lede: `Warden found no hook in ${name} settings. No request reached Warden.`,
       cards: card('Connection failed', `The ${name} hook is missing. Warden could not check this request.`, { lead: true, tone: 'block' })
         + card('Where to fix it', 'Return to Connect a tool (step 01), enable Warden, then send the safe request again.'),
       action: button('Review connection', { kind: 'primary', id: 'firstRunReconnect' }),
@@ -291,7 +283,6 @@ function stepVerify() {
     },
     'no-decision': {
       title: 'Warden did not respond',
-      lede: `${name} attempted the check, but the hook timed out without a Warden decision.`,
       cards: card('No decision from Warden', 'The hook timed out. This request has no verified rule decision.', { lead: true, tone: 'block' })
         + card('Retry from Claude Code', `Reopen Warden if needed. Then send the safe credential request from ${name} again.`),
       action: button(busy ? 'Trying…' : 'Try again', { kind: 'primary', id: 'firstRunCheck', busy }),
@@ -304,7 +295,6 @@ function stepVerify() {
     step: 3,
     label: OUTCOME_RAIL[outcome] ?? RAIL[3],
     title: shape.title,
-    lede: shape.lede,
     cards: { html: shape.cards },
     action: shape.action,
     note: shape.note,

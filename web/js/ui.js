@@ -248,14 +248,22 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
  * a gap. The headline's action slot takes one action, the one the headline
  * implies; a row whose gap that action resolves does not also carry a button.
  */
-export function conditionBlock({ key, claim, tone = 'allow', summary = '', rows = [], action = '', open = false }) {
+export function conditionBlock({ key, claim, detail = '', tone = 'allow', summary = '', rows = [], action = '', open = false }) {
   const gaps = rows.filter((r) => r.tone === 'attention');
   const rest = rows.filter((r) => r.tone !== 'attention');
   const list = (items, cls = '') => (items.length
     ? `<dl class="record conditions-rows${cls ? ` ${cls}` : ''}">${items.map((r) => `
       <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`
     : '');
-  const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>`;
+  /*
+   * The claim, and after it one quiet `detail` when the state needs a
+   * qualifier rather than a second row.
+   *
+   * A deliberate state — Warden paused by the person reading the page — is not
+   * a fault, so it takes `tone: 'muted'`: grey dot, ink text, and the detail
+   * says how long it lasts. Amber is reserved for what Warden did not choose.
+   */
+  const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${esc(tone)}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b>${detail ? `<span class="conditions-detail">${esc(detail)}</span>` : ''}</p>`;
 
   /*
    * The control is a button with `aria-expanded`, and that is a bug fix rather

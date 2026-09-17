@@ -27,7 +27,6 @@ ${esc(m.runtime.detail)}</pre></section>` : ''}
         <!-- Was the header's second line. A page that genuinely has to explain
              itself explains itself in the reading column, under the heading it
              is about. -->
-        <p class="section-lede">What the gateway is running, and the model files it found on this machine.</p>
         ${m ? `<div class="table runtime-table" role="table" aria-label="Model files">
           <div class="thead" role="row"><span>Job</span><span>Model</span><span>On disk</span></div>
           ${m.models.map((model) => `<div class="trow" role="row"><span>${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="mono cell-clip">${esc(modelLabel(model.name))}</span><span>${model.onDisk ? statusText(`On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}`, 'allow') : `<span class="cell-muted">${model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span>`}</span></div>`).join('')}

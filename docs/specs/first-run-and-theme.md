@@ -804,6 +804,18 @@ tres valores:
 |---|---|---|
 | titular sano | `Judging requests` | `Protection is on` |
 | acción sana | `Turn Warden off` | `Pause protection` |
+
+**Pausado, revisado.** El estado en pausa decía lo mismo cuatro veces: titular
+ámbar `Paused · nothing of yours is being judged`, fila ámbar sin plegar
+repitiendo la consecuencia, punto ámbar y botón `Resume protection` primario.
+Cuatro alarmas para algo que la persona acaba de elegir a propósito, y el ámbar
+en esta consola significa *algo va mal*, que una pausa no es. Ahora: el titular
+es la palabra `Paused` en tono `muted` (punto gris, texto en tinta), el detalle
+al lado dice cuánto dura (`until you turn it back on` o la fecha), la
+consecuencia — `Requests go through unchecked. Each one is still recorded,
+marked not judged.` — baja a ser una fila más de la evidencia plegada, y el
+botón es `Resume` con el mismo peso que `Pause protection`: un interruptor no
+grita más fuerte en una de sus dos posiciones.
 | control de detalle | `<details>` con resumen | `Show details` / `Hide details` |
 | Warden | `Running · "X" v0.2.5 · on this device` | `Running · "Warden" v0.2.5 · this device` |
 | You | `Gastón · admin · this gateway knows your key` | `You · this gateway knows your key` |
@@ -830,18 +842,25 @@ instalación, `You` puede ser la identidad de otro. El arreglo no es poner el
 nombre en esta fila — es resolver de quién es la pantalla — y sigue fuera de
 alcance.
 
-### 6.3 La banda del primer bloqueo
+### 6.3 La banda del primer bloqueo — **retirada**
 
-Debajo del bloque, un aviso verde con check:
+Se implementó y se sacó. Queda escrito por qué, para que no vuelva.
+
+La banda decía, en verde y durante 24 h:
 
 > ✓ **Your rule blocked a request from Claude Code**
-> Credential request · blocked just now, before it left Claude Code.
 
-Sale del registro de §4.1, no de un texto fijo: es el mismo hecho que cerró el
-recorrido, mostrado una vez más en su casa definitiva. **Envejece y se va sola**
-— no es un estado permanente de la pantalla. Se renderiza mientras
-`Date.now() - at` esté dentro de la ventana de `ago()` que dice "just now" o
-minutos; pasadas 24 h no se dibuja.
+El problema no era el texto sino el lugar. Quien provocó ese bloqueo estaba
+sentado en Claude Code o Cursor cuando su prompt volvió rechazado: ya lo vio
+pasar, en la ventana donde pasó, con la frase de la regla al lado. Esta pantalla
+se lo volvía a contar horas después, en el único sitio de la página que está
+para decir qué es verdad **ahora**, y se quedaba ahí fijo mientras se leían las
+cinco condiciones de abajo.
+
+Lo que un bloqueo deja atrás va al registro, no al titular: Activity los tiene
+todos con su regla y su hora, y `last judged` en la fila `Your tools` es la
+versión viva del mismo hecho. La prueba de que el setup funcionó pertenece al
+primer recorrido (§4.1), que es donde esa pregunta se hace de verdad.
 
 ### 6.4 Las cinco filas se quedan
 

@@ -737,10 +737,12 @@ test('turning Warden off is a recorded pause, not a way to stop the gateway', as
       soloIdentity: { ...deviceState().soloIdentity, paused: { until: null, by: 'you', at: '2026-09-16T10:00:00.000Z' } }
     }));
     const off = VIEWS.soloRules.body();
-    assert.match(off, /Paused · nothing of yours is being judged/);
+    // Paused says itself once: the word in the claim, how long in the detail.
+    assert.match(off, /<b>Paused<\/b>/);
+    assert.match(off, /until you turn it back on/);
     assert.match(off, /still recorded, marked not judged/, 'a pause is a gap in judging, never a gap in the record');
-    assert.match(off, /Resume protection/);
-    assert.ok(!/conditions-fold/.test(off), 'being paused is not something to fold away either');
+    assert.match(off, /Resume/);
+    assert.ok(!/conditions-claim[^"]*--attention/.test(off), 'a pause the person chose is not a fault and does not go amber');
   } finally { Object.assign(state, saved); }
 });
 
@@ -1025,5 +1027,130 @@ test('a tool nobody has reported on is not called unwired', async () => {
     const body = VIEWS.soloRules.body();
     assert.ok(!/not in its settings/.test(body), 'nobody looked, so nobody may say it is missing');
     assert.match(body, /Found · wiring not reported/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('Models omits job descriptions but keeps local state and compiler disclosure', () => {
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState(), {
+      view: 'models', sel: null,
+      models: { state: 'ready', models: [], judging: { model: 'dynaguard' } },
+      compiler: compilerConfiguration({ setupRequired: false }),
+      adjudicator: { choices: [] }, company: { roles: [], employees: [] }
+    });
+    const html = VIEWS.models.body();
+    assert.doesNotMatch(html, /section-lede|Writes rules from|Judges every request|PDFs, Word files/);
+    assert.match(html, /Rule writer/);
+    assert.match(html, /Request judge/);
+    assert.match(html, /local only/);
+    state.compiler = compilerConfiguration();
+    assert.doesNotMatch(VIEWS.models.body(), /Turns the policies|Checks every employee/);
+    assert.match(compilerSettings(), /account and plan/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('Prompts explains when changes apply at the editor, not above the list', () => {
+  const saved = { ...state };
+  try {
+    Object.assign(state, { view: 'models', sel: 'prompts' });
+    acceptPromptCatalog({ revision: 'one', templates: [promptTemplate('compile-system', 'compiler')] });
+    assert.doesNotMatch(VIEWS.models.body(), /section-lede|Full templates each job/);
+    togglePromptEditor('compiler');
+    const html = promptEditorMarkup('compiler');
+    assert.doesNotMatch(html, /Edit the actual templates/);
+    assert.match(html, /Changes apply to new requests/);
+    assert.match(html, /Keep required variables exactly as written/);
+    assert.match(html, /Save before closing or reloading/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('device and company sections omit introductions without losing state or consequences', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState());
+    for (const sel of ['tools', 'identity']) {
+      state.sel = sel;
+      assert.doesNotMatch(VIEWS.soloRules.body(), /section-lede|Nothing you type|A tool is configured/);
+    }
+    assert.match(VIEWS.soloRules.body(), /Copy key/);
+    assert.doesNotMatch(VIEWS.soloSettings.body(), /section-lede/);
+    Object.assign(state, {
+      view: 'people', sel: 'company', company: { name: 'Acme', roles: [], employees: [], demo: false }
+    });
+    const company = VIEWS.people.body();
+    assert.doesNotMatch(company, /Everyone in Team belongs/);
+    assert.match(company, /Company name/);
+    assert.match(company, /There is no undo/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('new rules lose the writing advice but keep the named audience', async () => {
+  await import('../web/js/rules.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState(), {
+      view: 'policy', sel: 'new', set: null, ruleChat: [], draftFor: 'ana',
+      company: { roles: ['employee'], employees: [{ id: 'ana', name: 'Ana <Admin>', role: 'employee' }] }
+    });
+    const html = VIEWS.policy.body();
+    assert.doesNotMatch(html, /Write it like you would|One worry at a time/);
+    assert.match(html, /Every rule here applies to Ana &lt;Admin&gt;/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('loading lists do not repeat the loading title in a second line', async () => {
+  await import('../web/js/activity.js');
+  await import('../web/js/inbox.js');
+  await import('../web/js/rules.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState(), { loads: {}, audit: [], escalations: [], appeals: [] });
+    for (const view of ['activity', 'inbox', 'policy']) {
+      Object.assign(state, { view, sel: null });
+      const html = VIEWS[view].body();
+      assert.match(html, /Loading/);
+      assert.doesNotMatch(html, /Fetching the|feedback-body/);
+    }
+  } finally { Object.assign(state, saved); }
+});
+
+test('first-run titles need no subtitle when cards carry the instructions and outcome', () => {
+  const saved = { ...state };
+  try {
+    world();
+    assert.doesNotMatch(VIEWS.firstRun.body(), /first-run-lede/);
+    world({ wired: ['claude-code'] });
+    assert.doesNotMatch(VIEWS.firstRun.body(), /first-run-lede/);
+    world({ wired: ['claude-code'], rules: ['no credentials'] });
+    const waiting = VIEWS.firstRun.body();
+    assert.doesNotMatch(waiting, /first-run-lede/);
+    assert.match(waiting, /Do not enter any real secret/);
+    assert.match(waiting, /checks the rule, but not the connection/);
+    state.firstRun.tool = 'claude-code';
+    state.firstRun.seen = true;
+    state.firstRun.allowed = true;
+    const allowed = VIEWS.firstRun.body();
+    assert.match(allowed, /Rule not verified/);
+    assert.doesNotMatch(allowed, /firstRunDone|first-run-lede/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('Inbox states the consequence once beside the answer controls', async () => {
+  await import('../web/js/inbox.js');
+  const saved = { ...state };
+  try {
+    const at = new Date().toISOString();
+    Object.assign(state, deviceState(), {
+      view: 'inbox', sel: 'subtitle-review', audit: [], appeals: [],
+      escalations: [{ auditId: 'subtitle-review', employeeId: 'ana', employeeName: 'Ana', at }],
+      company: { roles: ['employee'], employees: [{ id: 'ana', name: 'Ana', role: 'employee' }] }
+    });
+    const html = VIEWS.inbox.body();
+    assert.match(html, /Recording an answer does not resume this request/);
+    assert.match(html, /Ana must send a new request/);
+    assert.doesNotMatch(html, /Your answer will not resume it|Your note is kept if saving fails/);
+    assert.match(html, /Record approval/);
   } finally { Object.assign(state, saved); }
 });
