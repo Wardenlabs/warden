@@ -1170,10 +1170,23 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .conditions-rows { grid-template-columns: 180px minmax(0, 1fr); margin-top: var(--s-2); }
 .conditions-rows dd.--attention { color: var(--verdict-attention); }
 .conditions-rows dd .btn { margin-left: var(--s-3); }
-.conditions-summary { font-size: var(--fs-4); color: var(--ink-body); }
 .conditions-fold { border-bottom: 0; }
-.conditions-fold > summary { padding: 0; }
 .conditions-fold > .disclosure-body { padding-bottom: 0; }
+/* The toggle is the <summary>, but it is drawn inside the headline row rather
+   than above the body — the two things you can do to this block belong next to
+   each other. It sits hard against the action, so `margin-left: auto` pushes
+   the pair right and the claim keeps the left. */
+.conditions-toggle {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  margin-left: auto; padding: 0;
+  font-size: var(--fs-3); color: var(--ink-body); cursor: pointer;
+  list-style: none;
+}
+.conditions-toggle::-webkit-details-marker { display: none; }
+.conditions-toggle:hover { color: var(--ink); }
+.conditions-toggle .--hide { display: none; }
+[open] > .conditions-head > .conditions-toggle .--show { display: none; }
+[open] > .conditions-head > .conditions-toggle .--hide { display: inline; }
 
 /* Gateway. The tab content is bands of label/value rows: everything on this
    screen is something the gateway says about itself, and only one of them
@@ -1365,4 +1378,24 @@ body[data-bare] .pane { padding: 0; }
   .first-run > header { padding: var(--s-7) var(--s-6) var(--s-5); }
   .first-run-body { width: calc(100% - 2 * var(--s-6)); padding-top: var(--s-9); }
   .first-run-rail > div { gap: var(--s-4); }
+}
+
+/* Tools, on This device. Three columns: the name, two stacked facts, and at
+   most one button. The second fact always names where the first came from — a
+   screen that asserts protection without saying who told it is asking to be
+   believed. */
+.tool-rows { display: grid; margin-top: var(--s-5); }
+.tool-row {
+  display: grid; grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: center; gap: var(--s-5);
+  padding: var(--s-5) 0; border-bottom: 1px solid var(--line-hairline);
+}
+.tool-rows > .tool-row:last-child { border-bottom: 0; }
+.tool-name { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.tool-facts { display: grid; gap: var(--s-1); min-width: 0; }
+.tool-facts small { font-size: var(--fs-3); color: var(--muted); }
+
+@media (max-width: 900px) {
+  .tool-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tool-name { grid-column: 1 / -1; }
 }

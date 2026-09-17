@@ -142,6 +142,13 @@ export const state = {
   soloPausing: false,
   soloPauseError: '',
 
+  /** The tool whose Connect/Unwire is in flight on the Tools tab, and what the
+   *  gateway said if it refused. One at a time: the buttons are per row. */
+  soloWiring: null,
+  soloWireError: '',
+  /** True while the CLI probe behind "Check again" is re-running. */
+  soloProbing: false,
+
   /**
    * The first run of This device.
    *
