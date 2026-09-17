@@ -42,6 +42,29 @@
  * --action ↔ action/graphite, --action-ink ↔ action/on-graphite; the rest share
  * a name. Figma writes them --warden-ink-default and so on; renaming 1200 lines
  * of stylesheet to gain a prefix buys nothing, so the names here stay.
+ *
+ * **Every number below is Figma's, and Figma is where it gets changed.** The
+ * same collection now carries the sizes and the spacing as well as the colour,
+ * in two layers: `primitive/space-N` is the raw ramp, hidden from the picker,
+ * and `space/inset-*` and `space/stack-*` are what a component actually binds
+ * to. That split is the one this file makes too — `--s-1` to `--s-4` are the
+ * air inside a thing and do not move with the scale, `--s-5` upward is the
+ * distance between things and does. The type is Figma's ten text styles rather
+ * than variables, which is why the sizes here have no counterpart to bind to
+ * and are matched by hand:
+ *
+ *   --fs-1 11 Label · --fs-2 12 Code / Small · --fs-3 12 Caption
+ *   --fs-4 13 UI and Secondary · --fs-5 15 Body
+ *   --fs-6 18 Heading, the dominant thing inside a block
+ *   --fs-7 22 Title, the page's own name
+ *
+ * --fs-2 and --fs-3 hold the same 12 and are still two names, for the same
+ * reason --sidebar-bg and --surface-subtle hold the same #F4F5F4: one is mono
+ * metadata and the other is prose, and they will not stay equal forever.
+ * The heights map one to one: --h-control ↔ size/control, --h-page-row ↔
+ * size/page-row, --h-tabs ↔ size/tabs, --h-record-row ↔ size/record-row,
+ * --w-sidebar ↔ size/sidebar, --w-reading ↔ size/reading, --w-table ↔
+ * size/table, --w-bleed ↔ size/bleed, and .trow ↔ size/row.
  */
 
 :root {
@@ -214,44 +237,76 @@
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
+  /*
+   * A console is scanned, not read, so the chrome is small and the reading is
+   * not. That distinction is the whole scale: --fs-1 to --fs-4 are the things
+   * you sweep — labels, rows, controls, menus — and they sit at 11 to 13.
+   * --fs-5 and up are the things somebody actually stops and reads: the rule
+   * a judge was given, what a decision said, the turn in a conversation.
+   * Shrinking those with the rest would be the mistake that makes a dense UI
+   * hostile rather than efficient.
+   *
+   * --fs-1 stays at 11 while everything around it comes down. It is the only
+   * size set in uppercase with .06em of tracking, which is the worst case for
+   * legibility in the whole stylesheet; 10px there makes a column header a
+   * thing you decode rather than read, and nobody reads "APPLIES TO" with any
+   * enthusiasm to spare.
+   */
   --fs-1: 11px;  /* kickers and column headers, uppercase */
-  --fs-2: 12px;  /* chips, mono metadata */
-  --fs-3: 13px;  /* secondary: descriptions, datums, helpers */
-  --fs-4: 14px;  /* the body: labels, values, rows, buttons, menus */
-  --fs-5: 16px;  /* block title */
-  --fs-6: 20px;  /* section title, the dominant verdict */
-  --fs-7: 26px;  /* page title */
+  --fs-2: 12px;  /* chips, mono metadata — Figma's "Code / Small" */
+  --fs-3: 12px;  /* secondary: datums, helpers, notes beside a value */
+  --fs-4: 13px;  /* the body: labels, values, rows, buttons, menus, ledes */
+  --fs-5: 15px;  /* block title, and the prose you stop to read */
+  --fs-6: 18px;  /* section title, page title, the dominant verdict */
+  --fs-7: 22px;  /* the page's own name, and the first-run h1 */
 
   --fw-normal: 400; --fw-medium: 500; --fw-semi: 600;
   --lh-tight: 1.25; --lh-snug: 1.45; --lh-body: 1.6;
   --ls-label: .06em; --ls-tight: -.011em;
 
-  --s-1: 4px; --s-2: 6px; --s-3: 8px; --s-4: 12px; --s-5: 16px;
-  --s-6: 20px; --s-7: 24px; --s-8: 28px; --s-9: 32px; --s-10: 40px;
-  --s-11: 48px; --s-12: 64px;
+  /*
+   * The small end does not move and the large end does, because they are two
+   * different jobs wearing one scale. --s-1 to --s-4 are the air *inside*
+   * things — the padding of a pill, the gap between a dot and its word — and
+   * that air answers to the shape of a letter, not to the size of the page: a
+   * 13px label in a chip needs the same 12px beside it that a 14px one did.
+   * Compressing them is what makes a dense interface feel cramped rather than
+   * efficient, which is a different thing and a worse one.
+   *
+   * --s-5 upward is the distance *between* things, and that is what a scale
+   * change is actually for. --s-5 lands on 14, which is what the frames draw
+   * inside a tab (Tabs / Item, 697:913) and what Figma's own `space-14` says.
+   */
+  --s-1: 4px; --s-2: 6px; --s-3: 8px; --s-4: 12px; --s-5: 14px;
+  --s-6: 18px; --s-7: 20px; --s-8: 24px; --s-9: 28px; --s-10: 34px;
+  --s-11: 42px; --s-12: 52px;
 
   /* The distance between two blocks on a page, and the only spacing a page
-     layout is allowed to use. It is `--s-7` because 24 is what the frames
-     draw between every pair of blocks and what "01 · Fundamentos / ESPACIADO"
-     documents; --s-6 and --s-8 are in the scale for padding inside things and
-     are not page rhythm. Blocks do not carry outer margins to reach it — see
-     `.sheet`. */
+     layout is allowed to use. Still `--s-7`, which is now 20 rather than 24:
+     the frames and "01 · Fundamentos / ESPACIADO" draw 24 against a 14px body
+     and a 56px row, and neither of those is what this stylesheet has any more.
+     Keeping the one absolute number while every size around it came down would
+     leave the page rhythm loose in proportion to everything it separates.
+     `--s-6` and `--s-8` are in the scale for padding inside things and are not
+     page rhythm. Blocks do not carry outer margins to reach it — see `.sheet`. */
   --s-block: var(--s-7);
 
   --r-control: 6px;   /* everything with a box */
   --r-selected: 8px;  /* the sidebar's selection band, and nothing else */
   --r-avatar: 17px;
 
-  --h-control: 40px;
-  --h-control-compact: 32px;
-  --h-nav-row: 44px;  /* a row in the sidebar */
-  --h-page-row: 56px; /* Header / Page v4 (720:959): the one row that says where you are */
-  --h-tabs: 48px;     /* the strip under it, tabs or toolbar */
-  --h-record-row: 38px; /* Condition / * as the frames draw it */
-  --w-sidebar: 240px;
-  --w-reading: 760px;
-  --w-table: 1120px;
-  --w-bleed: 20px;    /* how far a table row reaches past the grid, each side */
+  --h-control: 34px;
+  --h-control-compact: 28px;
+  --h-nav-row: 34px;  /* a row in the sidebar */
+  --h-page-row: 48px; /* Header / Page v4 (720:959): the one row that says where you are */
+  --h-tabs: 40px;     /* the strip under it, tabs or toolbar */
+  --h-record-row: 32px; /* Condition / * — one fact, a label and a value */
+  --w-sidebar: 220px;
+  --w-reading: 700px; /* the measure, not a fixed column: 700 at 15px is the
+                         same ~75 characters 760 held at 16 */
+  --w-table: 1120px;  /* the frames' table width, and the one number here that
+                         does not move: it is a layout, not a size */
+  --w-bleed: 16px;    /* how far a table row reaches past the grid, each side */
   --prose: 68ch;
 }
 
@@ -293,7 +348,7 @@ body {
   background: var(--sidebar-bg);
   color: var(--sidebar-text);
 }
-.sb-brand { display: flex; align-items: center; gap: var(--s-4); height: 56px; flex: none; color: var(--sidebar-selected-text); }
+.sb-brand { display: flex; align-items: center; gap: var(--s-4); height: 48px; flex: none; color: var(--sidebar-selected-text); }
 .sb-brand svg { width: 28px; height: 28px; flex: none; }
 .sb-brand b { font-size: var(--fs-6); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); }
 .sb-workspace { display: grid; flex: none; line-height: var(--lh-snug); }
@@ -321,10 +376,10 @@ body {
 .sb-item:focus-visible { outline: 2px solid var(--sidebar-selected-text); outline-offset: -2px; }
 .sb-count { font-variant-numeric: tabular-nums; }
 .sb-fill { flex: 1; }
-.sb-profile { display: flex; align-items: center; gap: var(--s-4); flex: none; height: 54px; }
+.sb-profile { display: flex; align-items: center; gap: var(--s-4); flex: none; height: 46px; }
 .sb-avatar {
   display: grid; place-items: center; flex: none;
-  width: 34px; height: 34px; border-radius: var(--r-avatar);
+  width: 30px; height: 30px; border-radius: var(--r-avatar);
   background: var(--sidebar-avatar); color: var(--sidebar-selected-text);
   font-size: var(--fs-4); font-weight: var(--fw-medium);
 }
@@ -405,7 +460,7 @@ button, input, select, textarea { font: inherit; font-size: var(--fs-4); color: 
    drops the border and goes to the disabled surface. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
-  height: var(--h-control); padding: 0 18px; flex: none;
+  height: var(--h-control); padding: 0 var(--s-5); flex: none;
   border: 1px solid var(--line-accessible); border-radius: var(--r-control);
   background: var(--surface-page); color: var(--ink);
   font-size: var(--fs-4); font-weight: var(--fw-medium); line-height: 20px;
@@ -472,11 +527,11 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 
 /* Search: the magnifier inside a hairline box. */
 .search {
-  display: flex; align-items: center; gap: 10px; width: 260px; height: 42px; flex: none;
+  display: flex; align-items: center; gap: 10px; width: 230px; height: var(--h-control); flex: none;
   padding: 0 var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
   background: var(--surface-page); color: var(--muted); cursor: text;
 }
-.search svg { width: 20px; height: 20px; flex: none; }
+.search svg { width: 18px; height: 18px; flex: none; }
 .search input { min-height: 0; height: 100%; padding: 0; border: 0; background: none; }
 .search input:focus-visible { outline: none; }
 .search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
@@ -488,7 +543,7 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 /* ── Trigger / Value (515:7968): the value is the control ───────────────── */
 .trigger-value {
   display: inline-flex; align-items: center; gap: var(--s-4);
-  min-height: 0; padding: 9px 14px;
+  min-height: 0; padding: 7px var(--s-5);
   border: 1px solid var(--line-accessible); border-radius: var(--r-control);
   background: var(--surface-page); color: var(--ink);
   font-size: var(--fs-4); cursor: pointer; white-space: nowrap;
@@ -505,7 +560,7 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 .menu > summary { list-style: none; cursor: pointer; user-select: none; }
 .menu > summary::-webkit-details-marker { display: none; }
 .menu-trigger.--dots {
-  display: grid; place-items: center; width: 40px; height: 40px;
+  display: grid; place-items: center; width: var(--h-control); height: var(--h-control);
   border-radius: var(--r-control); color: var(--muted);
   font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: 1; letter-spacing: .02em;
 }
@@ -577,10 +632,22 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 }
 button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); }
 .page-sep { color: var(--muted); }
-/* 20, not 26. `--fs-7` is left with one user in the whole stylesheet,
-   `.first-run-body h1`, which is the screen you see once per installation. */
+/*
+ * `--fs-7`, and the reason is that `--fs-6` was never the page title's size.
+ *
+ * Five other things use 18: a section title, a section disclosure, the
+ * confirmation card's headline, the tester's verdict card, and the ··· glyph.
+ * What they have in common is being the dominant thing inside *a block*. The
+ * page's own name is not one of those — it outranks everything in every block
+ * on the page — and at 18 it tied with "Rule instruction" two blocks below it,
+ * which is a hierarchy that says nothing.
+ *
+ * It costs no height: the header row is a fixed `--h-page-row` of 48 and a
+ * 22/28 title sits in it with ten pixels to spare. Figma's Header / Page v4
+ * carries the same change, on the Title style rather than Heading.
+ */
 .page-title {
-  margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi);
+  margin: 0; font-size: var(--fs-7); font-weight: var(--fw-semi);
   line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -650,7 +717,11 @@ button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); 
 .reading { max-width: var(--w-reading); }
 .section-title { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-snug); }
 .section-title.--big { font-size: var(--fs-6); }
-.section-lede { margin: var(--s-2) 0 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+/* --fs-4, not --fs-3, and it is the only thing in this file that got bigger.
+   A lede is a paragraph, and this is where the sentences that used to sit in
+   the page header now live; moving them into the reading column and shrinking
+   them on the way would be making them worse twice. */
+.section-lede { margin: var(--s-2) 0 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
 .hairline { height: 1px; background: var(--line-hairline); border: 0; margin: 0; }
 
 /* ── Tables and rows (Row / Rule, Decision, Inbox, Person, Role) ──────────
@@ -663,11 +734,11 @@ button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); 
   padding: 0 var(--w-bleed);
 }
 .thead {
-  height: 40px; font-size: var(--fs-1); font-weight: var(--fw-medium);
+  height: 32px; font-size: var(--fs-1); font-weight: var(--fw-medium);
   letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
 }
 .trow {
-  width: 100%; min-height: 56px; border: 0; border-bottom: 1px solid var(--line-hairline);
+  width: 100%; min-height: 44px; border: 0; border-bottom: 1px solid var(--line-hairline);
   background: none; color: var(--ink-body); font-size: var(--fs-4); text-align: left;
 }
 .trow:last-child { border-bottom: 0; }
@@ -722,7 +793,7 @@ button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); 
 
 /* Group band (246:759): the day in Activity, the group in Inbox. */
 .group-band {
-  display: flex; align-items: center; height: 32px; padding: 0 var(--w-bleed);
+  display: flex; align-items: center; height: 28px; padding: 0 var(--w-bleed);
   background: var(--surface-subtle); border-top: 1px solid var(--line-hairline);
   font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label);
   text-transform: uppercase; color: var(--ink-body);
@@ -808,7 +879,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .disclosure { border-bottom: 1px solid var(--line-hairline); }
 .disclosure > summary {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
-  padding: 14px 0; list-style: none; cursor: pointer;
+  padding: var(--s-5) 0; list-style: none; cursor: pointer;
 }
 .disclosure > summary::-webkit-details-marker { display: none; }
 .disclosure-title { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
@@ -841,7 +912,7 @@ button.role-label:hover { background: var(--surface-subtle); }
   padding: var(--s-8) var(--s-7) var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
   background: var(--surface-raised);
 }
-.confirm-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-control); font-style: normal; font-weight: var(--fw-semi); }
+.confirm-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-control); font-style: normal; font-weight: var(--fw-semi); }
 .confirm-result.--success .confirm-mark { background: var(--verdict-allow-bg); color: var(--verdict-allow); }
 .confirm-result.--attention .confirm-mark { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
 .confirm-text { display: grid; gap: var(--s-2); font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); }
@@ -886,7 +957,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .composer-row { display: flex; align-items: center; gap: var(--s-4); }
 .composer-fill { flex: 1; }
 .composer-attach {
-  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
   border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-page);
   font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); cursor: pointer;
 }
@@ -906,8 +977,8 @@ button.role-label:hover { background: var(--surface-subtle); }
 .seg-tool button[aria-pressed="true"] { background: var(--surface-page); }
 
 /* ── Rule proposal (291:2027, 263:91) ──────────────────────────────────── */
-.proposal { display: grid; gap: var(--s-4); padding: 18px; border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
-.proposal-head { display: flex; align-items: center; gap: var(--s-4); min-height: 32px; }
+.proposal { display: grid; gap: var(--s-4); padding: var(--s-6); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
+.proposal-head { display: flex; align-items: center; gap: var(--s-4); min-height: var(--h-control-compact); }
 .proposal-head b { flex: 1; min-width: 0; font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
 .proposal-head .menu-trigger.--dots { width: 32px; height: 32px; font-size: var(--fs-4); }
 .proposal-text { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
@@ -1057,16 +1128,16 @@ span.composer-attach { color: var(--muted); cursor: default; }
 
 .activity-table .thead, .activity-table .trow {
   grid-template-columns: minmax(110px, 170fr) minmax(0, 450fr) minmax(0, 220fr) minmax(80px, 110fr) minmax(56px, 170fr);
-  min-height: 52px;
+  min-height: 40px;
 }
-.activity-table .thead { min-height: 40px; }
+.activity-table .thead { min-height: 32px; }
 .who-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .who-cell .dot { width: 6px; height: 6px; }
 .request-cell { color: var(--ink-body); }
 .dot.--muted { background: var(--line-control); }
 .person-trigger {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
-  width: 260px; height: 42px; padding: 0 var(--s-4);
+  width: 230px; height: var(--h-control); padding: 0 var(--s-5);
   border: 1px solid var(--line-hairline); border-radius: var(--r-control);
   font-size: var(--fs-4); color: var(--muted);
 }
@@ -1079,13 +1150,13 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .request-turn .turn-text { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .turn-text.muted { color: var(--muted); }
 .turn .labels { margin-top: var(--s-1); }
-.rule-card { gap: var(--s-4); padding: 18px 20px; }
+.rule-card { gap: var(--s-4); padding: var(--s-6) var(--s-7); }
 .rule-card-reason { margin: 0; font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .rule-card .turn-meta { margin: 0; }
 .exchange-note { margin: 0; font-size: var(--fs-4); color: var(--muted); max-width: var(--w-reading); }
 .exchange-kicker { margin-top: var(--s-6); }
 
-.dispute-card { gap: var(--s-3); padding: 18px; }
+.dispute-card { gap: var(--s-3); padding: var(--s-6); }
 
 .passes { display: grid; }
 .pass { display: grid; grid-template-columns: minmax(0, 1fr) 80px 72px 64px; align-items: center; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); }
@@ -1104,7 +1175,7 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .chain-link b { font-weight: var(--fw-normal); color: var(--ink-body); }
 .chain-line { width: 1px; height: 10px; margin-left: 3px; background: var(--line-control); }
 
-.inbox-table .trow { grid-template-columns: minmax(0, 470fr) minmax(0, 290fr) minmax(120px, 200fr) minmax(90px, 160fr); min-height: 52px; }
+.inbox-table .trow { grid-template-columns: minmax(0, 470fr) minmax(0, 290fr) minmax(120px, 200fr) minmax(90px, 160fr); min-height: 40px; }
 .inbox-table .group-band:first-child { border-top: 0; }
 .time-cell { text-align: right; }
 
@@ -1118,7 +1189,7 @@ span.composer-attach { color: var(--muted); cursor: default; }
 
 /* ═══ team ═══════════════════════════════════════════════════════════════ */
 
-.subhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: 40px; }
+.subhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
 .subhead-count { font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); }
 .people-table .thead, .people-table .trow { grid-template-columns: minmax(0, 296fr) minmax(150px, 200fr) minmax(0, 336fr) minmax(80px, 250fr) 40px; }
 /* 56, the height of every other row in the console. It was 72 because the
@@ -1132,14 +1203,14 @@ span.composer-attach { color: var(--muted); cursor: default; }
    that hides a bypass is the one default nobody gets to ship, but the fact is
    one word and the sentence was six. */
 .exempt-chip {
-  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--s-2);
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--s-3);
   border-radius: 4px; font-size: var(--fs-2); font-weight: var(--fw-medium);
   color: var(--verdict-attention); background: var(--verdict-attention-bg);
 }
 .role-menu > summary { display: inline-flex; border-radius: var(--r-control); }
 .role-menu > summary:hover .role-label, .role-menu[open] > summary .role-label { background: var(--surface-subtle); }
 .role-menu .menu-list { min-width: 280px; max-height: 360px; overflow-y: auto; }
-input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; border-bottom: 1px solid var(--line-hairline); border-radius: 0; background: none; }
+input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; border-bottom: 1px solid var(--line-hairline); border-radius: 0; background: none; }
 .cell-stack .cell-strong { font-weight: var(--fw-medium); }
 
 .person-role { gap: var(--s-4); margin: 0; }
@@ -1183,7 +1254,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .roles-table .trow.--editing { background: var(--surface-subtle); border-bottom: 0; }
 .inline-editor {
   display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
-  min-height: 62px; padding: var(--s-3) var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
+  min-height: 52px; padding: var(--s-3) var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
 }
 .inline-editor b { font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
 .inline-editor-help { font-size: var(--fs-3); color: var(--muted); }
@@ -1262,7 +1333,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .claude-login-command > code { padding: var(--s-2) var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-family: var(--mono); font-size: var(--fs-3); }
 .job-setup .disclosures { margin-top: var(--s-3); }
 .ceilings-table .thead, .ceilings-table .trow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.ceilings-table .trow { min-height: 44px; border-bottom: 0; }
+.ceilings-table .trow { min-height: 36px; border-bottom: 0; }
 .ceilings-table input.field-compact { width: 88px; }
 .inline-editor.--ceilings { min-height: 0; padding-block: 0 var(--s-3); padding-left: calc(var(--w-bleed) + (100% - 2 * var(--w-bleed)) / 4); border-bottom: 0; }
 
@@ -1291,7 +1362,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .library { display: grid; gap: var(--s-5); }
 .library-editor { max-width: var(--w-reading); padding: var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
 .library-table .thead, .library-table .trow { grid-template-columns: minmax(0, 420fr) minmax(0, 200fr) minmax(0, 220fr) minmax(0, 240fr) 40px; }
-.library-table .trow { min-height: 56px; padding-block: var(--s-2); }
+.library-table .trow { min-height: 44px; padding-block: var(--s-2); }
 .trow-note { margin: 0; padding: var(--s-3) var(--w-bleed); border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); color: var(--muted); }
 .model-delete-confirm { display: grid; gap: var(--s-3); background: var(--verdict-block-bg); }
 .model-delete-confirm p { margin: 0; color: var(--ink-body); }
@@ -1350,7 +1421,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
  */
 .conditions-gaps, .conditions-body { padding-top: var(--s-4); }
 .conditions-gaps + .conditions-body { padding-top: 0; }
-.conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: 40px; }
+.conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
 .conditions-claim { display: inline-flex; align-items: center; gap: var(--s-3); margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
 .conditions-claim.--attention { color: var(--verdict-attention); }
 .conditions-claim .dot { width: 10px; height: 10px; }
@@ -1374,7 +1445,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
    "Nothing judging you" frame draws, reached by the same two numbers. */
 .conditions-rows > dt, .conditions-rows > dd,
 .gw-record > dt, .gw-record > dd {
-  min-height: var(--h-record-row); padding-block: 9px; line-height: 20px;
+  min-height: var(--h-record-row); padding-block: 7px; line-height: 18px;
 }
 .conditions-rows { margin-top: 0; }
 .conditions-rows dd.--attention { color: var(--verdict-attention); }
