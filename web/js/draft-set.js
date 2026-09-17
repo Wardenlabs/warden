@@ -231,7 +231,7 @@ export function resultPage() {
   const body = partial
     ? `${live.length === 1 ? 'One rule now applies' : `${live.length} rules now apply`} to ${esc(who(live))}. ${failedItems.length === 1 ? 'The other is still a draft.' : `${failedItems.length} are still drafts.`}<br>Retry only attempts to activate the pending ${failedItems.length === 1 ? 'rule' : 'rules'}.`
     : `${live.length === 1 ? 'The rule now applies' : live.length === 2 ? 'Both rules now apply' : `All ${live.length} rules now apply`} to ${esc(who(live))}.`;
-  return `<div class="sheet thread-page">
+  return `<div class="sheet thread-page --centred">
     ${pageHead({
       title: 'Activation result',
       crumbs: [{ label: state.draftFor ? 'Back to person' : 'Back to rules', go: state.draftFor ? 'people' : 'policy', sel: state.draftFor ?? '' }]
