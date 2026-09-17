@@ -9,6 +9,32 @@ import { fileURLToPath } from 'node:url';
 export const PORT = Number(process.env['WARDEN_PORT'] ?? 8080);
 
 /**
+ * How long the hook waits for a decision before it gives up and lets the
+ * prompt through unchecked.
+ *
+ * 90 seconds by default, which is what `integrations/warden-hook.mjs` falls
+ * back to when a gateway is too old to say. Raise it on the gateway when the
+ * adjudicator is slower than the deadline — the optional 8B was measured at
+ * 46 s on four CPU cores — and every hook picks it up on its next prompt
+ * without anybody editing a shell profile.
+ *
+ * It lives here rather than beside `/health` because two places need it now.
+ * `/health` publishes it so hooks can learn it, and the guard compares its own
+ * `totalMs` against it: a decision that took longer than the deadline arrived
+ * after the hook had already released the prompt, which is the one way this
+ * process can observe a check that did not happen. See
+ * docs/specs/first-run-and-theme.md §4.4.
+ */
+export function hookDecisionDeadlineMs(): number {
+  const raw = process.env['WARDEN_HOOK_TIMEOUT_MS'];
+  if (raw === undefined) return 90_000;
+  const value = Number(raw);
+  // A deadline nobody can parse is not a reason to invent a shorter one: the
+  // shorter it is, the sooner the hook stops checking.
+  return Number.isFinite(value) && value > 0 ? value : 90_000;
+}
+
+/**
  * Bind every interface by default.
  *
  * Warden's deployment model is one machine holding the models with the rest of

@@ -10,17 +10,24 @@
   <meta charset="utf-8" />
   <title>Warden</title>
   <style>
+    /* The console's palette, copied rather than imported: this window loads no
+       external asset, so web/style.css cannot reach it. The two have to be
+       edited together or the app opens in one palette and lands in another.
+       Left column is the name over there. */
     :root {
-      --bg: #ffffff;
-      --ink: #17181c;
-      --muted: #70747c;
-      --line: #eaeaed;
-      --line-firm: #dcdce1;
-      --accent: #1a1d23;
-      --accent-hover: #2b2f37;
-      --accent-ink: #ffffff;
-      --ok: #1f7a3d;
-      --bad: #b3261e;
+      --bg: #ffffff;        /* --surface-page   */
+      --ink: #22282a;       /* --ink            */
+      --muted: #656e6f;     /* --muted          */
+      --line: #e7eae8;      /* --line-hairline  */
+      --line-firm: #dde2df; /* --line-control   */
+      --accent: #22282a;    /* --action         */
+      --accent-hover: #323b3e; /* --action-hover */
+      --accent-ink: #ffffff;   /* --action-ink   */
+      /* The download bars. Never the console's verdict tokens, just a loose
+         pair that drifted; they are the verdict greens and reds now because a
+         finished download and a failed one mean the same thing everywhere. */
+      --ok: #087356;        /* --verdict-allow  */
+      --bad: #b91c41;       /* --verdict-block  */
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -49,7 +56,7 @@
       border: 1px solid var(--line-firm);
       background: #fff;
       color: var(--ink);
-      border-radius: 8px;
+      border-radius: 6px;   /* radius/control, like every box in the console */
       padding: 9px 14px;
       font: inherit;
       font-weight: 550;

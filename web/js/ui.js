@@ -185,20 +185,42 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
  */
 export function conditionBlock({ key, claim, tone = 'allow', summary = '', rows = [], action = '', open = false }) {
   const gap = rows.some((r) => r.tone === 'attention');
-  const head = `<div class="conditions-head">
-      <p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>
-      ${action}
-    </div>`;
   const list = `<dl class="record conditions-rows">${rows.map((r) => `
       <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`;
+  const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>`;
 
-  if (gap) return `<section class="conditions">${head}${list}</section>`;
-  return `<section class="conditions">${head}
+  // A gap opens the block and takes the control away with it. Nobody gets to
+  // put away the fact that no model is judging, and a button that could hide it
+  // is worse than no button — so this branch has no toggle at all, not a
+  // disabled one.
+  if (gap) return `<section class="conditions">
+    <div class="conditions-head">${claimLine}${action}</div>${list}</section>`;
+
+  /*
+   * Healthy: the rows fold away behind a text control that sits in the
+   * headline row, to the left of the action.
+   *
+   * It was a <details> with the summary sentence inside the <summary>, which
+   * put the control at the far right of its own line and made the summary
+   * compete with the headline directly above it for the same job. The redesign
+   * drops the summary line and moves the control up beside the action, where
+   * the two things you can do to this block are together. `summary` is still
+   * accepted and no longer rendered — it is one sentence restating five rows
+   * that are one click away.
+   *
+   * Still a <details>, so `state.open` keeps working and the block survives a
+   * re-render open; what changed is where the <summary> is drawn.
+   */
+  return `<section class="conditions">
     <details class="disclosure conditions-fold" data-key="${esc(key)}"${open ? ' open' : ''}>
-      <summary>
-        <span class="conditions-summary">${summary}</span>
-        <span class="disclosure-datum"><span>Details</span><i class="chev" aria-hidden="true"></i></span>
-      </summary>
+      <div class="conditions-head">
+        ${claimLine}
+        <summary class="conditions-toggle">
+          <span class="--show">Show details</span><span class="--hide">Hide details</span>
+          <i class="chev" aria-hidden="true"></i>
+        </summary>
+        ${action}
+      </div>
       <div class="disclosure-body">${list}</div>
     </details>
   </section>`;

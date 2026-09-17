@@ -137,14 +137,58 @@ export async function refreshEscalations() {
  * than something to render straight from the wire. One small request per
  * decision buys rows identical to the historical ones.
  */
+/**
+ * What an arriving decision means to the first run, if it is open.
+ *
+ * It reacts **only** to the tool chosen on step 1. A decision from anything
+ * else is somebody's other window, and treating it as proof would tell a person
+ * their setup is verified on evidence about a tool they did not connect — the
+ * worst available way for this screen to be wrong. The envelope carries the
+ * tool for exactly this; the `Decision` does not and should not.
+ *
+ * Nothing here decides that the run is finished. A real verification is written
+ * on the server, under conditions this page cannot check, and the screen reads
+ * it back. What is recorded here is only what the server cannot tell it later:
+ * that an allowed request went past, or that a decision arrived after the
+ * hook's deadline. Both are gone by the next poll, and both are outcomes the
+ * flow has to be able to name.
+ */
+/**
+ * Re-read who this device is, and what it has verified.
+ *
+ * Lives here rather than in first-run.js because the live stream is here and
+ * importing a screen into the data layer is how a cycle starts.
+ */
+async function refreshSoloIdentity() {
+  const { ok, j } = await api('/api/solo/rules').catch(() => ({ ok: false }));
+  if (!ok) return;
+  state.soloIdentity = j.identity;
+  state.soloRules = Array.isArray(j.rules) ? j.rules : [];
+}
+
+function noteFirstRunDecision(payload) {
+  const chosen = state.firstRun?.tool;
+  if (!chosen || payload.source !== chosen) return;
+  state.firstRun.seen = true;
+  state.firstRun.late = Boolean(payload.late);
+  state.firstRun.allowed = payload.decision?.verdict === 'ALLOW';
+}
+
 function subscribe() {
   const src = new EventSource('/api/events');
   src.onmessage = async (e) => {
     let payload; try { payload = JSON.parse(e.data); } catch { return; }
     if (payload.type !== 'decision') return;
+    noteFirstRunDecision(payload);
     const { ok, j } = await api('/api/audit?limit=1');
     if (ok && j[0] && j[0].auditId !== state.audit[0]?.auditId) state.audit.unshift(j[0]);
     void refreshChain();
+    // The first run is waiting for exactly this. The verification itself is
+    // written on the server, so the page has to go and read it rather than
+    // conclude anything from the event — and this is what makes step 3 move on
+    // its own, with `Check request` left as the manual fallback for an event
+    // that never arrived. `renderNav` would be wrong here: there is no nav.
+    if (state.view === 'firstRun') { await refreshSoloIdentity(); render(); return; }
     // Audit events do not change model forms or the attachment composer. Keep
     // those DOM nodes intact so an arriving request cannot erase a typed key
     // or close the browser's file picker. Activity surfaces still update live.

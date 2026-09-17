@@ -73,7 +73,28 @@ export function render() {
   const view = VIEWS[state.view];
   const fields = captureFields();
 
-  renderNav();
+  /**
+   * A `bare` view owns the window: no sidebar, no banners, no breadcrumb.
+   *
+   * Only the first run is one, and it is one because the design gives that
+   * screen the full width and a single thing to do. It is still an ordinary
+   * view of this router — `go()` and the hash reach it like any other — so
+   * nothing here is a second way to navigate. The sidebar is emptied rather
+   * than left stale behind `display: none`, or its buttons stay in the tab
+   * order of a screen that does not show them.
+   *
+   * Guarded like `applyTheme` in nav.js, and for the same reason: the console
+   * tests run these modules against a document stub that has no body.
+   */
+  const bare = val(view.bare);
+  const body = typeof document !== 'undefined' ? document.body : null;
+  if (bare) {
+    if (body?.dataset) body.dataset.bare = 'true';
+    $('sidebar').innerHTML = '';
+  } else {
+    if (body?.dataset) delete body.dataset.bare;
+    renderNav();
+  }
   $('pane').className = `pane${val(view.flush) ? ' flush' : ''}`;
   // Demo mode goes above every screen, not inside one. It used to live in the
   // today card, which does not render until something has happened — so the
@@ -84,8 +105,12 @@ export function render() {
   // about a directory this view never shows. The mock banner still applies:
   // someone in demo mode needs to know nothing here is real no matter which
   // product surface they are looking at.
+  // A bare view takes none of them. The team's nudge is about a directory it
+  // never shows, the demo banner cannot apply — the first run does not open in
+  // demo mode at all — and a compiler notice has no room on a screen with two
+  // cards and one button.
   const isSoloView = state.view === 'soloRules' || state.view === 'soloSettings';
-  const banners = compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
+  const banners = bare ? '' : compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
   $('pane').innerHTML = view.body();
   // The shell's notices sit under the page's own header, where the reader has
   // already learnt which page this is; above it they pushed the breadcrumb and

@@ -2,11 +2,12 @@
  * "This device": the machine Warden runs on — its tools, its address, its data — and the rules that protect it.
  */
 import { $, api, attr, del, esc, post, state } from './core.js';
-import { refreshHealth } from './data.js';
+import { refreshCompiler, refreshHealth } from './data.js';
 import { TOOL_NAMES, modelLabel, plural } from './format.js';
 import { render } from './render.js';
 import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
+import { soloIsPureInstall } from './nav.js';
 import { button, conditionBlock, contextBar, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
@@ -52,6 +53,34 @@ async function refreshSoloRules() {
 }
 
 /**
+ * Whether the first run should take over instead of this screen.
+ *
+ * Four conditions, and each one is a way of not asking somebody a question
+ * that has already been answered:
+ *
+ * - **A pure solo install.** Somebody who chose the team console at the splash
+ *   is setting up a directory, not this machine, and must not be handed a
+ *   recipe for wiring their own laptop. (Known gap: an empty directory reads as
+ *   pure solo, so a team admin who has added nobody yet sees this once. The
+ *   splash's answer is not written anywhere the gateway can read — see
+ *   docs/specs/first-run-and-theme.md §2.2.)
+ * - **Not demo.** Demo mode is the splash's other door, and it guards nothing,
+ *   so there is no protection to verify. Leaving demo brings this back on its
+ *   own: `/health` is re-read on every entry here.
+ * - **Never completed.** Completion is durable and survives every withdrawal.
+ *   Unwiring a tool changes what this screen says; it does not reopen setup.
+ * - **The gateway answered.** With no identity there is nothing to ask about,
+ *   and redirecting on a failed fetch would trap somebody on a screen whose own
+ *   retry button lives here.
+ */
+function firstRunIsDue() {
+  if (!soloIsPureInstall()) return false;
+  if (state.mock) return false;
+  if (!state.soloIdentity) return false;
+  return !state.soloIdentity.completedFirstRun;
+}
+
+/**
  * `/api/solo/setup` is idempotent and cheap by design (spec §6) — it returns
  * an existing identity untouched in the coexistence case and only creates one
  * the first time a pure install has nobody in it yet — so this always calls
@@ -64,6 +93,12 @@ async function onEnterSolo() {
   // whether the mock is standing in for a judge, and both can have changed
   // since boot — the desktop app restarts the gateway to leave demo mode.
   await Promise.all([refreshSoloPresets(), refreshSoloRules(), refreshHealth()]);
+  // Everything the decision needs is now loaded, which is why it is made here
+  // and not in the router: the desktop app opens `#soloRules` explicitly and a
+  // browser with no hash lands here too, so both paths come through this
+  // function without desktop/main.ts having to know the flow exists. Coming
+  // back from the flow re-runs this, finds the verification, and stays.
+  if (firstRunIsDue()) { go('firstRun'); return; }
   render();
 }
 
@@ -238,10 +273,23 @@ function conditions() {
   const rows = [
     {
       label: 'Warden',
-      value: `Running · ${where.label ? `“${esc(where.label)}”` : 'this installation'}${where.version ? ` v${esc(where.version)}` : ''} · on this device`
+      value: `Running · ${where.label ? `“${esc(where.label)}”` : 'this installation'}${where.version ? ` v${esc(where.version)}` : ''} · this device`
     },
+    // "You", always — never the name and never the role.
+    //
+    // This device is the screen of whoever is sitting at this machine, and by
+    // construction there is no other candidate, so a name here is the page
+    // telling somebody who they are. What the name looked like it was adding is
+    // better placed elsewhere: the role matters for its consequences and
+    // `Rules for you` states those without naming it, and both live one click
+    // away on Identity. This row only has to say the gateway recognises you.
+    //
+    // Unresolved and not made worse by this: `resolveSoloIdentity`
+    // (src/server/routes/solo.ts) picks the first exempt person when there is
+    // more than one, so on such an installation "You" can be somebody else's
+    // identity. The fix is deciding whose screen this is, not printing a name.
     identity
-      ? { label: 'You', value: `${esc(identity.name || identity.id)} · ${esc(identity.role)} · this gateway knows your key` }
+      ? { label: 'You', value: 'You · this gateway knows your key' }
       : { label: 'You', tone: 'attention', value: 'This gateway did not answer with an identity for you' },
     wiringRow(wired, judged),
     state.mock
@@ -254,7 +302,7 @@ function conditions() {
   const gaps = rows.filter((r) => r.tone === 'attention');
   return conditionBlock({
     key: 'dev:conditions',
-    claim: paused ? 'Paused · nothing of yours is being judged' : gaps.length ? 'Not judging you yet' : 'Judging requests',
+    claim: paused ? 'Paused · nothing of yours is being judged' : gaps.length ? 'Not judging you yet' : 'Protection is on',
     tone: paused || gaps.length ? 'attention' : 'allow',
     summary: esc(`${wired.map((t) => t.name).join(' and ')} wired, judged by ${judgeName()} on this device, against ${plural(onRules.length, 'rule')} addressed at you.`),
     rows: paused ? [{ label: 'Paused', tone: 'attention', value: pauseLine(paused) }, ...rows] : rows,
@@ -299,6 +347,17 @@ function wiringRow(wired, judged) {
  */
 function rulesRow(onRules, exemptRules, exempt) {
   if (onRules.length) {
+    // One rule, so say which one. The design's row reads "1 rule on · blocks
+    // credential requests", and what it is after is what the rule protects
+    // rather than how many there are — a count answers a question nobody with
+    // one rule is asking. The console has no summary of a rule and must not
+    // invent one, so this shows the rule's own sentence, which is also the
+    // sentence the judge reads.
+    if (onRules.length === 1) {
+      return { label: 'Rules for you', value: `1 rule on · ${esc(onRules[0].text)}` };
+    }
+    // Past one, the texts stop fitting and the useful fact is the shape of the
+    // set: how many, and how many of them refuse outright.
     const blocks = onRules.filter((r) => r.severity === 'block').length;
     const escalates = onRules.filter((r) => r.severity === 'escalate').length;
     const parts = [blocks ? `${blocks} block` : '', escalates ? `${escalates} escalate${escalates === 1 ? 's' : ''}` : ''].filter(Boolean);
@@ -322,9 +381,12 @@ function rulesRow(onRules, exemptRules, exempt) {
  * pause is: off until somebody turns it on, recorded, with a name on it.
  */
 function headlineAction(paused, gaps) {
-  if (paused) return button('Turn Warden on', { kind: 'primary', id: 'soloResume', busy: state.soloPausing });
+  if (paused) return button('Resume protection', { kind: 'primary', id: 'soloResume', busy: state.soloPausing });
   const first = gaps[0];
-  if (!first) return button(state.soloPausing ? 'Turning off…' : 'Turn Warden off', { id: 'soloPause', busy: state.soloPausing });
+  // "Pause protection" rather than "Turn Warden off": same POST, same
+  // indefinite pause, same record with a name on it. The word changed because
+  // nothing here switches the gateway off — it is serving this page.
+  if (!first) return button(state.soloPausing ? 'Pausing…' : 'Pause protection', { id: 'soloPause', busy: state.soloPausing });
   if (first.label === 'Your tools') return button(state.soloProtecting ? 'Setting up…' : 'Protect this device', { kind: 'primary', id: 'soloProtect', busy: state.soloProtecting });
   if (first.label === 'The judge') return button('Get a judge', { kind: 'primary', attrs: 'data-go="models"' });
   if (first.label === 'Rules for you') return button('Write a rule for yourself', { kind: 'primary', id: 'soloFocusRule' });
@@ -343,11 +405,93 @@ function judgeName() {
 const TABS = [['', 'Rules'], ['tools', 'Tools'], ['identity', 'Identity']];
 const tabOf = () => (state.sel === 'tools' || state.sel === 'identity' ? state.sel : '');
 
+/**
+ * Tools that cannot be wired here, ever, and it is not about this machine.
+ *
+ * Cursor has no prompt hook to write into: there is nothing in `integrations/`
+ * for it and there will not be, because that is somebody else's product
+ * decision. The hook knows this — `AGENTS` in integrations/warden-hook.mjs
+ * carries `governable: false` — but it cannot tell us: `reportWiring()` filters
+ * ungovernable tools out before it builds the report, and including them would
+ * mean sending a row whose `wired: false` is a fact about nothing.
+ *
+ * So the list is here, and the day somebody writes that integration this is the
+ * line to delete. The console test on the impossible row is what fails if they
+ * forget.
+ */
+const UNGOVERNABLE = new Set(['cursor']);
+
+/**
+ * One tool, as two stacked facts and at most one button.
+ *
+ * The middle state is why this tab exists. Two states force a lie in both
+ * directions — a tool nobody has tested gets called protected, or a
+ * perfectly-wired tool nobody has used yet gets called broken — so *configured*
+ * says the cable is in and *verified* says current went through it. The second
+ * line always names where the fact came from, so nobody has to take the
+ * screen's word for it.
+ */
+function toolFacts(t) {
+  const verified = (state.soloIdentity?.verified ?? []).find((v) => v.tool === t.id);
+  const reported = t.reportedAt ? `reported ${ago(Date.parse(t.reportedAt))}` : 'reported by this machine';
+
+  if (UNGOVERNABLE.has(t.id)) {
+    return {
+      top: `<span class="cell-muted">Not judged, and never will be from this device</span>`,
+      under: 'No prompt hook exists — it cannot be wired here',
+      action: ''
+    };
+  }
+  if (t.wired === true && verified) {
+    return {
+      top: statusText(`Judging requests · verified ${ago(Date.parse(verified.at))}`, 'allow'),
+      under: `Wired · ${reported}`,
+      action: button('Unwire', { compact: true, attrs: `data-unwire="${attr(t.id)}"`, busy: state.soloWiring === t.id })
+    };
+  }
+  if (t.wired === true) {
+    return {
+      top: statusText('Configured · waiting for a real request', 'attention'),
+      under: `Wired · ${reported}`,
+      action: button('Unwire', { compact: true, attrs: `data-unwire="${attr(t.id)}"`, busy: state.soloWiring === t.id })
+    };
+  }
+  // Reported absence. Silence (`wired === null`) is not this: it falls through.
+  if (t.wired === false) {
+    return {
+      top: statusText('Not connected · no request judged', 'attention'),
+      under: `Found · Warden is not in ${t.name} settings`,
+      action: button('Connect', { compact: true, attrs: `data-connect="${attr(t.id)}"`, busy: state.soloWiring === t.id })
+    };
+  }
+  if (t.found) {
+    return {
+      top: statusText('Not connected · no request judged', 'attention'),
+      under: 'Found · this machine has not reported its wiring yet',
+      action: button('Connect', { compact: true, attrs: `data-connect="${attr(t.id)}"`, busy: state.soloWiring === t.id })
+    };
+  }
+  return {
+    top: `<span class="cell-muted">Not found on this device</span>`,
+    under: `Install ${t.name} before connecting it`,
+    action: button('Check again', { compact: true, id: 'soloProbe', busy: state.soloProbing })
+  };
+}
+
 function toolsTab() {
+  const rows = toolState().map((t) => {
+    const { top, under, action } = toolFacts(t);
+    return `<div class="tool-row">
+      <span class="tool-name">${esc(t.name)}</span>
+      <span class="tool-facts">${top}<small>${esc(under)}</small></span>
+      <span class="tool-action">${action}</span>
+    </div>`;
+  }).join('');
+
   return `<section class="settings-task">
-    <p class="section-lede">Warden judges a tool’s requests only while that tool is wired to it. Each machine reports its own wiring; the gateway cannot read your home directory.</p>
-    <div class="setting-rows">${toolRows() || '<div class="setting-row"><span class="cell-muted">No supported tool was found on this device.</span></div>'}</div>
-    <p class="disclosure-text muted">To unwire one, run <code>warden-hook --unfix</code> on this device. It is a file in your own settings, so Warden can see it go and cannot put it back.</p>
+    <p class="section-lede">A tool is configured when it reports its wiring. It is verified after a real request reaches Warden.</p>
+    ${state.soloWireError ? feedback({ tone: 'error', icon: true, title: 'That tool did not change', body: esc(state.soloWireError) }) : ''}
+    <div class="tool-rows">${rows || '<div class="tool-row"><span class="cell-muted">No supported tool was found on this device.</span></div>'}</div>
   </section>`;
 }
 
@@ -372,13 +516,59 @@ const maskKey = (key) => {
   return cut > 0 && k.length > cut + 12 ? `${k.slice(0, cut + 1)}${'•'.repeat(16)}${k.slice(-6)}` : k || 'not issued yet';
 };
 
+/**
+ * The band that says the protection just worked, once.
+ *
+ * The same fact that closed the first run, shown again in the place it lives
+ * from now on. It is drawn from the verification record rather than from a
+ * fixed string, so it can only appear when something really was blocked.
+ *
+ * **It ages out**, and that is the point of it: a permanent green banner is
+ * decoration, and the five condition rows are where the durable version of
+ * this lives. A day is the cutoff — long enough to survive somebody closing
+ * the window after setup, short enough that it is never the thing telling you
+ * about protection you set up last month.
+ *
+ * The design's second line reads "Credential request · blocked just now". This
+ * one does not name what was requested, because the console does not know: the
+ * audit log stores a hash and not the prompt, deliberately, and a category
+ * invented here would be the one sentence on the screen with nothing behind it.
+ */
+function firstBlockBand() {
+  const recent = (state.soloIdentity?.verified ?? [])
+    .filter((v) => v.verdict !== 'ALLOW')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  if (!recent) return '';
+  const at = Date.parse(recent.at);
+  if (!Number.isFinite(at) || Date.now() - at > 24 * 60 * 60 * 1000) return '';
+  const name = TOOL_NAMES[recent.tool] ?? recent.tool;
+  return feedback({
+    tone: 'success',
+    icon: true,
+    title: `Your rule blocked a request from ${esc(name)}`,
+    body: `Blocked ${esc(ago(at))}, before it left ${esc(name)}.`
+  });
+}
+
+/**
+ * The wide column, not the 760px reading one.
+ *
+ * Every content block in the three This device frames measures 1120 — the
+ * condition rows, the tab strip and the tab content alike — which is the
+ * --w-table token, and the same width `.sheet` around it already uses. The
+ * rule list is where the old width showed: a rule is a row carrying a badge, a
+ * sentence, a checkbox and a menu, and at 760 the sentence wrapped while a
+ * third of the window sat empty beside it. The reading width is for prose, and
+ * this page is a table of facts.
+ */
 function soloBody() {
   const tab = tabOf();
   return `<div class="sheet">
     ${contextBar([{ label: 'This device' }])}
     ${pageHead({ title: 'This device', sub: 'One device: yours. What is wired here, and what is judging you.' })}
-    <div class="reading device-page">
+    <div class="reading-wide device-page">
       ${conditions()}
+      ${firstBlockBand()}
       ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
       ${state.soloPauseError ? feedback({ tone: 'error', icon: true, title: 'Warden did not change', body: esc(state.soloPauseError) }) : ''}
       ${tabs('soloRules', TABS, tab, 'This device sections')}
@@ -434,6 +624,52 @@ function bindSolo() {
 
   pane.onclick = async (e) => {
     if (state.view !== 'soloRules') return;
+
+    /*
+     * Connect and Unwire, per row.
+     *
+     * They exist here and have no counterpart on Team, and the asymmetry is
+     * the whole argument: on This device the gateway runs on the same computer
+     * as the tool, and that computer belongs to whoever is reading the screen.
+     * `protect` has always written files into this `$HOME`. On Team the hook
+     * lives in an employee's own home directory on a machine the gateway never
+     * touches, so the button would be decoration that fails — which teaches
+     * people that every control in this console is decoration.
+     */
+    const wire = e.target.closest('[data-connect], [data-unwire]');
+    if (wire) {
+      const connect = 'connect' in wire.dataset;
+      const tool = connect ? wire.dataset.connect : wire.dataset.unwire;
+      state.soloWiring = tool;
+      state.soloWireError = '';
+      render();
+      const r = await post(connect ? '/api/solo/protect' : '/api/solo/unprotect', { tool })
+        .catch(() => ({ ok: false, j: null }));
+      state.soloWiring = null;
+      if (!r.ok) {
+        state.soloWireError = r.j?.error
+          ?? `Could not ${connect ? 'connect' : 'unwire'} that tool — the gateway did not answer.`;
+        render();
+        return;
+      }
+      // The row moves when the machine reports what it wrote, which --fix and
+      // --unfix both do before they exit. Re-reading is how this page hears it.
+      await refreshSoloRules();
+      render();
+      return;
+    }
+
+    // Re-run the CLI probe. The only thing that can change a "not found" row is
+    // somebody having installed the tool since the console last looked.
+    if (e.target.closest('#soloProbe')) {
+      state.soloProbing = true;
+      render();
+      await refreshCompiler();
+      state.soloProbing = false;
+      render();
+      return;
+    }
+
     const close = e.target.closest('[data-dialog-close="soloRemove"]');
     if (close || e.target.matches('[data-dialog-scrim="soloRemove"]')) { removing = null; render(); return; }
     const el = e.target.closest('[data-act="remove"]');

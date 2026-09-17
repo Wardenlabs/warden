@@ -842,6 +842,28 @@ function detectAgents() {
 }
 
 /**
+ * `--only <id>` — narrow `--fix` and `--unfix` to one tool.
+ *
+ * Both modes already take a list and dispatch by id; the CLI just never had a
+ * way to hand them a shorter one. The console needs it: "This device" offers
+ * Connect and Unwire per row, and wiring every tool because somebody pressed
+ * one button is not what the button said.
+ *
+ * Returns the full list when the flag is absent, so every existing invocation
+ * behaves exactly as before, and `null` for an id that is not a tool — which
+ * the caller turns into a refusal. Falling back to "all of them" on a typo is
+ * the expensive direction of that mistake: `--unfix --only clade-code` would
+ * quietly unwire the machine.
+ */
+function onlyAgents() {
+  const at = process.argv.indexOf('--only');
+  if (at === -1) return detectAgents();
+  const wanted = process.argv[at + 1];
+  const chosen = detectAgents().filter((agent) => agent.id === wanted);
+  return chosen.length ? chosen : null;
+}
+
+/**
  * `warden-hook --detect --fix` — wire this hook into whatever is installed.
  *
  * The detector answers "which of my tools is governed"; without this the
@@ -1746,9 +1768,15 @@ async function main() {
   }
 
   if (process.argv.includes('--detect') || process.argv.includes('--fix') || process.argv.includes('--unfix')) {
+    const chosen = onlyAgents();
+    if (chosen === null) {
+      process.stderr.write(`⚠ warden-hook: --only needs one of ${AGENTS.map((a) => a.id).join(', ')}.\n`);
+      process.exitCode = 1;
+      return;
+    }
     detectMode();
     if (process.argv.includes('--fix')) {
-      await fixMode(detectAgents());
+      await fixMode(chosen);
       // Re-read from disk so the closing inventory is what is actually there
       // now, not what this process believes it wrote.
       detectMode();
@@ -1757,7 +1785,7 @@ async function main() {
       await reportWiring();
     }
     if (process.argv.includes('--unfix')) {
-      unfixMode(detectAgents());
+      unfixMode(chosen);
       detectMode();
       // Especially here. Somebody unwiring and then vanishing from the console
       // is exactly the picture that has to say "not wired" rather than "went

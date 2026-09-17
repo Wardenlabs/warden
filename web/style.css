@@ -19,33 +19,42 @@
  *
  * No literal colour and no literal font-size appears outside the two theme
  * blocks of :root. Pick a token by its role, never by its value:
- * --surface-disabled and --sidebar-selected-text share a hex in light and
- * part ways in dark.
+ * --sidebar-selected-bg and --sidebar-avatar hold the same hex in both modes
+ * and are still two names, because they answer to two roles.
+ *
+ * The neutrals moved from blue-grey to green-grey on 2026-09-16, from the
+ * "Warden · Sistema" collection (node 677:2054, docs/specs/first-run-and-theme.md
+ * §3). The verdicts and the roles did not move: they were already the
+ * collection's values, checked hex by hex. The map from these names to Figma's
+ * is --ink ↔ ink/default, --ink-body ↔ ink/body, --muted ↔ ink/muted,
+ * --action ↔ action/graphite, --action-ink ↔ action/on-graphite; the rest share
+ * a name. Figma writes them --warden-ink-default and so on; renaming 1200 lines
+ * of stylesheet to gain a prefix buys nothing, so the names here stay.
  */
 
 :root {
   color-scheme: light;
 
   /* ink */
-  --ink: #17181C;
-  --ink-body: #44474E;
-  --muted: #70747C;
+  --ink: #22282A;
+  --ink-body: #444D4F;
+  --muted: #656E6F;
 
   /* surfaces */
   --surface-page: #FFFFFF;
-  --surface-subtle: #F5F5F7;
-  --surface-disabled: #F0F0F2;
+  --surface-subtle: #F4F5F4;
+  --surface-disabled: #ECEEEC;
   --surface-raised: #FFFFFF;
 
   /* lines */
-  --line-hairline: #EAEAED;
-  --line-control: #E0E0E4;
-  --line-accessible: #858A94;
+  --line-hairline: #E7EAE8;
+  --line-control: #DDE2DF;
+  --line-accessible: #7D8788;
 
   /* action — the graphite primary */
-  --action: #262A33;
+  --action: #22282A;
   --action-ink: #FFFFFF;
-  --action-hover: #353B47;
+  --action-hover: #323B3E;
 
   /* verdicts — the only saturated colour in the product */
   --verdict-block: #B91C41;     --verdict-block-bg: #FFF0F3;
@@ -60,41 +69,56 @@
   --role-solo: #944473;      --role-solo-bg: #F8EDF5;
   --role-everyone: #505868;  --role-everyone-bg: #EEF0F4;
 
-  /* sidebar — invariant: the same values in light and dark */
-  --sidebar-bg: #0F1013;
-  --sidebar-text: #C3C6CD;
-  --sidebar-muted: #8D919A;
-  --sidebar-avatar: #212329;
-  --sidebar-selected-text: #F0F0F2;
-  --sidebar-selected-bg: #262A33;
+  /* Sidebar. It used to be one dark slab in both modes, and the note here said
+     so; the redesign made it light on light and dark on dark, so the six below
+     are redefined in each dark block. In light --sidebar-bg is the same
+     #F4F5F4 as --surface-subtle, on purpose: the navigation and a hovered row
+     are the same grey. In dark they separate. */
+  --sidebar-bg: #F4F5F4;
+  --sidebar-text: #444D4F;
+  --sidebar-muted: #656E6F;
+  --sidebar-avatar: #E6E8E6;
+  --sidebar-selected-text: #22282A;
+  --sidebar-selected-bg: #E6E8E6;
 
+  /* Accessibility, and it shares the blue of --role-admin. Left where it was:
+     the collection does not name it and the neutrals moving is not a reason to
+     move a focus indicator. It is worth looking at against the light sidebar,
+     which is a different contrast problem from the near-black one it was
+     drawn against. */
   --focus-ring: #365FA5;
 
   /* Elevation and the dialog scrim have no Figma variable; they are the
      Menu component's two-layer drop shadow and the scrim the dialog frames
-     render, kept here so no colour lives outside the theme blocks. */
-  --shadow-float: 0 1px 1px rgba(23, 24, 28, .06), 0 8px 12px rgba(23, 24, 28, .12);
-  --scrim: rgba(15, 16, 19, .22);
+     render, kept here so no colour lives outside the theme blocks. Both are
+     derived from --ink, so they moved with it — a shadow still mixed from the
+     old #17181C reads blue over a green-grey page. */
+  --shadow-float: 0 1px 1px rgba(34, 40, 42, .06), 0 8px 12px rgba(34, 40, 42, .12);
+  --scrim: rgba(34, 40, 42, .22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
+    --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
 
-    --surface-page: #16181D;
-    --surface-subtle: #21242B;
-    --surface-disabled: #1C1F24;
-    --surface-raised: #1D2026;
+    --surface-page: #171717;
+    --surface-subtle: #242424;
+    --surface-disabled: #202020;
+    --surface-raised: #292929;
 
-    --line-hairline: #262A31;
-    --line-control: #30353D;
-    --line-accessible: #565C66;
+    --line-hairline: #353535;
+    --line-control: #424242;
+    /* Derived, not a Figma decision: the collection gives --line-accessible
+       only in light (#7D8788). This holds the same contrast against the dark
+       page that #7D8788 holds against white. Replace it the day the collection
+       names one. */
+    --line-accessible: #6A6A66;
 
-    --action: #E9EAED;
-    --action-ink: #141619;
-    --action-hover: #D9DBDF;
+    --action: #F3F3F1;
+    --action-ink: #171717;
+    --action-hover: #E4E4E1;
 
     --verdict-block: #F0708F;     --verdict-block-bg: #391820;
     --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
@@ -107,7 +131,13 @@
     --role-solo: #D183B4;      --role-solo-bg: #321F2B;
     --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
 
-    /* sidebar: deliberately not redefined */
+    --sidebar-bg: #202020;
+    --sidebar-text: #CACAC7;
+    --sidebar-muted: #999995;
+    --sidebar-avatar: #343434;
+    --sidebar-selected-text: #F2F2EF;
+    --sidebar-selected-bg: #343434;
+
     --focus-ring: #6E96E8;
 
     --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
@@ -120,20 +150,24 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
+  --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
 
-  --surface-page: #16181D;
-  --surface-subtle: #21242B;
-  --surface-disabled: #1C1F24;
-  --surface-raised: #1D2026;
+  --surface-page: #171717;
+  --surface-subtle: #242424;
+  --surface-disabled: #202020;
+  --surface-raised: #292929;
 
-  --line-hairline: #262A31;
-  --line-control: #30353D;
-  --line-accessible: #565C66;
+  --line-hairline: #353535;
+  --line-control: #424242;
+  /* Derived, not a Figma decision: the collection gives --line-accessible
+     only in light (#7D8788). This holds the same contrast against the dark
+     page that #7D8788 holds against white. Replace it the day the collection
+     names one. */
+  --line-accessible: #6A6A66;
 
-  --action: #E9EAED;
-  --action-ink: #141619;
-  --action-hover: #D9DBDF;
+  --action: #F3F3F1;
+  --action-ink: #171717;
+  --action-hover: #E4E4E1;
 
   --verdict-block: #F0708F;     --verdict-block-bg: #391820;
   --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
@@ -146,7 +180,13 @@
   --role-solo: #D183B4;      --role-solo-bg: #321F2B;
   --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
 
-  /* sidebar: deliberately not redefined */
+  --sidebar-bg: #202020;
+  --sidebar-text: #CACAC7;
+  --sidebar-muted: #999995;
+  --sidebar-avatar: #343434;
+  --sidebar-selected-text: #F2F2EF;
+  --sidebar-selected-bg: #343434;
+
   --focus-ring: #6E96E8;
 
   --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
@@ -1130,10 +1170,23 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .conditions-rows { grid-template-columns: 180px minmax(0, 1fr); margin-top: var(--s-2); }
 .conditions-rows dd.--attention { color: var(--verdict-attention); }
 .conditions-rows dd .btn { margin-left: var(--s-3); }
-.conditions-summary { font-size: var(--fs-4); color: var(--ink-body); }
 .conditions-fold { border-bottom: 0; }
-.conditions-fold > summary { padding: 0; }
 .conditions-fold > .disclosure-body { padding-bottom: 0; }
+/* The toggle is the <summary>, but it is drawn inside the headline row rather
+   than above the body — the two things you can do to this block belong next to
+   each other. It sits hard against the action, so `margin-left: auto` pushes
+   the pair right and the claim keeps the left. */
+.conditions-toggle {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  margin-left: auto; padding: 0;
+  font-size: var(--fs-3); color: var(--ink-body); cursor: pointer;
+  list-style: none;
+}
+.conditions-toggle::-webkit-details-marker { display: none; }
+.conditions-toggle:hover { color: var(--ink); }
+.conditions-toggle .--hide { display: none; }
+[open] > .conditions-head > .conditions-toggle .--show { display: none; }
+[open] > .conditions-head > .conditions-toggle .--hide { display: inline; }
 
 /* Gateway. The tab content is bands of label/value rows: everything on this
    screen is something the gateway says about itself, and only one of them
@@ -1223,3 +1276,126 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 }
 .device-page, .models-active, .test-subject, .job-block, .device-rules { grid-template-columns: minmax(0, 1fr); }
 .test-meta select { min-width: 0; }
+
+/* ── the first run ────────────────────────────────────────────────────────────
+   A screen with no sidebar, no breadcrumb and one thing to do. `body[data-bare]`
+   is set by render() for a view that declares `bare`, and the first run is the
+   only one. The column is 880 centred in the window, with the wordmark and its
+   rule in a band above it at the page margin — the proportions come from the
+   Figma frames at 1440 (see docs/specs/first-run-and-theme.md §5.6). */
+body[data-bare] .sidebar { display: none; }
+body[data-bare] .pane { padding: 0; }
+
+.first-run { min-height: 100vh; }
+.first-run > header {
+  padding: var(--s-9) var(--s-10) var(--s-6);
+  border-bottom: 1px solid var(--line-hairline);
+}
+/* The wordmark is the way out, and the only one. Styled as the mark rather than
+   as a button because that is what it is; it keeps a button's focus ring and a
+   button's keyboard behaviour, which a div with a click handler does not. */
+.first-run-mark {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; font-size: var(--fs-5); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); color: var(--ink); cursor: pointer;
+}
+.first-run-mark:hover { color: var(--ink-body); }
+
+.first-run-body {
+  width: min(880px, 100% - 2 * var(--s-10));
+  margin: 0 auto;
+  padding: var(--s-11) 0 var(--s-10);
+  display: flex; flex-direction: column;
+  /* The gaps between blocks are set on the blocks, not here: the rail sits
+     closer to its label than the cards sit to each other. */
+  gap: 0;
+}
+.first-run-eyebrow {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-body h1 {
+  margin-top: var(--s-4);
+  font-size: var(--fs-7); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
+}
+.first-run-lede { margin-top: var(--s-3); color: var(--ink-body); }
+
+.first-run-rail { margin-top: var(--s-9); }
+.first-run-rail p {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-rail > div { display: flex; gap: var(--s-6); margin-top: var(--s-4); }
+/* Three equal segments sharing the column, rather than the file's five fixed
+   at 160px. Reached and not reached; the label above says which one is now,
+   and the file draws no third state. */
+.first-run-rail i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-control); }
+.first-run-rail i.--done { background: var(--action); }
+
+.first-run-cards { margin-top: var(--s-8); display: flex; flex-direction: column; gap: var(--s-7); }
+
+/* Two on every screen. On steps 1 and 2 they are choices and `--lead` is the
+   selected one; from step 3 on they are a state and an instruction, and
+   `--lead` is the one carrying the state. The tone is about the outcome, never
+   about the verdict: the confirmation is green under a card that says
+   "Blocked", because blocking was the good ending. */
+.choice-card {
+  min-height: 132px;
+  padding: var(--s-7) var(--s-7) var(--s-7) 26px;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface-page);
+}
+.choice-card b { font-size: var(--fs-5); font-weight: var(--fw-semi); }
+.choice-card span { font-size: var(--fs-3); color: var(--ink-body); }
+[data-choice] { cursor: pointer; }
+[data-choice]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* The border goes 1px → 2px as well as changing colour, so the selection is
+   legible without colour at all. Padding compensates so nothing shifts. */
+.choice-card.--lead {
+  border-width: 2px; border-color: var(--action);
+  background: var(--surface-subtle);
+  padding: calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) 25px;
+}
+.choice-card.--lead.--block { border-color: var(--verdict-block); background: var(--verdict-block-bg); }
+.choice-card.--lead.--block b { color: var(--verdict-block); }
+.choice-card.--lead.--allow { border-color: var(--verdict-allow); background: var(--verdict-allow-bg); }
+.choice-card.--lead.--allow b { color: var(--verdict-allow); }
+
+.first-run-note { margin-top: var(--s-7); font-size: var(--fs-3); color: var(--muted); }
+.first-run-actions {
+  margin-top: var(--s-9);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+}
+.first-run-back {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; color: var(--ink-body); cursor: pointer;
+}
+.first-run-back:hover { color: var(--ink); }
+
+@media (max-width: 900px) {
+  .first-run > header { padding: var(--s-7) var(--s-6) var(--s-5); }
+  .first-run-body { width: calc(100% - 2 * var(--s-6)); padding-top: var(--s-9); }
+  .first-run-rail > div { gap: var(--s-4); }
+}
+
+/* Tools, on This device. Three columns: the name, two stacked facts, and at
+   most one button. The second fact always names where the first came from — a
+   screen that asserts protection without saying who told it is asking to be
+   believed. */
+.tool-rows { display: grid; margin-top: var(--s-5); }
+.tool-row {
+  display: grid; grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: center; gap: var(--s-5);
+  padding: var(--s-5) 0; border-bottom: 1px solid var(--line-hairline);
+}
+.tool-rows > .tool-row:last-child { border-bottom: 0; }
+.tool-name { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.tool-facts { display: grid; gap: var(--s-1); min-width: 0; }
+.tool-facts small { font-size: var(--fs-3); color: var(--muted); }
+
+@media (max-width: 900px) {
+  .tool-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tool-name { grid-column: 1 / -1; }
+}

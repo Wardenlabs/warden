@@ -142,6 +142,43 @@ export const state = {
   soloPausing: false,
   soloPauseError: '',
 
+  /** The tool whose Connect/Unwire is in flight on the Tools tab, and what the
+   *  gateway said if it refused. One at a time: the buttons are per row. */
+  soloWiring: null,
+  soloWireError: '',
+  /** True while the CLI probe behind "Check again" is re-running. */
+  soloProbing: false,
+
+  /**
+   * The first run of This device.
+   *
+   * Everything here is either a choice nobody has committed yet or something
+   * that arrived on the live stream. **No step number lives here** — `stepOf()`
+   * derives it from wiring, rules and verification, all of which the server
+   * holds. `step` is only the temporary override that `← Back` sets, and the
+   * next action clears it.
+   *
+   * `allowed`, `late` and `seen` are what the stream said about the chosen
+   * tool, and they are the only reason this is state at all: a decision that
+   * has already gone past cannot be asked for again.
+   */
+  firstRun: {
+    /** The tool picked on step 1. Null means "whatever is already wired". */
+    tool: null,
+    /** 'preset' or 'own' on step 2. */
+    rule: 'preset',
+    /** Set by ← Back only. Null means derive it. */
+    step: null,
+    busy: false,
+    error: '',
+    /** A decision from the chosen tool arrived, whatever it said. */
+    seen: false,
+    /** ...and it was an ALLOW: the path works, the rule is unproven. */
+    allowed: false,
+    /** ...and it came back after the hook's deadline, so the prompt went unchecked. */
+    late: false
+  },
+
   /**
    * Everything `/health` last said, kept whole for the Gateway screen.
    *
