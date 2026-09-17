@@ -19,33 +19,42 @@
  *
  * No literal colour and no literal font-size appears outside the two theme
  * blocks of :root. Pick a token by its role, never by its value:
- * --surface-disabled and --sidebar-selected-text share a hex in light and
- * part ways in dark.
+ * --sidebar-selected-bg and --sidebar-avatar hold the same hex in both modes
+ * and are still two names, because they answer to two roles.
+ *
+ * The neutrals moved from blue-grey to green-grey on 2026-09-16, from the
+ * "Warden · Sistema" collection (node 677:2054, docs/specs/first-run-and-theme.md
+ * §3). The verdicts and the roles did not move: they were already the
+ * collection's values, checked hex by hex. The map from these names to Figma's
+ * is --ink ↔ ink/default, --ink-body ↔ ink/body, --muted ↔ ink/muted,
+ * --action ↔ action/graphite, --action-ink ↔ action/on-graphite; the rest share
+ * a name. Figma writes them --warden-ink-default and so on; renaming 1200 lines
+ * of stylesheet to gain a prefix buys nothing, so the names here stay.
  */
 
 :root {
   color-scheme: light;
 
   /* ink */
-  --ink: #17181C;
-  --ink-body: #44474E;
-  --muted: #70747C;
+  --ink: #22282A;
+  --ink-body: #444D4F;
+  --muted: #656E6F;
 
   /* surfaces */
   --surface-page: #FFFFFF;
-  --surface-subtle: #F5F5F7;
-  --surface-disabled: #F0F0F2;
+  --surface-subtle: #F4F5F4;
+  --surface-disabled: #ECEEEC;
   --surface-raised: #FFFFFF;
 
   /* lines */
-  --line-hairline: #EAEAED;
-  --line-control: #E0E0E4;
-  --line-accessible: #858A94;
+  --line-hairline: #E7EAE8;
+  --line-control: #DDE2DF;
+  --line-accessible: #7D8788;
 
   /* action — the graphite primary */
-  --action: #262A33;
+  --action: #22282A;
   --action-ink: #FFFFFF;
-  --action-hover: #353B47;
+  --action-hover: #323B3E;
 
   /* verdicts — the only saturated colour in the product */
   --verdict-block: #B91C41;     --verdict-block-bg: #FFF0F3;
@@ -60,41 +69,56 @@
   --role-solo: #944473;      --role-solo-bg: #F8EDF5;
   --role-everyone: #505868;  --role-everyone-bg: #EEF0F4;
 
-  /* sidebar — invariant: the same values in light and dark */
-  --sidebar-bg: #0F1013;
-  --sidebar-text: #C3C6CD;
-  --sidebar-muted: #8D919A;
-  --sidebar-avatar: #212329;
-  --sidebar-selected-text: #F0F0F2;
-  --sidebar-selected-bg: #262A33;
+  /* Sidebar. It used to be one dark slab in both modes, and the note here said
+     so; the redesign made it light on light and dark on dark, so the six below
+     are redefined in each dark block. In light --sidebar-bg is the same
+     #F4F5F4 as --surface-subtle, on purpose: the navigation and a hovered row
+     are the same grey. In dark they separate. */
+  --sidebar-bg: #F4F5F4;
+  --sidebar-text: #444D4F;
+  --sidebar-muted: #656E6F;
+  --sidebar-avatar: #E6E8E6;
+  --sidebar-selected-text: #22282A;
+  --sidebar-selected-bg: #E6E8E6;
 
+  /* Accessibility, and it shares the blue of --role-admin. Left where it was:
+     the collection does not name it and the neutrals moving is not a reason to
+     move a focus indicator. It is worth looking at against the light sidebar,
+     which is a different contrast problem from the near-black one it was
+     drawn against. */
   --focus-ring: #365FA5;
 
   /* Elevation and the dialog scrim have no Figma variable; they are the
      Menu component's two-layer drop shadow and the scrim the dialog frames
-     render, kept here so no colour lives outside the theme blocks. */
-  --shadow-float: 0 1px 1px rgba(23, 24, 28, .06), 0 8px 12px rgba(23, 24, 28, .12);
-  --scrim: rgba(15, 16, 19, .22);
+     render, kept here so no colour lives outside the theme blocks. Both are
+     derived from --ink, so they moved with it — a shadow still mixed from the
+     old #17181C reads blue over a green-grey page. */
+  --shadow-float: 0 1px 1px rgba(34, 40, 42, .06), 0 8px 12px rgba(34, 40, 42, .12);
+  --scrim: rgba(34, 40, 42, .22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
+    --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
 
-    --surface-page: #16181D;
-    --surface-subtle: #21242B;
-    --surface-disabled: #1C1F24;
-    --surface-raised: #1D2026;
+    --surface-page: #171717;
+    --surface-subtle: #242424;
+    --surface-disabled: #202020;
+    --surface-raised: #292929;
 
-    --line-hairline: #262A31;
-    --line-control: #30353D;
-    --line-accessible: #565C66;
+    --line-hairline: #353535;
+    --line-control: #424242;
+    /* Derived, not a Figma decision: the collection gives --line-accessible
+       only in light (#7D8788). This holds the same contrast against the dark
+       page that #7D8788 holds against white. Replace it the day the collection
+       names one. */
+    --line-accessible: #6A6A66;
 
-    --action: #E9EAED;
-    --action-ink: #141619;
-    --action-hover: #D9DBDF;
+    --action: #F3F3F1;
+    --action-ink: #171717;
+    --action-hover: #E4E4E1;
 
     --verdict-block: #F0708F;     --verdict-block-bg: #391820;
     --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
@@ -107,7 +131,13 @@
     --role-solo: #D183B4;      --role-solo-bg: #321F2B;
     --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
 
-    /* sidebar: deliberately not redefined */
+    --sidebar-bg: #202020;
+    --sidebar-text: #CACAC7;
+    --sidebar-muted: #999995;
+    --sidebar-avatar: #343434;
+    --sidebar-selected-text: #F2F2EF;
+    --sidebar-selected-bg: #343434;
+
     --focus-ring: #6E96E8;
 
     --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
@@ -120,20 +150,24 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ink: #E9EAED;  --ink-body: #C2C5CB;  --muted: #878C96;
+  --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
 
-  --surface-page: #16181D;
-  --surface-subtle: #21242B;
-  --surface-disabled: #1C1F24;
-  --surface-raised: #1D2026;
+  --surface-page: #171717;
+  --surface-subtle: #242424;
+  --surface-disabled: #202020;
+  --surface-raised: #292929;
 
-  --line-hairline: #262A31;
-  --line-control: #30353D;
-  --line-accessible: #565C66;
+  --line-hairline: #353535;
+  --line-control: #424242;
+  /* Derived, not a Figma decision: the collection gives --line-accessible
+     only in light (#7D8788). This holds the same contrast against the dark
+     page that #7D8788 holds against white. Replace it the day the collection
+     names one. */
+  --line-accessible: #6A6A66;
 
-  --action: #E9EAED;
-  --action-ink: #141619;
-  --action-hover: #D9DBDF;
+  --action: #F3F3F1;
+  --action-ink: #171717;
+  --action-hover: #E4E4E1;
 
   --verdict-block: #F0708F;     --verdict-block-bg: #391820;
   --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
@@ -146,7 +180,13 @@
   --role-solo: #D183B4;      --role-solo-bg: #321F2B;
   --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
 
-  /* sidebar: deliberately not redefined */
+  --sidebar-bg: #202020;
+  --sidebar-text: #CACAC7;
+  --sidebar-muted: #999995;
+  --sidebar-avatar: #343434;
+  --sidebar-selected-text: #F2F2EF;
+  --sidebar-selected-bg: #343434;
+
   --focus-ring: #6E96E8;
 
   --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
