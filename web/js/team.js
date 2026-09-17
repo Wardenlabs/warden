@@ -16,7 +16,7 @@ import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { disclosure, render } from './render.js';
 import { go } from './router.js';
 import {
-  button, confirmResult, contextBar, dialog, disclosureRow, effectText, feedback, listState, menu,
+  button, confirmResult, dialog, disclosureRow, effectText, feedback, listState, menu,
   pageHead, roleLabel, roleTone, showToast, tabs
 } from './ui.js';
 import { VIEWS } from './views.js';
@@ -89,16 +89,19 @@ function wiringCell(e) {
   if (w.kind === 'wired') {
     return `<span class="cell-strong">${esc(w.tools.join(', '))}</span><small>${esc(`${plural(w.devices, 'device')}${w.hookVersion ? ` · hook v${w.hookVersion}` : ''}`)}</small>`;
   }
+  // Which tools, not the sentence about settings: the tools change per row and
+  // "removed from its settings" is what "unwired" already means.
   if (w.kind === 'unwired') {
-    return `<span class="cell-strong --attention">${esc(`Unwired on ${w.device || 'their device'}`)}</span><small>${esc(`${w.tools.join(', ')} removed from its settings`)}</small>`;
+    return `<span class="cell-strong --attention">${esc(`Unwired on ${w.device || 'their device'}`)}</span><small>${esc(w.tools.join(', '))}</small>`;
   }
   if (w.kind === 'pending') {
-    return `<span class="cell-strong --attention">Waiting for the new key</span><small>${esc(`${plural(w.devices, 'device')} since the key was rotated`)}</small>`;
+    return `<span class="cell-strong --attention">Waiting for the new key</span><small>${esc(plural(w.devices, 'device'))}</small>`;
   }
-  if (w.kind === 'silent') {
-    return `<span class="cell-strong">Seen, but has not reported</span><small>An older hook that does not say what it wired</small>`;
-  }
-  return '<span class="cell-muted">Never reported</span><small>No device has ever checked in</small>';
+  // The two that had no datum at all under them, only a restatement of the
+  // line above in other words — identical for every person in that state, and
+  // printed once per row.
+  if (w.kind === 'silent') return '<span class="cell-strong">Seen, but has not reported</span>';
+  return '<span class="cell-muted">Never reported</span>';
 }
 
 /** "2h ago" beats a timestamp in a column meant to be swept, not read. */
@@ -136,13 +139,11 @@ VIEWS.people = {
     const tab = tabOf();
     if (tab === null) return personPage(personById(state.sel));
     return `<div class="sheet">
-      ${contextBar([{ label: 'Your workspace' }])}
       ${pageHead({
         title: 'Team',
-        sub: 'Manage the people whose requests run through Warden.',
-        actions: tab === '' ? button('Add people', { kind: 'primary', id: 'openAdd' }) : tab === 'roles' ? button('New role', { kind: 'primary', id: 'openNewRole' }) : ''
+        primary: tab === '' ? button('Add people', { kind: 'primary', id: 'openAdd' }) : tab === 'roles' ? button('New role', { kind: 'primary', id: 'openNewRole' }) : '',
+        strip: tabs('people', TABS, tab, 'Team sections')
       })}
-      ${tabs('people', TABS, tab, 'Team sections')}
       ${tab === '' ? peopleTab() : tab === 'roles' ? rolesTab() : companyTab()}
       ${dialogMarkup()}
     </div>`;
@@ -516,7 +517,7 @@ function personRow(e) {
   const paused = activePause(e);
   return `<div class="trow --link" role="row" tabindex="0" data-go="people" data-sel="${attr(e.id)}">
     <span class="cell-strong person-name">${esc(e.name)}</span>
-    <span class="role-cell">${roleMenu(e)}${isExemptRole(e.role) ? '<span class="exempt-note">Exempt from company-wide rules</span>' : ''}</span>
+    <span class="role-cell">${roleMenu(e)}${isExemptRole(e.role) ? '<span class="exempt-chip" title="Exempt from company-wide rules">exempt</span>' : ''}</span>
     <span class="cell-stack">${wiringCell(e)}</span>
     ${paused
       // While somebody is paused, when they were last heard from does not mean
@@ -641,7 +642,7 @@ function devicesSection(p) {
             : `<span class="status-text --attention">${esc(gone.join(', '))} · not wired</span>`;
       return `<div class="setting-row">
         <span class="mono">${esc(d.name || d.machineId)}</span>
-        <span class="cell-stack device-cell">${line}<small>${esc(`${d.hookVersion ? `hook v${d.hookVersion} · ` : ''}last heard from ${ago(Date.parse(d.lastSeen))}`)}</small></span>
+        <span class="cell-stack --stacked device-cell">${line}<small>${esc(`${d.hookVersion ? `hook v${d.hookVersion} · ` : ''}last heard from ${ago(Date.parse(d.lastSeen))}`)}</small></span>
       </div>`;
     }).join('')}</div>
   </section>`;
@@ -649,8 +650,8 @@ function devicesSection(p) {
 
 function personPage(p) {
   if (!p) {
-    return `<div class="sheet">${contextBar([{ label: 'Team', go: 'people', back: true }, { label: 'Removed' }])}
-      ${pageHead({ title: 'This person is not on the team' })}${listState({ title: 'Nothing to show', body: 'They were removed, or the link is from another installation.' })}</div>`;
+    return `<div class="sheet">
+      ${pageHead({ title: 'This person is not on the team', crumbs: [{ label: 'Team', go: 'people' }] })}${listState({ title: 'Nothing to show', body: 'They were removed, or the link is from another installation.' })}</div>`;
   }
   const first = esc(firstName(p));
   const hits = state.audit.filter((a) => a.actor?.id === p.id);
@@ -664,11 +665,13 @@ function personPage(p) {
       ? `<div class="person-card"><div><h2 class="section-title --big">${plural(hits.length, 'request')} seen</h2><p>${count('ALLOW')} allowed · ${count('BLOCK')} blocked · ${count('ESCALATE')} held for review</p></div>${seeActivity}</div>`
       : `<div class="person-card --setup"><div><h2 class="section-title --big">${first} hasn’t connected yet</h2><p>Share their setup message. It includes their connection key and instructions for each tool.</p></div><div>${button('Copy setup message', { kind: 'primary', attrs: `data-act="copy-setup" data-id="${attr(p.id)}"` })}</div></div>`;
   return `<div class="sheet">
-    ${contextBar([{ label: 'Team', go: 'people', back: true }, { label: p.name }])}
     ${pageHead({
       title: p.name,
-      sub: esc(personLine(p)),
-      actions: menu(personActions(p), { label: `Actions for ${p.name}` })
+      crumbs: [{ label: 'Team', go: 'people' }],
+      // Who this person is, which changes with every person and is said
+      // nowhere else on the page. Not a description of what the page is for.
+      meta: personLine(p),
+      more: personActions(p)
     })}
     <div class="facts person-role">${roleMenu(p)}<span class="fact-v">Role determines which rules apply.</span></div>
     ${personNotice(p)}
@@ -874,7 +877,7 @@ function roleRow(r) {
   const row = `<div class="trow${editing ? ' --editing' : ''}" role="row">
     <span>${roleLabel(r)}</span>
     <span>${plural(held, 'person', 'people')}</span>
-    <span>${isExemptRole(r) ? '<span class="exempt-note">Exempt from company-wide rules</span>' : 'Every rule'}</span>
+    <span>${isExemptRole(r) ? '<span class="status-text --attention">Exempt from company-wide rules</span>' : 'Every rule'}</span>
     <span class="${q.maxRequestsPerDay ? '' : 'cell-muted'}">${q.maxRequestsPerDay ? `${q.maxRequestsPerDay} / day` : 'No limit'}</span>
     <span class="row-menu">${menu(items, { label: `Actions for ${r}` })}</span>
   </div>`;

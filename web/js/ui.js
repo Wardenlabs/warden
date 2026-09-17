@@ -17,45 +17,89 @@ import { ICONS } from './icons.js';
 // ── page anatomy ─────────────────────────────────────────────────────────────
 
 /**
- * The 64px bar above every page: where you are, and nothing else.
+ * Header / Page v4 (720:959). One row of 56 that says where you are, what this
+ * is and what you can do, an optional 48px strip under it for tabs or a
+ * toolbar, and a single hairline closing the whole region. 105 with the strip,
+ * 57 without, against the 266px Rules used to spend before its first row of
+ * data.
  *
- * `crumbs` is a list of `{ label, go?, sel?, q?, back? }`. A crumb with `back`
- * gets the arrow and is the way out; the last crumb is where you are and is
- * never a link.
+ * It is one component because the three it replaced were one region pretending
+ * to be three. A breadcrumb bar, a header and a tab strip each carried their
+ * own height and their own margin, and between them they said where you were
+ * three times: the sidebar item was lit, the crumb repeated it, and the `h1`
+ * repeated it again. None of the three was news to somebody who had just
+ * clicked to get here.
  *
- * It used to carry a dot and a line of status on the right — "12 active
- * rules", "Loading the log…", "Gateway running · demo mode". Every one of them
- * repeated something the page already said louder: the count is in the table,
- * the loading state is the plate in the middle of the screen, and the demo
- * banner says demo. A status that is never the reason you looked at the corner
- * is furniture, and it was on every screen.
+ * **`crumbs` is the way back and nothing else.** The ancestors, never the page
+ * itself — the page is the title. A root view passes none, because the lit
+ * sidebar item has already said it. Each crumb keeps the `data-go`/`data-sel`
+ * the old bar emitted, so `nav.js`'s delegated handler still moves it. A crumb
+ * with an `id` and no `go` is one the view binds itself, for the one case where
+ * leaving is more than a hash change — see `editDraftPage` in draft.js.
+ *
+ * **`meta` is the only second piece of information a header may carry**, and
+ * the fence around it is structural rather than a matter of judgement: mono,
+ * one line, and ignored unless there are `crumbs`. A record's own page — one
+ * decision, one held request, one person — has an identity that changes with
+ * every record and appears nowhere else on that screen, so a second line there
+ * is data. A root view's second line was prose: fourteen fixed sentences that
+ * were read on day one and were noise every day after, and whose content the
+ * filters and the table underneath already carried. Without `crumbs` there is
+ * no record, so there is nothing for `meta` to be, and the question does not
+ * get reopened view by view.
+ *
+ * Note that this contradicts the component's own description in Figma, which
+ * says there is no parameter for a second line. The description is what needs
+ * fixing: reading the call sites turned up four where the second line is the
+ * record's identity rather than prose — see docs/specs/header-and-rows.md §2.2.
+ *
+ * **Actions are one primary, at most one quiet, and the rest in `more`**, with
+ * anything destructive last by the caller's order. A view without an honest
+ * primary action puts none rather than promoting something to fill the slot.
+ *
+ * `tone` and `glyph` are for the pages whose title *is* the verdict — a
+ * decision, a held request. The verdict colours are the one thing on this
+ * screen that means something, and putting the word in its colour is how those
+ * pages have always opened; it is not a second style of header.
  */
-export function contextBar(crumbs = []) {
-  const parts = crumbs.map((c, i) => {
-    const last = i === crumbs.length - 1;
-    const label = `${c.back ? '← ' : ''}${esc(c.label)}`;
-    if ((last && !c.back) || !c.go) return `<span class="crumb${last ? ' --here' : ''}">${label}</span>`;
-    return `<button type="button" class="crumb" data-go="${esc(c.go)}"${c.sel ? ` data-sel="${esc(c.sel)}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${label}</button>`;
+export function pageHead({ title, crumbs = [], meta = '', tone = '', glyph = '', primary = '', quiet = '', more = [], strip = '' }) {
+  const where = crumbs.map((c, i) => {
+    // The arrow marks the way out, so it goes on the nearest ancestor — the
+    // one the crumb would actually take you to.
+    const label = `${i === crumbs.length - 1 ? '← ' : ''}${esc(c.label)}`;
+    if (!c.go && !c.id) return `<span class="page-crumb">${label}</span>`;
+    return `<button type="button" class="page-crumb"${c.id ? ` id="${esc(c.id)}"` : ''}${c.go ? ` data-go="${esc(c.go)}"` : ''}${c.sel ? ` data-sel="${esc(c.sel)}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${label}</button>`;
   });
-  return `<div class="context-bar">
-    <nav class="crumbs" aria-label="Breadcrumb">${parts.join('<span class="crumb-sep" aria-hidden="true">/</span>')}</nav>
-  </div>`;
-}
-
-/** Header / Page: the title, one line of context, and zero to two actions. */
-export function pageHead({ title, sub = '', subMuted = false, actions = '' }) {
+  const actions = `${quiet}${primary}${more.length ? menu(more) : ''}`;
   return `<header class="page-head">
-    <div class="page-head-text">
-      <h1 class="page-title">${esc(title)}</h1>
-      ${sub ? `<p class="page-sub${subMuted ? ' --muted' : ''}">${sub}</p>` : ''}
+    <div class="page-head-top">
+      <div class="page-where">
+        ${where.join('<span class="page-sep" aria-hidden="true">/</span>')}
+        ${crumbs.length ? '<span class="page-sep" aria-hidden="true">/</span>' : ''}
+        <h1 class="page-title${tone ? ` --${esc(tone)}` : ''}">${glyph ? `<span aria-hidden="true">${glyph}</span> ` : ''}${esc(title)}</h1>
+      </div>
+      ${crumbs.length && meta ? `<p class="page-meta mono">${esc(meta)}</p>` : ''}
+      ${actions ? `<div class="page-actions">${actions}</div>` : ''}
     </div>
-    ${actions ? `<div class="page-actions">${actions}</div>` : ''}
+    ${strip ? `<div class="page-strip">${strip}</div>` : ''}
   </header>`;
 }
 
-/** Tabs / Team, Tabs / Models: sub-sections of one page, never navigation. */
+/**
+ * Tabs / Item (697:913). Sub-sections of one page, never navigation.
+ *
+ * A card rather than an underline: the 2px rail and its accent are nowhere in
+ * the frames and were a decision taken only in code. The same component serves
+ * the filter sets too — no view has both at once — which is why `.tab` and
+ * `.filter` are one rule in the stylesheet rather than two that drift.
+ *
+ * The third element of an item is the pending dot: that section has work that
+ * is not finished. Until now the only sign of a gap was the status block at the
+ * top of the page, which says a gap exists without saying which section it is
+ * in.
+ */
 export function tabs(view, items, current, label) {
-  return `<nav class="tabs" aria-label="${esc(label)}">${items.map(([sel, text, mark]) => `<button type="button" class="tab${sel === current ? ' --on' : ''}"${sel === current ? ' aria-current="page"' : ''} data-go="${esc(view)}"${sel ? ` data-sel="${esc(sel)}"` : ''}>${esc(text)}${mark ? ' •' : ''}</button>`).join('')}</nav>`;
+  return `<nav class="tabs" aria-label="${esc(label)}">${items.map(([sel, text, mark]) => `<button type="button" class="tab${sel === current ? ' --on' : ''}"${sel === current ? ' aria-current="page"' : ''} data-go="${esc(view)}"${sel ? ` data-sel="${esc(sel)}"` : ''}>${esc(text)}${mark ? '<i class="tab-dot" role="img" aria-label="has unfinished work"></i>' : ''}</button>`).join('')}</nav>`;
 }
 
 // ── controls ─────────────────────────────────────────────────────────────────
@@ -164,19 +208,40 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
 
 /**
  * The block This device and Gateway both lead with: a headline that is the
- * conclusion and rows that are the evidence for it.
+ * conclusion, and under it the things that are not true yet.
  *
- * **The content decides the folding, not the reader.** With every condition
- * satisfied the block is two lines and offers to open; with a gap it is open
- * and has no control to close it. Someone can put away good news. Nobody gets
- * to put away the fact that no model is judging.
+ * **It shows the gaps, not the conditions.** One row per thing that is
+ * missing: one missing, one row; three missing, three rows. Everything that is
+ * satisfied folds behind the control, in the order the conditions are named.
+ * So the block's height is the size of the problem, which is the one thing it
+ * was not saying before — it stood 230px tall whether one condition was unmet
+ * or four, and that is why the tab strip under it sat halfway down the page on
+ * a device that only needed a rule written.
+ *
+ * The rule this settles is **good news folds, bad news does not**. It used to
+ * be "good news folds unless there is bad news, in which case the good news is
+ * forced open too", which is backwards: five rows where four of them say the
+ * machine is fine is the reassurance layout applied to the fault case. Nobody
+ * reading *"Not judging you yet"* needs to be told Warden is running — the
+ * page they are reading is being served by it.
+ *
+ * What does not change is that a gap cannot be put away. The control is back
+ * in this state, and what it hides is the evidence that everything else is in
+ * order; the gap rows are outside it and stay on screen.
+ *
+ * The rows are still the whole point and are not collapsible into a label.
+ * Two of the five conditions exist precisely because they were invisible
+ * before — a mock adapter standing in for a judge, and a role that no
+ * company-wide rule binds — and both need their sentence to be told apart from
+ * "you have not written a rule". A bare *"something is missing"* would put the
+ * three back in one bucket.
  *
  * It replaced a four-step setup wizard, which was the obvious design and the
  * wrong one twice over: the panel dies when the steps finish, taking the
  * vocabulary it taught with it, and the four things are not steps anyway —
  * a model can be downloaded before a tool is wired. These are conditions.
- * The same rows before and after; what changes is the values and whether
- * there is anything to press.
+ * The same rows before and after; what changes is the values, which side of
+ * the fold they are on, and whether there is anything to press.
  *
  * `rows` is `[{ label, value, tone }]`, where `value` is already-safe HTML so
  * a row can carry its own action, and `tone: 'attention'` is what makes a row
@@ -184,45 +249,44 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
  * implies; a row whose gap that action resolves does not also carry a button.
  */
 export function conditionBlock({ key, claim, tone = 'allow', summary = '', rows = [], action = '', open = false }) {
-  const gap = rows.some((r) => r.tone === 'attention');
-  const list = `<dl class="record conditions-rows">${rows.map((r) => `
-      <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`;
+  const gaps = rows.filter((r) => r.tone === 'attention');
+  const rest = rows.filter((r) => r.tone !== 'attention');
+  const list = (items, cls = '') => (items.length
+    ? `<dl class="record conditions-rows${cls ? ` ${cls}` : ''}">${items.map((r) => `
+      <dt>${esc(r.label)}</dt><dd${r.tone ? ` class="--${esc(r.tone)}"` : ''}>${r.value}</dd>`).join('')}</dl>`
+    : '');
   const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${tone}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b></p>`;
 
-  // A gap opens the block and takes the control away with it. Nobody gets to
-  // put away the fact that no model is judging, and a button that could hide it
-  // is worse than no button — so this branch has no toggle at all, not a
-  // disabled one.
-  if (gap) return `<section class="conditions">
-    <div class="conditions-head">${claimLine}${action}</div>${list}</section>`;
-
   /*
-   * Healthy: the rows fold away behind a text control that sits in the
-   * headline row, to the left of the action.
+   * The control is a button with `aria-expanded`, and that is a bug fix rather
+   * than a preference. It was a <details> whose <summary> sat nested inside the
+   * headline row; only a <summary> that is the first child of its <details> is
+   * the disclosure's control, so the browser ignored it, generated a summary of
+   * its own reading "Details", and hid everything else in the element — which
+   * is to say the claim and the action button. The healthy state of This device
+   * and of Gateway rendered as a bare disclosure triangle with no headline and
+   * no way to pause Warden. Nobody caught it because it only appeared once
+   * every condition was met.
    *
-   * It was a <details> with the summary sentence inside the <summary>, which
-   * put the control at the far right of its own line and made the summary
-   * compete with the headline directly above it for the same job. The redesign
-   * drops the summary line and moves the control up beside the action, where
-   * the two things you can do to this block are together. `summary` is still
-   * accepted and no longer rendered — it is one sentence restating five rows
-   * that are one click away.
-   *
-   * Still a <details>, so `state.open` keeps working and the block survives a
-   * re-render open; what changed is where the <summary> is drawn.
+   * A button is the disclosure pattern anyway, it lets the action stay a
+   * sibling instead of a button nested inside a <summary>, and `state.open`
+   * still carries the open state across a re-render — the markup is produced
+   * open or closed from it, and `bindDisclosures` keeps it.
    */
+  const bodyId = `fold-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const toggle = rest.length
+    ? `<button type="button" class="conditions-toggle" data-fold="${esc(key)}" aria-expanded="${open}" aria-controls="${esc(bodyId)}">
+        <span class="--show">Show details</span><span class="--hide">Hide details</span>
+        <i class="chev" aria-hidden="true"></i>
+      </button>`
+    : '';
+
   return `<section class="conditions">
-    <details class="disclosure conditions-fold" data-key="${esc(key)}"${open ? ' open' : ''}>
-      <div class="conditions-head">
-        ${claimLine}
-        <summary class="conditions-toggle">
-          <span class="--show">Show details</span><span class="--hide">Hide details</span>
-          <i class="chev" aria-hidden="true"></i>
-        </summary>
-        ${action}
-      </div>
-      <div class="disclosure-body">${list}</div>
-    </details>
+    <div class="conditions-head">${claimLine}${toggle}${action}</div>
+    <div class="conditions-evidence">
+      ${list(gaps, 'conditions-gaps')}
+      ${rest.length ? `<div class="disclosure-body conditions-body" id="${esc(bodyId)}"${open ? '' : ' hidden'}>${list(rest)}</div>` : ''}
+    </div>
   </section>`;
 }
 

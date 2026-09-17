@@ -8,7 +8,7 @@ import { render } from './render.js';
 import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
 import { soloIsPureInstall } from './nav.js';
-import { button, conditionBlock, contextBar, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
+import { button, conditionBlock, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ THIS DEVICE ═════════════════════════════════════════════════════════════
@@ -209,10 +209,24 @@ function rulesSection() {
     ${state.soloLoadError && !onRules.length && !offPresets.length
       ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
       : loading ? feedback({ title: 'Loading the rules for this device…', body: 'Fetching what is turned on and what is suggested.' })
+        /*
+         * No empty sentence, and the reason is not the layout.
+         *
+         * It read as orphaned because it was: an empty list here means no rule
+         * is addressed at you, which is a gap, which means the conditions
+         * block above is open and its `Rules for you` row is already saying
+         * *"None. Nothing is addressed at you, so there is nothing to judge a
+         * request against"* in amber, with the button that fixes it beside the
+         * headline. `rulesRow` returns `tone: 'attention'` on every path where
+         * this list can be empty, so the two are never apart.
+         *
+         * A second grey sentence a hundred pixels below the first, saying the
+         * same thing with less of the reason, is not an empty state. The
+         * Suggested band and a column of unchecked boxes are the empty state.
+         */
         : `<div class="table device-table" role="table" aria-label="Rules on this device">
           ${onRules.map((r) => row(r, true)).join('')}
-          ${exemptRules.map((r) => `<div class="trow" role="row"><span>${effectText(r.severity)}</span><span class="cell-stack"><span class="cell-muted solo-text">${esc(r.text)}</span><small>everyone · not judged for you</small></span><span></span><span></span></div>`).join('')}
-          ${!onRules.length && !exemptRules.length ? '<div class="trow"><span></span><span class="cell-muted">Nothing turned on yet. Turn on a suggestion below, or write your own.</span></div>' : ''}
+          ${exemptRules.map((r) => `<div class="trow" role="row"><span>${effectText(r.severity)}</span><span class="cell-stack"><span class="cell-muted solo-text">${esc(r.text)}</span><small>everyone</small></span><span></span><span></span></div>`).join('')}
           ${offPresets.length ? `<div class="group-band">Suggested · ${offPresets.length}</div>${offPresets.map((p) => row(p, false)).join('')}` : ''}
         </div>
         <div class="inline-form device-add">
@@ -435,10 +449,11 @@ function toolFacts(t) {
   const verified = (state.soloIdentity?.verified ?? []).find((v) => v.tool === t.id);
   const reported = t.reportedAt ? `reported ${ago(Date.parse(t.reportedAt))}` : 'reported by this machine';
 
+  // "No prompt hook exists" is what "never will be from this device" means.
   if (UNGOVERNABLE.has(t.id)) {
     return {
       top: `<span class="cell-muted">Not judged, and never will be from this device</span>`,
-      under: 'No prompt hook exists — it cannot be wired here',
+      under: '',
       action: ''
     };
   }
@@ -456,24 +471,36 @@ function toolFacts(t) {
       action: button('Unwire', { compact: true, attrs: `data-unwire="${attr(t.id)}"`, busy: state.soloWiring === t.id })
     };
   }
+  /*
+   * These two keep their second fact where the others lost theirs, and the
+   * reason is that here it is not an explanation of the line above it — it is
+   * the only thing telling the two states apart. Both read "Not connected · no
+   * request judged" on top, and the difference between them is whether the
+   * machine reported Warden missing from the tool's settings or has not
+   * reported at all. Silence is not absence; conflating them is somebody's
+   * afternoon spent fixing what was never broken. What went is the tail that
+   * explained the fact rather than stating it.
+   */
   // Reported absence. Silence (`wired === null`) is not this: it falls through.
   if (t.wired === false) {
     return {
       top: statusText('Not connected · no request judged', 'attention'),
-      under: `Found · Warden is not in ${t.name} settings`,
+      under: 'Found · not in its settings',
       action: button('Connect', { compact: true, attrs: `data-connect="${attr(t.id)}"`, busy: state.soloWiring === t.id })
     };
   }
   if (t.found) {
     return {
       top: statusText('Not connected · no request judged', 'attention'),
-      under: 'Found · this machine has not reported its wiring yet',
+      under: 'Found · wiring not reported',
       action: button('Connect', { compact: true, attrs: `data-connect="${attr(t.id)}"`, busy: state.soloWiring === t.id })
     };
   }
+  // An instruction beside the button that carries it out is the button said
+  // twice, once in a voice that cannot be pressed.
   return {
     top: `<span class="cell-muted">Not found on this device</span>`,
-    under: `Install ${t.name} before connecting it`,
+    under: '',
     action: button('Check again', { compact: true, id: 'soloProbe', busy: state.soloProbing })
   };
 }
@@ -483,7 +510,7 @@ function toolsTab() {
     const { top, under, action } = toolFacts(t);
     return `<div class="tool-row">
       <span class="tool-name">${esc(t.name)}</span>
-      <span class="tool-facts">${top}<small>${esc(under)}</small></span>
+      <span class="tool-facts">${top}${under ? `<small>${esc(under)}</small>` : ''}</span>
       <span class="tool-action">${action}</span>
     </div>`;
   }).join('');
@@ -561,20 +588,47 @@ function firstBlockBand() {
  * third of the window sat empty beside it. The reading width is for prose, and
  * this page is a table of facts.
  */
+/*
+ * No strip in the header here, and on Gateway for the same reason.
+ *
+ * `conditions()` goes between the title and the tabs, and what it says is true
+ * whichever tab is open. A switch that sits above a block it does not switch
+ * is claiming to govern it; down here the switch belongs to the content that
+ * actually changes under it.
+ */
 function soloBody() {
   const tab = tabOf();
+  const gaps = gapsBySection();
   return `<div class="sheet">
-    ${contextBar([{ label: 'This device' }])}
-    ${pageHead({ title: 'This device', sub: 'One device: yours. What is wired here, and what is judging you.' })}
+    ${pageHead({ title: 'This device' })}
     <div class="reading-wide device-page">
       ${conditions()}
       ${firstBlockBand()}
       ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
       ${state.soloPauseError ? feedback({ tone: 'error', icon: true, title: 'Warden did not change', body: esc(state.soloPauseError) }) : ''}
-      ${tabs('soloRules', TABS, tab, 'This device sections')}
+      ${tabs('soloRules', TABS.map(([sel, label]) => [sel, label, gaps[sel || 'rules']]), tab, 'This device sections')}
       ${tab === 'tools' ? toolsTab() : tab === 'identity' ? identityTab() : rulesSection()}
     </div>
   </div>`;
+}
+
+/**
+ * Which tab each unmet condition lives behind.
+ *
+ * The conditions block says a gap exists; until now nothing said which section
+ * to open to fix it, so somebody reading "Not judging you yet" had three tabs
+ * and no reason to prefer one. Read off the same rows the block is built from,
+ * so the dot and the amber row can never disagree.
+ */
+function gapsBySection() {
+  const identity = state.soloIdentity;
+  const onRules = state.soloRules.filter((r) => r.applies !== false);
+  const exemptRules = state.soloRules.filter((r) => r.applies === false);
+  return {
+    rules: rulesRow(onRules, exemptRules, identity && roleExempt(identity.role)).tone === 'attention',
+    tools: wiringRow(wiredTools(), judgedTools()).tone === 'attention',
+    identity: !identity
+  };
 }
 
 /** A setup refusal did not use up the rule the person typed. A later edit
@@ -808,12 +862,14 @@ VIEWS.soloRules = { body: soloBody, bind: bindSolo, onEnter: onEnterSolo };
  */
 function soloSettingsBody() {
   return `<div class="sheet">
-    ${contextBar([{ label: 'This machine' }, { label: 'Settings' }])}
-    ${pageHead({ title: 'Settings', sub: 'Warden is protecting one device: yours.' })}
+    ${pageHead({ title: 'Settings', crumbs: [{ label: 'This machine', go: 'soloRules' }] })}
     <div class="reading settings-page">
       <section class="settings-task">
         <h2 class="section-title">This installation</h2>
-        <p class="section-lede">Nobody else's prompts are checked, and nothing here is visible to anyone else.</p>
+        <!-- The header's sentence, moved to the section it is about. Prose
+             belongs in the reading column under a heading, not in a header
+             where it has to be true of the whole page forever. -->
+        <p class="section-lede">Warden is protecting one device: yours. Nobody else's prompts are checked, and nothing here is visible to anyone else.</p>
         <div>${button('Manage the rule writer and the judge', { attrs: 'data-go="models"' })}</div>
       </section>
       <section class="settings-task">

@@ -8,7 +8,7 @@ import { actorName, clip, dayKey, dayLabel, fileSize, hhmm, personById, plural, 
 import { disclosure, render } from './render.js';
 import { go } from './router.js';
 import {
-  VERDICT_TONE, VERDICT_WORD, badgeEffect, button, contextBar, fileChip, filters, groupBand,
+  VERDICT_TONE, VERDICT_WORD, badgeEffect, button, fileChip, filters, groupBand,
   listState, outcome, outcomeText, pageHead, turn, verdictText
 } from './ui.js';
 import { VIEWS } from './views.js';
@@ -90,14 +90,18 @@ function toolbar() {
   const { unjudged, ...count } = activityToolbarCounts();
   const person = personById(state.actorFilter);
   const items = [{ id: '', name: 'Everyone' }, ...state.company.employees];
-  return `<div class="toolbar-v2">
-    ${filters([['all', `All ${state.audit.length}`], ['BLOCK', `Blocked ${count.BLOCK}`], ['ESCALATE', `Held ${count.ESCALATE}`], ['ALLOW', `Allowed ${count.ALLOW}`], ...(unjudged ? [['paused', `Not judged ${unjudged}`]] : [])], state.filter, 'verdict')}
+  return `${filters([['all', `All ${state.audit.length}`], ['BLOCK', `Blocked ${count.BLOCK}`], ['ESCALATE', `Held ${count.ESCALATE}`], ['ALLOW', `Allowed ${count.ALLOW}`], ...(unjudged ? [['paused', `Not judged ${unjudged}`]] : [])], state.filter, 'verdict')}
     <details class="menu --right person-filter">
       <summary class="menu-trigger person-trigger" aria-label="Filter by person"><span>Person · ${esc(person?.name ?? 'Everyone')}</span><i class="caret" aria-hidden="true">▾</i></summary>
       <div class="menu-list" role="menu">${items.map((p) => `<button type="button" role="menuitemradio" aria-checked="${(state.actorFilter || '') === p.id}" class="menu-item" data-actor="${esc(p.id)}"><span>${esc(p.name)}</span>${(state.actorFilter || '') === p.id ? '<b class="menu-check">✓</b>' : ''}</button>`).join('')}</div>
-    </details>
-  </div>
-  ${state.query.rule ? `<p class="filter-line">Only decisions where <b>${esc(ruleName(state.query.rule))}</b> fired · <button type="button" class="linkbtn" data-go="activity">Show every decision</button></p>` : ''}`;
+    </details>`;
+}
+
+/* Which rule the log is narrowed to, and how to leave. Not in the strip: it is
+   a sentence about the state of the list, and the strip holds controls. */
+function filterLine() {
+  if (!state.query.rule) return '';
+  return `<p class="filter-line">Only decisions where <b>${esc(ruleName(state.query.rule))}</b> fired · <button type="button" class="linkbtn" data-go="activity">Show every decision</button></p>`;
 }
 
 function decisionRows(entries) {
@@ -125,25 +129,31 @@ function decisionRows(entries) {
 
 function listPage() {
   const load = state.loads.audit;
-  const crumbs = [{ label: 'Workspace' }, { label: 'Activity' }];
+  /*
+   * The three loading headers lose their second line for the same reason each
+   * time: the plate below says "Loading the log…", "Could not load the log" or
+   * "No decisions yet" in its title, and the header's line was a second, vaguer
+   * version of it 40px higher. `todayLine()` goes for the other reason — the
+   * shape of the day is the filters and the Time column, which are the things
+   * you would act on it with.
+   */
   if (!load || (load.loading && !state.audit.length)) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Catching up on today’s decisions…' })}
+    return `<div class="sheet">${pageHead({ title: 'Activity' })}
       ${listState({ title: 'Loading the log…', body: 'Fetching the latest decisions and checking the record against its hashes.' })}</div>`;
   }
   if (load.error) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Requests are still being judged.' })}
+    return `<div class="sheet">${pageHead({ title: 'Activity' })}
       ${listState({ tone: 'attention', title: 'Could not load the log', body: 'The record could not be read from this machine. Your rules still apply — requests keep being judged while this page recovers.', action: button('Retry loading', { kind: 'primary', id: 'retryAudit' }) })}</div>`;
   }
   if (!state.audit.length) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Activity', sub: 'Warden hasn’t seen a request yet.' })}
+    return `<div class="sheet">${pageHead({ title: 'Activity' })}
       ${listState({ title: 'No decisions yet', body: 'The moment a request runs through Warden, its decision lands here — allowed, held, or blocked.' })}</div>`;
   }
   const rows = visibleAudit();
   const who = personById(state.actorFilter);
   return `<div class="sheet">
-    ${contextBar(crumbs)}
-    ${pageHead({ title: 'Activity', sub: esc(todayLine()), actions: waitingAction() })}
-    ${toolbar()}
+    ${pageHead({ title: 'Activity', primary: waitingAction(), strip: toolbar() })}
+    ${filterLine()}
     ${rows.length
       ? `<div class="table activity-table" role="table" aria-label="Decisions">
           <div class="thead" role="row"><span>Who</span><span>Request</span><span>Rule</span><span>Verdict</span><span>Time</span></div>
@@ -310,13 +320,16 @@ function detailPage(entry) {
       : `<p class="exchange-note">Waiting in your Inbox since ${esc(hhmm(held.at))} — ${esc(firstName)} sees “held for review” until someone answers.</p>`;
   }
   return `<div class="sheet">
-    ${contextBar([{ label: 'Activity', go: 'activity', back: true }, { label: `${title} at ${hhmm(entry.ts)}` }])}
-    ${verdictHead({
+    ${pageHead({
+      title,
+      crumbs: [{ label: 'Activity', go: 'activity' }],
       tone: unjudged ? 'muted' : VERDICT_TONE[v],
       glyph: unjudged ? '⏸' : GLYPH[v],
-      title,
-      sub: unjudged ? `${whenLine(entry.ts)} · no rule was run` : `${whenLine(entry.ts)} · judged in ${seconds(d.totalMs)}`,
-      action
+      // When it happened and how long it took. One record's identity, not a
+      // sentence about decisions in general — this is the case §2.2 of the
+      // spec carved the `meta` slot out for.
+      meta: unjudged ? `${whenLine(entry.ts)} · no rule was run` : `${whenLine(entry.ts)} · judged in ${seconds(d.totalMs)}`,
+      quiet: action
     })}
     <div class="exchange reading">
       ${requestTurn(entry)}
@@ -327,22 +340,10 @@ function detailPage(entry) {
   </div>`;
 }
 
-/** Header / Detail, Decision pattern: the outcome as the title, in its colour. */
-export function verdictHead({ tone = 'muted', glyph = '', title, sub = '', action = '', lead = '' }) {
-  return `<header class="page-head --verdict">
-    <div class="page-head-text">
-      ${lead}
-      <h1 class="verdict-title --${tone}">${glyph ? `<span aria-hidden="true">${glyph}</span> ` : ''}${esc(title)}</h1>
-      ${sub ? `<p class="page-sub">${esc(sub)}</p>` : ''}
-    </div>
-    ${action ? `<div class="page-actions">${action}</div>` : ''}
-  </header>`;
-}
-
 export function missingDecision(label, view) {
   const loading = state.loads.audit?.loading || fetchingOlder;
-  return `<div class="sheet">${contextBar([{ label, go: view, back: true }, { label: 'Decision' }])}
-    ${pageHead({ title: loading ? 'Loading this decision…' : 'This decision is not in the log' })}
+  return `<div class="sheet">
+    ${pageHead({ title: loading ? 'Loading this decision…' : 'This decision is not in the log', crumbs: [{ label, go: view }] })}
     ${listState({ title: loading ? 'Looking further back in the log…' : 'Nothing to show', body: loading ? 'It is older than the decisions this page loaded first.' : 'The link may be from another installation, or the record is beyond what the log keeps.' })}</div>`;
 }
 

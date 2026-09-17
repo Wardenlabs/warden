@@ -113,10 +113,10 @@ export function render() {
   const banners = bare ? '' : compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
   $('pane').innerHTML = view.body();
   // The shell's notices sit under the page's own header, where the reader has
-  // already learnt which page this is; above it they pushed the breadcrumb and
-  // title down on every screen. A page with no header gets them at the top.
+  // already learnt which page this is; above it they pushed the title down on
+  // every screen. A page with no header gets them at the top.
   if (banners) {
-    const anchor = $('pane').querySelector('.page-head') ?? $('pane').querySelector('.context-bar');
+    const anchor = $('pane').querySelector('.page-head');
     if (anchor) anchor.insertAdjacentHTML('afterend', `<div class="shell-notices">${banners}</div>`);
     else $('pane').insertAdjacentHTML('afterbegin', `<div class="shell-notices">${banners}</div>`);
   }
@@ -155,6 +155,30 @@ export function bindDisclosures() {
   for (const d of document.querySelectorAll('details[data-key]')) {
     d.ontoggle = () => {
       if (d.open) state.open.add(d.dataset.key); else state.open.delete(d.dataset.key);
+    };
+  }
+
+  /*
+   * The same contract for a fold that is a button rather than a <details>.
+   *
+   * `conditionBlock` needs its control to sit inside a headline row beside an
+   * action button, and a <summary> only works as the first child of its
+   * <details> — nested, the browser ignores it and hides the row it is in.
+   * So that block is a button with `aria-expanded` and a body it names, and
+   * this is the one place that knows how to work it.
+   *
+   * It moves the body rather than re-rendering: nothing else on the page
+   * changes when somebody opens five rows of evidence, and a re-render here
+   * would rebuild the tab content underneath for no reason.
+   */
+  for (const b of document.querySelectorAll('[data-fold]')) {
+    b.onclick = () => {
+      const key = b.dataset.fold;
+      const open = !state.open.has(key);
+      if (open) state.open.add(key); else state.open.delete(key);
+      b.setAttribute('aria-expanded', String(open));
+      const body = document.getElementById(b.getAttribute('aria-controls'));
+      if (body) body.hidden = !open;
     };
   }
 }

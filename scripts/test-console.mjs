@@ -539,13 +539,26 @@ test('Gateway leads with whether it is judging, not with whether it is running',
     assert.match(healthy, /Judging every request/);
     // If the page renders at all the gateway is up: saying so is furniture.
     assert.ok(!/Running and enforcing|>Running</.test(healthy), 'the headline must not claim liveness the page already proves');
-    assert.match(healthy, /<details[^>]*conditions-fold/, 'all clear folds away');
+    assert.match(healthy, /aria-expanded="false"[^>]*>/, 'all clear folds away');
+    // The fold used to be a <details> with its <summary> nested inside the
+    // headline row. Only a <summary> that is the first child of its <details>
+    // is the control, so the browser hid the row it was in — the claim and the
+    // button with it — and drew its own "Details" triangle instead. Both have
+    // to survive the block being closed, which is the state this asserts.
+    assert.match(healthy, /conditions-claim[\s\S]*Judging every request/, 'the claim is visible while it is closed');
+    assert.ok(!/<details[^>]*conditions/.test(healthy), 'and it is not a <details>, which is what hid it');
 
     Object.assign(state, gatewayState(), { mock: true, health: { ...gatewayState().health, mock: true } });
     const blind = VIEWS.gateway.body();
     assert.match(blind, /Not judging anything/);
-    assert.ok(!/conditions-fold/.test(blind), 'a gap must leave no control to fold the evidence away');
     assert.match(blind, /stand-in/, 'and it has to say that nothing is reading the prompts');
+    // The gap is outside the fold, so no control can put it away — which is
+    // the promise. What the control now hides in this state is the evidence
+    // that everything else is in order, and hiding good news is what it is for.
+    const gapRows = blind.slice(blind.indexOf('conditions-gaps'), blind.indexOf('conditions-body'));
+    assert.match(gapRows, /stand-in/, 'the gap is in the rows that do not fold');
+    assert.ok(!/conditions-gaps[\s\S]*?Decision deadline[\s\S]*?conditions-body/.test(blind),
+      'and a satisfied condition is not, so the block is the size of the problem');
   } finally { Object.assign(state, saved); }
 });
 
@@ -622,8 +635,12 @@ test('a wired device with no traffic yet is protected, not "not protected yet"',
     assert.match(body, /Protection is on/, 'setup done is setup done, with or without a prompt having been sent');
     assert.ok(!/Not protected yet/.test(body), 'the sentence that broke the first install must not come back');
     assert.match(body, /nothing judged through them yet/, 'and the absence of traffic is still reported, just not as a fault');
-    assert.match(body, /conditions-fold/, 'all clear folds away');
+    assert.match(body, /aria-expanded="false"/, 'all clear folds away');
     assert.match(body, /Show details/, 'behind a control that says what it does');
+    // Closed is the state that used to lose the headline and the action: see
+    // the Gateway test above for what the nested <summary> did.
+    assert.match(body, /conditions-claim[\s\S]*Protection is on/, 'with the claim still on the screen');
+    assert.match(body, /Pause protection/, 'and the action still pressable');
   } finally { Object.assign(state, saved); }
 });
 
@@ -638,7 +655,25 @@ test('nothing wired is the gap, and the headline carries its fix', async () => {
     assert.match(body, /Not judging you yet/);
     assert.match(body, /Nothing on this device is wired/);
     assert.match(body, /Protect this device/);
-    assert.ok(!/conditions-fold/.test(body), 'a gap leaves no control to fold the evidence away');
+
+    /*
+     * The block is the size of the problem.
+     *
+     * Only the unmet conditions stand outside the fold; the satisfied ones are
+     * behind it in the order they are named. It used to print all five rows
+     * whenever any one of them was a gap, so a device that only needed a rule
+     * written stood 230px tall and pushed its own tab strip halfway down the
+     * page. Counting the rows either side of the fold is the cheapest way to
+     * say "shows the gaps, not the conditions" in a test.
+     */
+    const shown = body.slice(body.indexOf('conditions-gaps'), body.indexOf('conditions-body'));
+    assert.equal((shown.match(/<dt>/g) ?? []).length, 1, 'one condition is unmet, so one row stands outside the fold');
+    assert.match(shown, /Nothing on this device is wired/, 'and it is that one');
+    const folded = body.slice(body.indexOf('conditions-body'));
+    for (const good of ['Warden', 'You', 'The judge', 'Rules for you']) {
+      assert.match(folded, new RegExp(`>${good}</dt>`), `${good} is satisfied here, and satisfied conditions fold`);
+    }
+    assert.match(body, /data-fold/, 'so the control exists here too — what it hides is the good news');
   } finally { Object.assign(state, saved); }
 });
 
@@ -885,7 +920,7 @@ test('no control in the first run says Force, Reinstall or Guarantee', () => {
 
 // ── Tools: three facts per tool, and the row that has no button ──────────────
 
-test('the five tool states produce five different pairs of sentences', async () => {
+test('the five tool states produce five different lines', async () => {
   await import('../web/js/solo.js');
   const saved = { ...state };
   const at = new Date().toISOString();
@@ -910,10 +945,12 @@ test('the five tool states produce five different pairs of sentences', async () 
     let body = VIEWS.soloRules.body();
     assert.match(body, /Judging requests · verified/, 'verified: a real request was decided by the rule');
     assert.match(body, /Not connected · no request judged/, 'reported as unwired');
-    assert.match(body, /Warden is not in OpenCode settings/, 'and the row says who reported it');
+    // "Not connected" is the same sentence in two states — reported missing
+    // from the tool's settings, and never reported at all — so the second fact
+    // is what tells them apart and is the one kind of second fact a row keeps.
+    assert.match(body, /Found · not in its settings/, 'and the row says the machine reported it missing');
     assert.match(body, /Not found on this device/, 'not installed');
     assert.match(body, /Not judged, and never will be from this device/, 'no prompt hook exists for it');
-    assert.match(body, /No prompt hook exists — it cannot be wired here/);
 
     // The variant: wired, and nothing has come through it yet. This is the
     // state the whole tab exists for — neither protected nor broken.
@@ -956,7 +993,7 @@ test('a tool nobody has reported on is not called unwired', async () => {
       soloIdentity: { id: 'you', name: 'You', role: 'solo', connected: [], verified: [], devices: [] }
     }));
     const body = VIEWS.soloRules.body();
-    assert.ok(!/Warden is not in Claude Code settings/.test(body), 'nobody looked, so nobody may say it is missing');
-    assert.match(body, /has not reported its wiring yet/);
+    assert.ok(!/not in its settings/.test(body), 'nobody looked, so nobody may say it is missing');
+    assert.match(body, /Found · wiring not reported/);
   } finally { Object.assign(state, saved); }
 });

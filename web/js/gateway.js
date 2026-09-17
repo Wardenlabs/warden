@@ -17,7 +17,7 @@ import { $, attr, esc, post, state } from './core.js';
 import { refreshChain, refreshHealth } from './data.js';
 import { modelLabel, plural } from './format.js';
 import { render } from './render.js';
-import { button, conditionBlock, contextBar, feedback, groupBand, pageHead, statusText, tabs } from './ui.js';
+import { button, conditionBlock, feedback, groupBand, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
 const TABS = [['', 'Overview'], ['access', 'Access'], ['retention', 'Retention']];
@@ -323,10 +323,12 @@ function chainLine(chain) {
 
 function gatewayBody() {
   const tab = tabOf();
+  // No strip: `conditions()` sits between the title and the tabs and is true
+  // whichever tab is open, so the switch belongs to the content it switches.
+  // The description goes because `conditions()` says the same thing in facts.
   return `<div class="sheet">
-    ${contextBar([{ label: 'Gateway' }])}
-    ${pageHead({ title: 'Gateway', sub: 'The server that holds the rules, the people, the keys and the log. One per company.' })}
-    <div class="reading gw-page">
+    ${pageHead({ title: 'Gateway' })}
+    <div class="reading-wide gw-page">
       ${conditions()}
       ${alarm()}
       ${tabs('gateway', TABS, tab, 'Gateway sections')}
