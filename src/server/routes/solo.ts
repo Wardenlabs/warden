@@ -16,10 +16,11 @@ import { ratifyRule, removeRule } from '../../policy/ratify.js';
 import { addRole, clearPause, loadDirectory, setPause, upsertEmployee, type Employee } from '../../policy/people.js';
 import { isExempt, loadPolicy, rulesForActor } from '../../policy/store.js';
 import type { Rule } from '../../policy/types.js';
+import { verifiedFor, withdrawVerification } from '../../policy/verification.js';
 import { adapter } from '../../qvac/index.js';
 import { PORT, seedPath } from '../config.js';
 import { asyncRoute, readJsonFile } from '../http.js';
-import { buildInstallScript } from './install.js';
+import { buildInstallScript, buildUnwireScript } from './install.js';
 
 export const soloRoutes = Router();
 
@@ -94,8 +95,18 @@ function resolveSoloIdentity(): Employee {
 function withActivity(identity: Employee): Employee & {
   connected: ReturnType<typeof activityFor>;
   devices: ReturnType<typeof devicesFor>;
+  verified: ReturnType<typeof verifiedFor>;
 } {
-  return { ...identity, connected: activityFor(identity.id), devices: devicesFor(identity.id) };
+  return {
+    ...identity,
+    connected: activityFor(identity.id),
+    devices: devicesFor(identity.id),
+    // The third fact, and the narrowest of the three. `connected` is traffic,
+    // `devices` is what the machine says it wrote, and this is a rule having
+    // decided a real request from that tool. A row can have the first two and
+    // not this one, and saying so is the whole reason the Tools tab exists.
+    verified: verifiedFor(identity.id)
+  };
 }
 
 soloRoutes.post('/api/solo/setup', (_req, res) => {
@@ -177,18 +188,36 @@ soloRoutes.get('/api/solo/presets', (_req, res) => {
   res.json({ identity: withActivity(identity), presets, groups });
 });
 
+/**
+ * Every path that changes what judges this person, and the one thing they all
+ * owe afterwards.
+ *
+ * A verification is a claim about one request under one policy. Change the
+ * policy and nobody has checked the new one, so the claim is withdrawn — all
+ * of it, for every tool, because the rule set is not per-tool. What is kept is
+ * the configuration and the fact that the first run was completed once; see
+ * `withdrawVerification`. Wrapped rather than repeated because the fourth
+ * place somebody adds a rule-changing route is where this gets forgotten.
+ */
+async function changingRules<T>(identity: Employee, change: () => Promise<T>): Promise<T> {
+  const result = await change();
+  withdrawVerification(identity.id);
+  return result;
+}
+
 soloRoutes.post('/api/solo/presets/:id/toggle', asyncRoute(async (req, res) => {
   const presetId = String(req.params['id']);
   const entry = catalogue().find((p) => p.id === presetId);
   if (!entry) return res.status(404).json({ error: 'no such preset' });
 
-  const wantActive = Boolean(req.body?.active);
-  if (!wantActive) return res.json(await removeRule(presetId));
-
   const identity = resolveSoloIdentity();
+  const wantActive = Boolean(req.body?.active);
+  if (!wantActive) return res.json(await changingRules(identity, () => removeRule(presetId)));
+
   // The catalogue's own audience is replaced: on this screen a rule binds the
   // person at the keyboard and nobody else, which is the whole point of it.
-  res.json(await ratifyRule({ ...entry.rule, id: presetId, appliesTo: [`@${identity.id}`] } as Rule));
+  res.json(await changingRules(identity, () =>
+    ratifyRule({ ...entry.rule, id: presetId, appliesTo: [`@${identity.id}`] } as Rule)));
 }));
 
 soloRoutes.get('/api/solo/rules', asyncRoute(async (_req, res) => {
@@ -252,7 +281,7 @@ soloRoutes.delete('/api/solo/rules/:id', asyncRoute(async (req, res) => {
   if (!rule || !rule.appliesTo.includes(`@${identity.id}`)) {
     return res.status(404).json({ error: 'no such rule of yours' });
   }
-  res.json(await removeRule(id));
+  res.json(await changingRules(identity, () => removeRule(id)));
 }));
 
 soloRoutes.post('/api/solo/rules', asyncRoute(async (req, res) => {
@@ -260,22 +289,76 @@ soloRoutes.post('/api/solo/rules', asyncRoute(async (req, res) => {
   if (!text) return res.status(400).json({ error: 'text is required' });
   const identity = resolveSoloIdentity();
   const rule = await compileRule(adapter(), text, loadPolicy(), { lockTo: [`@${identity.id}`] });
+  // A sentence the compiler refused is not a rule change: nothing was ratified,
+  // so there is nothing to withdraw.
   if (isDeclined(rule)) return res.json({ notARule: true, reason: rule.notARuleReason });
-  res.json(await ratifyRule(rule));
+  res.json(await changingRules(identity, () => ratifyRule(rule)));
 }));
 
-soloRoutes.post('/api/solo/protect', asyncRoute(async (_req, res) => {
+/** Feed a generated shell script to `sh` on this machine and wait for it. */
+function runScript(script: string): Promise<void> {
+  return new Promise<void>((done, fail) => {
+    const child = execFile('/bin/sh', [], (err) => (err ? fail(err) : done()));
+    child.stdin?.end(script);
+  });
+}
+
+/**
+ * A tool id the console may act on.
+ *
+ * Only the three with a local integration. Cursor is detected and has no
+ * prompt hook, so there is nothing here to write or remove for it, and the
+ * screen does not offer a button — this is the same fact enforced a second
+ * time, at the boundary, because a screen is not an authorisation.
+ */
+const WIRABLE = new Set(['claude-code', 'codex', 'opencode']);
+
+function wirableTool(value: unknown): string | null {
+  return typeof value === 'string' && WIRABLE.has(value) ? value : null;
+}
+
+soloRoutes.post('/api/solo/protect', asyncRoute(async (req, res) => {
   const identity = resolveSoloIdentity();
+  // No tool named is the original behaviour and stays the default: wire
+  // whatever is on this machine. The console's per-row Connect names one.
+  const tool = req.body?.tool === undefined ? null : wirableTool(req.body.tool);
+  if (req.body?.tool !== undefined && !tool) {
+    return res.status(400).json({ error: 'not a tool Warden can wire on this device' });
+  }
   // Always `localhost`, never `gatewayUrl(req)` — that prefers a LAN address
   // so a link shown to a teammate resolves off-machine, which is exactly the
   // exposure Warden Solo does not have (PRD §2: nothing leaves 127.0.0.1).
   // This script also runs from this same process rather than a browser, so
   // there is no `Host` header to read it from in the first place.
-  const script = buildInstallScript(identity, `http://localhost:${PORT}`);
-  await new Promise<void>((done, fail) => {
-    const child = execFile('/bin/sh', [], (err) => (err ? fail(err) : done()));
-    child.stdin?.end(script);
-  });
+  await runScript(buildInstallScript(identity, `http://localhost:${PORT}`, tool ?? undefined));
+  // Rewiring a tool invalidates what was verified through it: the evidence was
+  // about the hook that was there, and this just replaced it. The
+  // configuration stays, the claim does not.
+  if (tool) withdrawVerification(identity.id, tool);
+  res.json({ identity, ok: true });
+}));
+
+/**
+ * Take one tool's hook out, on this machine only.
+ *
+ * This exists here and has no counterpart in Team, and the asymmetry is the
+ * point: on This device the gateway runs on the same computer as the tool, and
+ * that computer belongs to the person reading the screen. `protect` has always
+ * written files into this `$HOME`; removing one is the same operation with the
+ * same permission. The hook in an employee's home directory on their own
+ * laptop is not reachable from here and the console never pretends it is — a
+ * button that cannot work teaches people that none of them do.
+ */
+soloRoutes.post('/api/solo/unprotect', asyncRoute(async (req, res) => {
+  const tool = wirableTool(req.body?.tool);
+  // No "unwire everything": the screen has one button per row and this is the
+  // route behind it. A missing tool is a bug in the caller, not a request to
+  // strip the machine.
+  if (!tool) return res.status(400).json({ error: 'tool is required' });
+
+  const identity = resolveSoloIdentity();
+  await runScript(buildUnwireScript(`http://localhost:${PORT}`, identity.apiKey, tool));
+  withdrawVerification(identity.id, tool);
   res.json({ identity, ok: true });
 }));
 

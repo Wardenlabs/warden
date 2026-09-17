@@ -77,7 +77,25 @@ installRoutes.get('/install/:credential', (req, res) => {
  * see docs/specs/solo-mode.md §6. Nothing about the script changes depending
  * on who calls this; only how the result reaches a shell does.
  */
-export function buildInstallScript(person: Employee, url: string): string {
+/**
+ * Which tools a wiring run touches.
+ *
+ * Absent means all of them, which is what an install has always done and what
+ * the onboarding link still does: somebody setting up a machine for the first
+ * time wants every tool on it governed. One tool is the console's case — a row
+ * in "This device" with its own Connect button — and there the button has to
+ * mean what it says. `--only` is refused by the hook for an id it does not
+ * know rather than widened to everything, so a typo here wires nothing.
+ */
+function onlyFlag(tool?: string): string {
+  // The id reaches the hook inside a shell command. It is chosen from a fixed
+  // list by the console, but "chosen from a list" arrives here through an API,
+  // so anything that is not a plain tool id is dropped rather than quoted.
+  const safe = (tool ?? '').replace(/[^a-z0-9-]/g, '');
+  return safe ? ` --only ${safe}` : '';
+}
+
+export function buildInstallScript(person: Employee, url: string, tool?: string): string {
   // The key is the identity, so it has to be here. That makes this URL a
   // credential: it is only ever shown to the admin, inside the console, for a
   // person who already exists. The alternative — the employee pasting a key by
@@ -179,14 +197,60 @@ fi
 # desktop app never sourced the profile either, and without them its hook
 # fails open.
 if [ -n "$NODE_BIN" ]; then
-  WARDEN_URL="${url}" WARDEN_API_KEY="${person.apiKey}" "$NODE_BIN" "$HOOK" --fix || true
+  WARDEN_URL="${url}" WARDEN_API_KEY="${person.apiKey}" "$NODE_BIN" "$HOOK" --fix${onlyFlag(tool)} || true
 else
   echo ""
   echo "Could not find Node on this machine, so Claude Code / Codex were not wired automatically."
   echo "Install Node, then run this once:"
-  echo "  WARDEN_URL=${url} WARDEN_API_KEY=${person.apiKey} node \"$HOOK\" --fix"
+  echo "  WARDEN_URL=${url} WARDEN_API_KEY=${person.apiKey} node \"$HOOK\" --fix${onlyFlag(tool)}"
 fi
 
 echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"
+`;
+}
+
+/**
+ * Take one tool's hook back out. The counterpart of the `--fix` line above,
+ * and deliberately much smaller.
+ *
+ * Nothing is downloaded, no credentials are written and no profile is touched:
+ * unwiring a tool is not a reason to forget the key, and somebody who presses
+ * Unwire on one row usually presses Connect on another a minute later. The
+ * hook has to already be on disk, which it is — it could not have been wired
+ * without it — and if it is not, there is nothing to unwire and saying so is
+ * the right answer.
+ *
+ * This only ever runs against the machine the gateway is on. A hook in an
+ * employee's home directory on their own laptop is not ours to remove, and the
+ * console does not offer it there; see docs/specs/first-run-and-theme.md §7.3.
+ */
+export function buildUnwireScript(url: string, apiKey: string, tool: string): string {
+  return `#!/bin/sh
+set -e
+
+HOOK="$HOME/.warden-hook.mjs"
+if [ ! -f "$HOOK" ]; then
+  echo "No Warden hook on this machine, so there is nothing to unwire."
+  exit 0
+fi
+
+# Same lookup as the install script, and for the same reason: run from the
+# desktop app this shell inherits launchd's PATH, where a Homebrew or nvm node
+# is invisible.
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE_BIN" ]; then
+  for candidate in /opt/homebrew/bin/node /usr/local/bin/node /usr/local/opt/node/bin/node "$HOME/.volta/bin/node" "$HOME/.local/bin/node" "$HOME"/.nvm/versions/node/*/bin/node; do
+    if [ -x "$candidate" ]; then NODE_BIN="$candidate"; break; fi
+  done
+fi
+
+if [ -z "$NODE_BIN" ]; then
+  echo "Could not find Node on this machine, so nothing was unwired."
+  exit 1
+fi
+
+# The key goes on the line because --unfix reports the new wiring to the
+# gateway when it finishes, and that report is what moves the row on screen.
+WARDEN_URL="${url}" WARDEN_API_KEY="${apiKey}" "$NODE_BIN" "$HOOK" --unfix${onlyFlag(tool)}
 `;
 }
