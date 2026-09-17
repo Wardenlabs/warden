@@ -465,6 +465,36 @@ test('a policy read that fails keeps the rules already shown and says the read f
   assert.deepEqual(state.loads.policy, { loading: false, error: 'gateway restarting' });
 });
 
+/*
+ * A name is the one field every list here sorts and searches by, and until now
+ * it was the only one an administrator could not fix from the console: a role
+ * changed in place from the row, a person could be removed, but a name needed
+ * the directory file edited by hand. The row menu and the person page must
+ * offer it, and it must not be filed with the destructive action.
+ */
+test('a person can be renamed from the console, and renaming is not destructive', async () => {
+  await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, {
+      view: 'people', sel: '',
+      company: { name: 'Acme', roles: ['admin', 'engineer'], employees: [{ id: 'operator', name: 'Gastón', role: 'admin' }], demo: false },
+      policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+      loads: { ...state.loads, policy: { loading: false } },
+      devices: {}, open: new Set(), query: {}
+    });
+    for (const [label, sel] of [['the row menu', ''], ['the person page', 'operator']]) {
+      state.sel = sel;
+      const html = VIEWS.people.body();
+      assert.match(html, /data-act="rename"/, `${label} offers it`);
+      const rename = html.indexOf('data-act="rename"');
+      const remove = html.indexOf('data-act="remove"');
+      assert.ok(rename < remove, `${label} keeps the destructive action last`);
+      assert.ok(!/--destructive[^>]*data-act="rename"/.test(html), `${label} does not mark it destructive`);
+    }
+  } finally { Object.assign(state, saved); }
+});
+
 test('an exempt person is described as exempt from company-wide rules, never from every rule', async () => {
   const { sendAsOptions } = await import('../web/js/rules.js');
   const saved = { company: state.company, policy: state.policy };
