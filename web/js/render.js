@@ -113,10 +113,10 @@ export function render() {
   const banners = bare ? '' : compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
   $('pane').innerHTML = view.body();
   // The shell's notices sit under the page's own header, where the reader has
-  // already learnt which page this is; above it they pushed the breadcrumb and
-  // title down on every screen. A page with no header gets them at the top.
+  // already learnt which page this is; above it they pushed the title down on
+  // every screen. A page with no header gets them at the top.
   if (banners) {
-    const anchor = $('pane').querySelector('.page-head') ?? $('pane').querySelector('.context-bar');
+    const anchor = $('pane').querySelector('.page-head');
     if (anchor) anchor.insertAdjacentHTML('afterend', `<div class="shell-notices">${banners}</div>`);
     else $('pane').insertAdjacentHTML('afterbegin', `<div class="shell-notices">${banners}</div>`);
   }

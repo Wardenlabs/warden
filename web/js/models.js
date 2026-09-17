@@ -8,7 +8,7 @@ import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { bindLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
 import { bindPromptEditor, closePromptEditor, hasPromptChanges, loadPrompts, promptEditor, promptEditorMarkup, promptIsDirty, togglePromptEditor } from './prompt-editor.js';
 import { render } from './render.js';
-import { button, contextBar, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
+import { button, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
 /**
@@ -71,12 +71,6 @@ function writerState() {
   const where = state.models?.drafting?.where;
   return { text: c.provider === 'local' ? 'drafting on this machine' : `drafting ${where ? `· ${where}` : 'through the configured compiler'}`, tone: 'allow' };
 }
-
-const SUBS = {
-  '': 'Two jobs run Warden: one writes rules, one judges requests.',
-  library: 'Saved weights and connections, shared by this installation.',
-  prompts: 'Full templates each job uses. Edits apply to new work only; defaults stay untouched until you change them.'
-};
 
 // ── Active: two jobs ─────────────────────────────────────────────────────────
 
@@ -249,7 +243,17 @@ function promptsTab() {
       ? feedback({ title: 'Loading prompt templates…', body: 'Fetching the templates each job uses.' })
       : `${feedback({ tone: 'attention', title: 'Could not load the prompt templates', body: esc(promptEditor.error || 'No prompt templates are available.') })}<div class="list-state-action">${button('Retry loading', { kind: 'primary', id: 'refreshPrompts' })}</div>`;
   }
+  /*
+   * The tab's own lede, out of the page header.
+   *
+   * Two of the three descriptions the header used to cycle through were the
+   * tab's name said again — "Two jobs run Warden", "Saved weights and
+   * connections" — and those are gone. This one is not: what an edit here does
+   * and does not touch is a caveat about the screen's consequences, and it was
+   * only ever visible while this tab was open anyway.
+   */
   return `${promptEditor.error ? feedback({ tone: 'error', icon: true, title: 'Prompts could not be refreshed', body: `${esc(promptEditor.error)} Your drafts are kept.` }) : ''}
+    <p class="section-lede">Full templates each job uses. Edits apply to new work only; defaults stay untouched until you change them.</p>
     <div class="table prompts-table" role="table" aria-label="Prompt templates">
       <div class="thead" role="row"><span>Template</span><span>Job</span><span>Status</span><span></span></div>
       ${templates.map(promptRow).join('')}
@@ -270,10 +274,14 @@ function promptRow(item) {
 
 function modelsPage() {
   const tab = tabOf();
+  // One sentence per tab, and the lit tab was already saying which one you were
+  // on. The strip carries the same information in the words you clicked.
   return `<div class="sheet models-page">
-    ${contextBar([{ label: 'Your workspace' }])}
-    ${pageHead({ title: 'Models', sub: SUBS[tab], actions: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '' })}
-    ${tabs('models', TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), tab, 'Models sections')}
+    ${pageHead({
+      title: 'Models',
+      primary: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '',
+      strip: tabs('models', TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), tab, 'Models sections')
+    })}
     ${tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()}
   </div>`;
 }

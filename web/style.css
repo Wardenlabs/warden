@@ -28,8 +28,11 @@
  *
  * No literal colour and no literal font-size appears outside the two theme
  * blocks of :root. Pick a token by its role, never by its value:
- * --sidebar-selected-bg and --sidebar-avatar hold the same hex in both modes
- * and are still two names, because they answer to two roles.
+ * --sidebar-bg and --surface-subtle hold the same #F4F5F4 in light and are
+ * still two names, because they answer to two roles. The converse also gets
+ * acted on: --sidebar-selected-bg was folded into --surface-selected the day
+ * the tab, the filter and the sidebar band became one answer to "this one is
+ * chosen".
  *
  * The neutrals moved from blue-grey to green-grey on 2026-09-16, from the
  * "Warden · Sistema" collection (node 677:2054, docs/specs/first-run-and-theme.md
@@ -52,6 +55,12 @@
   /* surfaces */
   --surface-page: #FFFFFF;
   --surface-subtle: #F4F5F4;
+  /* "This one is chosen", and it has to be a second grey. Sharing
+     --surface-subtle with hover is what made a hovered filter read exactly
+     like the selected one. It used to be --sidebar-selected-bg and answered
+     only to the sidebar; with the tab and the filter becoming the same card,
+     the sidebar's selection and theirs are one role. */
+  --surface-selected: #E6E8E6;
   --surface-disabled: #ECEEEC;
   --surface-raised: #FFFFFF;
 
@@ -88,7 +97,6 @@
   --sidebar-muted: #656E6F;
   --sidebar-avatar: #E6E8E6;
   --sidebar-selected-text: #22282A;
-  --sidebar-selected-bg: #E6E8E6;
 
   /* Accessibility, and it shares the blue of --role-admin. Left where it was:
      the collection does not name it and the neutrals moving is not a reason to
@@ -114,6 +122,7 @@
 
     --surface-page: #171717;
     --surface-subtle: #242424;
+    --surface-selected: #343434;
     --surface-disabled: #202020;
     --surface-raised: #292929;
 
@@ -145,7 +154,6 @@
     --sidebar-muted: #999995;
     --sidebar-avatar: #343434;
     --sidebar-selected-text: #F2F2EF;
-    --sidebar-selected-bg: #343434;
 
     --focus-ring: #6E96E8;
 
@@ -163,6 +171,7 @@
 
   --surface-page: #171717;
   --surface-subtle: #242424;
+  --surface-selected: #343434;
   --surface-disabled: #202020;
   --surface-raised: #292929;
 
@@ -194,7 +203,6 @@
   --sidebar-muted: #999995;
   --sidebar-avatar: #343434;
   --sidebar-selected-text: #F2F2EF;
-  --sidebar-selected-bg: #343434;
 
   --focus-ring: #6E96E8;
 
@@ -237,7 +245,8 @@
   --h-control: 40px;
   --h-control-compact: 32px;
   --h-nav-row: 44px;  /* a row in the sidebar */
-  --h-tabs: 48px;     /* Tabs / * (542:81): taller than a nav row, not the same token */
+  --h-page-row: 56px; /* Header / Page v4 (720:959): the one row that says where you are */
+  --h-tabs: 48px;     /* the strip under it, tabs or toolbar */
   --h-record-row: 38px; /* Condition / * as the frames draw it */
   --w-sidebar: 240px;
   --w-reading: 760px;
@@ -307,7 +316,7 @@ body {
 }
 .sb-item svg { width: 20px; height: 20px; flex: none; color: var(--sidebar-muted); }
 .sb-item:hover { background: var(--sidebar-avatar); }
-.sb-item.on { background: var(--sidebar-selected-bg); color: var(--sidebar-selected-text); font-weight: var(--fw-semi); }
+.sb-item.on { background: var(--surface-selected); color: var(--sidebar-selected-text); font-weight: var(--fw-semi); }
 .sb-item.on svg { color: var(--sidebar-selected-text); }
 .sb-item:focus-visible { outline: 2px solid var(--sidebar-selected-text); outline-offset: -2px; }
 .sb-count { font-variant-numeric: tabular-nums; }
@@ -347,9 +356,9 @@ body {
 /*
  * The page, and the only thing that decides how far apart its blocks sit.
  *
- * Every view has the same shape — a breadcrumb, a page header, sometimes a
- * toolbar or a tab strip, then a body — and until this was a grid each of
- * those carried its own outer margin to space itself from the next one. That
+ * Every view has the same shape — a header and a body — and until this was one
+ * container each block carried its own outer margin to space itself from the
+ * next one. That
  * works in one layout and nowhere else: `.tabs` shipped `margin: -8px 0 24px`,
  * which in `.sheet`'s old flow collapsed against the header's 24 to 16 above
  * and stood as 24 below, but inside the grid wrappers on This device and
@@ -360,13 +369,20 @@ body {
  * margin to its siblings. If something needs to sit closer, the container says
  * so (`.flush-head`), never the block.
  *
- * `align-content: start` keeps a short page at the top: `.pane.flush` hands
- * its child the full column height and a stretched grid would spread three
- * blocks down a 900px screen.
+ * A column flex rather than a grid, and that part is not a preference. A grid
+ * item's containing block is its own grid area, so `position: sticky` on one
+ * has nowhere to travel — the header's row is exactly the header's height and
+ * it would never leave the top of the page. A flex item's containing block is
+ * the whole flex container, which is what the sticky header needs. Everything
+ * the grid was here for survives: one gap, spent by the container.
+ *
+ * `justify-content` stays at its start default so a short page sits at the
+ * top: `.pane.flush` hands its child the full column height, and spreading
+ * three blocks down a 900px screen is what a stretched container would do.
  */
 .sheet {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--s-block);
   max-width: var(--w-table);
   margin: 0;
@@ -465,16 +481,9 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 .search input:focus-visible { outline: none; }
 .search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
 
-/* Segmented filters: plain words, the lit one on a filled band. */
-.filter-set { display: flex; flex-wrap: wrap; gap: var(--s-1); }
-.filter {
-  min-width: 110px; height: var(--h-control); padding: 0 var(--s-5);
-  border: 0; border-radius: var(--r-control); background: none;
-  font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--muted); cursor: pointer; white-space: pre;
-}
-.filter:hover { color: var(--ink); background: var(--surface-subtle); }
-.filter.--on { background: var(--surface-subtle); color: var(--ink); }
-.toolbar-v2 { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; }
+/* Segmented filters are Tabs / Item — see the page-anatomy block below. The
+   toolbar they used to sit in is gone: filters and a search field are the
+   header's strip now, which is what the strip is for. */
 
 /* ── Trigger / Value (515:7968): the value is the control ───────────────── */
 .trigger-value {
@@ -528,61 +537,115 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
 .menu-note { padding: var(--s-3) var(--s-4); font-size: var(--fs-4); color: var(--muted); }
 .menu-sub { display: block; font-size: var(--fs-3); color: var(--muted); white-space: normal; }
 
-/* ── Page anatomy: context bar, Header / Page, Tabs ──────────────────────── */
-.context-bar {
-  display: flex; align-items: center; gap: var(--s-5);
-  height: 64px; font-size: var(--fs-3); color: var(--muted);
-}
-.crumbs { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
-.crumb { border: 0; padding: 0; background: none; font-size: var(--fs-3); color: var(--muted); white-space: nowrap; cursor: pointer; }
-button.crumb:hover { color: var(--ink); }
-.crumb.--here { color: var(--muted); cursor: default; overflow: hidden; text-overflow: ellipsis; }
-.crumb-sep { color: var(--muted); }
-
-.page-head {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--s-7);
-  min-height: 90px;
-}
-.page-head-text { min-width: 0; display: grid; gap: var(--s-2); }
-.page-title { margin: 0; font-size: var(--fs-7); font-weight: var(--fw-semi); line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink); overflow-wrap: anywhere; }
-.page-sub { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
-.page-actions { display: flex; align-items: center; gap: var(--s-4); flex: none; }
-
-/*
- * Tabs / * (542:81): 48 tall and 24 apart, neither of which this was.
+/* ── Page anatomy: Header / Page v4 (720:959), Tabs / Item (697:913) ───────
  *
- * The height was `--h-nav-row`, which is a row in the sidebar and answers to
- * nothing here, and the gap was 12 against the component's 24 — measured off
- * the frame, where the Rules tab box ends at 70 and the Tools box starts at
- * 94. Half the gap made three words read as one clump rather than a strip.
+ * One region, one hairline. The bar that carried the breadcrumb, the 90px
+ * header and the free-standing tab strip were three blocks with three heights
+ * and three margins, and Rules spent 266px of them before its first row of
+ * data — 64 + 24 + 90 + 24 + 40 + 24, not one pixel of which was content.
  *
- * The rail under the whole width is **not** in the frames and is the one
- * thing here that is a decision rather than a measurement. Without it the
- * selected tab's 2px accent is a mark floating on nothing, and on the two
- * screens that put a status block above the strip — This device with a gap
- * open, Gateway — there is no edge anywhere between the page title and the
- * first row of content: five label/value lines, three words, then a sentence,
- * all at the same x and the same weight. The rail is where the page stops
- * saying what is true and starts saying what you can change. One line to
- * remove if it is the wrong call.
+ * It is sticky because the primary action left the screen the moment anybody
+ * scrolled, and a header that has to be scrolled back to is a header that gets
+ * scrolled past. The background exists only so the rows can pass underneath
+ * it: in repose it is the page's own colour and invisible. It is deliberately
+ * **not** `--surface-subtle` — that grey is a *state* in its 26 other uses
+ * (hover, open, pressed, a sunk box), and in light it is the same #F4F5F4 as
+ * the sidebar, so a band of it here fused the header with the navigation.
  *
- * No margins: the page grid spaces the strip, the same 24 above as below.
+ * The bleed is `--w-bleed`, the same 20 the tables and the bands already use,
+ * so the hairline ends where the row dividers under it end.
  */
-.tabs {
-  display: flex; gap: var(--s-7);
-  /* The rail reaches as far as the bands and row dividers under it: a line
-     that stops 20px short of the one below it is the sloppiness this was
-     meant to fix. The padding puts the first tab back on the grid. */
+.page-head {
+  position: sticky; top: 0; z-index: 10;
   margin-inline: calc(-1 * var(--w-bleed)); padding-inline: var(--w-bleed);
+  background: var(--surface-page);
   border-bottom: 1px solid var(--line-hairline);
 }
-.tab {
-  height: var(--h-tabs); padding: 0 var(--s-5); margin-bottom: -1px;
-  border: 0; border-bottom: 2px solid transparent; background: none;
-  font-size: var(--fs-4); color: var(--muted); cursor: pointer;
+.page-head-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-7); height: var(--h-page-row);
 }
-.tab:hover { color: var(--ink); }
-.tab.--on { color: var(--ink); font-weight: var(--fw-medium); border-bottom-color: var(--ink); }
+/* Baseline, not centre: the crumb is 14px and the title 20, and centring two
+   type sizes on a box leaves neither of them sitting on a line. */
+.page-where { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
+/* A button with a box, never a span folded into the title. Folded in it is
+   the picture of a link with no hover, no focus ring and no tab stop. */
+.page-crumb {
+  border: 0; padding: 3px var(--s-2); border-radius: var(--r-control);
+  background: none; font-size: var(--fs-4); color: var(--muted);
+  white-space: nowrap; cursor: pointer;
+}
+button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); }
+.page-sep { color: var(--muted); }
+/* 20, not 26. `--fs-7` is left with one user in the whole stylesheet,
+   `.first-run-body h1`, which is the screen you see once per installation. */
+.page-title {
+  margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi);
+  line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-title.--block { color: var(--verdict-block); }
+.page-title.--attention { color: var(--verdict-attention); }
+.page-title.--allow { color: var(--verdict-allow); }
+.page-title.--muted { color: var(--ink-body); }
+/* In the top row between the title and the actions, never under the title.
+   That is what keeps the row one line tall and `align-items` honest. */
+.page-meta { margin: 0; font-size: var(--fs-2); color: var(--muted); white-space: nowrap; }
+/* Every control in this row is 32 and 13px — Button / Compact, which is what
+   the frames draw here. Said once on the container rather than passed as
+   `compact: true` at twenty call sites, because it is a property of the row. */
+.page-actions { display: flex; align-items: center; gap: var(--s-3); flex: none; }
+.page-actions .btn { height: var(--h-control-compact); padding: 0 var(--s-4); font-size: var(--fs-3); }
+.page-actions .btn.--link { padding: 0 var(--s-3); }
+.page-actions .menu-trigger.--dots { width: var(--h-control-compact); height: var(--h-control-compact); }
+.page-strip { display: flex; align-items: center; gap: var(--s-1); height: var(--h-tabs); }
+
+/*
+ * The one switch, for tabs and for filters alike.
+ *
+ * Card, not underline: the 2px rail and its accent appear in no frame and were
+ * a decision taken only in code. Tabs live in four views and a toolbar in two,
+ * with no overlap anywhere, so collapsing them into one rule removes a
+ * component rather than confusing two.
+ *
+ * Hover and selected must not share a fill — which is the bug `.filter` shipped
+ * with, where both were `--surface-subtle` and hovering an unselected filter
+ * read exactly like the selected one. That is what `--surface-selected` is for.
+ */
+.tabs, .filter-set { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.tab, .filter {
+  display: inline-flex; align-items: center;
+  height: var(--h-control-compact); padding: 0 var(--s-5);
+  border: 0; border-radius: var(--r-control); background: none;
+  font-size: var(--fs-4); font-weight: var(--fw-medium);
+  color: var(--muted); cursor: pointer; white-space: pre;
+}
+.tab:hover, .filter:hover { background: var(--surface-subtle); color: var(--ink-body); }
+.tab.--on, .filter.--on { background: var(--surface-selected); color: var(--ink); }
+
+/* Inside the strip the field is a word with a magnifier, not a box: a 42px
+   outlined input beside three 32px cards is the tallest thing in a row that
+   is meant to read as one set of controls. Outside the strip it keeps its box. */
+.page-strip .search {
+  width: auto; height: var(--h-control-compact);
+  border-color: transparent; background: none;
+  margin-left: auto; padding-inline: var(--s-3);
+}
+.page-strip .search:hover { background: var(--surface-subtle); }
+/* The person filter is a value you open, and in the strip it is a card like
+   everything beside it rather than the 42px boxed field it is elsewhere. */
+.page-strip .person-trigger {
+  width: auto; height: var(--h-control-compact); padding: 0 var(--s-4);
+  border-color: transparent; border-radius: var(--r-control);
+}
+.page-strip .person-filter { margin-left: auto; }
+
+/* That section has work that is not finished. The status block at the top of a
+   page says a gap exists; this is the only thing that says which section. */
+.tab-dot {
+  display: inline-block; width: 5px; height: 5px; margin-left: var(--s-2);
+  border-radius: 50%; background: var(--verdict-attention);
+}
 
 .reading { max-width: var(--w-reading); }
 .section-title { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-snug); }
@@ -615,8 +678,27 @@ button.crumb:hover { color: var(--ink); }
 .cell-strong { color: var(--ink); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell-muted { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cell-stack { display: grid; line-height: var(--lh-snug); }
-.cell-stack small { font-size: var(--fs-3); color: var(--muted); }
+/*
+ * A cell is one line.
+ *
+ * Almost every second line in this console defined what the line above it had
+ * already said — "No device has ever checked in" under "Never reported" — and
+ * a table cell is the worst place in the product to put an explanation,
+ * because it is repeated once per row. What survives a second line is what
+ * changes from row to row, and it changes side rather than level: the datum
+ * joins the first line after a `·`. Rows went from 80 to 56.
+ *
+ * The separator is generated rather than typed into sixteen call sites; it is
+ * punctuation between two facts, not one of the facts.
+ */
+.cell-stack { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; line-height: var(--lh-snug); }
+.cell-stack small { font-size: var(--fs-3); color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-stack > small::before { content: "· "; }
+/* The one cell with five facts in it. Two short facts do not need two lines;
+   `Claude Code · wired · hook v0.2.5` over `Reported 40 min · last judged
+   5 min` is not two short facts, and joined it is a run-on. */
+.cell-stack.--stacked { display: grid; }
+.cell-stack.--stacked > small::before { content: none; }
 .row-menu { display: flex; justify-content: flex-end; }
 /*
  * A list with nothing in it, said at the grid origin.
@@ -992,10 +1074,6 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .person-filter .menu-list { max-height: 360px; overflow-y: auto; }
 .filter-line { margin: 0; font-size: var(--fs-3); color: var(--muted); }
 
-.page-head.--verdict { min-height: 0; margin: 0; align-items: flex-start; }
-.page-head.--verdict .page-sub { margin-top: var(--s-4); }
-.verdict-title.--ink { color: var(--ink); }
-.appeal-meta { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-6); font-size: var(--fs-4); color: var(--muted); }
 
 .exchange { display: flex; flex-direction: column; gap: var(--s-4); }
 .request-turn .turn-text { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
@@ -1043,10 +1121,21 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .subhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: 40px; }
 .subhead-count { font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); }
 .people-table .thead, .people-table .trow { grid-template-columns: minmax(0, 296fr) minmax(150px, 200fr) minmax(0, 336fr) minmax(80px, 250fr) 40px; }
-.people-table .trow { min-height: 72px; padding-block: var(--s-3); }
+/* 56, the height of every other row in the console. It was 72 because the
+   wiring cell had a second line and the role cell had a sentence under the
+   pill; neither is there now. */
+.people-table .trow { padding-block: var(--s-3); }
 .person-name { font-size: var(--fs-5); font-weight: var(--fw-normal); }
-.role-cell { display: grid; justify-items: start; gap: var(--s-1); }
-.exempt-note { font-size: var(--fs-3); color: var(--verdict-attention); line-height: var(--lh-tight); }
+.role-cell { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+/* A role nothing in the company policy measures. It was a sentence under the
+   role pill and it is a chip beside it — the fact is not negotiable, a default
+   that hides a bypass is the one default nobody gets to ship, but the fact is
+   one word and the sentence was six. */
+.exempt-chip {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--s-2);
+  border-radius: 4px; font-size: var(--fs-2); font-weight: var(--fw-medium);
+  color: var(--verdict-attention); background: var(--verdict-attention-bg);
+}
 .role-menu > summary { display: inline-flex; border-radius: var(--r-control); }
 .role-menu > summary:hover .role-label, .role-menu[open] > summary .role-label { background: var(--surface-subtle); }
 .role-menu .menu-list { min-width: 280px; max-height: 360px; overflow-y: auto; }
@@ -1087,7 +1176,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 .person-devices { display: grid; gap: var(--s-2); max-width: var(--w-reading); }
 .person-devices .setting-rows { margin-top: var(--s-3); }
 .person-devices .setting-row { align-items: flex-start; }
-.device-cell { text-align: right; justify-items: end; }
+.device-cell { text-align: right; justify-items: end; justify-content: end; }
 .cell-strong.--attention { color: var(--verdict-attention); }
 
 .roles-table .thead, .roles-table .trow { grid-template-columns: minmax(0, 310fr) minmax(90px, 170fr) minmax(0, 350fr) minmax(90px, 260fr) 40px; }
@@ -1382,15 +1471,14 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
   .sb-item { position: relative; justify-content: center; width: var(--h-nav-row); padding: 0; }
   .sb-count {
     position: absolute; top: var(--s-1); right: var(--s-1); min-width: 16px; padding: 0 var(--s-1);
-    border-radius: var(--r-selected); background: var(--sidebar-selected-bg); color: var(--sidebar-selected-text);
+    border-radius: var(--r-selected); background: var(--surface-selected); color: var(--sidebar-selected-text);
     font-size: var(--fs-1); line-height: 16px; text-align: center;
   }
   .pane { padding: 0 var(--s-6); }
-  .context-bar { height: auto; min-height: 64px; flex-wrap: wrap; row-gap: var(--s-1); padding-block: var(--s-4); }
   .status-text { white-space: normal; }
-  .page-head { flex-wrap: wrap; align-items: flex-start; min-height: 0; gap: var(--s-4); }
+  .page-head-top { flex-wrap: wrap; align-items: flex-start; height: auto; padding-block: var(--s-4); gap: var(--s-4); }
   .page-actions { flex-wrap: wrap; }
-  .tabs { overflow-x: auto; }
+  .page-strip { overflow-x: auto; }
   .table { overflow-x: auto; }
   .table > .thead, .table > .trow, .table > .group-band, .table > .inline-editor, .table > .trow-note { min-width: 640px; }
   .model-form-grid { grid-template-columns: minmax(0, 1fr); }
@@ -1398,7 +1486,7 @@ input.menu-search { min-height: 44px; margin-bottom: var(--s-1); border: 0; bord
 }
 
 @media (max-width: 640px) {
-  .page-title { font-size: var(--fs-6); }
+  .page-title { white-space: normal; }
   .setting-row, .job-task, .device-rules-head, .claude-setup-head { flex-wrap: wrap; }
   .dialog { max-width: calc(100vw - 2 * var(--s-5)); }
 }
@@ -1519,12 +1607,18 @@ body[data-bare] .pane { padding: 0; }
 .tool-row {
   display: grid; grid-template-columns: 200px minmax(0, 1fr) auto;
   align-items: center; gap: var(--s-5);
-  padding: 18px var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
+  /* 12, not 18: with the facts on one line the floor is the 32px button, and
+     18+32+18 is 68 where 12+32+12 is 56 — the height every other row here is. */
+  padding: var(--s-4) var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
 }
 .tool-rows > .tool-row:last-child { border-bottom: 0; }
 .tool-name { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
-.tool-facts { display: grid; gap: var(--s-1); min-width: 0; }
+/* One line, like every other cell. The second fact still names where the first
+   came from — a screen that asserts protection without saying who told it is
+   asking to be believed — it just does not need a line of its own to do it. */
+.tool-facts { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
 .tool-facts small { font-size: var(--fs-3); color: var(--muted); }
+.tool-facts > small::before { content: "· "; }
 
 @media (max-width: 900px) {
   .tool-row { grid-template-columns: minmax(0, 1fr) auto; }

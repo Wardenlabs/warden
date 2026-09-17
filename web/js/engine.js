@@ -1,6 +1,6 @@
 /** Runtime diagnostics. Model choices live together on the Models screen. */
 import { esc, post, state } from './core.js';
-import { contextBar, feedback, pageHead, statusText } from './ui.js';
+import { feedback, pageHead, statusText } from './ui.js';
 import { modelLabel } from './format.js';
 import { VIEWS } from './views.js';
 
@@ -17,14 +17,17 @@ function enginePage() {
   const status = engineStatus(m);
   const tone = { ok: 'success', warn: 'attention', bad: 'error' }[status.tone];
   return `<div class="sheet">
-    ${contextBar([{ label: 'Models', go: 'models', back: true }, { label: 'Runtime details' }])}
-    ${pageHead({ title: 'Runtime details', sub: 'What the gateway is running, and the model files it found on this machine.' })}
+    ${pageHead({ title: 'Runtime details', crumbs: [{ label: 'Models', go: 'models' }] })}
     <div class="reading settings-page">
       ${feedback({ tone, title: status.title, body: esc(status.detail), icon: tone === 'error' })}
       ${m?.runtime?.ok === false ? `<section class="settings-task"><h2 class="section-title">Runtime error</h2><p class="section-lede">The local model worker could not start.</p><pre class="code">${esc(m.runtime.path ?? 'Runtime not found')}
 ${esc(m.runtime.detail)}</pre></section>` : ''}
       <section class="settings-task">
         <h2 class="section-title">Model files on this gateway</h2>
+        <!-- Was the header's second line. A page that genuinely has to explain
+             itself explains itself in the reading column, under the heading it
+             is about. -->
+        <p class="section-lede">What the gateway is running, and the model files it found on this machine.</p>
         ${m ? `<div class="table runtime-table" role="table" aria-label="Model files">
           <div class="thead" role="row"><span>Job</span><span>Model</span><span>On disk</span></div>
           ${m.models.map((model) => `<div class="trow" role="row"><span>${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="mono cell-clip">${esc(modelLabel(model.name))}</span><span>${model.onDisk ? statusText(`On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}`, 'allow') : `<span class="cell-muted">${model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span>`}</span></div>`).join('')}

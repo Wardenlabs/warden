@@ -19,7 +19,7 @@ import { render } from './render.js';
 import { go } from './router.js';
 import { limitsPlan, readable } from './answers.js';
 import { audience } from './rules.js';
-import { badgeEffect, button, confirmResult, contextBar, dialog, feedback, menu, pageHead, turn } from './ui.js';
+import { badgeEffect, button, confirmResult, dialog, feedback, menu, pageHead, turn } from './ui.js';
 
 const EFFECT_WORD = { block: 'Block', escalate: 'Escalate', warn: 'Warn' };
 const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'];
@@ -228,16 +228,20 @@ export function resultPage() {
     const a = [...new Set(items.map((it) => audienceLabel(it.rule.appliesTo)))];
     return a.length === 1 ? a[0].replace(/^everyone$/, 'Everyone') : 'the people each one names';
   };
-  const hasTarget = typeof set.factor === 'number';
   const body = partial
     ? `${live.length === 1 ? 'One rule now applies' : `${live.length} rules now apply`} to ${esc(who(live))}. ${failedItems.length === 1 ? 'The other is still a draft.' : `${failedItems.length} are still drafts.`}<br>Retry only attempts to activate the pending ${failedItems.length === 1 ? 'rule' : 'rules'}.`
     : `${live.length === 1 ? 'The rule now applies' : live.length === 2 ? 'Both rules now apply' : `All ${live.length} rules now apply`} to ${esc(who(live))}.`;
   return `<div class="sheet thread-page">
-    ${contextBar([{ label: state.draftFor ? 'Back to person' : 'Back to rules', go: state.draftFor ? 'people' : 'policy', sel: state.draftFor ?? '', back: true }])}
-    ${pageHead({ title: 'Activation result', sub: partial ? `Review what activated and retry the ${failedItems.length === 1 ? 'rule that is' : 'rules that are'} still pending.` : hasTarget ? 'Review the activated rules and the request that still needs clarification.' : 'Review the activated rules.' })}
-    <hr class="hairline">
+    ${pageHead({
+      title: 'Activation result',
+      crumbs: [{ label: state.draftFor ? 'Back to person' : 'Back to rules', go: state.draftFor ? 'people' : 'policy', sel: state.draftFor ?? '' }]
+    })}
     <div class="thread">
       ${firstSaid ? turn('person', { body: esc(firstSaid), end: true }) : ''}
+      <!-- "Review the activated rules" was the header's second line. The
+           confirmation card at the foot of this thread already says what
+           activated and what did not, with the button that retries; an
+           instruction to read the page you are reading is not a second fact. -->
       <div class="warden-label">${partial ? 'Activation details' : 'Activated rules'}</div>
       ${shown.map((it) => card(it, set.items.indexOf(it), { result: true })).join('')}
       ${limitsNote(set)}

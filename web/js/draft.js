@@ -10,7 +10,7 @@ import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
 import { audience, effectMenu, isExempt } from './rules.js';
 import { bindSet, included, proposalsBlock, replayMarkup, resultPage, revisionBlock, runSetPreviews } from './draft-set.js';
-import { button, composer, contextBar, feedback, menu, pageHead, roleTone, statusText, turn } from './ui.js';
+import { button, composer, feedback, menu, pageHead, roleTone, statusText, turn } from './ui.js';
 
 // ── the conversation ─────────────────────────────────────────────────────────
 //
@@ -49,18 +49,37 @@ function pageHeader() {
   const revising = Boolean(set?.revision?.set);
   const started = state.ruleChat.length > 0 || hasProposal();
   const person = state.draftFor ? personById(state.draftFor) : null;
-  return `${contextBar(person
-    ? [{ label: person.name, go: 'people', sel: person.id, back: true }, { label: 'New rule' }]
-    : [{ label: 'Rules', go: 'policy', back: true }, { label: 'New rule' }])}
-    ${pageHead({
-      title: revising ? 'Review revised drafts' : 'New rule',
-      sub: revising
-        ? 'Your current drafts stay unchanged until you choose to replace them.'
-        : started ? `Describe what to protect. Review the drafts, then choose what to activate.${person ? ` Every rule here applies to ${esc(person.name)}.` : ''}`
-          : `Say what to protect, in your own words. Warden drafts the rules — nothing activates until you approve it.${person ? ` Every rule here applies to ${esc(person.name)}.` : ''}`,
-      actions: started && !state.ruleBusy && !set?.activating ? button('Start over', { kind: 'link', id: 'cancelDraft' }) : ''
-    })}
-    <hr class="hairline">`;
+  /*
+   * The header's sentence goes down into the conversation, where the hero
+   * already asks the question it was answering ("What should Warden protect?")
+   * and the composer is the thing you answer with. What survives the move is
+   * the one part that is not encouragement: whose rules these are, and that a
+   * revision leaves the current drafts alone until you choose.
+   *
+   * The component draws its own hairline now, so the `<hr>` that used to close
+   * this block is a second line under the first.
+   */
+  return pageHead({
+    title: revising ? 'Review revised drafts' : 'New rule',
+    crumbs: person
+      ? [{ label: person.name, go: 'people', sel: person.id }]
+      : [{ label: 'Rules', go: 'policy' }],
+    quiet: started && !state.ruleBusy && !set?.activating ? button('Start over', { kind: 'link', id: 'cancelDraft' }) : ''
+  });
+}
+
+/**
+ * Whose rules these are, when they are one person's.
+ *
+ * The header used to carry it, tacked onto a sentence of encouragement that
+ * went with the rest of the descriptions. It is not encouragement: a rule
+ * drafted here binds one named person and no one else, and somebody who
+ * reaches this screen from a person's page has to be told once. It says it
+ * where the writing happens rather than in a band above it.
+ */
+function scopeNote() {
+  const person = state.draftFor ? personById(state.draftFor) : null;
+  return person ? ` Every rule here applies to ${esc(person.name)}.` : '';
 }
 
 /** The two suggestions the hero offers, as the administrator would type them. */
@@ -86,7 +105,7 @@ function heroPage() {
     <div class="hero-fill">
       <div class="hero">
         <h2 class="hero-q">What should Warden protect?</h2>
-        <p class="hero-sub">Write it like you would say it. One worry at a time works best.</p>
+        <p class="hero-sub">Write it like you would say it. One worry at a time works best.${scopeNote()}</p>
         ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'What shouldn’t happen? Write it in your own words…', sendLabel: 'Draft rules', disabled: true, attach: presetMenu(), rows: 2 })}
         <div class="suggestions">${TRIES.map((t) => `<button type="button" class="suggestion" data-try="${esc(t)}">Try: “${esc(t)}”</button>`).join('')}</div>
       </div>
@@ -133,6 +152,7 @@ export function ruleChatPane() {
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="chat" id="ruleChat">
       <div class="thread">
+        ${scopeNote() ? `<p class="thread-note">${scopeNote().trim()}</p>` : ''}
         ${said.map(renderTurn).join('')}
         ${revising?.set ? revisionBlock() : proposalsBlock()}
         ${revising?.pending ? `${turn('warden', { body: '<b class="turn-title">Revising the proposal…</b><span class="turn-note">Your current drafts stay unchanged until you accept the revised proposal. Nothing is being activated.</span>' })}
@@ -322,12 +342,23 @@ function editDraftPage(set, item) {
   const exemptNamed = e.appliesTo.filter((t) => t !== '*' && isExempt(t.startsWith('@') ? personById(t.slice(1))?.role ?? '' : t))
     .map((t) => (t.startsWith('@') ? personById(t.slice(1))?.name ?? t : t));
   return `<div class="sheet">
-    ${contextBar([{ label: 'Back to proposal', go: 'policy', sel: 'new', back: true }, { label: 'Edit draft' }])}
     ${pageHead({
       title: ruleName(item.rule),
-      actions: button('Cancel', { id: 'draftCancel' })
-        + button('Test rule', { id: 'draftTest', disabled: empty || e.busy })
-        + button(e.busy ? 'Saving…' : 'Save draft', { kind: 'primary', id: 'draftSave', disabled: empty || !dirty, busy: e.busy })
+      /*
+       * Cancel goes, but not the way it goes when editing a saved rule.
+       *
+       * There, Cancel called the same `go()` the crumb calls and both passed
+       * through the same leave guard, so removing the button removed nothing.
+       * Here it does not: the proposal and the draft editor are the same route
+       * (`policy/new`), and `set.editing` is what tells them apart, so a crumb
+       * that only changed the hash would navigate to the page it is already on
+       * and leave the editor open. The crumb carries the cancel instead —
+       * which is what "Back to proposal" meant all along — and `bindDraftEdit`
+       * is what makes it true.
+       */
+      crumbs: [{ label: 'Back to proposal', id: 'draftCancel' }],
+      quiet: button('Test rule', { id: 'draftTest', disabled: empty || e.busy }),
+      primary: button(e.busy ? 'Saving…' : 'Save draft', { kind: 'primary', id: 'draftSave', disabled: empty || !dirty, busy: e.busy })
     })}
     ${e.error ? feedback({ tone: 'error', title: 'Could not save the draft', body: `${esc(e.error)} Your changes are kept below; the proposal still has the earlier draft.`, icon: true }) : ''}
     <div class="facts">

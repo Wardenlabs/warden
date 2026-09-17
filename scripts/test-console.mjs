@@ -920,7 +920,7 @@ test('no control in the first run says Force, Reinstall or Guarantee', () => {
 
 // ── Tools: three facts per tool, and the row that has no button ──────────────
 
-test('the five tool states produce five different pairs of sentences', async () => {
+test('the five tool states produce five different lines', async () => {
   await import('../web/js/solo.js');
   const saved = { ...state };
   const at = new Date().toISOString();
@@ -945,10 +945,12 @@ test('the five tool states produce five different pairs of sentences', async () 
     let body = VIEWS.soloRules.body();
     assert.match(body, /Judging requests · verified/, 'verified: a real request was decided by the rule');
     assert.match(body, /Not connected · no request judged/, 'reported as unwired');
-    assert.match(body, /Warden is not in OpenCode settings/, 'and the row says who reported it');
+    // "Not connected" is the same sentence in two states — reported missing
+    // from the tool's settings, and never reported at all — so the second fact
+    // is what tells them apart and is the one kind of second fact a row keeps.
+    assert.match(body, /Found · not in its settings/, 'and the row says the machine reported it missing');
     assert.match(body, /Not found on this device/, 'not installed');
     assert.match(body, /Not judged, and never will be from this device/, 'no prompt hook exists for it');
-    assert.match(body, /No prompt hook exists — it cannot be wired here/);
 
     // The variant: wired, and nothing has come through it yet. This is the
     // state the whole tab exists for — neither protected nor broken.
@@ -991,7 +993,7 @@ test('a tool nobody has reported on is not called unwired', async () => {
       soloIdentity: { id: 'you', name: 'You', role: 'solo', connected: [], verified: [], devices: [] }
     }));
     const body = VIEWS.soloRules.body();
-    assert.ok(!/Warden is not in Claude Code settings/.test(body), 'nobody looked, so nobody may say it is missing');
-    assert.match(body, /has not reported its wiring yet/);
+    assert.ok(!/not in its settings/.test(body), 'nobody looked, so nobody may say it is missing');
+    assert.match(body, /Found · wiring not reported/);
   } finally { Object.assign(state, saved); }
 });

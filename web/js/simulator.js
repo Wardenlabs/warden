@@ -12,7 +12,7 @@ import {
 import { audienceLabel, fileSize, personById, plural, ruleName, sendOnEnter } from './format.js';
 import { disclosure, render } from './render.js';
 import { isExempt, sendAsOptions } from './rules.js';
-import { button, contextBar, fileChip, listState, pageHead, turn } from './ui.js';
+import { button, fileChip, listState, pageHead, turn } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ═══ TEST ════════════════════════════════════════════════════════════════════
@@ -104,8 +104,7 @@ function policyBody() {
   }
   const who = personById(sendAs);
   const rules = state.policy.rules.length;
-  const head = `${contextBar([{ label: 'Rules', go: 'policy', back: true }, { label: 'Test rules' }])}
-    ${pageHead({ title: 'Test rules' })}
+  const head = `${pageHead({ title: 'Test rules', crumbs: [{ label: 'Rules', go: 'policy' }] })}
     <div class="test-subject">
       <h2 class="section-title --big">Every active rule</h2>
       <p class="test-meta">${people.length
@@ -402,8 +401,11 @@ function draftBody() {
 
   return `<div class="chatwrap">
     <div class="sheet flush-head">
-      ${contextBar([{ label: t.back.label, go: t.back.view, sel: t.back.sel, back: true }, { label: 'Test rule' }])}
-      ${pageHead({ title: 'Test rule', actions: button(state.open.has('t:instruction') ? 'Hide instruction' : 'View instruction', { kind: 'link', id: 'viewInstruction' }) })}
+      ${pageHead({
+        title: 'Test rule',
+        crumbs: [{ label: t.back.label, go: t.back.view, sel: t.back.sel }],
+        quiet: button(state.open.has('t:instruction') ? 'Hide instruction' : 'View instruction', { kind: 'link', id: 'viewInstruction' })
+      })}
       <div class="test-subject">
         <h2 class="section-title --big">${esc(ruleName(t.rule))}</h2>
         <p class="test-meta">${esc(meta)}</p>

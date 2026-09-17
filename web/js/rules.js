@@ -9,7 +9,7 @@ import { audienceLabel, dayKey, personById, plural, ruleName } from './format.js
 import { disclosure, render } from './render.js';
 import { go } from './router.js';
 import {
-  audienceLabels, button, contextBar, dialog, effectText, feedback, filters,
+  audienceLabels, button, dialog, effectText, feedback, filters,
   listState, menu, pageHead, search, showToast, statusText
 } from './ui.js';
 import { VIEWS } from './views.js';
@@ -111,36 +111,48 @@ function matches(rule) {
   return `${ruleName(rule)} ${rule.text} ${audienceLabel(rule.appliesTo)}`.toLowerCase().includes(q);
 }
 
-const listHead = (primary = true) => pageHead({
+/*
+ * No description, and no crumb.
+ *
+ * "Set the boundaries. Keep your team moving." was read on day one and was
+ * furniture every day after, in a tool somebody opens daily; the filters under
+ * it already count the rules by effect, which is the only thing that sentence
+ * was ever near saying. And the sidebar item is lit: a crumb reading "Rules"
+ * on the Rules page tells whoever clicked to get here nothing they did not do
+ * themselves.
+ *
+ * `loaded` false is the page that could not read the policy. It keeps one
+ * quiet action and no primary — there is no honest primary on a page whose
+ * subject failed to load, and testing rules nobody could fetch is not one.
+ */
+const listHead = (loaded = true, strip = '') => pageHead({
   title: 'Rules',
-  sub: 'Set the boundaries. Keep your team moving.',
-  actions: button('Test rules →', { attrs: 'data-go="simulator"' }) + button('+ New rule', { kind: primary ? 'primary' : 'quiet', attrs: 'data-go="policy" data-sel="new"' })
+  quiet: loaded ? button('Test rules →', { attrs: 'data-go="simulator"' }) : '',
+  primary: loaded ? button('+ New rule', { kind: 'primary', attrs: 'data-go="policy" data-sel="new"' }) : '',
+  strip
 });
 
 function listPage() {
   const rules = state.policy.rules;
   const load = state.loads.policy;
-  const crumbs = [{ label: 'Workspace' }, { label: 'Rules' }];
 
   if (!load || (load.loading && !rules.length)) {
-    return `<div class="sheet">${contextBar(crumbs)}${listHead()}
+    return `<div class="sheet">${listHead()}
       ${listState({ title: 'Loading workspace rules…', body: 'Fetching the current rules and their activity.' })}</div>`;
   }
   if (load.error) {
-    return `<div class="sheet">${contextBar(crumbs)}${listHead(false)}
+    return `<div class="sheet">${listHead(false)}
       ${listState({ title: 'Could not load the rules', body: 'We could not confirm the current policy state. Retry to load the latest rules.', icon: true, action: button('Retry loading', { kind: 'primary', id: 'retryRules' }) })}</div>`;
   }
   if (!rules.length) {
-    return `<div class="sheet">${contextBar(crumbs)}${listHead()}
+    return `<div class="sheet">${listHead()}
       ${listState({ title: 'No workspace rules yet', body: 'Describe what Warden should detect to create your first rule.' })}</div>`;
   }
 
   const shown = rules.filter(matches);
   const count = (s) => rules.filter((r) => r.severity === s).length;
-  const toolbar = `<div class="toolbar-v2">
-    ${filters([['all', `All rules  ${rules.length}`], ['block', `Block  ${count('block')}`], ['escalate', `Escalate  ${count('escalate')}`], ['warn', `Warn  ${count('warn')}`]], severity, 'severity')}
-    ${search('ruleSearch', query, 'Search rules…')}
-  </div>`;
+  const toolbar = filters([['all', `All rules  ${rules.length}`], ['block', `Block  ${count('block')}`], ['escalate', `Escalate  ${count('escalate')}`], ['warn', `Warn  ${count('warn')}`]], severity, 'severity')
+    + search('ruleSearch', query, 'Search rules…');
 
   const body = shown.length
     ? `<div class="table rules-table" role="table" aria-label="Rules">
@@ -155,9 +167,7 @@ function listPage() {
     });
 
   return `<div class="sheet">
-    ${contextBar(crumbs)}
-    ${listHead()}
-    ${toolbar}
+    ${listHead(true, toolbar)}
     ${body}
     ${removeDialogMarkup()}
     ${wipeDialogMarkup()}
@@ -281,8 +291,8 @@ function testRule(rule) {
 }
 
 function missingRule() {
-  return `<div class="sheet">${contextBar([{ label: 'Rules', go: 'policy', back: true }, { label: 'Not found' }])}
-    ${pageHead({ title: 'This rule is not in the policy' })}
+  return `<div class="sheet">
+    ${pageHead({ title: 'This rule is not in the policy', crumbs: [{ label: 'Rules', go: 'policy' }] })}
     ${listState({ title: state.loads.policy?.loading ? 'Loading the policy…' : 'Nothing to show', body: state.loads.policy?.loading ? 'Fetching the current rules.' : 'It was removed, or the link is from another installation.' })}</div>`;
 }
 
@@ -304,12 +314,12 @@ function detailPage(rule) {
   const examples = rule.examples ?? {};
   const outcome = rule.severity === 'warn' ? 'none blocked' : `${blocked + held} ${rule.severity === 'escalate' ? 'held' : 'blocked'}`;
   return `<div class="sheet">
-    ${contextBar([{ label: 'Rules', go: 'policy', back: true }, { label: ruleName(rule) }])}
     ${pageHead({
       title: ruleName(rule),
-      actions: button('Edit rule', { kind: 'primary', attrs: `data-go="policy" data-sel="edit:${esc(rule.id)}"` })
-        + button('Test rule', { attrs: `data-act="test-rule" data-rule="${esc(rule.id)}"` })
-        + `<button type="button" class="btn --link --danger" data-act="remove-rule" data-rule="${esc(rule.id)}">Remove rule…</button>`
+      crumbs: [{ label: 'Rules', go: 'policy' }],
+      primary: button('Edit rule', { kind: 'primary', attrs: `data-go="policy" data-sel="edit:${esc(rule.id)}"` }),
+      quiet: button('Test rule', { attrs: `data-act="test-rule" data-rule="${esc(rule.id)}"` }),
+      more: [{ label: 'Remove rule…', act: 'remove-rule', attrs: `data-rule="${esc(rule.id)}"`, destructive: true }]
     })}
     <div class="facts">
       ${statusText('Active', 'allow')}
@@ -389,13 +399,22 @@ function editPage(rule) {
   const empty = !editor.text.trim();
   const dirty = editDirty(rule);
   const changedText = editor.text.trim() !== rule.text;
+  /*
+   * No Cancel, and nothing is lost by its going.
+   *
+   * It called `go('policy', rule.id)`. The crumb beside the title calls the
+   * same thing, and both pass through `holdLeave` in the router, which is
+   * `holdEdit` here, which raises "Leave without saving?" when the draft is
+   * dirty. The two paths were the same path, guard included: Cancel was the
+   * crumb, repeated two nodes to its right. What is left is one quiet and one
+   * primary, which is the rule with no exception carved out of it.
+   */
   return `<div class="sheet">
-    ${contextBar([{ label: 'Rule details', go: 'policy', sel: rule.id, back: true }, { label: 'Edit' }])}
     ${pageHead({
       title: ruleName(rule),
-      actions: button('Cancel', { id: 'editCancel' })
-        + button('Test rule', { id: 'editTest', disabled: empty || editor.busy })
-        + button(editor.busy ? 'Saving…' : 'Save changes', { kind: 'primary', id: 'editSave', disabled: empty || !dirty, busy: editor.busy })
+      crumbs: [{ label: 'Rule details', go: 'policy', sel: rule.id }],
+      quiet: button('Test rule', { id: 'editTest', disabled: empty || editor.busy }),
+      primary: button(editor.busy ? 'Saving…' : 'Save changes', { kind: 'primary', id: 'editSave', disabled: empty || !dirty, busy: editor.busy })
     })}
     ${editor.error ? feedback({ tone: 'error', title: 'Could not save', body: `${esc(sentence(editor.error))} Your changes are kept below — the active rule keeps enforcing the previous version. Try saving again.`, icon: true }) : ''}
     <div class="facts">
@@ -450,7 +469,6 @@ function bindEdit() {
     if (editor.severity !== item.dataset.setSeverity) { editor.severity = item.dataset.setSeverity; editor.version++; }
     render();
   };
-  $('editCancel').onclick = () => go('policy', rule.id);
   $('editTest').onclick = () => {
     if (!editor.text.trim()) { editor.invalid = true; render(); return; }
     state.testDraft = {

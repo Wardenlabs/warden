@@ -1,14 +1,14 @@
 /**
  * Inbox: what is waiting on a person — held requests, and blocks somebody said were wrong — each as its own page.
  */
-import { GLYPH, decisionFolds, ensureEntry, findEntry, missingDecision, pendingEscalations, promptMarkup, ruleCard, verdictHead, whenLine } from './activity.js';
+import { GLYPH, decisionFolds, ensureEntry, findEntry, missingDecision, pendingEscalations, promptMarkup, ruleCard, whenLine } from './activity.js';
 import { readable } from './answers.js';
 import { $, attr, esc, post, state } from './core.js';
 import { refreshAppeals, refreshEscalations } from './data.js';
 import { actorName, fileSize, hhmm, personById, plural, ruleName } from './format.js';
 import { render } from './render.js';
 import { go } from './router.js';
-import { badgeVerdict, button, confirmResult, contextBar, feedback, fileChip, groupBand, listState, pageHead, turn } from './ui.js';
+import { button, confirmResult, feedback, fileChip, groupBand, listState, pageHead, turn } from './ui.js';
 import { VIEWS } from './views.js';
 
 /**
@@ -44,26 +44,27 @@ const roleOf = (e) => personById(e.employeeId)?.role ?? e.role;
 // ── the list ─────────────────────────────────────────────────────────────────
 
 function listPage() {
-  const crumbs = [{ label: 'Workspace' }, { label: 'Inbox' }];
   const loads = [state.loads.escalations, state.loads.appeals];
-  const sub = 'Held requests and blocks people say were wrong — everything that needs a person.';
+  // What the Inbox is for is said by the group bands over the list — "Waiting
+  // on you", "Reported as wrong", "Answer recorded" — and by the empty state
+  // when there is nothing in it. A standing sentence at the top said it a
+  // fourth time, on a page somebody opens every day.
   if (loads.some((l) => !l || (l.loading && !state.escalations.length && !state.appeals.length))) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub: 'Checking what needs you…' })}
+    return `<div class="sheet">${pageHead({ title: 'Inbox' })}
       ${listState({ title: 'Loading the inbox…', body: 'Fetching the items that are waiting on a person.' })}</div>`;
   }
   if (loads.some((l) => l.error)) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub: 'Requests are still being judged.' })}
+    return `<div class="sheet">${pageHead({ title: 'Inbox' })}
       ${listState({ tone: 'attention', title: 'Could not load the inbox', body: 'The queue could not be read from this machine. Nothing is lost — held requests stay held until someone answers.', action: button('Retry loading', { kind: 'primary', id: 'retryInbox' }) })}</div>`;
   }
   const waiting = pendingEscalations();
   const answered = state.escalations.filter((e) => e.review);
   if (!waiting.length && !state.appeals.length && !answered.length) {
-    return `<div class="sheet">${contextBar(crumbs)}${pageHead({ title: 'Inbox', sub })}
+    return `<div class="sheet">${pageHead({ title: 'Inbox' })}
       <div class="empty-center"><b>Nothing waiting</b><span>Requests that need your sign-off land here, next to blocks somebody says were wrong.</span></div></div>`;
   }
   return `<div class="sheet">
-    ${contextBar(crumbs)}
-    ${pageHead({ title: 'Inbox', sub })}
+    ${pageHead({ title: 'Inbox' })}
     <div class="table inbox-table" role="table" aria-label="Inbox">
       ${waiting.length ? groupBand('Waiting on you', waiting.length) + waiting.map(heldRow).join('') : ''}
       ${state.appeals.length ? groupBand('Reported as wrong', state.appeals.length) + state.appeals.map(appealRow).join('') : ''}
@@ -125,8 +126,8 @@ const waitedFor = (ts) => {
 };
 
 function heldPage(e) {
-  if (!e) return state.loads.escalations?.loading ? missingDecision('Inbox', 'inbox') : `<div class="sheet">${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
-    ${pageHead({ title: 'This request is not waiting any more' })}${listState({ title: 'Nothing to answer', body: 'It is not in the queue. It may have been answered from another console.' })}</div>`;
+  if (!e) return state.loads.escalations?.loading ? missingDecision('Inbox', 'inbox') : `<div class="sheet">
+    ${pageHead({ title: 'This request is not waiting any more', crumbs: [{ label: 'Inbox', go: 'inbox' }] })}${listState({ title: 'Nothing to answer', body: 'It is not in the queue. It may have been answered from another console.' })}</div>`;
   const entry = findEntry(e.auditId);
   const a = answerOf(e.auditId);
   const first = whoOf(e.employeeId, e.employeeName).split(' ')[0];
@@ -141,8 +142,12 @@ function heldPage(e) {
 
   if (done) {
     return `<div class="sheet">
-      ${contextBar(a.justNow ? [{ label: 'Back to Inbox', go: 'inbox', back: true }] : [{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
-      ${verdictHead({ tone: done.outcome === 'approved' ? 'allow' : 'block', title: `${outcomeWord(done.outcome)} recorded`, sub: `Recorded ${a.justNow ? 'just now' : whenLine(done.at)} · original decision: Held at ${hhmm(e.at)}` })}
+      ${pageHead({
+        title: `${outcomeWord(done.outcome)} recorded`,
+        crumbs: [{ label: 'Inbox', go: 'inbox' }],
+        tone: done.outcome === 'approved' ? 'allow' : 'block',
+        meta: `Recorded ${a.justNow ? 'just now' : whenLine(done.at)} · original decision: Held at ${hhmm(e.at)}`
+      })}
       <div class="exchange reading">
         ${request}
         ${ruleCard(d, { note: '<p class="turn-meta">This request did not reach the assistant. Your answer did not resume it.</p>' })}
@@ -163,8 +168,13 @@ function heldPage(e) {
   const saving = a.saving;
   const failed = a.error;
   return `<div class="sheet">
-    ${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Held request' }])}
-    ${verdictHead({ tone: 'attention', glyph: GLYPH.ESCALATE, title: 'Held', sub: `${whenLine(e.at)} · waiting ${waitedFor(e.at)}${judged}` })}
+    ${pageHead({
+      title: 'Held',
+      crumbs: [{ label: 'Inbox', go: 'inbox' }],
+      tone: 'attention',
+      glyph: GLYPH.ESCALATE,
+      meta: `${whenLine(e.at)} · waiting ${waitedFor(e.at)}${judged}`
+    })}
     <div class="exchange reading">
       ${request}
       ${ruleCard(d, { note: '<p class="turn-meta">This request did not reach the assistant. Your answer will not resume it.</p>' })}
@@ -218,12 +228,19 @@ function appealPage(a) {
   const ruleHits = a.ruleId ? state.audit.filter((x) => (x.decision?.firedRules ?? []).some((r) => r.ruleId === a.ruleId) && x.decision?.verdict === 'BLOCK').length : 0;
   const disputes = a.ruleId ? state.appeals.filter((x) => x.ruleId === a.ruleId).length : 0;
   const d = entry?.decision;
+  /*
+   * The BLOCK badge that used to sit above the title is gone with the line it
+   * was on. The title says the word — "says this block was wrong" — and the
+   * decision itself is one card below, under its own kicker, where the badge
+   * would be telling somebody about the thing they are looking at. Who and
+   * when stays, as the record's identity.
+   */
   return `<div class="sheet">
-    ${contextBar([{ label: 'Inbox', go: 'inbox', back: true }, { label: 'Reported as wrong' }])}
-    ${verdictHead({
-      lead: `<div class="appeal-meta">${badgeVerdict('BLOCK')}<span>${esc(name)}${role ? ` · ${esc(role)}` : ''}${blockedAt ? ` · blocked at ${esc(blockedAt)}` : ''} · reported at ${esc(hhmm(a.at))}</span></div>`,
-      tone: 'ink', title: `${first} says this block was wrong.`,
-      action: a.ruleId ? button('Open the rule', { attrs: `data-go="policy" data-sel="${attr(a.ruleId)}"` }) : ''
+    ${pageHead({
+      title: `${first} says this block was wrong.`,
+      crumbs: [{ label: 'Inbox', go: 'inbox' }],
+      meta: `${name}${role ? ` · ${role}` : ''}${blockedAt ? ` · blocked at ${blockedAt}` : ''} · reported at ${hhmm(a.at)}`,
+      quiet: a.ruleId ? button('Open the rule', { attrs: `data-go="policy" data-sel="${attr(a.ruleId)}"` }) : ''
     })}
     <div class="exchange reading">
       ${turn('person', { who: `${esc(name)} · reported at ${esc(hhmm(a.at))}`, body: `<div class="turn-text">${a.note ? `“${esc(a.note)}”` : 'No note, just that it was wrong.'}</div>` })}

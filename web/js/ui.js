@@ -17,45 +17,89 @@ import { ICONS } from './icons.js';
 // ── page anatomy ─────────────────────────────────────────────────────────────
 
 /**
- * The 64px bar above every page: where you are, and nothing else.
+ * Header / Page v4 (720:959). One row of 56 that says where you are, what this
+ * is and what you can do, an optional 48px strip under it for tabs or a
+ * toolbar, and a single hairline closing the whole region. 105 with the strip,
+ * 57 without, against the 266px Rules used to spend before its first row of
+ * data.
  *
- * `crumbs` is a list of `{ label, go?, sel?, q?, back? }`. A crumb with `back`
- * gets the arrow and is the way out; the last crumb is where you are and is
- * never a link.
+ * It is one component because the three it replaced were one region pretending
+ * to be three. A breadcrumb bar, a header and a tab strip each carried their
+ * own height and their own margin, and between them they said where you were
+ * three times: the sidebar item was lit, the crumb repeated it, and the `h1`
+ * repeated it again. None of the three was news to somebody who had just
+ * clicked to get here.
  *
- * It used to carry a dot and a line of status on the right — "12 active
- * rules", "Loading the log…", "Gateway running · demo mode". Every one of them
- * repeated something the page already said louder: the count is in the table,
- * the loading state is the plate in the middle of the screen, and the demo
- * banner says demo. A status that is never the reason you looked at the corner
- * is furniture, and it was on every screen.
+ * **`crumbs` is the way back and nothing else.** The ancestors, never the page
+ * itself — the page is the title. A root view passes none, because the lit
+ * sidebar item has already said it. Each crumb keeps the `data-go`/`data-sel`
+ * the old bar emitted, so `nav.js`'s delegated handler still moves it. A crumb
+ * with an `id` and no `go` is one the view binds itself, for the one case where
+ * leaving is more than a hash change — see `editDraftPage` in draft.js.
+ *
+ * **`meta` is the only second piece of information a header may carry**, and
+ * the fence around it is structural rather than a matter of judgement: mono,
+ * one line, and ignored unless there are `crumbs`. A record's own page — one
+ * decision, one held request, one person — has an identity that changes with
+ * every record and appears nowhere else on that screen, so a second line there
+ * is data. A root view's second line was prose: fourteen fixed sentences that
+ * were read on day one and were noise every day after, and whose content the
+ * filters and the table underneath already carried. Without `crumbs` there is
+ * no record, so there is nothing for `meta` to be, and the question does not
+ * get reopened view by view.
+ *
+ * Note that this contradicts the component's own description in Figma, which
+ * says there is no parameter for a second line. The description is what needs
+ * fixing: reading the call sites turned up four where the second line is the
+ * record's identity rather than prose — see docs/specs/header-and-rows.md §2.2.
+ *
+ * **Actions are one primary, at most one quiet, and the rest in `more`**, with
+ * anything destructive last by the caller's order. A view without an honest
+ * primary action puts none rather than promoting something to fill the slot.
+ *
+ * `tone` and `glyph` are for the pages whose title *is* the verdict — a
+ * decision, a held request. The verdict colours are the one thing on this
+ * screen that means something, and putting the word in its colour is how those
+ * pages have always opened; it is not a second style of header.
  */
-export function contextBar(crumbs = []) {
-  const parts = crumbs.map((c, i) => {
-    const last = i === crumbs.length - 1;
-    const label = `${c.back ? '← ' : ''}${esc(c.label)}`;
-    if ((last && !c.back) || !c.go) return `<span class="crumb${last ? ' --here' : ''}">${label}</span>`;
-    return `<button type="button" class="crumb" data-go="${esc(c.go)}"${c.sel ? ` data-sel="${esc(c.sel)}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${label}</button>`;
+export function pageHead({ title, crumbs = [], meta = '', tone = '', glyph = '', primary = '', quiet = '', more = [], strip = '' }) {
+  const where = crumbs.map((c, i) => {
+    // The arrow marks the way out, so it goes on the nearest ancestor — the
+    // one the crumb would actually take you to.
+    const label = `${i === crumbs.length - 1 ? '← ' : ''}${esc(c.label)}`;
+    if (!c.go && !c.id) return `<span class="page-crumb">${label}</span>`;
+    return `<button type="button" class="page-crumb"${c.id ? ` id="${esc(c.id)}"` : ''}${c.go ? ` data-go="${esc(c.go)}"` : ''}${c.sel ? ` data-sel="${esc(c.sel)}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${label}</button>`;
   });
-  return `<div class="context-bar">
-    <nav class="crumbs" aria-label="Breadcrumb">${parts.join('<span class="crumb-sep" aria-hidden="true">/</span>')}</nav>
-  </div>`;
-}
-
-/** Header / Page: the title, one line of context, and zero to two actions. */
-export function pageHead({ title, sub = '', subMuted = false, actions = '' }) {
+  const actions = `${quiet}${primary}${more.length ? menu(more) : ''}`;
   return `<header class="page-head">
-    <div class="page-head-text">
-      <h1 class="page-title">${esc(title)}</h1>
-      ${sub ? `<p class="page-sub${subMuted ? ' --muted' : ''}">${sub}</p>` : ''}
+    <div class="page-head-top">
+      <div class="page-where">
+        ${where.join('<span class="page-sep" aria-hidden="true">/</span>')}
+        ${crumbs.length ? '<span class="page-sep" aria-hidden="true">/</span>' : ''}
+        <h1 class="page-title${tone ? ` --${esc(tone)}` : ''}">${glyph ? `<span aria-hidden="true">${glyph}</span> ` : ''}${esc(title)}</h1>
+      </div>
+      ${crumbs.length && meta ? `<p class="page-meta mono">${esc(meta)}</p>` : ''}
+      ${actions ? `<div class="page-actions">${actions}</div>` : ''}
     </div>
-    ${actions ? `<div class="page-actions">${actions}</div>` : ''}
+    ${strip ? `<div class="page-strip">${strip}</div>` : ''}
   </header>`;
 }
 
-/** Tabs / Team, Tabs / Models: sub-sections of one page, never navigation. */
+/**
+ * Tabs / Item (697:913). Sub-sections of one page, never navigation.
+ *
+ * A card rather than an underline: the 2px rail and its accent are nowhere in
+ * the frames and were a decision taken only in code. The same component serves
+ * the filter sets too — no view has both at once — which is why `.tab` and
+ * `.filter` are one rule in the stylesheet rather than two that drift.
+ *
+ * The third element of an item is the pending dot: that section has work that
+ * is not finished. Until now the only sign of a gap was the status block at the
+ * top of the page, which says a gap exists without saying which section it is
+ * in.
+ */
 export function tabs(view, items, current, label) {
-  return `<nav class="tabs" aria-label="${esc(label)}">${items.map(([sel, text, mark]) => `<button type="button" class="tab${sel === current ? ' --on' : ''}"${sel === current ? ' aria-current="page"' : ''} data-go="${esc(view)}"${sel ? ` data-sel="${esc(sel)}"` : ''}>${esc(text)}${mark ? ' •' : ''}</button>`).join('')}</nav>`;
+  return `<nav class="tabs" aria-label="${esc(label)}">${items.map(([sel, text, mark]) => `<button type="button" class="tab${sel === current ? ' --on' : ''}"${sel === current ? ' aria-current="page"' : ''} data-go="${esc(view)}"${sel ? ` data-sel="${esc(sel)}"` : ''}>${esc(text)}${mark ? '<i class="tab-dot" role="img" aria-label="has unfinished work"></i>' : ''}</button>`).join('')}</nav>`;
 }
 
 // ── controls ─────────────────────────────────────────────────────────────────
