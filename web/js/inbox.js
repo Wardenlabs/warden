@@ -178,22 +178,21 @@ function heldPage(e) {
       glyph: GLYPH.ESCALATE,
       meta: `${whenLine(e.at)} · waiting ${waitedFor(e.at)}${judged}`
     })}
-    <div class="exchange reading">
-      ${request}
-      ${ruleCard(d)}
+    <div class="exchange reading review-context">
+      <section class="review-section"><h2>Request</h2>${request}</section>
+      <section class="review-section"><h2>Why it was held</h2>${ruleCard(d)}</section>
     </div>
-    <hr class="hairline">
-    <section class="reading answer-block" aria-labelledby="answerTitle">
-      <h2 class="section-title --big" id="answerTitle">Record your answer</h2>
+    <section class="reading answer-block review-answer" aria-labelledby="answerTitle">
+      <h2 class="section-title --big" id="answerTitle">Decision</h2>
       ${failed ? feedback({ tone: 'error', icon: true, title: `${outcomeWord(failed.outcome)} couldn’t be saved`, body: `Your ${outcomeWord(failed.outcome).toLowerCase()} was not recorded. This request is still waiting for review.<br>Your note is preserved below — try saving again.${failed.why ? `<br>${esc(failed.why)}` : ''}` }) : ''}
       <div class="field">
-        <label for="reviewNote">Note to ${esc(first)} <span class="optional">(optional)</span></label>
-        <textarea id="reviewNote" rows="3" placeholder="Add context for your answer…"${saving ? ' readonly' : ''}>${esc(a.note)}</textarea>
+        <label for="reviewNote">Note <span class="optional">(optional)</span></label>
+        <textarea id="reviewNote" rows="3" placeholder="Add a note for ${esc(first)}…"${saving ? ' readonly' : ''}>${esc(a.note)}</textarea>
         ${saving ? '<span class="field-help">Saving your answer…</span>' : ''}
       </div>
       <div class="btn-row">
-        ${button(saving === 'approved' ? 'Saving approval…' : failed?.outcome === 'approved' ? 'Retry saving approval' : 'Record approval', { kind: 'primary', attrs: `data-review="approved" data-id="${attr(e.auditId)}"`, busy: saving === 'approved', disabled: Boolean(saving) })}
-        ${button(saving === 'refused' ? 'Saving refusal…' : failed?.outcome === 'refused' ? 'Retry saving refusal' : 'Record refusal', { kind: saving ? 'quiet' : 'danger', attrs: `data-review="refused" data-id="${attr(e.auditId)}"`, busy: saving === 'refused', disabled: Boolean(saving) })}
+        ${button(saving === 'approved' ? 'Saving…' : failed?.outcome === 'approved' ? 'Retry approval' : 'Approve', { kind: 'primary', attrs: `data-review="approved" data-id="${attr(e.auditId)}"`, busy: saving === 'approved', disabled: Boolean(saving) })}
+        ${button(saving === 'refused' ? 'Saving…' : failed?.outcome === 'refused' ? 'Retry refusal' : 'Refuse', { kind: saving ? 'quiet' : 'danger', attrs: `data-review="refused" data-id="${attr(e.auditId)}"`, busy: saving === 'refused', disabled: Boolean(saving) })}
       </div>
     </section>
     ${entry ? decisionFolds(entry, { chain: false, record: false }) : ''}
@@ -206,7 +205,7 @@ function requestTurnFor(entry, extra) {
   const files = (d.documents ?? []).map((doc) => fileChip(doc.name, fileSize(doc.bytes ?? 0))).join('');
   return turn('person', {
     who: `${esc(actorName(entry.actor))}${role ? ` · ${esc(role)}` : ''}`,
-    body: `${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not stored — the log keeps the hash, not the text</div>'}${files ? `<div class="labels">${files}</div>` : ''}${extra}`,
+    body: `${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Prompt not retained</div>'}${files ? `<div class="labels">${files}</div>` : ''}${extra}`,
     cls: 'request-turn'
   });
 }
@@ -249,7 +248,7 @@ function appealPage(a) {
       <span class="kicker exchange-kicker">The decision they dispute</span>
       ${entry ? `<article class="turn --warden dispute-card">
           <div class="turn-who">What they sent · ${esc(hhmm(entry.ts))}</div>
-          ${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not stored — the log keeps the hash, not the text</div>'}
+          ${d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Prompt not retained</div>'}
           ${(d.documents ?? []).length ? `<div class="labels">${d.documents.map((doc) => fileChip(doc.name, fileSize(doc.bytes ?? 0))).join('')}</div>` : ''}
         </article>
         ${ruleCard(d, { note: a.ruleId ? `<p class="turn-meta">${plural(ruleHits, 'block')} by this rule in the loaded log · ${disputes} disputed</p>` : '' })}`

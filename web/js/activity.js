@@ -281,12 +281,12 @@ export function ruleCard(d, { note = '' } = {}) {
     return `<article class="turn --warden rule-card"><div class="turn-head"><b>No rule matched</b>${badgeEffect(d.verdict === 'BLOCK' ? 'block' : 'escalate')}</div>
       <p class="rule-card-reason">${signal ? `Warden noticed ${esc(signal)}.` : esc(d.explanation || 'Warden noticed something structural in the text.')}</p>${note}</article>`;
   }
-  const others = fired.slice(1).map((r) => ruleName(r.ruleId));
+  const others = fired.slice(1);
   return `<article class="turn --warden rule-card">
     <div class="turn-head"><b>${esc(ruleName(rule.ruleId))}</b>${badgeEffect(rule.severity)}</div>
     <p class="rule-card-reason">${esc(rule.reason || rule.ruleText)}</p>
     ${rule.guidance ? `<p class="turn-meta">They were told: “${esc(rule.guidance)}”</p>` : ''}
-    ${others.length ? `<p class="turn-meta">Also fired: ${others.map(esc).join(', ')}</p>` : ''}
+    ${others.length ? `<p class="turn-meta">${plural(others.length, 'other rule')} also matched</p>` : ''}
     ${note}
   </article>`;
 }

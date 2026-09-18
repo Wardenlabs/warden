@@ -56,7 +56,7 @@ function verdictCard({ tone, glyph, title, meta, line, kicker, reason, extra = '
     <article class="turn --warden verdict-card${muted ? ' --previous' : ''}">
       <div class="verdict-head"><h3 class="verdict-title --${tone}">${glyph ? `<span aria-hidden="true">${glyph}</span> ` : ''}${esc(title)}</h3><span class="verdict-meta">${esc(meta)}</span></div>
       <p class="verdict-line">${line}</p>
-      ${kicker ? `<span class="kicker">${esc(kicker)}</span><div class="verdict-reason">${reason}</div>` : ''}
+      ${kicker ? `<section class="verdict-explanation"><h4>${esc(kicker)}</h4><div class="verdict-reason">${reason}</div></section>` : ''}
       ${extra}
       ${foot ? `<div class="verdict-foot">${foot}</div>` : ''}
     </article>`;
@@ -150,7 +150,7 @@ const LABEL = { ALLOW: ['allow', '✓', 'Allowed'], BLOCK: ['block', '⊘', 'Blo
 
 export function resultTitle(message, fallback) {
   if (message.exemptAllow) return 'Allowed without being judged';
-  if (message.warningCount) return 'Allowed with warnings';
+  if (fallback === 'Allowed' && message.warningCount) return 'Allowed with warnings';
   return fallback;
 }
 
@@ -179,7 +179,7 @@ function renderMessage(m, i) {
     line: m.line,
     kicker: m.kicker, reason: m.why,
     extra: `${m.notice ?? ''}${m.extraFacts ?? ''}${followUpControls(m, i)}${m.showReport ? `<div class="extraction-report">${documentMetadataMarkup(docs)}</div>` : ''}${passes ? `<div class="disclosures">${passes}</div>` : ''}`,
-    foot: `<span>${esc(docSummary)}</span><span class="btn-row">${m.auditId ? button('See the full record →', { kind: 'link', attrs: `data-go="activity" data-sel="${attr(m.auditId)}"` }) : ''}${docs.length ? button(m.showReport ? 'Hide extraction report' : 'View extraction report →', { attrs: `data-report="${i}"` }) : ''}</span>`
+    foot: `<span>${esc(docSummary)}</span><span class="btn-row">${m.auditId ? button('Full record →', { kind: 'link', attrs: `data-go="activity" data-sel="${attr(m.auditId)}"` }) : ''}${docs.length ? button(m.showReport ? 'Hide extraction report' : 'Extraction report →', { attrs: `data-report="${i}"` }) : ''}</span>`
   });
 }
 
@@ -283,8 +283,8 @@ export function policyDecisionPresentation(j, person, exemptAllow = false) {
   if (rule) {
     kicker = j.verdict === 'ESCALATE' ? 'Why it needs a person' : j.verdict === 'BLOCK' ? 'Why it matches' : 'Warnings';
     const shown = j.verdict === 'ALLOW' ? warnings : [rule];
-    why = shown.map((item) => `<p><b>${esc(ruleName(item.ruleId))}:</b> ${esc(item.guidance || item.reason)}</p>`).join('');
-    if (rule.allowedExamples?.length) why += `<p class="verdict-aside">These would go through: ${rule.allowedExamples.map((x) => `“${esc(x)}”`).join(' · ')}</p>`;
+    why = shown.map((item) => `<div class="verdict-rule"><b>${esc(ruleName(item.ruleId))}</b><p>${esc(item.guidance || item.reason)}</p></div>`).join('');
+    if (rule.allowedExamples?.length) why += `<p class="verdict-aside"><b>Examples that pass:</b> ${rule.allowedExamples.map((x) => `“${esc(x)}”`).join(' · ')}</p>`;
   } else if (j.verdict !== 'ALLOW' && j.explanation) {
     kicker = 'Why';
     why = `<p>${esc(j.explanation)}</p>`;
@@ -315,8 +315,8 @@ function followUpControls(m, i) {
     ${m.appealed
       ? '<p class="verdict-aside --allow">Reported. An administrator sees it in their Inbox, next to the rule that stopped you.</p>'
       : `<div class="btn-row">
-          ${s || m.followUp.hasDocuments ? '' : button(m.busy === 'rewrite' ? 'Asking…' : 'Suggest a rewrite', { compact: true, attrs: `data-rewrite="${i}"`, disabled: Boolean(m.busy) })}
-          ${button('This block was wrong', { compact: true, attrs: `data-appeal="${i}"`, disabled: Boolean(m.busy) })}
+          ${s || m.followUp.hasDocuments ? '' : button(m.busy === 'rewrite' ? 'Asking…' : 'Suggest rewrite', { compact: true, attrs: `data-rewrite="${i}"`, disabled: Boolean(m.busy) })}
+          ${button('Report wrong block', { compact: true, attrs: `data-appeal="${i}"`, disabled: Boolean(m.busy) })}
         </div>
         ${m.followUp.hasDocuments ? '<p class="verdict-aside">To revise a document request, update the file and check it again.</p>' : ''}
         ${m.appealOpen ? `<div class="field"><label for="appealNote">What were you actually trying to do? <span class="optional">(optional)</span></label>

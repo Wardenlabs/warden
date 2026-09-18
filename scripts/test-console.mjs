@@ -106,6 +106,7 @@ test('the Simulator explains allowed warning matches instead of claiming no rule
   assert.match(shown.line, /1 warning matched/);
   assert.match(shown.why, /An API key was included/);
   assert.equal(resultTitle(shown, 'Allowed'), 'Allowed with warnings');
+  assert.equal(resultTitle(shown, 'Blocked'), 'Blocked');
   assert.ok(!shown.line.includes('Nothing in the active rules'));
 });
 
@@ -599,12 +600,12 @@ test('Gateway leads with whether it is judging, not with whether it is running',
     Object.assign(state, gatewayState(), { mock: true, health: { ...gatewayState().health, mock: true } });
     const blind = VIEWS.gateway.body();
     assert.match(blind, /Policy checks off/);
-    assert.match(blind, /stand-in/, 'and it has to say that nothing is reading the prompts');
+    assert.match(blind, /No request judge is loaded/, 'and it has to say that nothing is reading the prompts');
     // The gap is outside the fold, so no control can put it away — which is
     // the promise. What the control now hides in this state is the evidence
     // that everything else is in order, and hiding good news is what it is for.
     const gapRows = blind.slice(blind.indexOf('conditions-gaps'), blind.indexOf('conditions-body'));
-    assert.match(gapRows, /stand-in/, 'the gap is in the rows that do not fold');
+    assert.match(gapRows, /No request judge is loaded/, 'the gap is in the rows that do not fold');
     assert.ok(!/conditions-gaps[\s\S]*?Decision deadline[\s\S]*?conditions-body/.test(blind),
       'and a satisfied condition is not, so the block is the size of the problem');
   } finally { Object.assign(state, saved); }
@@ -617,13 +618,13 @@ test('Gateway states the deadline and what happens when it passes', async () => 
     Object.assign(state, gatewayState());
     const open = VIEWS.gateway.body();
     assert.match(open, /90 s/, 'the deadline comes from /health, never from a constant here');
-    assert.match(open, /goes through unchecked/, 'fail-open is said in words, not implied');
+    assert.match(open, /Allow unchecked/, 'fail-open is said in words, not implied');
 
     Object.assign(state, gatewayState(), { health: { ...gatewayState().health, failClosed: true, deadlines: { decisionMs: 45000 } } });
     const closed = VIEWS.gateway.body();
     assert.match(closed, /45 s/);
-    assert.match(closed, /refused/);
-    assert.ok(!/goes through unchecked/.test(closed), 'a fail-closed gateway must not be described as letting prompts through');
+    assert.match(closed, /Refuse/);
+    assert.ok(!/Allow unchecked/.test(closed), 'a fail-closed gateway must not be described as letting prompts through');
   } finally { Object.assign(state, saved); }
 });
 
@@ -634,8 +635,8 @@ test('Gateway names baseline mode as the guard being off', async () => {
     Object.assign(state, gatewayState(), { health: { ...gatewayState().health, mode: 'baseline' } });
     const body = VIEWS.gateway.body();
     assert.match(body, /Policy checks off/);
-    assert.match(body, /the guard is off/);
-    assert.match(body, /exactly like one that is working/, 'the whole point is that it is indistinguishable from a healthy one');
+    assert.match(body, /active rules are not applied/);
+    assert.match(body, /Policy checks are off/, 'the disabled state must be unmistakable');
   } finally { Object.assign(state, saved); }
 });
 
@@ -1172,7 +1173,9 @@ test('Inbox uses explicit recording actions and puts the consequence in the reco
     assert.match(recorded, /Approval recorded/);
     assert.match(recorded, /Your answer did not resume it/);
     assert.doesNotMatch(html, /Your answer will not resume it|Your note is kept if saving fails/);
-    assert.match(html, /Record approval/);
+    assert.match(html, />Approve</);
+    assert.match(html, />Refuse</);
+    assert.match(html, />Decision</);
   } finally { Object.assign(state, saved); }
 });
 

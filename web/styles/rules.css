@@ -82,7 +82,7 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .chatwrap.--drafting .chat-foot { padding-top: var(--s-3); }
 .test-instruction { margin: 0; font-size: var(--fs-4); color: var(--ink-body); max-width: var(--w-reading); }
 .select-inline { width: auto; max-width: 100%; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
-.verdict-card { gap: var(--s-4); padding: var(--s-7); }
+.verdict-card { gap: var(--s-4); padding: var(--s-6); }
 .verdict-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
 .verdict-title { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
 .verdict-title.--block { color: var(--verdict-block); }
@@ -91,9 +91,14 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .verdict-title.--muted { color: var(--ink-body); }
 .verdict-meta { font-size: var(--fs-3); color: var(--muted); }
 .verdict-line { margin: 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
-.verdict-card .kicker { margin-top: var(--s-1); }
+.verdict-explanation { display: grid; gap: var(--s-3); padding-top: var(--s-2); }
+.verdict-explanation h4 { margin: 0; font: 600 var(--fs-4)/var(--lh-snug) var(--display); color: var(--ink); }
 .verdict-reason { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .verdict-reason p { margin: 0; }
+.verdict-rule { display: grid; gap: var(--s-1); }
+.verdict-rule + .verdict-rule { padding-top: var(--s-3); border-top: 1px solid var(--line-hairline); }
+.verdict-rule > b { font-size: var(--fs-4); font-weight: var(--fw-semi); }
+.verdict-rule > p { color: var(--ink-body); }
 .verdict-aside { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
 .verdict-aside.--allow { color: var(--verdict-allow); }
 .verdict-aside.--block { color: var(--verdict-block); }
@@ -172,6 +177,11 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .answer-block textarea { min-height: 88px; font-size: var(--fs-5); }
 .recorded-note { margin: 0; font-size: var(--fs-5); color: var(--ink-body); }
 .answer-block .confirm-result { margin-top: var(--s-2); }
+.review-context { gap: 28px; }
+.review-section { display: grid; gap: var(--s-3); }
+.review-section > h2 { margin: 0; font: 600 var(--fs-5)/var(--lh-snug) var(--display); color: var(--ink); }
+.review-answer { padding: var(--s-6); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); }
+.review-answer textarea { min-height: 76px; font-size: var(--fs-4); background: var(--surface-page); }
 
 
 /* ═══ team ═══════════════════════════════════════════════════════════════ */

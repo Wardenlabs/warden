@@ -3,11 +3,10 @@ import { $, attr, esc, post, state } from './core.js';
 import { refreshChain, refreshHealth } from './data.js';
 import { modelLabel, plural } from './format.js';
 import { render } from './render.js';
-import { button, conditionBlock, feedback, groupBand, statusText } from './ui.js';
-import { settingsPage } from './settings-layout.js';
+import { button, conditionBlock, feedback, pageHead, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
-const TABS = [['', 'Overview'], ['access', 'Access'], ['retention', 'Retention']];
+const TABS = [['', 'Overview'], ['access', 'Access'], ['retention', 'Data']];
 const tabOf = () => (state.sel === 'access' || state.sel === 'retention' ? state.sel : '');
 
 const health = () => state.health ?? {};
@@ -50,26 +49,26 @@ function conditions() {
   const version = where.version ? ` v${where.version}` : '';
   const rows = [
     {
-      label: 'This gateway',
-      value: `${esc(name)}${esc(version)}${where.dataDir ? ` · <span class="mono">${esc(where.dataDir)}</span>` : ''}`
+      label: 'Gateway',
+      value: `${esc(name)}${esc(version)}`
     },
     state.mock
-      ? { label: 'The judge', tone: 'attention', value: 'Mock adapter · a stand-in answers, no model reads these prompts' }
-      : { label: 'The judge', value: `${esc(judgeName())} · local analysis` },
+      ? { label: 'Judge', tone: 'attention', value: 'No request judge is loaded' }
+      : { label: 'Judge', value: `${esc(judgeName())} · on this device` },
     isBaseline()
-      ? { label: 'Mode', tone: 'attention', value: 'Baseline · the guard is off; requests are recorded and let through' }
-      : { label: 'Mode', value: 'Warden · every request is judged against the rules in force' },
+      ? { label: 'Mode', tone: 'attention', value: 'Baseline · active rules are not applied' }
+      : { label: 'Mode', value: 'Active rules apply to every request' },
     {
-      label: 'Hooks',
+      label: 'Timeout',
       value: health().failClosed
-        ? `Wait ${deadlineSeconds()} s · then the request is refused`
-        : `Wait ${deadlineSeconds()} s · then the prompt goes through unchecked`
+        ? `Refuse after ${deadlineSeconds()} s`
+        : `Allow unchecked after ${deadlineSeconds()} s`
     },
     {
-      label: 'Reach',
+      label: 'Access',
       value: state.publicUrl
-        ? 'Open to the internet · anyone holding the address reaches it'
-        : 'No public tunnel'
+        ? 'Public address on'
+        : 'Private network only'
     }
   ];
   const judging = !state.mock && !isBaseline();
@@ -88,8 +87,8 @@ function summaryLine() {
   const where = installation();
   const name = where.label ? `“${where.label}”` : 'This gateway';
   const version = where.version ? ` v${where.version}` : '';
-  const reach = state.publicUrl ? ' on a public address' : '';
-  return `${name}${version}${reach}, judged by ${judgeName()}. Hooks wait ${deadlineSeconds()} s, then ${health().failClosed ? 'refuse' : 'let the prompt through'}.`;
+  const reach = state.publicUrl ? 'public access' : 'private network';
+  return `${name}${version} · ${judgeName()} · ${deadlineSeconds()} s timeout · ${reach}`;
 }
 
 /**
@@ -111,7 +110,7 @@ function alarm() {
   return feedback({
     tone: 'attention',
     icon: true,
-    title: `${both ? 'Two things are off' : 'Something is off'}, and a gateway in this state answers every hook exactly like one that is working`,
+    title: both ? 'Policy checks are off for two reasons' : 'Policy checks are off',
     body: esc(body)
   });
 }
@@ -130,21 +129,14 @@ function alarm() {
  */
 function overviewTab() {
   const devices = deviceSummary();
-  return `<div class="gw-rows">
-    <h2 class="settings-section-title">Request handling</h2>
-    <dl class="record gw-record">
-      <dt>Decision deadline</dt>
-      <dd>${deadlineSeconds()} seconds</dd>
-      <dt>If it cannot answer</dt>
-      <dd>${health().failClosed
-        ? 'The request is refused'
-        : 'The prompt goes through unchecked'}
-        <small class="gw-note">${health().failClosed
-          ? 'Requests remain blocked until the gateway responds.'
-          : 'Set WARDEN_FAIL_CLOSED=1 to refuse requests during an outage.'}</small></dd>
-      <dt>Devices</dt>
-      <dd${devices.tone ? ` class="--${devices.tone}"` : ''}>${esc(devices.text)}</dd>
-    </dl>
+  return `<div class="gw-overview">
+    ${conditions()}
+    ${alarm()}
+    <section class="gw-facts" aria-label="Request handling">
+      <div class="gw-fact"><span>Decision timeout</span><b>${deadlineSeconds()} seconds</b></div>
+      <div class="gw-fact"><span>After timeout</span><b>${health().failClosed ? 'Refuse' : 'Allow unchecked'}</b></div>
+      <div class="gw-fact"><span>Devices</span><b${devices.tone ? ` class="--${devices.tone}"` : ''}>${esc(devices.text)}</b></div>
+    </section>
   </div>`;
 }
 
@@ -196,15 +188,16 @@ async function watchAddress(want) {
  */
 function accessTab() {
   const here = typeof location === 'undefined' ? '' : location.origin;
-  return `<div class="gw-rows">
-    ${groupBand('Where this gateway can be reached')}
-    <dl class="record gw-record">
-      <dt>You reached it at</dt>
-      <dd><span class="mono">${esc(here)}</span>${button('Copy', { compact: true, attrs: `data-copy="${attr(here)}"` })}
-        <small class="gw-note">Remote access requires an API key.</small></dd>
-    </dl>
-    ${groupBand('Public address')}
-    ${publicAddress()}
+  return `<div class="gw-sections">
+    ${alarm()}
+    <section class="gw-section">
+      <h2>Gateway address</h2>
+      <div class="gw-address"><span class="mono">${esc(here)}</span>${button('Copy', { compact: true, attrs: `data-copy="${attr(here)}"` })}</div>
+    </section>
+    <section class="gw-section">
+      <h2>Public access</h2>
+      ${publicAddress()}
+    </section>
   </div>`;
 }
 
@@ -212,29 +205,26 @@ function publicAddress() {
   if (expose.asked) {
     const opening = expose.asked === 'open';
     return `<div class="gw-block">
-      <p class="gw-line">${opening ? 'Opening… · asked the tunnel for an address' : 'Closing… · asked the tunnel to shut'}</p>
-      <p class="disclosure-text">${opening
-        ? 'The gateway accepted the request and has not come back with an address yet. Asking is not having one: nothing outside this network reaches the gateway until an address appears here.'
-        : 'The address stops working once the gateway is back. Anyone who wrote it down will find it gone, which is the point.'}</p>
+      <p class="gw-line">${opening ? 'Opening public access…' : 'Closing public access…'}</p>
       ${button(opening ? 'Opening…' : 'Closing…', { kind: 'primary', busy: true })}
       ${expose.error ? feedback({ tone: 'error', icon: true, title: 'The address did not change', body: esc(expose.error) }) : ''}
     </div>`;
   }
   if (state.publicUrl) {
     return `<div class="gw-block">
-      <p class="gw-line">${statusText('Open · anyone holding the address reaches this gateway.', 'allow')}</p>
+      <p class="gw-line --allow">On</p>
       <p class="mono public-url">${esc(state.publicUrl)}</p>
-      <p class="disclosure-text">They still need a key, and an address alone judges nothing. Only the address became public: the prompts, the rules and the log stay on this device. It changes every time the tunnel restarts, so a written-down address stops working.</p>
+      <p class="gw-note">A Warden key is still required. The address changes after a restart.</p>
       <div class="btn-row">${button('Copy address', { attrs: `data-copy="${attr(state.publicUrl)}"` })}${button('Stop exposing', { id: 'stopExpose', disabled: !state.canLeaveDemo })}</div>
       ${expose.error ? feedback({ tone: 'error', icon: true, title: 'The address did not change', body: esc(expose.error) }) : ''}
     </div>`;
   }
   return `<div class="gw-block">
-    <p class="gw-line">Closed · nobody outside this network can reach this gateway.</p>
-    <p class="disclosure-text">Opening one publishes a Cloudflare address that changes every time the tunnel restarts. Anyone holding it reaches this gateway and still needs a key. Only the address becomes public: the prompts, the rules and the log stay on this device.</p>
+    <p class="gw-line">Off</p>
+    <p class="gw-note">Only devices on this network can reach Warden.</p>
     ${state.canLeaveDemo
-      ? `${button('Open a public address', { kind: 'primary', id: 'startExpose', disabled: state.mock })}${state.mock ? '<p class="disclosure-text muted">Not while Warden is in demo mode: nothing here is really judged.</p>' : ''}`
-      : '<p class="disclosure-text muted">This gateway is not running inside the desktop app, so it cannot open a tunnel for you. Put your own proxy in front of it instead.</p>'}
+      ? `${button('Turn on public access', { kind: 'primary', id: 'startExpose', disabled: state.mock })}${state.mock ? '<p class="gw-note">Unavailable in demo mode.</p>' : ''}`
+      : '<p class="gw-note">Public access is managed outside the desktop app for this gateway.</p>'}
     ${expose.error ? feedback({ tone: 'error', icon: true, title: 'The address did not change', body: esc(expose.error) }) : ''}
   </div>`;
 }
@@ -254,29 +244,25 @@ function retentionTab() {
   const p = state.prompts;
   const chain = state.chain;
   const dir = installation().dataDir;
-  return `<div class="gw-rows">
-    ${groupBand('Prompt text')}
-    <dl class="record gw-record">
-      <dt>Kept for</dt>
-      <dd>${p
-        ? `${plural(p.days, 'day')} · ${plural(p.held, 'prompt')} held now, ${p.max} is the ceiling`
-        : 'Not kept · only hashes are stored'}</dd>
-      <dt>What is kept</dt>
-      <dd>${p
-        ? 'The masked text, so a blocked request can be read back. Never the original.'
-        : 'Nothing readable. WARDEN_PROMPT_RETENTION_DAYS is 0 here.'}
-        ${p ? '<small class="gw-note">Mode 0600, never synced, and expiry is checked on every read. WARDEN_PROMPT_RETENTION_DAYS=0 turns it off and deletes the file.</small>' : ''}</dd>
-    </dl>
-    ${groupBand('The audit log')}
-    <dl class="record gw-record">
-      <dt>Records</dt>
-      <dd>${chain ? `${plural(chain.entries, 'record')} · hash-chained, append-only` : 'Could not be read right now'}</dd>
-      <dt>Verified</dt>
-      <dd${chain && !chain.ok ? ' class="--attention"' : ''}>${chainLine(chain)}${button('Verify now', { compact: true, id: 'gwVerify' })}</dd>
-      <dt>What it stores</dt>
-      <dd>Who asked, when, which rules fired, and a hash of the prompt. Never the text.</dd>
-    </dl>
-    ${dir ? `${groupBand('On disk')}<dl class="record gw-record"><dt>This installation</dt><dd><span class="mono">${esc(dir)}</span></dd></dl>` : ''}
+  return `<div class="gw-sections">
+    ${alarm()}
+    <section class="gw-section">
+      <h2>Prompt history</h2>
+      <dl class="record gw-record">
+        <dt>Retention</dt><dd>${p ? plural(p.days, 'day') : 'Off'}</dd>
+        <dt>Stored</dt><dd>${p ? `${plural(p.held, 'masked prompt')} · ${p.max} maximum` : 'None · only hashes are kept'}
+          ${p ? '<small class="gw-note">Original prompt text is never stored.</small>' : ''}</dd>
+      </dl>
+    </section>
+    <section class="gw-section">
+      <h2>Decision log</h2>
+      <dl class="record gw-record">
+        <dt>Records</dt><dd>${chain ? `${plural(chain.entries, 'record')} · append-only` : 'Unavailable'}</dd>
+        <dt>Integrity</dt><dd${chain && !chain.ok ? ' class="--attention"' : ''}>${chainLine(chain)}${button('Verify now', { compact: true, id: 'gwVerify' })}</dd>
+        <dt>Contains</dt><dd>Person, time, matched rules and prompt hash</dd>
+      </dl>
+    </section>
+    ${dir ? `<section class="gw-section"><h2>Storage</h2><p class="mono gw-path">${esc(dir)}</p></section>` : ''}
   </div>`;
 }
 
@@ -286,10 +272,10 @@ function retentionTab() {
  * `verifyChain` reports them separately precisely so this sentence can.
  */
 function chainLine(chain) {
-  if (!chain) return 'Not verified in this session';
+  if (!chain) return 'Not checked';
   if (chain.ok) return chain.unwitnessed
-    ? 'Intact · every record matches its hash, but there is no witness to prove none were removed'
-    : 'Intact · every record matches its hash';
+    ? 'Verified locally · no external witness'
+    : 'Verified';
   if (chain.missing) return `${plural(chain.missing, 'record')} the witness counted are no longer in the log`;
   return `A record was altered or removed after it was written (entry ${chain.brokenAt ?? '?'})`;
 }
@@ -298,10 +284,11 @@ function chainLine(chain) {
 
 function gatewayBody() {
   const tab = tabOf();
-  return settingsPage({ title: 'Gateway', view: 'gateway', sections: TABS, selected: tab,
-    status: conditions(), notices: alarm(),
-    content: tab === 'access' ? accessTab() : tab === 'retention' ? retentionTab() : overviewTab()
-  });
+  const content = tab === 'access' ? accessTab() : tab === 'retention' ? retentionTab() : overviewTab();
+  return `<div class="sheet gateway-page">
+    ${pageHead({ title: 'Gateway', strip: tabs('gateway', TABS, tab, 'Gateway sections') })}
+    <div class="gateway-content">${content}</div>
+  </div>`;
 }
 
 function bindGateway() {

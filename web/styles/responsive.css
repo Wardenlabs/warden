@@ -220,6 +220,12 @@ body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border
   .settings-layout .tool-action { grid-column: 2; grid-row: 1 / span 2; }
   .settings-layout .gw-record { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .settings-layout .gw-record dt { border: 0; padding-bottom: 0; }
+  .gateway-page .gw-record { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .gateway-page .gw-record dt { border: 0; padding-bottom: 0; }
+  .gw-facts { grid-template-columns: minmax(0, 1fr); }
+  .gw-fact, .gw-fact:first-child, .gw-fact:last-child { min-height: 0; padding: var(--s-4) 0; border-right: 0; border-bottom: 1px solid var(--line-hairline); }
+  .gw-fact:last-child { border-bottom: 0; }
+  .gw-address { align-items: flex-start; flex-direction: column; }
   .device-table .trow { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
   .device-table .solo-text { grid-column: 1; }
   .device-rule-action { grid-column: 2; grid-row: 1 / span 2; }
