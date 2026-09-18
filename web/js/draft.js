@@ -151,7 +151,7 @@ export function ruleChatPane() {
   if (!state.ruleChat.length && !set) return heroPage();
   const revising = set?.revision;
   const said = state.ruleChat.filter((t) => !(revising?.set && t.from === 'warden'));
-  return `<div class="chatwrap --centred">
+  return `<div class="chatwrap --centred${state.ruleBusy && !hasProposal() ? ' --drafting' : ''}">
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="chat" id="ruleChat">
       <div class="thread">

@@ -38,8 +38,11 @@
 
 /* ═══ models ═════════════════════════════════════════════════════════════ */
 
-.models-active { display: grid; gap: var(--s-9); }
-.job-block { display: grid; gap: var(--s-3); }
+.models-content { min-width: 0; }
+.models-active { display: grid; border-top: 1px solid var(--line-hairline); }
+.job-block { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: var(--s-3) var(--s-7); padding: var(--s-7) 0; border-bottom: 1px solid var(--line-hairline); }
+.job-block > .section-title { grid-column: 1; grid-row: 1; margin: 0; }
+.job-block > :not(.section-title) { grid-column: 2; }
 .job-block .section-lede { margin: 0 0 var(--s-2); font-size: var(--fs-3); }
 .job-value { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
 .value-menu .menu-list { min-width: 240px; }
@@ -178,7 +181,6 @@
 .conditions-toggle .--hide { display: none; }
 .conditions-toggle[aria-expanded="true"] .--show { display: none; }
 .conditions-toggle[aria-expanded="true"] .--hide { display: inline; }
-.conditions-toggle[aria-expanded="true"] .chev::before { content: "⌃"; }
 /* The body is hidden with the attribute, and `.disclosure-body` is a grid,
    so it needs a rule that beats `display: grid`. */
 .conditions-body[hidden] { display: none; }
@@ -277,3 +279,6 @@
 .settings-layout .gw-record dt, .settings-layout .gw-record dd { margin: 0; align-self: stretch; }
 .compile-error-detail { margin-top: 16px; color: var(--muted); }
 .compile-error-detail summary { cursor: pointer; }
+.identity-key { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.identity-key .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity-key .btn { flex: none; }

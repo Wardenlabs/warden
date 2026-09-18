@@ -106,28 +106,25 @@ function policyBody() {
   const rules = state.policy.rules.length;
   const head = `${pageHead({ title: 'Test rules', crumbs: [{ label: 'Rules', go: 'policy' }] })}
     <div class="test-subject">
-      <h2 class="section-title --big">Every active rule</h2>
       <p class="test-meta">${people.length
-        ? `<label for="who">Send as</label> <select id="who" class="select-inline" aria-label="Send as">${sendAsOptions(sendAs)}</select> · ${plural(rules, 'active rule')} · checked like a real request and recorded in Activity`
+        ? `<label for="who">Send as</label><select id="who" class="select-inline" aria-label="Send as">${sendAsOptions(sendAs)}</select><span>${plural(rules, 'active rule')}</span>`
         : 'Nobody to send as yet'}</p>
-    </div>
-    <hr class="hairline">`;
+    </div>`;
 
   if (!people.length) {
-    return `<div class="chatwrap"><div class="sheet flush-head">${head}</div><div class="chat"><div class="thread">
+    return `<div class="chatwrap --centred"><div class="sheet flush-head">${head}</div><div class="chat"><div class="thread">
       ${listState({ title: 'Set up an identity to check requests', body: 'Choose who Warden should check as. Protect this device to create your own identity, or add people to your team.', action: button('Set up this device', { kind: 'primary', attrs: 'data-go="soloRules"' }) + button('Add people', { attrs: 'data-go="people"' }) })}
     </div></div></div>`;
   }
 
   const thread = state.chat.length
     ? state.chat.map(renderMessage).join('') + documentReviewPendingMarkup(state.chat.at(-1)?.documents, state.sending && state.chat.at(-1)?.from === 'employee')
-    : emptyLine('No tests yet. Send a request or drop a file to see what the active rules would do.');
+    : emptyLine('No tests yet.');
 
-  return `<div class="chatwrap">
+  return `<div class="chatwrap --centred${state.chat.length ? '' : ' --test-empty'}">
     <div class="sheet flush-head">${head}</div>
     <div class="chat" id="chat"><div class="thread">${thread}${who && isExempt(who.role) ? `<p class="thread-note">${esc(who.name)} is ${esc(who.role)}, exempt from company-wide rules: only rules that name them are applied.</p>` : ''}</div></div>
     <div class="chat-foot"><div class="thread">
-      ${state.chat.length ? '' : tries([['“¿Puede salir este archivo?” + a file', '¿Puede salir este archivo?', true], ['paste a customer email thread', '']])}
       <div class="composer --files" id="documentDropzone">
         <textarea id="prompt" rows="1" aria-label="Request to test" placeholder="${state.sending ? 'Waiting for the verdict…' : 'Write or paste a request to test…'}"${state.sending ? ' disabled' : ''}></textarea>
         ${documentChips()}
@@ -486,4 +483,3 @@ function bindDraft() {
   if ($('send')) $('send').onclick = send;
   sendOnEnter($('prompt'), send);
 }
-

@@ -34,10 +34,10 @@
 
 .chat { flex: 1; min-height: 0; overflow-y: auto; }
 .thread { display: flex; flex-direction: column; gap: var(--s-4); width: 100%; max-width: var(--w-reading); }
-.chat > .thread { min-height: 100%; justify-content: flex-end; padding: var(--s-8) 0 var(--s-5); }
+.chat > .thread { min-height: 100%; justify-content: flex-start; padding: var(--s-8) 0 var(--s-5); }
 .chat-foot { flex: none; padding: var(--s-4) 0 var(--s-5); background: var(--surface-page); }
 .chat-foot > .thread { gap: var(--s-4); }
-.thread-empty { margin: auto 0; font-size: var(--fs-4); color: var(--muted); }
+.thread-empty { margin: 0; font-size: var(--fs-4); color: var(--muted); }
 .thread-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
 .thread-divider { margin: var(--s-5) 0 var(--s-2); font-size: var(--fs-3); color: var(--muted); }
 .thread-page .thread { margin-top: 0; }
@@ -70,8 +70,16 @@ span.composer-attach { color: var(--muted); cursor: default; }
 
 /* ── Test: a thread of verdicts ──────────────────────────────────────────── */
 
-.test-subject { display: grid; gap: var(--s-3); }
+.test-subject { display: grid; gap: var(--s-3); padding: var(--s-3) 0 var(--s-5); border-bottom: 1px solid var(--line-hairline); }
 .test-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.test-meta label { color: var(--ink-body); }
+.test-meta span { margin-left: var(--s-2); }
+.chatwrap.--test-empty .chat { flex: 0 0 auto; overflow: visible; }
+.chatwrap.--test-empty .chat > .thread { min-height: auto; padding: var(--s-7) 0 var(--s-2); }
+.chatwrap.--test-empty .chat-foot { padding-top: var(--s-3); }
+.chatwrap.--drafting .chat { flex: 0 0 auto; overflow: visible; }
+.chatwrap.--drafting .chat > .thread { min-height: auto; padding-bottom: var(--s-2); }
+.chatwrap.--drafting .chat-foot { padding-top: var(--s-3); }
 .test-instruction { margin: 0; font-size: var(--fs-4); color: var(--ink-body); max-width: var(--w-reading); }
 .select-inline { width: auto; max-width: 100%; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
 .verdict-card { gap: var(--s-4); padding: var(--s-7); }

@@ -164,10 +164,9 @@ export function compilerSettings() {
         <input id="cModel" type="text" spellcheck="false" list="cModelList"${remote ? ' required' : ''} value="${esc(d.model)}" placeholder="${esc(cli ? claude ? 'Claude Code default' : 'CLI default' : chosen?.models?.[0] ?? 'Provider default')}">
         <datalist id="cModelList">${(chosen?.models ?? []).map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>
 
-        ${chosen?.note ? `<span class="field-help">${esc(chosen.note)}</span>` : ''}
       </div>` : localCompilerNote()}
       ${remote ? `<div class="field"><label for="cKey">API key <span class="optional">(if required)</span></label><input id="cKey" type="password" autocomplete="off" spellcheck="false" value="" placeholder="${testedKey ? 'Tested key ready to apply.' : c.hasKey ? 'A key is saved. Leave blank to keep it.' : 'Enter a provider key'}"></div>` : ''}
-      ${remote || cli ? `<div class="field"><label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}><span>Replace employee names with their IDs before sending</span></label></div>` : ''}
+      ${remote || cli ? `<div class="field"><label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}><span>Hide employee names from this provider</span></label></div>` : ''}
       ${claude ? claudeSetup(d) : `<div class="actions">
         ${remote ? '<button type="button" class="btn" id="cTest">Test connection</button>' : ''}
         <button type="submit" class="btn --primary" id="cSave">${busy === 'save' ? 'Applying…' : 'Apply compiler'}</button>
@@ -281,7 +280,6 @@ function cliNote(providerId) {
   const found = cliFor(providerId);
   if (!found) return '';
   return found.found
-    ? `<span class="field-help">Installed on the gateway. Sign in using that CLI before applying it. Usage follows its account and provider terms.</span>`
+    ? ''
     : `<span class="form-note --block">Not on this machine. Install <span class="mono">${esc(found.tool)}</span>, sign in, then come back to this page.</span>`;
 }
-

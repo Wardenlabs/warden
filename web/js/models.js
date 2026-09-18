@@ -8,8 +8,7 @@ import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { bindLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
 import { bindPromptEditor, closePromptEditor, hasPromptChanges, loadPrompts, promptEditor, promptEditorMarkup, promptIsDirty, togglePromptEditor } from './prompt-editor.js';
 import { render } from './render.js';
-import { button, disclosureRow, feedback, statusText } from './ui.js';
-import { settingsPage } from './settings-layout.js';
+import { button, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
 import { VIEWS } from './views.js';
 
 /**
@@ -208,11 +207,11 @@ function ceilingsBlock() {
       }).join('')}
     </div>
     <p class="table-foot">Set a daily limit in <button type="button" class="linkish" data-go="people" data-sel="roles">Team → Roles</button> to enable session ceilings.</p>`;
-  return disclosureRow('m:ceilings', 'Session ceilings', `${set ? `Set for ${plural(set, 'role')}` : 'None set'} · per role · escalate, never block`, body, { open: state.open.has('m:ceilings') || Boolean(ceilingEdit) });
+  return disclosureRow('m:ceilings', 'Session ceilings', set ? `Set for ${plural(set, 'role')}` : 'None set', body, { open: state.open.has('m:ceilings') || Boolean(ceilingEdit) });
 }
 
 function activeTab() {
-  return `<div class="reading models-active">
+  return `<div class="models-active">
     ${writerBlock()}
     ${judgeBlock()}
     ${compilerNeedsSetup() ? '' : `<div class="disclosures">${ceilingsBlock()}</div>`}
@@ -260,11 +259,11 @@ function promptRow(item) {
 
 function modelsPage() {
   const tab = tabOf();
-  return settingsPage({ title: 'Models', view: 'models',
-    sections: TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), selected: tab,
-    primary: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '',
-    content: tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()
-  });
+  const sections = TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]);
+  const primary = tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '';
+  const content = tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab();
+  return `<div class="sheet">${pageHead({ title: 'Models', primary, strip: tabs('models', sections, tab, 'Models sections') })}
+    <div class="models-content">${content}</div></div>`;
 }
 
 async function switchJudge(label, from, request) {
@@ -384,4 +383,3 @@ VIEWS.models = { body: modelsPage, bind: bindModels, onEnter: enterModels, onLea
 // The old compiler page's address still works — the composer's picker and older
 // links point at it — and lands on Active with the rule writer's settings open.
 VIEWS.compiler = { ...VIEWS.models, railParent: 'models' };
-

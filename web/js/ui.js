@@ -329,8 +329,8 @@ export function confirmResult({ tone = 'success', title, body, action = '' }) {
  */
 export function dialog({ id = 'dialog', title, body, actions, close = true }) {
   return `<div class="dialog-scrim" data-dialog-scrim="${esc(id)}">
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="${esc(id)}Title">
-      ${title || close ? `<div class="dialog-head"><h2 id="${esc(id)}Title">${esc(title)}</h2>${close ? `<button type="button" class="dialog-close" data-dialog-close="${esc(id)}" aria-label="Close">×</button>` : ''}</div>` : ''}
+    <div class="dialog" role="dialog" aria-modal="true" ${title ? `aria-labelledby="${esc(id)}Title"` : 'aria-label="Confirmation"'}>
+      ${title || close ? `<div class="dialog-head"><h2 id="${esc(id)}Title">${esc(title)}</h2>${close ? `<button type="button" class="dialog-close" data-dialog-close="${esc(id)}" aria-label="Close"></button>` : ''}</div>` : ''}
       <div class="dialog-body">${body}</div>
       <div class="dialog-actions">${actions}</div>
     </div>
@@ -372,4 +372,3 @@ export function composer({ id, sendId, placeholder, sendLabel, busy = false, dis
     </div>
   </div>`;
 }
-

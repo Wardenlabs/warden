@@ -573,8 +573,14 @@ button.role-label:hover { background: var(--surface-subtle); }
 .disclosure > summary::-webkit-details-marker { display: none; }
 .disclosure-title { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
 .disclosure-datum { display: inline-flex; align-items: center; gap: var(--s-3); min-width: 0; font-size: var(--fs-3); color: var(--muted); text-align: right; }
-.chev::before { content: "⌄"; font-style: normal; font-size: var(--fs-3); color: var(--muted); }
-.disclosure[open] > summary .chev::before { content: "⌃"; }
+.chev { position: relative; display: inline-block; flex: none; width: 14px; height: 14px; }
+.chev::before {
+  content: ""; position: absolute; top: 3px; left: 4px; width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  color: var(--muted); transform: rotate(45deg); transform-origin: center;
+}
+.disclosure[open] > summary .chev::before,
+.conditions-toggle[aria-expanded="true"] .chev::before { top: 5px; transform: rotate(-135deg); }
 .disclosure > summary:hover .disclosure-title { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-control); }
 .disclosure-body { display: grid; gap: var(--s-5); padding: 0 0 var(--s-6); }
 .disclosure.--section { border-bottom: 0; }
@@ -617,19 +623,30 @@ button.role-label:hover { background: var(--surface-subtle); }
 .toast-mark { font-style: normal; color: var(--verdict-allow); font-weight: var(--fw-semi); line-height: 24px; }
 .toast-text { flex: 1; display: grid; gap: var(--s-1); font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); }
 .toast-text b { font-weight: var(--fw-medium); color: var(--ink); }
-.toast-close, .dialog-close { border: 0; background: none; padding: 0 var(--s-2); font-size: var(--fs-5); color: var(--ink); cursor: pointer; line-height: 24px; border-radius: var(--r-control); }
-.toast-close:hover, .dialog-close:hover { background: var(--surface-subtle); }
+.toast-close { border: 0; background: none; padding: 0 var(--s-2); font-size: var(--fs-5); color: var(--ink); cursor: pointer; line-height: 24px; border-radius: var(--r-control); }
+.toast-close:hover { background: var(--surface-subtle); }
 
 /* ── Dialog ─────────────────────────────────────────────────────────────── */
 .dialog-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--s-5); background: var(--scrim); }
 .dialog {
-  display: grid; gap: var(--s-7); width: min(520px, 100%); max-height: calc(100vh - 2 * var(--s-5)); overflow-y: auto;
+  display: grid; gap: var(--s-6); width: min(520px, 100%); max-height: calc(100vh - 2 * var(--s-5)); overflow-y: auto;
   padding: var(--s-7); border-radius: var(--r-control);
   background: var(--surface-raised); box-shadow: var(--shadow-float);
 }
-.dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); }
+.dialog-head { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .dialog-head h2 { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
-.dialog-body { display: grid; gap: var(--s-5); font-size: var(--fs-5); line-height: 1.5; color: var(--ink-body); }
+.dialog-close {
+  position: relative; width: 32px; height: 32px; flex: none; padding: 0; border: 0;
+  border-radius: var(--r-control); background: none; color: var(--ink); cursor: pointer;
+}
+.dialog-close::before, .dialog-close::after {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 1.5px;
+  border-radius: 1px; background: currentColor;
+}
+.dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.dialog-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.dialog-close:hover { background: var(--surface-subtle); }
+.dialog-body { display: grid; gap: var(--s-5); font-size: var(--fs-4); line-height: var(--lh-body); color: var(--ink-body); }
 .dialog-body p { margin: 0; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-4); flex-wrap: wrap; }
 
@@ -732,4 +749,3 @@ button.role-label:hover { background: var(--surface-subtle); }
 
 .rule-field { max-width: none; }
 .rule-field textarea { min-height: 88px; font-size: var(--fs-5); }
-

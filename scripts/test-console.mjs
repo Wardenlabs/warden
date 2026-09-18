@@ -816,7 +816,7 @@ test('while anybody is paused, the list says so and stops reporting a last-seen 
     ]));
     const list = VIEWS.people.body();
     assert.match(list, /is paused/, 'a gateway judging nobody must not look like one that is');
-    assert.match(list, /still recorded, marked not judged/);
+    assert.match(list, /still recorded as not judged/);
     assert.match(list, /by marce/, 'a pause nobody can attribute is a hole in the record');
     assert.match(list, /Paused<\/span>/, 'and the last-heard column says the thing that is true instead');
   } finally { Object.assign(state, saved); }

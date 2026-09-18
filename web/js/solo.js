@@ -411,7 +411,7 @@ function identityTab() {
     <dl class="record">
       <dt>Name</dt><dd>${esc(identity.name || identity.id)}</dd>
       <dt>Role</dt><dd>${esc(identity.role)}${exempt ? ' · exempt from company-wide rules' : ''}</dd>
-      <dt>Key</dt><dd><span class="mono">${esc(maskKey(identity.apiKey))}</span>${identity.apiKey ? button('Copy key', { compact: true, attrs: `data-copy="${attr(`export WARDEN_API_KEY=${identity.apiKey}`)}"` }) : ''}</dd>
+      <dt>Key</dt><dd class="identity-key"><span class="mono">${esc(maskKey(identity.apiKey))}</span>${identity.apiKey ? button('Copy key', { compact: true, attrs: `data-copy="${attr(`export WARDEN_API_KEY=${identity.apiKey}`)}"` }) : ''}</dd>
     </dl>
   </section>`;
 }
@@ -691,4 +691,3 @@ function bindSoloSettings() {
 }
 
 VIEWS.soloSettings = { body: soloSettingsBody, bind: bindSoloSettings };
-

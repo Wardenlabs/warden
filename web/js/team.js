@@ -511,12 +511,15 @@ function pausedBand() {
   if (!paused.length) return '';
   const names = paused.map((p) => esc(p.name)).join(', ');
   const one = paused.length === 1 ? activePause(paused[0]) : null;
-  const until = one ? (one.until ? `until ${new Date(one.until).toLocaleString()}` : 'until somebody turns it back on') : '';
+  const subject = paused.length === 1 && paused[0].name === 'You' ? 'You are' : `${names} ${paused.length === 1 ? 'is' : 'are'}`;
+  const requests = paused.length === 1 && paused[0].name === 'You' ? 'Your requests' : 'Their requests';
+  const timing = one?.until ? `until ${new Date(one.until).toLocaleString()}` : 'until protection is resumed';
+  const detail = one ? `Paused${one.by ? ` by ${one.by}` : ''} ${timing}${one.reason ? `. Reason: “${one.reason}”` : ''}. ` : '';
   return feedback({
     tone: 'attention',
     icon: true,
-    title: `${names} ${paused.length === 1 ? 'is' : 'are'} paused — ${paused.length === 1 ? 'their' : 'those'} requests are going through unchecked`,
-    body: esc(`${one ? `Paused ${until}${one.by ? ` by ${one.by}` : ''}${one.reason ? `: “${one.reason}”` : ''}. ` : ''}Every request is still recorded, marked not judged.`)
+    title: `${subject} paused. ${requests} go through unchecked.`,
+    body: esc(`${detail}Requests are still recorded as not judged.`)
   });
 }
 

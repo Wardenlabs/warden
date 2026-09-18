@@ -26,6 +26,8 @@
   .table { overflow-x: auto; }
   .table > .thead, .table > .trow, .table > .group-band, .table > .inline-editor, .table > .trow-note { min-width: 640px; }
   .model-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .job-block { grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+  .job-block > .section-title, .job-block > :not(.section-title) { grid-column: 1; }
 }
 
 @media (max-width: 640px) {
