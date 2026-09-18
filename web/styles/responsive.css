@@ -221,3 +221,12 @@ body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border
   .device-rule-action { grid-column: 2; grid-row: 1 / span 2; }
 }
 @media (prefers-reduced-motion: reduce) { .hero { animation: none; } .rule-emblem, .hero .composer { transition: none; } }
+@media (max-width: 760px) {
+  .settings-layout .conditions-rows { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .settings-layout .conditions-rows dt { padding: 8px 0 0; }
+  .settings-layout .conditions-rows dd { padding: 0 0 4px; }
+  .settings-layout .tool-name { grid-column: 1; grid-row: 1; }
+  .settings-layout .tool-facts { display: grid; grid-column: 1 / -1; grid-row: 2; gap: 4px; }
+  .settings-layout .tool-facts small::before { content: none; }
+  .settings-layout .tool-action { grid-column: 2; grid-row: 1; }
+}
