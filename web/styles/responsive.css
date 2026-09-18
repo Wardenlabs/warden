@@ -181,7 +181,10 @@ body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border
 .detail-panel[open] { display: flex; flex-direction: column; }
 .detail-panel::backdrop { background: color-mix(in srgb, var(--ink) 12%, transparent); }
 .detail-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: var(--s-4) var(--s-8); color: var(--muted); font-size: var(--fs-4); border-bottom: 1px solid var(--line-hairline); }
-.detail-close { display: grid; place-items: center; width: var(--h-control); height: var(--h-control); border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); font-size: var(--fs-7); cursor: pointer; }
+.detail-close { position: relative; width: var(--h-control); height: var(--h-control); padding: 0; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); cursor: pointer; }
+.detail-close::before, .detail-close::after { content: ""; position: absolute; top: 50%; left: 50%; width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
+.detail-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.detail-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 .detail-close:hover { background: var(--surface-selected); }
 .detail-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-9) var(--s-9); }
 .detail-panel .page-head { margin-inline: 0; padding-inline: 0; }

@@ -115,9 +115,10 @@ function templateOption(item) {
 
 function promptVariables(template, busy) {
   return `<section class="prompt-variables" aria-labelledby="promptVariablesTitle">
-    <div class="prompt-reference-heading"><h4 id="promptVariablesTitle">Variables</h4><span>Click to insert</span></div>
+    <div class="prompt-reference-heading"><h4 id="promptVariablesTitle">Insert variables</h4></div>
     ${template.tokens.length ? `<ul>${template.tokens.map((token) => `<li>
-      <div class="prompt-variable-heading"><button type="button" class="btn --link prompt-token" data-prompt-token="${esc(token.name)}"${busy ? ' disabled' : ''}><code>${esc(tokenText(token.name))}</code><span class="sr-only">Insert variable</span></button><span class="prompt-variable-kind">${token.required || template.requiredTokens?.includes(token.name) ? 'Required' : 'Optional'}</span></div>
+      <button type="button" class="prompt-token" data-prompt-token="${esc(token.name)}" aria-label="Insert ${esc(tokenText(token.name))}"${busy ? ' disabled' : ''}><code>${esc(tokenText(token.name))}</code><span class="prompt-token-action"><span aria-hidden="true">+</span> Insert</span></button>
+      <div class="prompt-variable-heading"><span class="prompt-variable-kind">${token.required || template.requiredTokens?.includes(token.name) ? 'Required' : 'Optional'}</span></div>
       <p>${esc(token.description)}</p></li>`).join('')}</ul>` : '<p class="field-help">No variables.</p>'}
   </section>`;
 }

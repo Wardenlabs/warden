@@ -115,8 +115,10 @@ function navItems() {
  * it is the sample, the line says so and is the one click that fixes it.
  */
 function workspaceLine() {
-  if (state.company.demo) return '<button type="button" data-go="people" data-sel="company">Sample data</button>';
-  return `<b>${esc(state.company.name || 'Your workspace')}</b>`;
+  const name = state.company.demo
+    ? '<button type="button" data-go="people" data-sel="company">Sample data</button>'
+    : `<b>${esc(state.company.name || 'Your workspace')}</b>`;
+  return `<span>Workspace</span>${name}`;
 }
 
 export function renderNav() {

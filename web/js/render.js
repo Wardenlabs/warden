@@ -33,7 +33,7 @@ export function detailShell(background, content, label) {
   const context = background.replace(/\sid="([^"]+)"/g, ' id="context-$1"');
   return `<div class="detail-context" inert aria-hidden="true">${context}</div>
     <dialog id="detailPanel" class="detail-panel" aria-label="${esc(label)} details">
-      <div class="detail-toolbar"><span>${esc(label)}</span><button type="button" id="closeDetail" class="detail-close" aria-label="Close details">×</button></div>
+      <div class="detail-toolbar"><span>${esc(label)}</span><button type="button" id="closeDetail" class="detail-close" aria-label="Close details"></button></div>
       <div id="detailScroll" class="detail-scroll">${content}</div>
     </dialog>`;
 }
