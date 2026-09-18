@@ -105,30 +105,6 @@
 .model-file-input::file-selector-button { margin-right: var(--s-4); padding: var(--s-2) var(--s-4); border: 1px solid var(--line-accessible); border-radius: var(--r-control); background: var(--surface-page); color: var(--ink); font: inherit; cursor: pointer; }
 
 .prompts-table .thead, .prompts-table .trow { grid-template-columns: minmax(0, 420fr) minmax(0, 200fr) minmax(0, 440fr) 80px; }
-.prompt-back { margin: 0 0 0 calc(-1 * var(--s-4)); }
-.prompt-editor { display: grid; gap: var(--s-5); max-width: var(--w-reading); }
-.prompt-editor h3 { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
-.prompt-editor h4 { margin: 0 0 var(--s-2); font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
-.prompt-editor-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--s-4); }
-.prompt-editor-heading .field-help { margin: var(--s-2) 0 0; }
-.prompt-editor form { display: grid; gap: var(--s-5); }
-.prompt-editor textarea { min-height: 22rem; font-family: var(--mono); font-size: var(--fs-3); line-height: var(--lh-body); tab-size: 2; }
-.prompt-editor textarea[aria-invalid="true"] { border-color: var(--verdict-block); }
-.prompt-errors { margin: 0; padding-left: var(--s-5); font-size: var(--fs-3); color: var(--verdict-block); overflow-wrap: anywhere; }
-.prompt-description { margin: 0; }
-.prompt-variables ul { display: grid; gap: var(--s-3); margin: var(--s-3) 0 0; padding: 0; list-style: none; }
-.prompt-variables li { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); align-items: start; gap: var(--s-4); font-size: var(--fs-3); }
-.prompt-variables li p { margin: var(--s-1) 0 0; color: var(--ink-body); overflow-wrap: anywhere; }
-.prompt-variable-kind { color: var(--muted); font-size: var(--fs-2); }
-.prompt-token code { font-family: var(--mono); font-size: var(--fs-3); overflow-wrap: anywhere; }
-.prompt-reference { border-top: 1px solid var(--line-hairline); padding-top: var(--s-4); }
-.prompt-reference summary { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); cursor: pointer; }
-.prompt-reference pre { max-height: 26rem; overflow: auto; margin: var(--s-3) 0; padding: var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-family: var(--mono); font-size: var(--fs-3); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-body); }
-.prompt-save-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-hairline); }
-.prompt-save-row .actions, .prompt-conflict .actions, .prompt-reset-confirm .actions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
-.prompt-conflict, .prompt-reset-confirm { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle); font-size: var(--fs-4); }
-.prompt-conflict p, .prompt-reset-confirm p { margin: 0; color: var(--ink-body); }
-.prompt-feedback:empty { display: none; }
 .skeleton-line { display: block; width: 70%; height: 12px; margin: var(--s-2) 0; border-radius: var(--r-control); background: var(--surface-subtle); }
 .skeleton-line.short { width: 45%; }
 
@@ -263,7 +239,6 @@
 .model-loading { display: grid; gap: var(--s-2); }
 .empty { display: grid; gap: var(--s-3); max-width: var(--w-reading); padding-block: var(--s-12); font-size: var(--fs-4); color: var(--muted); }
 .empty b { font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink); }
-.prompt-template-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
 .device-page .disclosure-text { color: var(--muted); }
 
 

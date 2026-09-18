@@ -3,4 +3,5 @@
 @import url("./styles/components.css");
 @import url("./styles/rules.css");
 @import url("./styles/settings.css");
+@import url("./styles/prompt-editor.css");
 @import url("./styles/responsive.css");

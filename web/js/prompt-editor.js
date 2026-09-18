@@ -90,7 +90,7 @@ export function validatePromptTemplate(template, text) {
   if (missing.length) errors.push(`Keep the required variables: ${missing.map(tokenText).join(', ')}.`);
   const known = new Set(template.tokens.map((token) => token.name));
   const unknown = [...new Set([...text.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1]).filter((name) => !known.has(name)))];
-  if (unknown.length) errors.push(`Unknown variables: ${unknown.map(tokenText).join(', ')}. Use the variables listed below.`);
+  if (unknown.length) errors.push(`Unknown variables: ${unknown.map(tokenText).join(', ')}. Use the listed variables.`);
   if (/\{\{|\}\}/.test(text.replace(/\{\{[^{}]*\}\}/g, '')) || text.includes('{{}}')) errors.push('Write variables exactly as {{name}}, with matching braces and no spaces or expressions.');
   return errors;
 }
@@ -98,7 +98,7 @@ export function validatePromptTemplate(template, text) {
 function draftStatus(draft) {
   if (draft.conflict) return 'A newer version was saved. Review it before saving your draft.';
   if (dirty(draft)) return 'Unsaved changes';
-  return 'No unsaved changes';
+  return 'Saved';
 }
 
 function errorMarkup(errors) {
@@ -113,32 +113,58 @@ function templateOption(item) {
   return `${item.name}${item.active ? ' · In use' : ''}${item.custom ? ' · Custom' : ''}${dirty(promptEditor.drafts[item.id]) ? ' · Unsaved' : ''}`;
 }
 
-export function promptEditorMarkup(role) {
+function promptVariables(template, busy) {
+  return `<section class="prompt-variables" aria-labelledby="promptVariablesTitle">
+    <div class="prompt-reference-heading"><h4 id="promptVariablesTitle">Variables</h4><span>Click to insert</span></div>
+    ${template.tokens.length ? `<ul>${template.tokens.map((token) => `<li>
+      <div class="prompt-variable-heading"><button type="button" class="btn --link prompt-token" data-prompt-token="${esc(token.name)}"${busy ? ' disabled' : ''}><code>${esc(tokenText(token.name))}</code><span class="sr-only">Insert variable</span></button><span class="prompt-variable-kind">${token.required || template.requiredTokens?.includes(token.name) ? 'Required' : 'Optional'}</span></div>
+      <p>${esc(token.description)}</p></li>`).join('')}</ul>` : '<p class="field-help">No variables.</p>'}
+  </section>`;
+}
+
+function promptReference(template, draft, busy) {
+  return `<aside class="prompt-reference-panel" aria-label="Template reference">
+    ${promptVariables(template, busy)}
+    <details class="prompt-reference" data-prompt-reference="format"${draft.referenceOpen?.format ? ' open' : ''}><summary>Response format</summary><pre>${esc(template.outputContract)}</pre></details>
+    <details class="prompt-reference" data-prompt-reference="default"${draft.referenceOpen?.default ? ' open' : ''}><summary>Default template</summary><pre>${esc(template.defaultTemplate)}</pre>
+      <button type="button" class="btn" id="restorePromptDefault"${busy || draft.conflict || (!template.custom && draft.text === template.defaultTemplate) ? ' disabled' : ''}>Restore default</button></details>
+    <details class="prompt-reference" data-prompt-reference="notes"${draft.referenceOpen?.notes ? ' open' : ''}><summary>Editing notes</summary>
+      <p>${esc(template.description)}</p><p>Changes apply to new requests. Keep required variables exactly as written.</p>
+      <p>Save before closing or reloading. Unsaved drafts stay in this tab.</p>
+      <p>Up to 32,768 characters. Ctrl+Enter or ⌘+Enter saves.</p>
+    </details>
+  </aside>`;
+}
+
+export function promptEditorMarkup(role, navigation = '') {
   if (promptEditor.openRole !== role) return '';
   const name = role === 'compiler' ? 'Compiler' : 'Analyzer';
   const choices = promptEditor.catalog?.templates.filter((item) => item.role === role) ?? [];
   const template = choices.find((item) => item.id === promptEditor.selected[role]) ?? preferredTemplate(choices);
   if (template) promptEditor.selected[role] = template.id;
-  const shell = `<section class="prompt-editor" id="${role}Prompts" aria-labelledby="${role}PromptsTitle" aria-busy="${promptEditor.loading || Boolean(promptEditor.busy)}"><div class="prompt-editor-heading"><div><h3 id="${role}PromptsTitle">${name} prompts</h3></div><button type="button" class="btn --link" id="refreshPrompts"${promptEditor.loading || promptEditor.busy ? ' disabled' : ''}>Refresh prompts</button></div>`;
+  const shell = `<section class="prompt-editor" id="${role}Prompts" aria-labelledby="${role}PromptsTitle" aria-busy="${promptEditor.loading || Boolean(promptEditor.busy)}"><div class="prompt-editor-heading"><div class="prompt-location">${navigation}<h3 id="${role}PromptsTitle">${name} prompts</h3></div><button type="button" class="btn --link" id="refreshPrompts"${promptEditor.loading || promptEditor.busy ? ' disabled' : ''}>Refresh</button></div>`;
   if (!template) return `${shell}${promptEditor.loading ? '<div class="model-loading" role="status"><span class="sr-only">Loading prompt templates</span><i class="skeleton-line"></i><i class="skeleton-line short"></i></div>' : `<p class="form-note --block" role="alert">${esc(promptEditor.error || 'No prompt templates are available. Refresh to try again.')}</p>`}</section>`;
   const draft = draftFor(template);
   const busy = Boolean(promptEditor.busy);
   return `${shell}
     ${promptEditor.error ? `<p class="form-note --block" role="alert">${esc(promptEditor.error)} Your drafts are kept.</p>` : ''}
     <form id="promptEditorForm" novalidate>
-      <div class="prompt-template-picker field"><label for="promptTemplate">Prompt template</label><select id="promptTemplate" data-no-restore${busy ? ' disabled' : ''}>${choices.map((item) => `<option value="${esc(item.id)}"${item.id === template.id ? ' selected' : ''}>${esc(templateOption(item))}</option>`).join('')}</select></div>
-      <div class="prompt-template-heading"><h3>${esc(template.name)}</h3><span class="model-status${template.custom ? ' warn' : ''}">${template.custom ? 'Custom prompt saved' : 'Default prompt'}</span><span class="model-status${template.active ? ' good' : ''}">${template.active ? 'In use' : 'Available for another configuration'}</span></div>
-      <p class="field-help prompt-description">${esc(template.description)}</p>
-      <div class="field prompt-text-field"><label for="promptTemplateText">Template text</label><textarea id="promptTemplateText" data-no-restore spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="32768" aria-describedby="promptTextHelp promptValidation" aria-invalid="${draft.errors.length > 0}"${busy ? ' readonly' : ''}>${esc(draft.text)}</textarea><p class="field-help" id="promptTextHelp">${template.tokens.length ? 'Warden fills the variables below with request data. Keep required variables exactly as written.' : 'This template is used as written; it has no replaceable variables.'} Up to 32,768 characters. Ctrl+Enter or ⌘+Enter saves.</p><div id="promptValidation" role="alert">${errorMarkup(draft.errors)}</div></div>
-      <div class="prompt-variables"><h4>Variables</h4><p class="field-help">Select a variable to insert it at the text cursor.</p>${template.tokens.length ? `<ul>${template.tokens.map((token) => `<li><button type="button" class="btn --link prompt-token" data-prompt-token="${esc(token.name)}"${busy ? ' disabled' : ''}><code>${esc(tokenText(token.name))}</code><span class="sr-only">Insert variable</span></button><div><span class="prompt-variable-kind">${token.required || template.requiredTokens?.includes(token.name) ? 'Required' : 'Optional'}</span><p>${esc(token.description)}</p></div></li>`).join('')}</ul>` : '<p class="field-help">This template has no variables.</p>'}</div>
-      <details class="prompt-reference"><summary>Required response format · read only</summary><pre>${esc(template.outputContract)}</pre><p class="field-help">Saving a prompt does not change this response contract or certify its policy accuracy.</p></details>
-      <details class="prompt-reference"><summary>View the default template</summary><pre>${esc(template.defaultTemplate)}</pre></details>
+      <div class="prompt-toolbar">
+        <div class="prompt-template-picker"><label class="sr-only" for="promptTemplate">Prompt template</label><select id="promptTemplate" data-no-restore${busy ? ' disabled' : ''}>${choices.map((item) => `<option value="${esc(item.id)}"${item.id === template.id ? ' selected' : ''}>${esc(templateOption(item))}</option>`).join('')}</select></div>
+        <div class="actions"><button type="button" class="btn --link" id="discardPromptDraft"${busy || !dirty(draft) ? ' disabled' : ''}>Discard changes</button><button type="submit" class="btn --primary" id="savePrompt"${busy || !dirty(draft) || draft.conflict ? ' disabled' : ''}>${promptEditor.busy === 'save' ? 'Saving…' : 'Save prompt'}</button></div>
+      </div>
       ${draft.conflict ? `<div class="prompt-conflict" role="alert"><h4>A newer prompt is saved</h4><p>Your draft is preserved. Compare it with the saved version before choosing which to keep.</p><details class="prompt-reference"><summary>View the latest saved template</summary><pre>${esc(template.template)}</pre></details><div class="actions"><button type="button" class="btn" id="useSavedPrompt"${busy ? ' disabled' : ''}>Discard draft and use saved prompt</button><button type="button" class="btn" id="keepPromptDraft"${busy ? ' disabled' : ''}>Keep my draft</button></div></div>` : ''}
-      <p class="field-help">Changes apply to new requests.</p>
-      <div class="prompt-save-row"><div class="actions"><button type="submit" class="btn --primary" id="savePrompt"${busy || !dirty(draft) || draft.conflict ? ' disabled' : ''}>${promptEditor.busy === 'save' ? 'Saving…' : 'Save prompt'}</button><button type="button" class="btn" id="discardPromptDraft"${busy || !dirty(draft) ? ' disabled' : ''}>Discard changes</button><button type="button" class="btn --link" id="restorePromptDefault"${busy || draft.conflict || (!template.custom && draft.text === template.defaultTemplate) ? ' disabled' : ''}>Restore default</button></div><span id="promptDraftStatus" class="field-help${dirty(draft) ? ' --attention' : ''}" role="status">${esc(draftStatus(draft))}</span></div>
+      <div class="prompt-workspace">
+        <div class="prompt-text-field">
+          <div class="prompt-text-heading"><label for="promptTemplateText">Template text</label><span id="promptDraftStatus" class="prompt-draft-status" role="status">${esc(draftStatus(draft))}</span></div>
+          <textarea id="promptTemplateText" data-no-restore spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="32768" aria-describedby="promptTextHelp promptValidation" aria-invalid="${draft.errors.length > 0}"${busy ? ' readonly' : ''}>${esc(draft.text)}</textarea>
+          <span class="sr-only" id="promptTextHelp">Keep required variables exactly as written. Ctrl+Enter or ⌘+Enter saves.</span>
+          <div id="promptValidation" role="alert">${errorMarkup(draft.errors)}</div>
+          <div id="promptFeedback" class="prompt-feedback">${noteMarkup(draft.note)}</div>
+        </div>
+        ${promptReference(template, draft, busy)}
+      </div>
       ${promptEditor.confirmReset === template.id ? `<div class="prompt-reset-confirm" role="group" aria-label="Restore default prompt"><p>Restore the default ${esc(template.name.toLowerCase())} for new requests? This also discards this template’s unsaved changes.</p><div class="actions"><button type="button" class="btn" id="confirmPromptReset"${busy ? ' disabled' : ''}>${promptEditor.busy === 'reset' ? 'Restoring…' : 'Restore default prompt'}</button><button type="button" class="btn --link" id="cancelPromptReset"${busy ? ' disabled' : ''}>Keep current prompt</button></div></div>` : ''}
-      <div id="promptFeedback" class="prompt-feedback">${noteMarkup(draft.note)}</div>
-      <p class="field-help prompt-draft-help">Unsaved drafts stay in this browser tab while you switch templates or leave Models. Save before closing or reloading the tab.</p>
     </form>
   </section>`;
 }
@@ -147,7 +173,7 @@ function updateDraftControls(template, draft) {
   if ($('savePrompt')) $('savePrompt').disabled = Boolean(promptEditor.busy) || !dirty(draft) || draft.conflict;
   if ($('discardPromptDraft')) $('discardPromptDraft').disabled = Boolean(promptEditor.busy) || !dirty(draft);
   if ($('restorePromptDefault')) $('restorePromptDefault').disabled = Boolean(promptEditor.busy) || draft.conflict || (!template.custom && draft.text === template.defaultTemplate);
-  if ($('promptDraftStatus')) { $('promptDraftStatus').textContent = draftStatus(draft); $('promptDraftStatus').className = `field-help${dirty(draft) ? ' --attention' : ''}`; }
+  if ($('promptDraftStatus')) { $('promptDraftStatus').textContent = draftStatus(draft); $('promptDraftStatus').className = 'prompt-draft-status'; }
   const option = [...($('promptTemplate')?.options ?? [])].find((item) => item.value === template.id);
   if (option) option.textContent = templateOption(template);
   if ($('promptValidation')) $('promptValidation').innerHTML = errorMarkup(draft.errors);
@@ -203,6 +229,12 @@ export function bindPromptEditor() {
   if (!template || !textarea) return;
   const draft = draftFor(template);
   textarea.setSelectionRange(draft.start, draft.end);
+  textarea.scrollTop = draft.scrollTop ?? 0;
+  textarea.onscroll = () => { draft.scrollTop = textarea.scrollTop; };
+  // Live updates must not close the reference someone is reading.
+  for (const section of document.querySelectorAll('[data-prompt-reference]')) section.ontoggle = () => {
+    (draft.referenceOpen ??= {})[section.dataset.promptReference] = section.open;
+  };
   const rememberCursor = () => { draft.start = textarea.selectionStart; draft.end = textarea.selectionEnd; };
   rememberCursor();
   textarea.onselect = rememberCursor;

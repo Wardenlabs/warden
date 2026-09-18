@@ -232,23 +232,13 @@ function activeTab() {
 function promptsTab() {
   const templates = promptEditor.catalog?.templates ?? [];
   if (promptEditor.openRole) {
-    return `<div class="prompt-back">${button('← All templates', { kind: 'link', id: 'closePromptTemplate' })}</div>
-      ${promptEditorMarkup(promptEditor.openRole)}`;
+    return promptEditorMarkup(promptEditor.openRole, button('← All templates', { kind: 'link', id: 'closePromptTemplate' }));
   }
   if (!templates.length) {
     return promptEditor.loading
       ? feedback({ title: 'Loading prompt templates…' })
       : `${feedback({ tone: 'attention', title: 'Could not load the prompt templates', body: esc(promptEditor.error || 'No prompt templates are available.') })}<div class="list-state-action">${button('Retry loading', { kind: 'primary', id: 'refreshPrompts' })}</div>`;
   }
-  /*
-   * The tab's own lede, out of the page header.
-   *
-   * Two of the three descriptions the header used to cycle through were the
-   * tab's name said again — "Two jobs run Warden", "Saved weights and
-   * connections" — and those are gone. This one is not: what an edit here does
-   * and does not touch is a caveat about the screen's consequences, and it was
-   * only ever visible while this tab was open anyway.
-   */
   return `${promptEditor.error ? feedback({ tone: 'error', icon: true, title: 'Prompts could not be refreshed', body: `${esc(promptEditor.error)} Your drafts are kept.` }) : ''}
     <div class="table prompts-table" role="table" aria-label="Prompt templates">
       <div class="thead" role="row"><span>Template</span><span>Job</span><span>Status</span><span></span></div>

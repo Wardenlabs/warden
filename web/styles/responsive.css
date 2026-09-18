@@ -26,7 +26,6 @@
   .table { overflow-x: auto; }
   .table > .thead, .table > .trow, .table > .group-band, .table > .inline-editor, .table > .trow-note { min-width: 640px; }
   .model-form-grid { grid-template-columns: minmax(0, 1fr); }
-  .prompt-variables li { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
