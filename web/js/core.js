@@ -111,8 +111,8 @@ export const attr = (s) => encodeURIComponent(String(s ?? ''));
 export const val = (x) => (typeof x === 'function' ? x() : x);
 
 export const state = {
-  view: 'activity',
-  sel: null,
+  view: 'policy',
+  sel: 'new',
   query: {},
 
   /** Per list: `{ loading, error }`. Absent means never requested yet. */

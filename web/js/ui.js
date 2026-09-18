@@ -263,7 +263,7 @@ export function conditionBlock({ key, claim, detail = '', tone = 'allow', summar
    * a fault, so it takes `tone: 'muted'`: grey dot, ink text, and the detail
    * says how long it lasts. Amber is reserved for what Warden did not choose.
    */
-  const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${esc(tone)}`}"><span class="dot --${esc(tone)}"></span><b>${esc(claim)}</b>${detail ? `<span class="conditions-detail">${esc(detail)}</span>` : ''}</p>`;
+  const claimLine = `<p class="conditions-claim${tone === 'allow' ? '' : ` --${esc(tone)}`}"><b>${esc(claim)}</b>${detail ? `<span class="conditions-detail">${esc(detail)}</span>` : ''}</p>`;
 
   /*
    * The control is a button with `aria-expanded`, and that is a bug fix rather

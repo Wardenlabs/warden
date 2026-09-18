@@ -208,7 +208,7 @@ function rulesSection() {
     ${state.soloToggleError ? feedback({ tone: 'error', icon: true, title: 'That rule did not change', body: esc(state.soloToggleError) }) : ''}
     ${state.soloLoadError && !onRules.length && !offPresets.length
       ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
-      : loading ? feedback({ title: 'Loading the rules for this device…', body: 'Fetching what is turned on and what is suggested.' })
+      : loading ? feedback({ title: 'Loading the rules for this device…', body: '' })
         /*
          * No empty sentence, and the reason is not the layout.
          *
@@ -303,12 +303,12 @@ function conditions() {
     // more than one, so on such an installation "You" can be somebody else's
     // identity. The fix is deciding whose screen this is, not printing a name.
     identity
-      ? { label: 'You', value: 'You · this gateway knows your key' }
-      : { label: 'You', tone: 'attention', value: 'This gateway did not answer with an identity for you' },
+      ? { label: 'You', value: 'Connected' }
+      : { label: 'You', tone: 'attention', value: 'Identity unavailable' },
     wiringRow(wired, judged),
     state.mock
-      ? { label: 'The judge', tone: 'attention', value: 'Mock adapter · a stand-in answers, no model reads your prompts' }
-      : { label: 'The judge', value: `${esc(judgeName())} · on this device, nothing leaves it` },
+      ? { label: 'The judge', tone: 'attention', value: 'Demo mode' }
+      : { label: 'The judge', value: `${esc(judgeName())} · local` },
     rulesRow(onRules, exemptRules, exempt)
   ];
 
@@ -328,7 +328,7 @@ function conditions() {
      * What the pause actually costs you is a fact like the other five, and it
      * sits with them in the evidence rather than shouting over the headline.
      */
-    claim: paused ? 'Paused' : gaps.length ? 'Not judging you yet' : 'Protection is on',
+    claim: paused ? 'Paused' : gaps.length ? 'Setup incomplete' : 'Protection on',
     detail: paused ? pauseDetail(paused) : '',
     tone: paused ? 'muted' : gaps.length ? 'attention' : 'allow',
     summary: esc(`${wired.map((t) => t.name).join(' and ')} wired, judged by ${judgeName()} on this device, against ${plural(onRules.length, 'rule')} addressed at you.`),
@@ -369,8 +369,8 @@ function wiringRow(wired, judged) {
       label: 'Your tools',
       tone: 'attention',
       value: reported
-        ? 'Nothing on this device is wired to Warden'
-        : 'No tool has reported its wiring yet'
+        ? 'No tools connected'
+        : 'No connection reported'
     };
   }
   const last = judged.map((t) => Date.parse(t.connected.at)).filter(Number.isFinite).sort((a, b) => b - a)[0];
@@ -407,8 +407,8 @@ function rulesRow(onRules, exemptRules, exempt) {
     label: 'Rules for you',
     tone: 'attention',
     value: exempt && exemptRules.length
-      ? `None. ${plural(exemptRules.length, 'company-wide rule')} exist and your role is exempt from them, so nothing judges you.`
-      : 'None. Nothing is addressed at you, so there is nothing to judge a request against.'
+      ? `No applicable rules · exempt from ${plural(exemptRules.length, 'company-wide rule')}.`
+      : 'No applicable rules.'
   };
 }
 

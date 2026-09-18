@@ -141,7 +141,7 @@ function writerBlock() {
   if (compilerNeedsSetup()) {
     return `<section class="job-block" aria-labelledby="compilerTitle">
       <h2 class="section-title" id="compilerTitle">Rule writer</h2>
-      <p class="job-warning">Needs setup — rules can't be written yet.</p>
+      <p class="job-warning">Setup required.</p>
       <div class="job-setup-host">${compilerSettings()}</div>
     </section>`;
   }
@@ -206,7 +206,7 @@ function ceilingsBlock() {
         </div>`;
       }).join('')}
     </div>
-    <p class="table-foot">Hitting a ceiling escalates the request — it never blocks. Blank means no limit. A role needs a daily limit on <button type="button" class="linkish" data-go="people" data-sel="roles">Team → Roles</button> before it can have ceilings.</p>`;
+    <p class="table-foot">Set a daily limit in <button type="button" class="linkish" data-go="people" data-sel="roles">Team → Roles</button> to enable session ceilings.</p>`;
   return disclosureRow('m:ceilings', 'Session ceilings', `${set ? `Set for ${plural(set, 'role')}` : 'None set'} · per role · escalate, never block`, body, { open: state.open.has('m:ceilings') || Boolean(ceilingEdit) });
 }
 

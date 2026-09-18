@@ -24,7 +24,7 @@ export function compilerNeedsSetup() {
 /** Shared by solo and team: a setup step, with the rest of the console open. */
 export function compilerSetupNudge() {
   if (!compilerNeedsSetup() || ['models', 'compiler'].includes(state.view)) return '';
-  return feedback({ tone: 'attention', title: 'Choose what writes your rules', body: 'Warden needs a model to turn your instructions into rules. Nothing drafts until you pick one; you can keep exploring, or start from the rule presets. Employee requests are analyzed on this machine either way.<div class="feedback-actions"><button type="button" class="btn --primary --compact" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>' });
+  return feedback({ tone: 'attention', title: 'Set up rule drafting', body: '<div class="feedback-actions"><button type="button" class="btn --primary --compact" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>' });
 }
 
 const defaultProviderModel = (provider) => provider?.id.endsWith('-cli') ? '' : provider?.models?.[0] ?? '';
@@ -53,15 +53,15 @@ function localCompilerMissing() {
 }
 
 function localCompilerNote() {
-  if (!localCompilerMissing()) return '<p class="field-help">Uses the compiler weights installed on this machine. Your own local weights live on the Library tab.</p>';
+  if (!localCompilerMissing()) return '';
   const selected = state.compiler?.provider === 'local' && !compilerNeedsSetup();
   return `<div class="compiler-local-missing"><p class="form-note --attention">The local compiler model is not downloaded. ${selected ? 'Download its weights before drafting a rule.' : 'Apply this selection, then download its weights before drafting a rule.'}</p>${state.canLeaveDemo ? `<button type="button" class="btn js-get-models"${selected ? '' : ' disabled'}>Download models</button>` : '<p class="field-help">After applying, run <code>pnpm run setup</code> on the gateway to download the local compiler.</p>'}</div>`;
 }
 
 function compilerFeedback() {
   const busy = state.compilerBusy;
-  if (busy === 'test') return '<p class="field-help">Checking the connection with a short test request…</p>';
-  if (busy === 'refresh') return '<p class="field-help">Checking installation and sign-in status…</p>';
+  if (busy === 'test') return '<p class="field-help">Testing connection…</p>';
+  if (busy === 'refresh') return '<p class="field-help">Checking…</p>';
   const t = state.compilerTest;
   if (!t) return '';
   let text;
@@ -106,7 +106,7 @@ function claudeQuickSetup(draft) {
     ${installed === false ? `<p class="job-note">Install the command-line app on this gateway, as the same user running Warden, then refresh its status.</p>
       <div><a class="btn" href="https://code.claude.com/docs/en/setup#install-claude-code" target="_blank" rel="noopener noreferrer">Open installation guide<span class="sr-only"> in a new tab</span></a></div>` : ''}
     ${installed !== false && !signedIn ? `<div class="claude-login-command"><code>claude auth login</code><button type="button" class="btn --compact" data-copy="${attr('claude auth login')}">Copy sign-in command</button></div>` : ''}
-    <div class="disclosures">${disclosureRow('m:another', 'Use another model', '', '<p class="disclosure-text">Choose a local model, another signed-in CLI, or an endpoint.</p><div><button type="button" class="btn --compact" id="cAnother">Choose another model</button></div>', { open: state.open.has('m:another') })}</div>
+    <div class="disclosures">${disclosureRow('m:another', 'Use another model', '', '<div><button type="button" class="btn --compact" id="cAnother">Choose another model</button></div>', { open: state.open.has('m:another') })}</div>
   </div>`;
 }
 
@@ -149,7 +149,7 @@ export function compilerSettings() {
     </form>`;
   }
   return `<form id="compilerForm" class="model-editor" aria-label="Compiler settings" aria-busy="${Boolean(busy)}">
-    <p class="field-help">The compiler turns your instructions into rules. A provider or signed-in CLI can receive your instruction, role names and staff list. Employee requests are analyzed locally.</p>
+    ${disclosureRow('compiler:privacy', 'Data shared', '', '<p class="disclosure-text">Remote providers receive instructions, role names and the team list. Employee requests are analyzed locally.</p>', { open: state.open.has('compiler:privacy') })}
     ${c.configurationError ? feedback({ tone: 'error', icon: true, title: 'Compiler configuration needs attention.', body: esc(c.configurationError) }) : ''}
     ${c.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment.', body: 'Your saved preference will apply after the environment override is removed.' }) : ''}
     <fieldset class="model-fields"${busy ? ' disabled' : ''}>
@@ -158,15 +158,15 @@ export function compilerSettings() {
         <select id="cProvider" data-no-restore>${(c.providers ?? []).map((p) => `<option value="${esc(p.id)}"${p.id === d.provider ? ' selected' : ''}>${esc(p.label)}${cliFor(p.id)?.found === false ? ' · not installed' : ''}</option>`).join('')}</select>
         ${claude ? '' : cliNote(d.provider)}
       </div>
-      ${remote ? `<div class="field"><label for="cBase">API endpoint</label><input id="cBase" type="text" spellcheck="false" autocomplete="url" required value="${esc(d.baseUrl)}" placeholder="https://api.example.com/v1"><span class="field-help">Use the provider’s OpenAI-compatible endpoint.</span></div>` : ''}
+      ${remote ? `<div class="field"><label for="cBase">API endpoint</label><input id="cBase" type="text" spellcheck="false" autocomplete="url" required value="${esc(d.baseUrl)}" placeholder="https://api.example.com/v1"></div>` : ''}
       ${remote || cli ? `<div class="field">
         <label for="cModel">Model ${cli ? '<span class="optional">(optional)</span>' : ''}</label>
         <input id="cModel" type="text" spellcheck="false" list="cModelList"${remote ? ' required' : ''} value="${esc(d.model)}" placeholder="${esc(cli ? claude ? 'Claude Code default' : 'CLI default' : chosen?.models?.[0] ?? 'Provider default')}">
         <datalist id="cModelList">${(chosen?.models ?? []).map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>
-        ${cli ? `<span class="field-help">Leave blank to use ${claude ? 'Claude Code’s configured default' : 'the CLI’s configured default'}. Warden does not choose a model alias for you.</span>` : ''}
+
         ${chosen?.note ? `<span class="field-help">${esc(chosen.note)}</span>` : ''}
       </div>` : localCompilerNote()}
-      ${remote ? `<div class="field"><label for="cKey">API key <span class="optional">(if required)</span></label><input id="cKey" type="password" autocomplete="off" spellcheck="false" value="" placeholder="${testedKey ? 'Tested key ready to apply.' : c.hasKey ? 'A key is saved. Leave blank to keep it.' : 'Enter a provider key'}"><span class="field-help">Stored on the gateway. Saved keys are never returned to this page.</span></div>` : ''}
+      ${remote ? `<div class="field"><label for="cKey">API key <span class="optional">(if required)</span></label><input id="cKey" type="password" autocomplete="off" spellcheck="false" value="" placeholder="${testedKey ? 'Tested key ready to apply.' : c.hasKey ? 'A key is saved. Leave blank to keep it.' : 'Enter a provider key'}"></div>` : ''}
       ${remote || cli ? `<div class="field"><label class="check"><input id="cRedact" type="checkbox"${d.redactNames ? ' checked' : ''}><span>Replace employee names with their IDs before sending</span></label></div>` : ''}
       ${claude ? claudeSetup(d) : `<div class="actions">
         ${remote ? '<button type="button" class="btn" id="cTest">Test connection</button>' : ''}

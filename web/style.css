@@ -1,72 +1,13 @@
-/*
- * Served as one static file with no build step. A demo that needs `npm run
- * build` before it can be shown is a demo that fails at the wrong moment.
- *
- * A dark sidebar fixed on the left and one origin for content: every title,
- * table, thread and card starts 40px in from the sidebar's edge. Conversations
- * and settings read in a 760px column; tables take 1120 and their rows bleed
- * 20px either side so hover and focus land in the gutter, not on the text.
- * Anything that sits under a group band bleeds with it — a band whose label
- * is 20px to the right of the rows beneath it is the tell that it did not.
- *
- * Vertically there is one number, `--s-block`, and the container spends it:
- * `.sheet` is a grid and the blocks in it carry no margin to each other. This
- * is the rule the file used to break everywhere, and it broke silently —
- * margins collapse in flow and add in grid, so the same component came out
- * 16px from its neighbour on Team and 52px on This device. A block that wants
- * to sit closer says so on its container (`.flush-head`), never on itself.
- *
- * Everything is grey except the verdicts and the role identities. Radius is 6
- * on anything with a box — the composer is the one exception and says why at
- * `--r-composer` — pills do not exist, and hover is a fill rather than
- * a border. Dark mode follows the operating system unless the account menu
- * says otherwise (html[data-theme], three states, system is the default):
- * every dark value below is a decision taken in Figma ("Warden · Sistema"),
- * never an automatic inversion, and floating surfaces get lighter than the
- * paper rather than darker. The dark tokens appear twice — under the media
- * query and under [data-theme="dark"] — because CSS has no way to share the
- * block without a build step: edit both or neither.
- *
- * No literal colour and no literal font-size appears outside the two theme
- * blocks of :root. Pick a token by its role, never by its value:
- * --sidebar-bg and --surface-subtle hold the same #F4F5F4 in light and are
- * still two names, because they answer to two roles. The converse also gets
- * acted on: --sidebar-selected-bg was folded into --surface-selected the day
- * the tab, the filter and the sidebar band became one answer to "this one is
- * chosen".
- *
- * The neutrals moved from blue-grey to green-grey on 2026-09-16, from the
- * "Warden · Sistema" collection (node 677:2054, docs/specs/first-run-and-theme.md
- * §3). The verdicts and the roles did not move: they were already the
- * collection's values, checked hex by hex. The map from these names to Figma's
- * is --ink ↔ ink/default, --ink-body ↔ ink/body, --muted ↔ ink/muted,
- * --action ↔ action/graphite, --action-ink ↔ action/on-graphite; the rest share
- * a name. Figma writes them --warden-ink-default and so on; renaming 1200 lines
- * of stylesheet to gain a prefix buys nothing, so the names here stay.
- *
- * **Every number below is Figma's, and Figma is where it gets changed.** The
- * same collection now carries the sizes and the spacing as well as the colour,
- * in two layers: `primitive/space-N` is the raw ramp, hidden from the picker,
- * and `space/inset-*` and `space/stack-*` are what a component actually binds
- * to. That split is the one this file makes too — `--s-1` to `--s-4` are the
- * air inside a thing and do not move with the scale, `--s-5` upward is the
- * distance between things and does. The type is Figma's ten text styles rather
- * than variables, which is why the sizes here have no counterpart to bind to
- * and are matched by hand:
- *
- *   --fs-1 11 Label · --fs-2 12 Code / Small · --fs-3 12 Caption
- *   --fs-4 13 UI and Secondary · --fs-5 15 Body
- *   --fs-6 18 Heading, the dominant thing inside a block
- *   --fs-7 22 Title, the page's own name
- *
- * --fs-2 and --fs-3 hold the same 12 and are still two names, for the same
- * reason --sidebar-bg and --surface-subtle hold the same #F4F5F4: one is mono
- * metadata and the other is prose, and they will not stay equal forever.
- * The heights map one to one: --h-control ↔ size/control, --h-page-row ↔
- * size/page-row, --h-tabs ↔ size/tabs, --h-record-row ↔ size/record-row,
- * --w-sidebar ↔ size/sidebar, --w-reading ↔ size/reading, --w-table ↔
- * size/table, --w-bleed ↔ size/bleed, and .trow ↔ size/row.
- */
+/* The console keeps full-width lists inside a breathing frame. Selected
+ * records open in one shared right-hand panel; only prose keeps a reading
+ * measure. Colours remain Warden's green-grey palette and verdict signals. */
+@font-face {
+  font-family: "Manrope";
+  src: url("/assets/fonts/Manrope-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
 
 :root {
   color-scheme: light;
@@ -101,15 +42,15 @@
   /* verdicts — the only saturated colour in the product */
   --verdict-block: #B91C41;     --verdict-block-bg: #FFF0F3;
   --verdict-allow: #087356;     --verdict-allow-bg: #E8F8F1;
-  --verdict-attention: #7B6200; --verdict-attention-bg: #FFF9DE;
+  --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
   --signal-red: #FF3B5C;
 
   /* roles — identity, never severity */
-  --role-admin: #365FA5;     --role-admin-bg: #EAF1FF;
-  --role-employee: #256B78;  --role-employee-bg: #E7F5F7;
-  --role-sales: #6547B5;     --role-sales-bg: #F1EDFF;
-  --role-solo: #944473;      --role-solo-bg: #F8EDF5;
-  --role-everyone: #505868;  --role-everyone-bg: #EEF0F4;
+  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
 
   /* Sidebar. It used to be one dark slab in both modes, and the note here said
      so; the redesign made it light on light and dark on dark, so the six below
@@ -164,14 +105,14 @@
 
     --verdict-block: #F0708F;     --verdict-block-bg: #391820;
     --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
-    --verdict-attention: #D9B24B; --verdict-attention-bg: #33290F;
+    --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
     --signal-red: #FF5C77;
 
-    --role-admin: #7FA5E8;     --role-admin-bg: #1B2536;
-    --role-employee: #5FB5C4;  --role-employee-bg: #14282C;
-    --role-sales: #A78BE8;     --role-sales-bg: #241D38;
-    --role-solo: #D183B4;      --role-solo-bg: #321F2B;
-    --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
+    --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+    --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+    --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+    --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+    --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
 
     --sidebar-bg: #202020;
     --sidebar-text: #CACAC7;
@@ -213,14 +154,14 @@
 
   --verdict-block: #F0708F;     --verdict-block-bg: #391820;
   --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
-  --verdict-attention: #D9B24B; --verdict-attention-bg: #33290F;
+  --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
   --signal-red: #FF5C77;
 
-  --role-admin: #7FA5E8;     --role-admin-bg: #1B2536;
-  --role-employee: #5FB5C4;  --role-employee-bg: #14282C;
-  --role-sales: #A78BE8;     --role-sales-bg: #241D38;
-  --role-solo: #D183B4;      --role-solo-bg: #321F2B;
-  --role-everyone: #9BA3B2;  --role-everyone-bg: #232730;
+  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
 
   --sidebar-bg: #202020;
   --sidebar-text: #CACAC7;
@@ -236,6 +177,11 @@
 
 :root {
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --display: "Manrope", -apple-system, system-ui, sans-serif;
+  --fs-display: clamp(26px, 2.5vw, 36px);
+  --frame-inset: 12px;
+  --page-gutter: clamp(24px, 3vw, 52px);
+  --panel-width: 760px;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
   /*
@@ -292,7 +238,7 @@
      page rhythm. Blocks do not carry outer margins to reach it — see `.sheet`. */
   --s-block: var(--s-7);
 
-  --r-control: 6px;   /* everything with a box */
+  --r-control: 8px;   /* everything with a box */
   --r-selected: 8px;  /* the sidebar's selection band, and nothing else */
   /* The composer, and the only box in the product that is not 6.
      Corners read as concentric when the outer radius clears the inner one by
@@ -302,7 +248,7 @@
      a stiff 2015 form field rather than a place to write. 10 is the smallest
      step that resolves it while still belonging to the 6px family — 12 works
      too and 16 starts arguing with the turn bubbles above it. */
-  --r-composer: 10px;
+  --r-composer: 22px;
   --r-avatar: 17px;
 
   --h-control: 34px;
@@ -327,7 +273,7 @@ html, body { height: 100%; }
 body {
   margin: 0;
   display: flex;
-  background: var(--surface-page);
+  background: var(--sidebar-bg);
   color: var(--ink);
   font-family: var(--sans);
   font-size: var(--fs-4);
@@ -358,20 +304,17 @@ body {
   background: var(--sidebar-bg);
   color: var(--sidebar-text);
 }
-.sb-brand { display: flex; align-items: center; gap: var(--s-4); height: 48px; flex: none; color: var(--sidebar-selected-text); }
-.sb-brand svg { width: 28px; height: 28px; flex: none; }
-.sb-brand b { font-size: var(--fs-6); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); }
-.sb-workspace { display: grid; flex: none; line-height: var(--lh-snug); }
+.sb-brand { display: flex; align-items: center; flex: none; height: 64px; padding: 0 var(--s-2); border: 0; background: none; color: var(--sidebar-selected-text); cursor: pointer; }
+.sb-brand svg { display: block; width: 128px; height: 38px; }
+.brand-mark { display: none; }
+.sb-workspace { display: grid; flex: none; padding-inline: var(--s-2); margin-bottom: var(--s-4); line-height: var(--lh-snug); }
 .sb-workspace span { font-size: var(--fs-3); color: var(--sidebar-muted); text-transform: uppercase; }
 .sb-workspace b, .sb-workspace button {
   font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sb-workspace button { border: 0; padding: 0; background: none; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-.sb-group {
-  display: flex; align-items: flex-end; flex: none; height: 32px;
-  font-size: var(--fs-3); color: var(--sidebar-muted); text-transform: uppercase;
-}
+.sb-group { flex: none; height: var(--s-5); }
 .sb-item {
   display: flex; align-items: center; gap: var(--s-4); flex: none;
   width: 100%; height: var(--h-nav-row); padding: 0 var(--s-4);
@@ -406,7 +349,7 @@ body {
    at that edge; the one exception is the New rule conversation, which is
    centred end to end (`.--centred`, see "writing rules" below). */
 
-.pane { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; padding: 0 var(--s-10); }
+.pane { flex: 1; min-width: 0; height: calc(100dvh - 2 * var(--frame-inset)); overflow-y: auto; overscroll-behavior: contain; margin: var(--frame-inset) var(--frame-inset) var(--frame-inset) 0; padding: var(--s-6) var(--page-gutter); border: 1px solid var(--line-hairline); border-radius: var(--s-4); background: var(--surface-page); }
 .pane:focus { outline: none; }
 .pane.flush { overflow: hidden; display: flex; flex-direction: column; }
 .pane.flush > * { flex: 1; min-height: 0; }
@@ -450,7 +393,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--s-block);
-  max-width: var(--w-table);
+  width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 0 0 var(--s-12);
 }
@@ -627,6 +571,7 @@ input.field-compact { width: 90px; min-height: var(--h-control-compact); height:
   background: var(--surface-page);
   border-bottom: 1px solid var(--line-hairline);
 }
+.page-head::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--s-6); background: var(--surface-page); }
 .page-head-top {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--s-7); height: var(--h-page-row);
@@ -658,13 +603,13 @@ button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); 
  * carries the same change, on the Title style rather than Heading.
  */
 .page-title {
-  margin: 0; font-size: var(--fs-7); font-weight: var(--fw-semi);
+  margin: 0; font-family: var(--display); font-size: var(--fs-7); font-weight: var(--fw-semi);
   line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.page-title.--block { color: var(--verdict-block); }
-.page-title.--attention { color: var(--verdict-attention); }
-.page-title.--allow { color: var(--verdict-allow); }
+.page-title.--block { color: var(--ink); }
+.page-title.--attention { color: var(--ink); }
+.page-title.--allow { color: var(--ink); }
 .page-title.--muted { color: var(--ink-body); }
 /* In the top row between the title and the actions, never under the title.
    That is what keeps the row one line tall and `align-items` honest. */
@@ -963,7 +908,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .composer {
   display: grid; gap: var(--s-5); width: 100%; max-width: var(--w-reading);
   padding: var(--s-5);
-  border: 1px solid var(--line-accessible); border-radius: var(--r-composer); background: var(--surface-page);
+  border: 1px solid var(--line-control); border-radius: var(--r-composer); background: var(--surface-page);
 }
 .composer:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
 .composer textarea { min-height: var(--h-control-compact); padding: 0; border: 0; background: none; resize: none; font-size: var(--fs-5); line-height: var(--lh-snug); }
@@ -981,8 +926,8 @@ button.role-label:hover { background: var(--surface-subtle); }
 .composer .btn.--primary:disabled:not(.--busy) { background: var(--surface-disabled); border-color: var(--surface-disabled); color: var(--muted); }
 .suggestions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
 .suggestion {
-  padding: var(--s-2) var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
-  background: var(--surface-page); font-size: var(--fs-4); color: var(--ink-body); cursor: pointer; text-align: left;
+  padding: var(--s-2) var(--s-4); border: 0; border-radius: var(--s-6);
+  background: none; font-size: var(--fs-4); color: var(--ink-body); cursor: pointer; text-align: left;
 }
 .suggestion:hover { background: var(--surface-subtle); color: var(--ink); }
 
@@ -1057,12 +1002,9 @@ button.role-label:hover { background: var(--surface-subtle); }
 
 /* ── writing rules: the hero, the thread, the composer at the foot ────────── */
 
-/* Capped at the table's width like `.sheet`, so the centred column below
-   centres inside the same 1120 box the rest of the product is drawn in and
-   not inside whatever the window happens to be. Without it a wide screen
-   centres the conversation and the activation result in two different
-   places, which is the travel this whole block exists to remove. */
-.new-rule, .chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; max-width: var(--w-table); }
+/* The conversation is centred in the actual workspace; the text and
+   composer keep their own reading measure at every stage. */
+.new-rule, .chatwrap { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
 
 /*
  * The one centred column in the product, and it is the whole New rule flow
@@ -1085,10 +1027,12 @@ button.role-label:hover { background: var(--surface-subtle); }
 .flush-head { flex: none; width: 100%; padding-bottom: 0; gap: var(--s-4); }
 .hero-fill { flex: 1; min-height: 0; overflow-y: auto; display: flex; }
 .hero { margin: auto; width: 100%; max-width: var(--w-reading); display: grid; gap: var(--s-5); justify-items: center; padding: var(--s-10) 0 var(--s-12); text-align: center; }
-.hero-q { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-tight); }
+.hero-q { margin: 0 0 var(--s-4); font-family: var(--display); letter-spacing: -.04em; font-size: var(--fs-display); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-tight); }
 .hero-sub { margin: 0 0 var(--s-3); font-size: var(--fs-4); color: var(--muted); }
-.hero .composer { text-align: left; }
-.hero .suggestions { justify-self: stretch; }
+.hero .composer { text-align: left; padding: var(--s-8); }
+.hero .composer textarea { min-height: 68px; }
+.composer .btn { border-radius: var(--s-6); padding-inline: var(--s-6); }
+.hero .suggestions { justify-content: center; }
 
 .chat { flex: 1; min-height: 0; overflow-y: auto; }
 .thread { display: flex; flex-direction: column; gap: var(--s-4); width: 100%; max-width: var(--w-reading); }
@@ -1460,7 +1404,7 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
 .conditions-gaps + .conditions-body { padding-top: 0; }
 .conditions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
 .conditions-claim { display: inline-flex; align-items: center; gap: var(--s-3); margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); }
-.conditions-claim.--attention { color: var(--verdict-attention); }
+.conditions-claim.--attention { color: var(--ink); }
 /* A deliberate state — Warden paused on purpose — keeps ink text and takes a
    grey dot. Amber on this line means Warden is not doing what it was set up to
    do; a pause is the person doing exactly what they meant to. `--line-control`
@@ -1554,7 +1498,7 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
 .rate-bar.--allow i { background: var(--verdict-allow); }
 .rate-bar.--attention i { background: var(--verdict-attention); }
 .rate-bar.--block i { background: var(--verdict-block); }
-.reading-wide { max-width: var(--w-table); }
+.reading-wide { width: 100%; }
 .library-table .mono { font-size: var(--fs-3); font-weight: var(--fw-normal); }
 .library-table .cell-stack small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .prompts-table .mono { font-size: var(--fs-3); color: var(--ink); }
@@ -1582,8 +1526,10 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
 
 @media (max-width: 760px) {
   .sidebar { width: 64px; padding: var(--s-6) var(--s-3); align-items: center; }
-  .sb-brand { justify-content: center; }
-  .sb-brand b, .sb-workspace, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
+  .sb-brand { justify-content: center; padding: 0; }
+  .brand-mark { display: block; }
+  .brand-mark svg { width: 30px; height: 30px; }
+  .brand-lockup, .sb-workspace, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
   .sb-group { height: var(--s-5); font-size: 0; border-top: 1px solid var(--sidebar-avatar); align-self: stretch; }
   .sb-item { position: relative; justify-content: center; width: var(--h-nav-row); padding: 0; }
   .sb-count {
@@ -1591,7 +1537,8 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
     border-radius: var(--r-selected); background: var(--surface-selected); color: var(--sidebar-selected-text);
     font-size: var(--fs-1); line-height: 16px; text-align: center;
   }
-  .pane { padding: 0 var(--s-6); }
+  :root { --w-sidebar: 64px; --frame-inset: 8px; --w-bleed: 8px; }
+  .pane { padding: var(--s-4) var(--s-6); }
   .status-text { white-space: normal; }
   .page-head-top { flex-wrap: wrap; align-items: flex-start; height: auto; padding-block: var(--s-4); gap: var(--s-4); }
   .page-actions { flex-wrap: wrap; }
@@ -1617,7 +1564,7 @@ input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; bord
    rule in a band above it at the page margin — the proportions come from the
    Figma frames at 1440 (see docs/specs/first-run-and-theme.md §5.6). */
 body[data-bare] .sidebar { display: none; }
-body[data-bare] .pane { padding: 0; }
+body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border-radius: 0; }
 
 .first-run { min-height: 100vh; }
 .first-run > header {
@@ -1739,4 +1686,41 @@ body[data-bare] .pane { padding: 0; }
 @media (max-width: 900px) {
   .tool-row { grid-template-columns: minmax(0, 1fr) auto; }
   .tool-name { grid-column: 1 / -1; }
+}
+
+/* A record lives beside its list. Native dialog supplies focus containment
+   and makes the background inert; the URL still addresses the same record. */
+.pane.has-detail { overflow: hidden; }
+.detail-panel {
+  position: fixed; inset: var(--frame-inset) var(--frame-inset) var(--frame-inset) auto;
+  margin: 0; padding: 0; width: min(var(--panel-width), calc(100vw - var(--w-sidebar) - 2 * var(--frame-inset)));
+  max-width: none; height: calc(100dvh - 2 * var(--frame-inset)); max-height: none;
+  border: 1px solid var(--line-control); border-radius: var(--s-4);
+  color: var(--ink); background: var(--surface-page); box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+.detail-panel[open] { display: flex; flex-direction: column; }
+.detail-panel::backdrop { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.detail-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: var(--s-4) var(--s-8); color: var(--muted); font-size: var(--fs-4); border-bottom: 1px solid var(--line-hairline); }
+.detail-close { display: grid; place-items: center; width: var(--h-control); height: var(--h-control); border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); font-size: var(--fs-7); cursor: pointer; }
+.detail-close:hover { background: var(--surface-selected); }
+.detail-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-9) var(--s-9); }
+.detail-panel .page-head { margin-inline: 0; padding-inline: 0; }
+.detail-panel .page-head-top { display: flex; flex-wrap: wrap; height: auto; min-height: 80px; padding-block: var(--s-6); gap: var(--s-4); }
+.detail-panel .page-where { flex: 1; }
+.detail-panel .page-title { white-space: normal; overflow-wrap: anywhere; }
+.detail-panel .page-crumb, .detail-panel .page-sep { display: none; }
+.detail-panel .page-meta { order: 3; width: 100%; white-space: normal; }
+.detail-panel .reading { max-width: none; }
+.detail-panel .disclosure > summary { flex-wrap: wrap; }
+.detail-panel .disclosure-datum { white-space: normal; }
+.detail-panel .table { overflow-x: auto; }
+.detail-enter { animation: detail-in 180ms ease-out; }
+@keyframes detail-in { from { transform: translateX(32px); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .detail-enter { animation: none; } }
+@media (max-width: 760px) {
+  .detail-panel { inset: 0 0 0 auto; width: 100%; height: 100dvh; border-radius: 0; }
+  .detail-scroll { padding-inline: var(--s-6); }
+  .detail-toolbar { padding-inline: var(--s-6); }
+  .hero .composer { padding: var(--s-6); }
 }

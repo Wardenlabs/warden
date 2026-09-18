@@ -60,11 +60,12 @@ function pageHeader() {
    * this block is a second line under the first.
    */
   return pageHead({
-    title: revising ? 'Review revised drafts' : 'New rule',
+    title: revising ? 'Review revised drafts' : 'Rules',
     crumbs: person
       ? [{ label: person.name, go: 'people', sel: person.id }]
-      : [{ label: 'Rules', go: 'policy' }],
-    quiet: started && !state.ruleBusy && !set?.activating ? button('Start over', { kind: 'link', id: 'cancelDraft' }) : ''
+      : [],
+    quiet: (started && !state.ruleBusy && !set?.activating ? button('Start over', { kind: 'link', id: 'cancelDraft' }) : '')
+      + button('View rules', { attrs: 'data-go="policy"' })
   });
 }
 
@@ -83,7 +84,7 @@ function scopeNote() {
 }
 
 /** The two suggestions the hero offers, as the administrator would type them. */
-const TRIES = ['No quiero que se filtren datos de clientes', 'Nadie gasta más de $500 sin avisar'];
+const TRIES = ['Keep customer data private', 'Ask before spending more than $500'];
 
 /**
  * The catalogue, behind the composer's "+". It used to be a row of category
@@ -104,10 +105,10 @@ function heroPage() {
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="hero-fill">
       <div class="hero">
-        <h2 class="hero-q">What should Warden protect?</h2>
+        <h2 class="hero-q">What should your AI never do?</h2>
         ${scopeNote() ? `<p class="hero-sub">${scopeNote().trim()}</p>` : ''}
         ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'What shouldn’t happen? Write it in your own words…', sendLabel: 'Draft rules', disabled: true, attach: presetMenu() })}
-        <div class="suggestions">${TRIES.map((t) => `<button type="button" class="suggestion" data-try="${esc(t)}">Try: “${esc(t)}”</button>`).join('')}</div>
+        <div class="suggestions">${TRIES.map((t) => `<button type="button" class="suggestion" data-try="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       </div>
     </div>
   </div>`;
@@ -367,15 +368,12 @@ function editDraftPage(set, item) {
       <span class="fact"><span class="fact-k">Applies to</span>${audiencePicker(e)}</span>
       <span class="fact"><span class="fact-k">Effect</span>${effectMenu(e.severity, 'data-draft-severity')}</span>
     </div>
-    ${exemptNamed.length ? `<p class="fact-note">This rule will also apply to ${esc(exemptNamed.join(', '))} — normally exempt from company-wide rules, but a rule that names them by role or by name reaches them anyway.</p>` : ''}
-    <div class="facts --second"><span class="fact-k">Editing</span><span class="fact-v">Editing a proposal. Nothing is active until you review and activate it.</span></div>
+    ${exemptNamed.length ? `<p class="fact-note">Includes exempt roles: ${esc(exemptNamed.join(', '))}.</p>` : ''}
     <hr class="hairline">
     <div class="field rule-field${e.invalid && empty ? ' --error' : ''}">
       <label for="draftText">Rule instruction</label>
       <textarea id="draftText" rows="3"${e.busy ? ' readonly' : ''}>${esc(e.text)}</textarea>
-      <span class="field-help">${e.invalid && empty ? 'Enter an instruction before saving.'
-        : dirty ? 'Previous results belong to the earlier draft. Testing the changed draft is recommended.'
-          : 'Test the draft before activating it. Testing does not activate anything.'}</span>
+      ${e.invalid && empty ? '<span class="field-help" role="alert">Enter an instruction.</span>' : ''}
     </div>
   </div>`;
 }

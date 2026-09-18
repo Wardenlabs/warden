@@ -29,6 +29,9 @@ import { VIEWS } from './views.js';
 const APPEAL = 'appeal-';
 
 VIEWS.inbox = {
+  detail: () => Boolean(state.sel),
+  background: listPage,
+  detailLabel: 'Inbox',
   onEnter: () => { void Promise.all([refreshAppeals(), refreshEscalations()]).then(render); },
   bind: bindInbox,
   body: () => {
@@ -183,7 +186,6 @@ function heldPage(e) {
     <section class="reading answer-block" aria-labelledby="answerTitle">
       <h2 class="section-title --big" id="answerTitle">Record your answer</h2>
       ${failed ? feedback({ tone: 'error', icon: true, title: `${outcomeWord(failed.outcome)} couldn’t be saved`, body: `Your ${outcomeWord(failed.outcome).toLowerCase()} was not recorded. This request is still waiting for review.<br>Your note is preserved below — try saving again.${failed.why ? `<br>${esc(failed.why)}` : ''}` }) : ''}
-      <p class="answer-lead">Recording an answer does not resume this request. ${esc(first)} must send a new request; Warden will check it again.</p>
       <div class="field">
         <label for="reviewNote">Note to ${esc(first)} <span class="optional">(optional)</span></label>
         <textarea id="reviewNote" rows="3" placeholder="Add context for your answer…"${saving ? ' readonly' : ''}>${esc(a.note)}</textarea>

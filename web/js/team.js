@@ -134,10 +134,7 @@ const maskKey = (key) => {
  */
 const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
 
-VIEWS.people = {
-  body: () => {
-    const tab = tabOf();
-    if (tab === null) return personPage(personById(state.sel));
+function teamPage(tab = '', context = false) {
     return `<div class="sheet">
       ${pageHead({
         title: 'Team',
@@ -145,8 +142,18 @@ VIEWS.people = {
         strip: tabs('people', TABS, tab, 'Team sections')
       })}
       ${tab === '' ? peopleTab() : tab === 'roles' ? rolesTab() : companyTab()}
-      ${dialogMarkup()}
+      ${context ? '' : dialogMarkup()}
     </div>`;
+}
+
+VIEWS.people = {
+  detail: () => tabOf() === null,
+  background: () => teamPage('', true),
+  detailLabel: 'Team',
+  body: () => {
+    const tab = tabOf();
+    if (tab === null) return personPage(personById(state.sel));
+    return teamPage(tab);
   },
   bind: () => {
     bindActions();
@@ -240,7 +247,7 @@ function dialogMarkup() {
         body: `<div class="field">
             <label for="newName">Name</label>
             <input type="text" id="newName" autocomplete="off" value="${esc(value)}">
-            <span class="field-help">Their key keeps working, and rules written for them by name keep applying — those follow the person, not the text.</span>
+
           </div>
           ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The name was not changed', body: `${first} is still called “${esc(p?.name ?? '')}”. ${esc(dlg.error)}` }) : ''}`,
         actions: button('Cancel', { attrs: 'data-dialog-close="renamePerson"' })
@@ -273,8 +280,8 @@ function dialogMarkup() {
       return dialog({
         id: 'newRole', title: 'New role',
         body: `<p>A role is a name your rules can point at. Give it a daily limit now or leave it open and set one later.</p>
-          <div class="field"><label for="newRoleName">Name</label><input type="text" id="newRoleName" placeholder="designer" autocomplete="off" value="${esc(dlg.name ?? '')}"><span class="field-help">Lowercase, no spaces — people are judged by this name.</span></div>
-          <div class="field"><label for="newRoleQuota">Requests a day</label><input type="text" inputmode="numeric" id="newRoleQuota" placeholder="none" autocomplete="off" value="${esc(dlg.quota ?? '')}"><span class="field-help">Leave blank for no limit.</span></div>
+          <div class="field"><label for="newRoleName">Name</label><input type="text" id="newRoleName" placeholder="designer" autocomplete="off" value="${esc(dlg.name ?? '')}"><span class="field-help">Lowercase, no spaces.</span></div>
+          <div class="field"><label for="newRoleQuota">Requests a day</label><input type="text" inputmode="numeric" id="newRoleQuota" placeholder="none" autocomplete="off" value="${esc(dlg.quota ?? '')}"></div>
           ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'The role was not created', body: esc(dlg.error) }) : ''}`,
         actions: button('Cancel', { attrs: 'data-dialog-close="newRole"' }) + button(dlg.busy ? 'Creating…' : 'Create role', { kind: 'primary', id: 'confirmNewRole', busy: dlg.busy })
       });
@@ -296,9 +303,9 @@ function dialogMarkup() {
         body: `<p>While ${first} is paused, ${first}’s requests go through without being checked against any rule. Each one is still recorded and marked “not judged”, with your name on it.</p>
           <div class="field"><span class="field-label">For how long</span>
             <div class="role-choices" role="radiogroup" aria-label="For how long">${choices.map(([id, label]) => `<button type="button" role="radio" aria-checked="${id === pick}" class="role-choice${id === pick ? ' --chosen' : ''}" data-choose-until="${id}">${id === pick ? '✓ ' : ''}${esc(label)}</button>`).join('')}</div>
-            ${pick === 'forever' ? '<span class="field-help --attention">With no end date this lasts until somebody turns it back on. Every screen that lists people will say so meanwhile.</span>' : ''}
+            ${pick === 'forever' ? '<span class="field-help --attention">Until resumed.</span>' : ''}
           </div>
-          <div class="field"><label for="pauseReason">Why (optional)</label><input type="text" id="pauseReason" placeholder="Debugging their own rule" autocomplete="off" value="${esc(dlg.reason ?? '')}"><span class="field-help">It shows in the log beside your name.</span></div>
+          <div class="field"><label for="pauseReason">Why (optional)</label><input type="text" id="pauseReason" placeholder="Debugging their own rule" autocomplete="off" value="${esc(dlg.reason ?? '')}"></div>
           ${dlg.error ? feedback({ tone: 'error', icon: true, title: 'Warden was not paused', body: esc(dlg.error) }) : ''}`,
         actions: button('Cancel', { attrs: 'data-dialog-close="pausePerson"' }) + button(dlg.busy ? 'Pausing…' : 'Pause', { kind: 'primary', id: 'confirmPause', busy: dlg.busy })
       });
@@ -931,8 +938,7 @@ function rolesTab() {
     <div class="table roles-table" role="table" aria-label="Roles">
       <div class="thead" role="row"><span>Role</span><span>People</span><span>Judged by</span><span>Daily limit</span><span></span></div>
       ${roles.map(roleRow).join('')}
-    </div>
-    <p class="table-foot">A daily limit is a number of requests, not money. Setting one also opens that role's session ceilings — output, context and prompt size, on Models. Token counts are reported by the tool, not measured here.</p>`;
+    </div>`;
 }
 
 function roleRow(r) {
@@ -1032,7 +1038,6 @@ function companyTab() {
         <p class="disclosure-text">Removes every person except the first administrator, who gets a fresh key, and clears every stored prompt. Your rules and roles stay. There is no undo.</p>
         <div>${button('Reset company', { kind: 'danger', id: 'openReset' })}</div>`, { open: state.open.has('c:reset') })}
     </div>
-    <p class="table-foot">Looking for the address people connect to? That belongs to the machine running Warden, not to the company — it lives in <button type="button" class="linkish" data-go="soloRules">This device</button>.</p>
   </div>`;
 }
 

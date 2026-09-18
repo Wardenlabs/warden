@@ -1,10 +1,10 @@
 /**
  * Console behaviour. Plain ES modules, no framework, no build step.
  *
- * One column. A rail to choose what you are looking at, and a list of those
- * things; selecting one opens it in place, under the row you clicked. There is
- * no side panel, because a panel that has to be labelled to be understood is a
- * panel that was not carrying its width.
+ * Lists use the available workspace width. Selected records open in the
+ * shared right-hand panel, keeping their list visible behind them; rule
+ * creation keeps its own focused conversation. An empty URL opens that
+ * composer, while explicit links keep their destinations.
  *
  * Two people read every detail and they want opposite things. An operations
  * lead wants one sentence; whoever runs the gateway wants nine passes and a

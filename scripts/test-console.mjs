@@ -281,10 +281,10 @@ test('compiler setup appears in solo and team until an explicit provider or envi
   for (const view of ['soloRules', 'soloSettings', 'activity', 'policy']) {
     state.view = view;
     const html = compilerSetupNudge();
-    assert.match(html, /Choose what writes your rules/);
+    assert.match(html, /Set up rule drafting/);
     assert.match(html, /Set up the rule writer/);
     assert.match(html, /data-go="models" data-q="setup=compiler"/);
-    assert.match(html, /keep exploring/);
+    assert.doesNotMatch(html, /keep exploring/);
   }
   state.compiler.setupRequired = false;
   assert.equal(compilerNeedsSetup(), false);
@@ -662,14 +662,14 @@ test('a wired device with no traffic yet is protected, not "not protected yet"',
     // Wired, judge present, a rule addressed at them, and nothing sent yet.
     Object.assign(state, deviceState());
     const body = VIEWS.soloRules.body();
-    assert.match(body, /Protection is on/, 'setup done is setup done, with or without a prompt having been sent');
+    assert.match(body, /Protection on/, 'setup done is setup done, with or without a prompt having been sent');
     assert.ok(!/Not protected yet/.test(body), 'the sentence that broke the first install must not come back');
     assert.match(body, /nothing judged through them yet/, 'and the absence of traffic is still reported, just not as a fault');
     assert.match(body, /aria-expanded="false"/, 'all clear folds away');
     assert.match(body, /Show details/, 'behind a control that says what it does');
     // Closed is the state that used to lose the headline and the action: see
     // the Gateway test above for what the nested <summary> did.
-    assert.match(body, /conditions-claim[\s\S]*Protection is on/, 'with the claim still on the screen');
+    assert.match(body, /conditions-claim[\s\S]*Protection on/, 'with the claim still on the screen');
     assert.match(body, /Pause protection/, 'and the action still pressable');
   } finally { Object.assign(state, saved); }
 });
@@ -682,8 +682,8 @@ test('nothing wired is the gap, and the headline carries its fix', async () => {
       soloIdentity: { id: 'you', name: 'You', role: 'solo', connected: [], devices: [{ name: 'mbp', tools: [{ id: 'claude-code', wired: false }] }] }
     }));
     const body = VIEWS.soloRules.body();
-    assert.match(body, /Not judging you yet/);
-    assert.match(body, /Nothing on this device is wired/);
+    assert.match(body, /Setup incomplete/);
+    assert.match(body, /No tools connected/);
     assert.match(body, /Protect this device/);
 
     /*
@@ -698,7 +698,7 @@ test('nothing wired is the gap, and the headline carries its fix', async () => {
      */
     const shown = body.slice(body.indexOf('conditions-gaps'), body.indexOf('conditions-body'));
     assert.equal((shown.match(/<dt>/g) ?? []).length, 1, 'one condition is unmet, so one row stands outside the fold');
-    assert.match(shown, /Nothing on this device is wired/, 'and it is that one');
+    assert.match(shown, /No tools connected/, 'and it is that one');
     const folded = body.slice(body.indexOf('conditions-body'));
     for (const good of ['Warden', 'You', 'The judge', 'Rules for you']) {
       assert.match(folded, new RegExp(`>${good}</dt>`), `${good} is satisfied here, and satisfied conditions fold`);
@@ -713,7 +713,7 @@ test('the two invisible conditions are on the screen: the mock judge and an exem
   try {
     Object.assign(state, deviceState({ mock: true }));
     const blind = VIEWS.soloRules.body();
-    assert.match(blind, /Mock adapter/, 'a stand-in answering is not a judgement and has to say so');
+    assert.match(blind, /Demo mode/, 'a stand-in answering is not a judgement and has to say so');
     assert.match(blind, /Get a judge/);
 
     Object.assign(state, deviceState({
@@ -721,7 +721,7 @@ test('the two invisible conditions are on the screen: the mock judge and an exem
       soloRules: [{ id: 'r1', text: 'Company rule', severity: 'block', applies: false }]
     }));
     const exempt = VIEWS.soloRules.body();
-    assert.match(exempt, /your role is exempt from them/, 'wiring alone protects nobody whom no rule binds');
+    assert.match(exempt, /No applicable rules · exempt from/, 'wiring alone protects nobody whom no rule binds');
     assert.match(exempt, /Write a rule for yourself/);
   } finally { Object.assign(state, saved); }
 });
@@ -1137,7 +1137,7 @@ test('first-run titles need no subtitle when cards carry the instructions and ou
   } finally { Object.assign(state, saved); }
 });
 
-test('Inbox states the consequence once beside the answer controls', async () => {
+test('Inbox uses explicit recording actions and puts the consequence in the recorded result', async () => {
   await import('../web/js/inbox.js');
   const saved = { ...state };
   try {
@@ -1148,9 +1148,67 @@ test('Inbox states the consequence once beside the answer controls', async () =>
       company: { roles: ['employee'], employees: [{ id: 'ana', name: 'Ana', role: 'employee' }] }
     });
     const html = VIEWS.inbox.body();
-    assert.match(html, /Recording an answer does not resume this request/);
-    assert.match(html, /Ana must send a new request/);
+    assert.doesNotMatch(html, /Recording an answer does not resume this request/);
+    state.escalations[0].review = { outcome: 'approved', at };
+    const recorded = VIEWS.inbox.body();
+    assert.match(recorded, /Approval recorded/);
+    assert.match(recorded, /Your answer did not resume it/);
     assert.doesNotMatch(html, /Your answer will not resume it|Your note is kept if saving fails/);
     assert.match(html, /Record approval/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('an unaddressed launch opens the rule composer for both solo and team installations', async () => {
+  const { parseHash } = await import('../web/js/router.js');
+  const previousLocation = globalThis.location;
+  const company = state.company;
+  try {
+    for (const employees of [[], [{ id: 'solo', role: 'solo' }], [{ id: 'admin', role: 'admin' }]]) {
+      state.company = { ...company, employees };
+      for (const hash of ['', '#/', '#/unknown']) {
+        globalThis.location = { hash };
+        assert.deepEqual(parseHash(), { view: 'policy', sel: 'new', query: {} });
+      }
+    }
+  } finally {
+    state.company = company;
+    if (previousLocation === undefined) delete globalThis.location; else globalThis.location = previousLocation;
+  }
+});
+
+test('explicit links still reach lists, records and device setup after changing the start screen', async () => {
+  const { parseHash } = await import('../web/js/router.js');
+  const previousLocation = globalThis.location;
+  try {
+    for (const [hash, expected] of [
+      ['#/policy', { view: 'policy', sel: null, query: {} }],
+      ['#/policy/edit%3Acustomer-data', { view: 'policy', sel: 'edit:customer-data', query: {} }],
+      ['#/activity/event-1?rule=customer-data', { view: 'activity', sel: 'event-1', query: { rule: 'customer-data' } }],
+      ['#soloRules', { view: 'soloRules', sel: null, query: {} }]
+    ]) {
+      globalThis.location = { hash };
+      assert.deepEqual(parseHash(), expected);
+    }
+  } finally {
+    if (previousLocation === undefined) delete globalThis.location; else globalThis.location = previousLocation;
+  }
+});
+
+test('records open over their lists while creation and team settings remain full pages', async () => {
+  await import('../web/js/team.js');
+  await import('../web/js/inbox.js');
+  const saved = { ...state };
+  try {
+    for (const [view, selections] of [
+      ['activity', [[null, false], ['event-1', true]]],
+      ['inbox', [[null, false], ['appeal-event-1', true]]],
+      ['policy', [[null, false], ['new', false], ['rule-1', true], ['edit:rule-1', true]]],
+      ['people', [[null, false], ['roles', false], ['company', false], ['alex', true]]]
+    ]) {
+      for (const [sel, expected] of selections) {
+        Object.assign(state, { view, sel });
+        assert.equal(VIEWS[view].detail(), expected, `${view}/${sel}`);
+      }
+    }
   } finally { Object.assign(state, saved); }
 });

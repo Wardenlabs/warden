@@ -6,8 +6,8 @@ source file, so there is one place to change if the logo changes.
 | File | What it is | Where it is used |
 |---|---|---|
 | `warden-lockup-source.png` | The original raster the logo was delivered as. Provenance only — nothing reads it. | — |
-| `warden-mark.svg` | Shield + W alone, `fill="currentColor"`, square viewBox, holes as `fill-rule="evenodd"`. 2.3 KB. | Inlined in `web/index.html` header |
-| `warden-lockup.svg` | Mark + "warden" wordmark, `fill="currentColor"`. 5.7 KB. | The master for anything that can set its own colour |
+| `warden-mark.svg` | Shield + W alone, `fill="currentColor"`, square viewBox, holes as `fill-rule="evenodd"`. 2.3 KB. | Inlined by `web/js/icons.js` for the compact sidebar |
+| `warden-lockup.svg` | Mark + "warden" wordmark, `fill="currentColor"`. 5.7 KB. | Master asset; inlined by `web/js/icons.js` for the sidebar |
 | `warden-wordmark.svg` | The wordmark alone, no shield, `fill="currentColor"`, tight viewBox. | Anywhere the mark already appears separately |
 | `warden-lockup-light.svg` | Lockup with `#141414` baked in. | `README.md`, light backgrounds |
 | `warden-lockup-dark.svg` | Lockup with `#f0f0f2` baked in. | `README.md` dark mode, dark backgrounds |

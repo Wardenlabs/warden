@@ -22,6 +22,82 @@ import { VIEWS } from './views.js';
 /** How close to the bottom still counts as "following the conversation". */
 const STICK_PX = 140;
 const SMOOTH = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+let renderedRoute = '';
+let hadDetail = false;
+let returnRow = null;
+const listScroll = new Map();
+
+/** The list remains a visual reference; only the foreground record is active.
+ * Prefix its IDs so background forms cannot steal detail bindings or values. */
+export function detailShell(background, content, label) {
+  const context = background.replace(/\sid="([^"]+)"/g, ' id="context-$1"');
+  return `<div class="detail-context" inert aria-hidden="true">${context}</div>
+    <dialog id="detailPanel" class="detail-panel" aria-label="${esc(label)} details">
+      <div class="detail-toolbar"><span>${esc(label)}</span><button type="button" id="closeDetail" class="detail-close" aria-label="Close details">×</button></div>
+      <div id="detailScroll" class="detail-scroll">${content}</div>
+    </dialog>`;
+}
+
+function bindDetail(open, changed, fields) {
+  const panel = $('detailPanel');
+  if (open && panel) {
+    const close = () => go(state.view, null, state.query);
+    $('closeDetail').onclick = close;
+    panel.oncancel = (event) => {
+      event.preventDefault();
+      // Escape belongs to an inner confirmation/menu before it belongs to
+      // this record. Closing the editor still uses its unsaved-work guard.
+      if (!panel.querySelector('.dialog-scrim, details.menu[open]')) close();
+    };
+    panel.onclick = (event) => {
+      if (event.target !== panel || panel.querySelector('.dialog-scrim')) return;
+      const r = panel.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close();
+    };
+    panel.onkeydown = (event) => {
+      const menu = panel.querySelector('details.menu[open]');
+      if (event.key === 'Escape' && menu) {
+        event.preventDefault();
+        event.stopPropagation();
+        menu.removeAttribute('open');
+        menu.querySelector('summary')?.focus();
+      }
+    };
+    panel.showModal?.();
+    panel.classList.toggle('detail-enter', changed && !hadDetail);
+    $('detailScroll').scrollTop = changed ? 0 : fields.detailScroll;
+    const confirmation = panel.querySelector('.dialog-scrim');
+    if (confirmation) {
+      // An inner confirmation owns focus until it is answered. Inert every
+      // sibling along its ancestry so Tab cannot reach the editor behind it.
+      let child = confirmation;
+      while (child.parentElement && child.parentElement !== panel) {
+        for (const sibling of child.parentElement.children) if (sibling !== child) sibling.inert = true;
+        child = child.parentElement;
+      }
+      panel.querySelector('.detail-toolbar').inert = true;
+      const previous = fields.focus && $(fields.focus);
+      const target = previous && confirmation.contains(previous) ? previous
+        : confirmation.querySelector('#keepEditing, input:not([disabled]), textarea:not([disabled])')
+          ?? confirmation.querySelector('button:not([disabled])');
+      target?.focus({ preventScroll: true });
+      panel.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab') return;
+        const controls = [...confirmation.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex="0"]')].filter((el) => el.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if ((!event.shiftKey && document.activeElement === last) || (event.shiftKey && document.activeElement === first)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        }
+      });
+    } else if (!changed && fields.focus && $(fields.focus)) $(fields.focus).focus({ preventScroll: true });
+    else $('closeDetail').focus({ preventScroll: true });
+  } else if (hadDetail && returnRow?.view === state.view) {
+    const row = [...$('pane').querySelectorAll('.trow[data-sel]')].find((el) => el.dataset.sel === returnRow.sel);
+    (row ?? $('pane')).focus({ preventScroll: true });
+    returnRow = null;
+  }
+}
 
 function captureFields() {
   const saved = captureFieldValues($('pane'));
@@ -30,6 +106,7 @@ function captureFields() {
     saved,
     focus: document.activeElement?.id ?? null,
     scroll: $('pane').scrollTop,
+    detailScroll: $('detailScroll')?.scrollTop ?? 0,
     // A conversation follows along on its own while you are at the bottom of
     // it, and stays put if you have scrolled up to read something. Yanking
     // someone back down mid-sentence is worse than not scrolling at all.
@@ -72,6 +149,13 @@ function restoreChat(chat) {
 export function render() {
   const view = VIEWS[state.view];
   const fields = captureFields();
+  const detail = Boolean(val(view.detail));
+  const routeKey = `${state.view}/${state.sel ?? ''}`;
+  const changed = renderedRoute !== routeKey;
+  if (detail && (!hadDetail || returnRow?.view !== state.view)) {
+    if (!hadDetail) listScroll.set(state.view, fields.scroll);
+    returnRow = { view: state.view, sel: state.sel?.replace(/^edit:/, '') };
+  }
 
   /**
    * A `bare` view owns the window: no sidebar, no banners, no breadcrumb.
@@ -95,7 +179,7 @@ export function render() {
     if (body?.dataset) delete body.dataset.bare;
     renderNav();
   }
-  $('pane').className = `pane${val(view.flush) ? ' flush' : ''}`;
+  $('pane').className = `pane${val(view.flush) ? ' flush' : ''}${detail ? ' has-detail' : ''}`;
   // Demo mode goes above every screen, not inside one. It used to live in the
   // today card, which does not render until something has happened — so the
   // person it is written for, somebody who has just installed the app and is
@@ -111,17 +195,20 @@ export function render() {
   // cards and one button.
   const isSoloView = state.view === 'soloRules' || state.view === 'soloSettings';
   const banners = bare ? '' : compilerSetupNudge() + (state.mock ? mockBanner() : '') + (isSoloView ? '' : firstRunBanner());
-  $('pane').innerHTML = view.body();
+  const content = view.body();
+  $('pane').innerHTML = detail ? detailShell(view.background(), content, view.detailLabel) : content;
   // The shell's notices sit under the page's own header, where the reader has
   // already learnt which page this is; above it they pushed the title down on
   // every screen. A page with no header gets them at the top.
   if (banners) {
-    const anchor = $('pane').querySelector('.page-head');
+    const anchor = (detail ? $('detailScroll') : $('pane')).querySelector('.page-head');
     if (anchor) anchor.insertAdjacentHTML('afterend', `<div class="shell-notices">${banners}</div>`);
     else $('pane').insertAdjacentHTML('afterbegin', `<div class="shell-notices">${banners}</div>`);
   }
 
-  restoreFields(fields);
+  // A live refresh preserves typing; opening another record must not carry
+  // the previous person's note into a same-named field on the next record.
+  restoreFields(changed ? { ...fields, saved: {}, focus: null } : fields);
   bindDisclosures();
   if (view.bind) view.bind();
 
@@ -147,6 +234,11 @@ export function render() {
   bindGetModels();
 
   restoreChat(fields.chat);
+  bindDetail(detail, changed, fields);
+  if (hadDetail && !detail && listScroll.has(state.view)) $('pane').scrollTop = listScroll.get(state.view);
+  else if (changed && !detail) $('pane').scrollTop = 0;
+  renderedRoute = routeKey;
+  hadDetail = detail;
 }
 
 /** Disclosures report their own open state back into `state.open` so the next

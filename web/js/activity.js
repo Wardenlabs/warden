@@ -118,7 +118,7 @@ function decisionRows(entries) {
       <span class="who-cell"><i class="dot --${outcome(d).tone}"></i><span class="cell-strong">${esc(actorName(a.actor))}</span></span>
       ${d.maskedPrompt
         ? `<span class="cell-clip request-cell">“${promptMarkup(clip(d.maskedPrompt, 140))}”${files}</span>`
-        : `<span class="cell-muted" title="The audit log keeps this prompt's SHA-256, not its text.">Not stored — the log keeps the hash, not the text${files}</span>`}
+        : `<span class="cell-muted" title="The audit log keeps this prompt's SHA-256, not its text.">Not retained${files}</span>`}
       <span class="cell-muted">${fired ? esc(ruleName(fired.ruleId)) : '—'}</span>
       <span>${outcomeText(d)}</span>
       <span class="cell-muted num">${esc(hhmm(a.ts))}</span>
@@ -255,7 +255,7 @@ export function requestTurn(entry, { who, extra = '', cls = '' } = {}) {
   const heading = who ?? `${esc(actorName(entry.actor))}${role ? ` · ${esc(role)}` : ''}`;
   const files = (d.documents ?? []).map((doc) => fileChip(doc.name, fileSize(doc.bytes ?? 0))).join('');
   const masked = d.maskedSpans?.length ? `<div class="turn-meta">${plural(d.maskedSpans.length, 'secret')} masked before checking</div>` : '';
-  const text = d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not stored — the log keeps the hash, not the text</div>';
+  const text = d.maskedPrompt ? `<div class="turn-text">${promptMarkup(d.maskedPrompt)}</div>` : '<div class="turn-text muted">Not retained</div>';
   return turn('person', { who: heading, body: `${text}${files ? `<div class="labels">${files}</div>` : ''}${masked}${extra}`, cls: `request-turn ${cls}` });
 }
 
@@ -309,15 +309,13 @@ function detailPage(entry) {
     const until = d.pausedUntil
       ? `until ${esc(whenLine(d.pausedUntil))}`
       : 'until somebody turns it back on';
-    after = `<p class="exchange-note">Warden was paused for ${esc(firstName)} ${until}, so this request went out without being checked against any rule. It is here because it happened, not because it was cleared.</p>`;
+    after = `<p class="exchange-note">Warden was paused for ${esc(firstName)} ${until}, so this request went out without being checked against any rule. </p>`;
   } else if (v === 'ALLOW') {
-    after = person
-      ? `<p class="exchange-note">Checked against the ${plural(person.ruleCount ?? 0, 'rule')} that apply to ${esc(firstName)} — none matched.</p>`
-      : '<p class="exchange-note">No rule in the policy matched it.</p>';
+    after = '';
   } else if (held) {
     after = held.review
       ? `<p class="exchange-note">${held.review.outcome === 'approved' ? 'Approval' : 'Refusal'} recorded ${esc(whenLine(held.review.at))}${held.review.note ? ` — “${esc(held.review.note)}”` : ''}.</p>`
-      : `<p class="exchange-note">Waiting in your Inbox since ${esc(hhmm(held.at))} — ${esc(firstName)} sees “held for review” until someone answers.</p>`;
+      : `<p class="exchange-note">Awaiting review · ${esc(hhmm(held.at))}</p>`;
   }
   return `<div class="sheet">
     ${pageHead({
@@ -369,6 +367,9 @@ export function ensureEntry(id) {
 }
 
 VIEWS.activity = {
+  detail: () => Boolean(state.sel),
+  background: listPage,
+  detailLabel: 'Activity',
   bind: () => { if (state.sel) ensureEntry(state.sel); else bindList(); },
   body: () => (state.sel ? detailPage(findEntry(state.sel)) : listPage())
 };

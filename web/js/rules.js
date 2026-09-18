@@ -17,13 +17,9 @@ import { VIEWS } from './views.js';
 // ═══ RULES ═══════════════════════════════════════════════════════════════════
 
 /**
- * Rules is a list, and a rule is a page.
- *
- * `sel` decides what the view is: nothing is the list, `new` is the
- * conversation that writes rules, `edit:<id>` edits one in place, and anything
- * else is a rule's own page. A row used to open its detail underneath itself;
- * the redesign's rule is that rows open a page, so the list never reflows
- * under the pointer and a rule has an address you can send somebody.
+ * Rules has a full-width catalogue and a focused writing conversation.
+ * `new` opens the composer; an ID or `edit:<id>` opens the shared detail
+ * panel over the catalogue. The record still has its own shareable URL.
  */
 function onNewRule() { return state.view === 'policy' && state.sel === 'new'; }
 function inConversation() { return onNewRule() && (state.ruleChat.length > 0 || Boolean(state.draft) || Boolean(state.set)); }
@@ -32,6 +28,9 @@ const editingId = () => (state.view === 'policy' && state.sel?.startsWith('edit:
 const ruleById = (id) => state.policy.rules.find((r) => r.id === id) ?? null;
 
 VIEWS.policy = {
+  detail: () => Boolean(state.sel) && !onNewRule(),
+  background: () => listPage(true),
+  detailLabel: 'Rules',
   // The conversation fills the pane and scrolls inside itself; the result page
   // and editing one draft are ordinary pages that scroll with the pane.
   flush: () => onNewRule() && !state.set?.result && state.set?.editing == null,
@@ -132,7 +131,7 @@ const listHead = (loaded = true, strip = '') => pageHead({
   strip
 });
 
-function listPage() {
+function listPage(context = false) {
   const rules = state.policy.rules;
   const load = state.loads.policy;
 
@@ -169,8 +168,8 @@ function listPage() {
   return `<div class="sheet">
     ${listHead(true, toolbar)}
     ${body}
-    ${removeDialogMarkup()}
-    ${wipeDialogMarkup()}
+    ${context ? '' : removeDialogMarkup()}
+    ${context ? '' : wipeDialogMarkup()}
   </div>`;
 }
 
@@ -335,7 +334,6 @@ function detailPage(rule) {
     <section class="rule-instruction reading">
       <h2 class="section-title --big">Rule instruction</h2>
       <p>${esc(rule.text)}</p>
-      <p class="rule-means">If it fires, ${esc(severityMeans(rule.severity))}.${rule.pinned ? ' Checked on every request.' : ''}</p>
     </section>
     <div class="disclosures reading">
       ${rule.boundary ? disclosure('r:boundary', 'What it is not about', `<p class="disclosure-text">${esc(rule.boundary)}</p>`) : ''}
@@ -398,7 +396,6 @@ function editPage(rule) {
   openEditor(rule);
   const empty = !editor.text.trim();
   const dirty = editDirty(rule);
-  const changedText = editor.text.trim() !== rule.text;
   /*
    * No Cancel, and nothing is lost by its going.
    *
@@ -422,16 +419,11 @@ function editPage(rule) {
       <span class="fact"><span class="fact-k">Applies to</span><span class="labels">${audience(rule.appliesTo)}</span></span>
       <span class="fact"><span class="fact-k">Effect</span>${effectMenu(editor.severity)}</span>
     </div>
-    <div class="facts --second"><span class="fact-k">Editing</span><span class="fact-v">Changes apply when you save. The current rule stays active until then.</span></div>
     <hr class="hairline">
     <div class="field rule-field${editor.invalid && empty ? ' --error' : ''}">
       <label for="editText">Rule instruction</label>
       <textarea id="editText" rows="3"${editor.busy ? ' readonly' : ''}>${esc(editor.text)}</textarea>
-      <span class="field-help">${editor.invalid && empty
-        ? 'Enter an instruction before saving.'
-        : changedText
-          ? 'Test your changes before saving. A changed instruction is compiled again when you save, so the examples the judge is shown match it.'
-          : 'Test your changes before saving. Testing does not update the active rule.'}</span>
+      ${editor.invalid && empty ? '<span class="field-help" role="alert">Enter an instruction.</span>' : ''}
     </div>
     ${leaveDialogMarkup()}
   </div>`;
@@ -566,7 +558,7 @@ export function sendAsOptions(selected = '') {
  */
 export function firstRunBanner() {
   const read = state.loads.policy && !state.loads.policy.loading && !state.loads.policy.error;
-  if (!read || state.company.employees.length || state.policy.rules.length) return '';
+  if (!read || onNewRule() || state.company.employees.length || state.policy.rules.length) return '';
   return feedback({
     title: 'Nothing is being stopped yet.',
     body: `Write a rule on <button type="button" class="linkish" data-go="policy" data-sel="new">Rules</button>, or put your team in on <button type="button" class="linkish" data-go="people">Team</button>.
@@ -589,9 +581,9 @@ export function firstRunBanner() {
 export function mockBanner() {
   return feedback({
     tone: 'attention',
-    title: 'Demo mode. None of this is real.',
-    body: `No model has judged anything you see here. ${state.canLeaveDemo
-      ? '<div class="feedback-actions"><button type="button" class="btn --primary --compact" id="getModels">Download the models</button><span>5.4&nbsp;GB, once. Warden restarts by itself when they land.</span></div>'
-      : 'Run <span class="mono">pnpm run setup</span>. 5.4&nbsp;GB, once.'}`
+    title: 'Demo mode',
+    body: `${state.canLeaveDemo
+      ? '<div class="feedback-actions"><button type="button" class="btn --primary --compact" id="getModels">Download the models</button></div>'
+      : 'Run <span class="mono">pnpm run setup</span>.'}`
   });
 }

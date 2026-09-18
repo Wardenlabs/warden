@@ -60,10 +60,10 @@ applyTheme(storedTheme());
  */
 const TEAM_NAV = [
   { group: 'Overview' },
+  { view: 'policy', sel: 'new', label: 'Rules', icon: 'rules' },
   { view: 'activity', label: 'Activity', icon: 'activity' },
   { view: 'inbox', label: 'Inbox', icon: 'inbox', count: () => pendingEscalations().length + state.appeals.length },
   { group: 'Manage' },
-  { view: 'policy', label: 'Rules', icon: 'rules' },
   { view: 'people', label: 'Team', icon: 'team' },
   // Its own item rather than a tab inside Rules. What lives here is the answer
   // to "is the guard working at all", and it used to sit two clicks deep
@@ -119,7 +119,7 @@ export function soloIsPureInstall() {
  */
 function navItems() {
   return soloIsPureInstall()
-    ? [{ group: 'Manage' }, { view: 'models', label: 'Models', icon: 'models' }, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM, SOLO_SETTINGS_NAV_ITEM]
+    ? [{ group: 'Overview' }, { view: 'policy', sel: 'new', label: 'Rules', icon: 'rules' }, { group: 'Manage' }, { view: 'models', label: 'Models', icon: 'models' }, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM, SOLO_SETTINGS_NAV_ITEM]
     : [...TEAM_NAV, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM];
 }
 
@@ -138,13 +138,13 @@ function workspaceLine() {
 
 export function renderNav() {
   const here = VIEWS[state.view]?.railParent ?? state.view;
-  $('sidebar').innerHTML = `<div class="sb-brand">${ICONS.brand}<b>warden</b></div>
-    <div class="sb-workspace"><span>Workspace</span>${workspaceLine()}</div>
+  $('sidebar').innerHTML = `<button type="button" class="sb-brand" data-go="policy" data-sel="new" aria-label="Warden — write a rule"><span class="brand-lockup">${ICONS.brand}</span><span class="brand-mark">${ICONS.brandMark}</span></button>
+    <div class="sb-workspace">${workspaceLine()}</div>
     ${navItems().map((it) => {
-      if (it.group) return `<div class="sb-group">${esc(it.group)}</div>`;
+      if (it.group) return '<div class="sb-group" role="separator" aria-hidden="true"></div>';
       const n = it.count ? it.count() : 0;
       const on = here === it.view;
-      return `<button type="button" class="sb-item${on ? ' on' : ''}"${on ? ' aria-current="page"' : ''} data-go="${it.view}">
+      return `<button type="button" class="sb-item${on ? ' on' : ''}"${on ? ' aria-current="page"' : ''} data-go="${it.view}"${it.sel ? ` data-sel="${it.sel}"` : ''} aria-label="${esc(it.label)}">
         ${ICONS[it.icon] ?? ''}<span>${esc(it.label)}</span>${n > 0 ? `<span class="sb-count">${n}</span>` : ''}
       </button>`;
     }).join('')}
@@ -179,7 +179,8 @@ document.addEventListener('click', (e) => {
   const inMenu = e.target.closest('details.menu');
   if (nav && !(inMenu && !inMenu.contains(nav))) {
     inMenu?.removeAttribute('open');
-    const q = nav.dataset.q ? Object.fromEntries(new URLSearchParams(nav.dataset.q)) : undefined;
+    const q = nav.dataset.q ? Object.fromEntries(new URLSearchParams(nav.dataset.q))
+      : nav.dataset.sel && nav.dataset.go === state.view ? state.query : undefined;
     go(nav.dataset.go, nav.dataset.sel || null, q);
     return;
   }
@@ -194,6 +195,6 @@ document.addEventListener('keydown', (e) => {
     e.target.click();
     return;
   }
-  if (e.key === 'Escape' && document.querySelector('details.menu[open], .dialog-scrim')) return;
+  if (e.key === 'Escape' && document.querySelector('details.menu[open], .dialog-scrim, #detailPanel[open]')) return;
   if (e.key === 'Escape' && state.sel && !composing() && !VIEWS[state.view]?.keepOnEscape?.()) go(state.view);
 });

@@ -286,7 +286,7 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
   }
 
   // The one-shot half of "This device, for me": create (or recover) the solo identity
-  // and land the console on "Mis reglas" instead of the normal view.
+  // then open the rule composer like every other launch.
   // One-shot because `launchGateway` also runs on every restart this same
   // process makes afterward — the LAN checkbox, the internet toggle, crash
   // recovery — and those should reopen wherever the console already was,
@@ -301,7 +301,7 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       // the console's own "Mis reglas" screen ends up with it anyway on its
       // first request. This call only saves that screen its own round trip.
     }
-    openConsole(port, '#soloRules');
+    openConsole(port, '#/policy/new');
   } else {
     openConsole(port);
   }

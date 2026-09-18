@@ -1,0 +1,66 @@
+# Rule-first console and contextual records
+
+The owner’s review of v0.2.5 requested the official logo, larger outer margins,
+full-width lists, record panels that retain list context, and rule prompting as
+the first screen. This replaces the previous full-page record convention.
+
+## Direction
+
+Warden is an administrator’s workspace for stating rules and inspecting their
+consequences. Its entrance is the rule composer. The distinctive interaction is
+writing an instruction in a quiet central column, then reviewing decisions and
+people beside the lists that led to them.
+
+Preserve the existing palette: paper `#FFFFFF`, canvas `#F4F5F4`, graphite
+`#22282A`, secondary ink `#656E6F`, allowed `#087356`, separators `#E7EAE8`. Attention and role labels use neutral ink.
+Small blocked/allowed verdict markers retain their meaning; large headings and setup states stay neutral. Manrope, already used by the
+landing, gives headings their own voice; system sans remains the compact body
+face and system monospace carries timestamps and technical records. Font files
+are local, with their original license.
+
+A 12px outer frame separates the white workspace from the canvas. List width
+follows the window, with balanced responsive gutters. Reading and composing
+remain limited to 700px. The official SVG lockup replaces the generic checkmark
+shield and typeset approximation. Narrow windows use the official mark alone.
+
+```
+Sidebar | Full-width list                    |
+Sidebar | Visible list    | Selected record  |
+Sidebar |         Rule composer              |
+```
+
+The initial alternative retained the 1120px page cap and centred that box.
+That still wasted the space the owner identified, so only prose retains a
+reading measure. The shared drawer is the one new structural gesture; colour,
+verdict semantics and the existing controls remain quiet.
+
+## Interaction
+
+- Empty and unknown addresses open `policy/new`, for solo and team installs.
+- Rules is the first sidebar destination and opens its composer. View rules
+  reaches the catalogue. Existing explicit links continue to work.
+- Activity, Inbox, rule detail/edit and people use a native modal dialog on the
+  right. Rules creation and Team tabs remain full pages.
+- The underlying list stays visible and inert. Its IDs are isolated so live
+  updates cannot bind foreground actions to background controls.
+- Close, outside click and Escape return to the list. Focus and scroll return
+  to the selected row when available. Rule edits keep their unsaved-work guard.
+- A nested confirmation owns keyboard focus; the editor behind it becomes inert.
+- At narrow widths the panel fills the screen. Motion respects reduced motion.
+
+## Verification
+
+Console tests cover launch routing, explicit links and which destinations use
+panels. Browser checks exercise all four sections, live text preservation,
+keyboard focus, list scroll restoration, unsaved edit confirmation, wide-screen
+coverage, dark mode and a 390px viewport using synthetic data.
+
+## Follow-up: less visual instruction
+
+The owner rejected mustard status headings, coloured role labels, redundant
+helper paragraphs and the boxy Rules composer. Setup now reads “Setup
+incomplete” in neutral ink. Sidebar group labels and the Workspace caption are
+removed. Rule effect explanations and persistent editing instructions are
+removed from the templates; validation errors remain conditional. Inbox uses
+explicit recording actions and reports the non-resumption in the saved result.
+The composer uses a 22px radius, a quiet border and unboxed example actions.
