@@ -149,7 +149,7 @@ export function compilerSettings() {
     </form>`;
   }
   return `<form id="compilerForm" class="model-editor" aria-label="Compiler settings" aria-busy="${Boolean(busy)}">
-    ${disclosureRow('compiler:privacy', 'Data shared', '', '<p class="disclosure-text">Remote providers receive instructions, role names and the team list. Employee requests are analyzed locally.</p>', { open: state.open.has('compiler:privacy') })}
+    ${remote || cli ? disclosureRow('compiler:privacy', 'Data shared', '', '<p class="disclosure-text">Remote providers receive instructions, role names and the team list. Employee requests are analyzed locally.</p>', { open: state.open.has('compiler:privacy') }) : ''}
     ${c.configurationError ? feedback({ tone: 'error', icon: true, title: 'Compiler configuration needs attention.', body: esc(c.configurationError) }) : ''}
     ${c.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment.', body: 'Your saved preference will apply after the environment override is removed.' }) : ''}
     <fieldset class="model-fields"${busy ? ' disabled' : ''}>

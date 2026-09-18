@@ -151,15 +151,15 @@ span.composer-attach { color: var(--muted); cursor: default; }
 .dispute-card { gap: var(--s-3); padding: var(--s-6); }
 
 .passes { display: grid; }
-.pass { display: grid; grid-template-columns: minmax(0, 1fr) 80px 72px 64px; align-items: center; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); }
+.pass-summary { margin: 0 0 var(--s-4); color: var(--muted); font-size: var(--fs-3); line-height: var(--lh-snug); }
+.pass-summary b { color: var(--ink-body); font-weight: var(--fw-medium); }
+.pass { display: grid; grid-template-columns: minmax(0, 1fr) 110px 64px; align-items: center; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); }
 .pass:last-child { border-bottom: 0; }
 .pass-name { color: var(--ink-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pass-verdict { font-size: var(--fs-3); }
 .pass-verdict.--block { color: var(--verdict-block); }
 .pass-verdict.--attention { color: var(--verdict-attention); }
 .pass-verdict.--allow { color: var(--verdict-allow); }
-.pass-track { height: 3px; border-radius: 2px; background: var(--surface-subtle); overflow: hidden; }
-.pass-track i { display: block; height: 100%; background: var(--line-control); }
 .pass-ms { text-align: right; color: var(--muted); }
 .pass-why { margin: 0 0 var(--s-2); font-family: var(--mono); font-size: var(--fs-2); color: var(--verdict-block); overflow-wrap: anywhere; }
 .chain { display: grid; gap: var(--s-2); font-size: var(--fs-3); }

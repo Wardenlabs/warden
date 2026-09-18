@@ -11,8 +11,9 @@ globalThis.window = { prompt: () => { throw new Error('An employee request must 
 globalThis.sessionStorage = { getItem: () => 'administrator-secret' };
 const { api, post, state } = await import('../web/js/core.js');
 const { documentAnalysisNotice, documentMetadataMarkup, documentReason, documentReviewPendingMarkup } = await import('../web/js/documents.js');
-const { passOutcome } = await import('../web/js/activity.js');
+const { passOutcome, passPresentation, ruleCoverageMarkup } = await import('../web/js/activity.js');
 const { policyDecisionPresentation, resultTitle } = await import('../web/js/simulator.js');
+const { renderNav, workspaceName } = await import('../web/js/nav.js');
 const { library, libraryMarkup } = await import('../web/js/model-library.js');
 const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindCompiler } = await import('../web/js/compiler.js');
 const { compileFailure } = await import('../web/js/answers.js');
@@ -104,10 +105,40 @@ test('the Simulator explains allowed warning matches instead of claiming no rule
   const shown = policyDecisionPresentation({ verdict: 'ALLOW', warnings: [warning], firedRules: [] }, { name: 'Martín Pulitano', role: 'analyst' });
   assert.equal(shown.warningCount, 1);
   assert.match(shown.line, /1 warning matched/);
+  assert.match(shown.line, /effect is Warn/);
+  assert.match(shown.line, /Choose Block/);
   assert.match(shown.why, /An API key was included/);
   assert.equal(resultTitle(shown, 'Allowed'), 'Allowed with warnings');
   assert.equal(resultTitle(shown, 'Blocked'), 'Blocked');
   assert.ok(!shown.line.includes('Nothing in the active rules'));
+});
+
+test('decision details use human rule names and explain exactly which rules were checked', () => {
+  state.policy = { version: '1', quotas: [], rules: [
+    { id: 'r-do-not-share-api-6564', text: 'Do not share API keys.' },
+    { id: 'r-finance-only', text: 'Finance only.' },
+    { id: 'r-admin-only', text: 'Admin only.' }
+  ] };
+  const passes = [{ pass: 'retrieve', detail: { applicable: 1, selected: ['r-do-not-share-api-6564'] } }];
+  assert.equal(passPresentation({ pass: 'adjudicate:r-do-not-share-api-6564', verdict: 'ESCALATE', detail: { label: 'VIOLATES', ruleText: 'Do not share API keys.' } }).label, 'Do not share API');
+  const coverage = ruleCoverageMarkup(passes, 'Martín');
+  assert.match(coverage, /1 rule applies to Martín/);
+  assert.match(coverage, /It was checked/);
+  assert.match(coverage, /other 2 rules apply to other people/);
+});
+
+test('the sidebar puts the workspace with the account and starts navigation below the brand', () => {
+  const previous = state.company;
+  state.company = { name: 'JUAN', roles: [], employees: [], demo: false };
+  elements.set('sidebar', { innerHTML: '' });
+  try {
+    renderNav();
+    const html = elements.get('sidebar').innerHTML;
+    assert.equal(workspaceName(), 'JUAN');
+    assert.ok(!html.includes('sb-workspace'));
+    assert.match(html, /<b>You<\/b><span>JUAN<\/span>/);
+    assert.ok(html.indexOf('>Overview<') < html.indexOf('>Rules<'));
+  } finally { state.company = previous; elements.delete('sidebar'); }
 });
 
 test('prepared attachments do not claim the document was read or policy checked', () => {
@@ -1055,7 +1086,7 @@ test('Models omits job descriptions but keeps local state and compiler disclosur
     Object.assign(state, deviceState(), {
       view: 'models', sel: null,
       models: { state: 'ready', models: [], judging: { model: 'dynaguard' } },
-      compiler: compilerConfiguration({ setupRequired: false }),
+      compiler: compilerConfiguration({ setupRequired: false, provider: 'local' }),
       adjudicator: { choices: [] }, company: { roles: [], employees: [] }
     });
     const html = VIEWS.models.body();
@@ -1063,7 +1094,9 @@ test('Models omits job descriptions but keeps local state and compiler disclosur
     assert.match(html, /Rule writer/);
     assert.match(html, /Request judge/);
     assert.match(html, /local only/);
+    assert.doesNotMatch(compilerSettings(), /Data shared/);
     state.compiler = compilerConfiguration();
+    state.compilerDraft = null;
     assert.doesNotMatch(VIEWS.models.body(), /Turns the policies|Checks every employee/);
     assert.match(compilerSettings(), /account and plan/);
   } finally { Object.assign(state, saved); }

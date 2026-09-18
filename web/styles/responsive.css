@@ -9,7 +9,7 @@
   .sb-brand { justify-content: center; padding: 0; }
   .brand-mark { display: block; }
   .brand-mark svg { width: 30px; height: 30px; }
-  .brand-lockup, .sb-workspace, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
+  .brand-lockup, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
   .sb-group { height: var(--s-5); font-size: 0; border-top: 1px solid var(--sidebar-avatar); align-self: stretch; }
   .sb-item { position: relative; justify-content: center; width: var(--h-nav-row); padding: 0; }
   .sb-count {
@@ -35,7 +35,7 @@
   .setting-row, .job-task, .device-rules-head, .claude-setup-head { flex-wrap: wrap; }
   .dialog { max-width: calc(100vw - 2 * var(--s-5)); }
 }
-.device-page, .models-active, .test-subject, .job-block, .device-rules { grid-template-columns: minmax(0, 1fr); }
+.device-page, .models-active, .test-subject, .device-rules { grid-template-columns: minmax(0, 1fr); }
 .test-meta select { min-width: 0; }
 
 /* ── the first run ────────────────────────────────────────────────────────────

@@ -383,10 +383,10 @@ const SEVERITIES = [['block', 'Block'], ['escalate', 'Escalate'], ['warn', 'Warn
 
 /** Effect as a Trigger / Value: the value is what you click to change it. */
 export function effectMenu(current, attr = 'data-set-severity') {
-  const word = SEVERITIES.find(([v]) => v === current)?.[1] ?? current;
+  const word = SEVERITIES.find(([value]) => value === current)?.[1] ?? current;
   return menu(SEVERITIES.map(([value, label]) => ({ label, check: value === current, attrs: `${attr}="${value}"` })), {
     label: 'Effect', align: 'left', cls: 'effect-picker',
-    trigger: `<span class="status-text --${current === 'block' ? 'block' : 'attention'}"><i class="dot"></i>${esc(word)}</span><i class="caret" aria-hidden="true">▾</i>`,
+    trigger: `<span class="effect-text --${current === 'block' ? 'block' : 'attention'}"><i class="dot"></i>${esc(word)}</span><i class="caret" aria-hidden="true">▾</i>`,
     triggerCls: 'trigger-value --effect'
   });
 }

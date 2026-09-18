@@ -193,14 +193,63 @@ export function passOutcome(p) {
   return { word: VERDICT_WORD[p.verdict] ?? p.verdict ?? '', tone: VERDICT_TONE[p.verdict] ?? 'muted' };
 }
 
-/** One row of evidence, plus the cause when a pass failed closed. */
-export function passRow(p, slowest) {
-  const why = p.failedClosed && p.detail?.error ? String(p.detail.error) : '';
+const PASS_LABELS = {
+  quota: 'Daily limit',
+  budget: 'Session limits',
+  sanitize: 'Secrets',
+  isolate: 'Prompt safety',
+  'isolate:output': 'Output safety',
+  retrieve: 'Rules considered',
+  'retrieve:output': 'Output rules considered',
+  documents: 'Files',
+  ocr: 'Scanned files',
+  injection: 'Instruction safety',
+  aggregate: 'Final decision'
+};
+
+/** Human labels and useful outcomes replace internal pipeline identifiers. */
+export function passPresentation(p) {
+  const raw = String(p.pass ?? '');
   const result = passOutcome(p);
+  if (raw.startsWith('adjudicate:')) {
+    const id = raw.slice('adjudicate:'.length);
+    return { label: p.detail?.ruleText ? ruleName({ id, text: p.detail.ruleText }) : ruleName(id), ...result };
+  }
+  const selected = Array.isArray(p.detail?.selected) ? p.detail.selected.length : 0;
+  if (raw.startsWith('retrieve')) return { label: PASS_LABELS[raw] ?? 'Rules considered', word: `${selected} checked`, tone: 'muted' };
+  if (raw === 'sanitize') {
+    const masked = Number(p.detail?.masked ?? 0);
+    return { label: PASS_LABELS[raw], word: masked ? `${masked} masked` : 'Clear', tone: masked ? 'attention' : 'allow' };
+  }
+  if (raw === 'quota' && p.detail?.limit == null) return { label: PASS_LABELS[raw], word: 'No limit', tone: 'muted' };
+  if (raw === 'budget' && p.detail?.reported === false && result.word === 'Allowed') return { label: PASS_LABELS[raw], word: 'No limits reached', tone: 'allow' };
+  return {
+    label: PASS_LABELS[raw] ?? raw.replaceAll(':', ' ').replace(/^./, (c) => c.toUpperCase()),
+    ...result
+  };
+}
+
+/** Explain rule coverage before showing the individual checks. */
+export function ruleCoverageMarkup(passes, subject = 'this person') {
+  const retrieve = (passes ?? []).find((p) => p.pass === 'retrieve');
+  if (!retrieve) return '';
+  const applicable = Number(retrieve.detail?.applicable ?? 0);
+  const selected = Array.isArray(retrieve.detail?.selected) ? retrieve.detail.selected.length : 0;
+  const elsewhere = Math.max(0, (state.policy.rules?.length ?? 0) - applicable);
+  let checked = selected === applicable
+    ? applicable === 0 ? 'None needed to be checked.' : applicable === 1 ? 'It was checked.' : `All ${applicable} were checked.`
+    : `Warden checked the ${selected} most related ${selected === 1 ? 'rule' : 'rules'} for this request.`;
+  if (elsewhere) checked += ` The other ${elsewhere} ${elsewhere === 1 ? 'rule applies' : 'rules apply'} to other people.`;
+  return `<p class="pass-summary"><b>${applicable} ${applicable === 1 ? 'rule applies' : 'rules apply'} to ${esc(subject)}.</b> ${esc(checked)}</p>`;
+}
+
+/** One row of evidence, plus the cause when a pass failed closed. */
+export function passRow(p, _slowest) {
+  const why = p.failedClosed && p.detail?.error ? String(p.detail.error) : '';
+  const result = passPresentation(p);
   return `<div class="pass">
-      <span class="pass-name">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
+      <span class="pass-name">${esc(result.label)}${p.failedClosed ? ' ⚠' : ''}</span>
       <span class="pass-verdict --${result.tone}">${esc(result.word)}</span>
-      <span class="pass-track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
       <span class="pass-ms num">${p.ms ?? 0} ms</span>
     </div>${why ? `<div class="pass-why">${esc(why)}</div>` : ''}`;
 }
@@ -226,7 +275,7 @@ export function decisionFolds(entry, { chain = true, record = true } = {}) {
   const slowest = Math.max(1, ...passes.map((p) => p.ms ?? 0));
   const docs = d.documents ?? [];
   const how = disclosure(`d:passes:${entry.auditId}`, 'How it was decided',
-    `${docs.length ? documentMetadataMarkup(docs) : ''}<div class="passes">${passes.map((p) => passRow(p, slowest)).join('') || '<p class="disclosure-text">No passes were recorded.</p>'}</div>`,
+    `${docs.length ? documentMetadataMarkup(docs) : ''}${ruleCoverageMarkup(passes, actorName(entry.actor))}<div class="passes">${passes.map((p) => passRow(p, slowest)).join('') || '<p class="disclosure-text">No passes were recorded.</p>'}</div>`,
     `${plural(passes.length, 'pass', 'passes')} · ${seconds(d.totalMs)} · ${where()}`);
   const proof = chain ? disclosure(`d:chain:${entry.auditId}`, 'Proof this record has not been altered', `
     <div class="chain">

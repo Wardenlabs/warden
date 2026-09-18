@@ -39,14 +39,8 @@ body {
 .sb-brand { display: flex; align-items: center; flex: none; height: 50px; padding: 0 var(--s-2); border: 0; background: none; color: var(--sidebar-selected-text); cursor: pointer; }
 .sb-brand svg { display: block; width: 100px; height: 30px; }
 .brand-mark { display: none; }
-.sb-workspace { display: grid; row-gap: var(--s-1); flex: none; padding-inline: var(--s-2); margin-bottom: var(--s-4); line-height: var(--lh-snug); }
-.sb-workspace span { font-size: var(--fs-3); color: var(--sidebar-muted); text-transform: uppercase; }
-.sb-workspace b, .sb-workspace button {
-  font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.sb-workspace button { border: 0; padding: 0; background: none; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .sb-group { flex: none; padding: 20px 12px 8px; font-size: 11px; font-weight: 600; color: var(--sidebar-muted); letter-spacing: .06em; text-transform: uppercase; }
+.sb-brand + .sb-group { padding-top: var(--s-3); }
 .sb-item {
   display: flex; align-items: center; gap: var(--s-4); flex: none;
   width: 100%; height: var(--h-nav-row); padding: 0 var(--s-4);
@@ -740,9 +734,12 @@ button.role-label:hover { background: var(--surface-subtle); }
 .example-list { display: grid; gap: var(--s-2); }
 .example-list p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); overflow-wrap: anywhere; }
 
-.trigger-value.--effect { padding: var(--s-1) 10px; border-color: var(--line-hairline); gap: var(--s-3); }
+.trigger-value.--effect { min-height: 30px; padding: 0 var(--s-3); border-color: var(--line-hairline); gap: var(--s-3); font-size: var(--fs-3); }
+.trigger-value.--effect .effect-text { gap: var(--s-1); }
+.trigger-value.--effect .effect-text .dot { margin-right: var(--s-1); }
 .trigger-value .caret, .audience-trigger .caret { font-style: normal; font-size: var(--fs-1); color: var(--muted); }
-.effect-picker .menu-list, .audience-picker .menu-list { min-width: 200px; }
+.effect-picker .menu-list { min-width: 150px; }
+.audience-picker .menu-list { min-width: 200px; }
 .audience-picker .menu-list { max-height: 320px; overflow-y: auto; }
 .audience-trigger { display: inline-flex; align-items: center; gap: var(--s-3); padding: 2px; border-radius: var(--r-control); }
 .audience-trigger:hover, .audience-picker[open] > .audience-trigger { background: var(--surface-subtle); }

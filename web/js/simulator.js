@@ -1,7 +1,7 @@
 /**
  * Test: send a request against the active rules as somebody on the team, or against one draft before it is saved.
  */
-import { passRow } from './activity.js';
+import { passRow, ruleCoverageMarkup } from './activity.js';
 import { readable } from './answers.js';
 import { $, attr, esc, post, state } from './core.js';
 import { refreshAppeals } from './data.js';
@@ -170,7 +170,7 @@ function renderMessage(m, i) {
   const masked = (m.maskedSpans ?? 0) + docs.reduce((n, d) => n + (d.redactions ?? 0), 0);
   const docSummary = docs.length ? [read === docs.length ? 'Read completely' : `${read} of ${docs.length} read`, docs.reduce((n, d) => n + (d.pages ?? 0), 0) ? plural(docs.reduce((n, d) => n + (d.pages ?? 0), 0), 'page') : '', masked ? plural(masked, 'secret') + ' masked' : ''].filter(Boolean).join(' · ') : '';
   const passes = (m.passes ?? []).length
-    ? disclosure(`s:${i}`, 'How it was decided', `<div class="passes">${m.passes.map((p) => passRow(p, Math.max(1, ...m.passes.map((x) => x.ms ?? 0)))).join('')}</div>`, `${plural(m.passes.length, 'pass', 'passes')} · ${seconds(m.totalMs)} · ${where()}`)
+    ? disclosure(`s:${i}`, 'How it was decided', `${ruleCoverageMarkup(m.passes, m.actorName || 'this person')}<div class="passes">${m.passes.map((p) => passRow(p, Math.max(1, ...m.passes.map((x) => x.ms ?? 0)))).join('')}</div>`, `${plural(m.passes.length, 'pass', 'passes')} · ${seconds(m.totalMs)} · ${where()}`)
     : '';
   return verdictCard({
     tone, glyph,
@@ -258,6 +258,7 @@ async function judge(text, person, attachments) {
   // shows them because the tester is where it stands in for one.
   state.chat.push({
     from: 'warden', verdict: j.verdict, exemptAllow, ...presentation,
+    actorName: person.name.split(' ')[0],
     notice: documentAnalysisNotice(j) ? `<div class="verdict-notice">${documentAnalysisNotice(j)}</div>` : '',
     extraFacts: facts.length ? `<p class="verdict-aside">${facts.join(' ')}</p>` : '',
     passes: j.passes, totalMs: j.totalMs, documents: j.documents, maskedSpans: j.maskedSpans?.length ?? 0, auditId: j.auditId,
@@ -276,7 +277,7 @@ export function policyDecisionPresentation(j, person, exemptAllow = false) {
     : { BLOCK: `The active rules stop this request from ${esc(first)}. It was checked like a real one and is in Activity.`,
       ESCALATE: `The active rules hold this request for a person to review. It is waiting in your Inbox like a real one.`,
       ALLOW: warnings.length
-        ? `${plural(warnings.length, 'warning')} matched. The request would still go through.`
+        ? `${plural(warnings.length, 'warning')} matched. Its effect is Warn, so the request would still go through. Choose Block if it should stop requests.`
         : `Nothing in the active rules stops this request from ${esc(first)}. It would go through.` }[j.verdict];
   let why = '';
   let kicker = '';

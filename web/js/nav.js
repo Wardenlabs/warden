@@ -106,25 +106,14 @@ function navItems() {
     : [...TEAM_NAV, { group: 'Local' }, SOLO_NAV_ITEM, GATEWAY_NAV_ITEM];
 }
 
-/**
- * The workspace line under the wordmark.
- *
- * A demo directory has a company name, and it is not the user's. Showing it in
- * the chrome is the product asserting something false about whoever installed
- * it, so the seeded name stays out until someone claims it on Team — and while
- * it is the sample, the line says so and is the one click that fixes it.
- */
-function workspaceLine() {
-  const name = state.company.demo
-    ? '<button type="button" data-go="people" data-sel="company">Sample data</button>'
-    : `<b>${esc(state.company.name || 'Your workspace')}</b>`;
-  return `<span>Workspace</span>${name}`;
+/** The workspace belongs with the account identity, not under the wordmark. */
+export function workspaceName() {
+  return state.company.demo ? 'Sample data' : state.company.name || 'Your workspace';
 }
 
 export function renderNav() {
   const here = VIEWS[state.view]?.railParent ?? state.view;
   $('sidebar').innerHTML = `<button type="button" class="sb-brand" data-go="policy" data-sel="new" aria-label="Warden — write a rule"><span class="brand-lockup">${ICONS.brand}</span><span class="brand-mark">${ICONS.brandMark}</span></button>
-    <div class="sb-workspace">${workspaceLine()}</div>
     ${navItems().map((it) => {
       if (it.group) return `<div class="sb-group">${esc(it.group)}</div>`;
       const n = it.count ? it.count() : 0;
@@ -141,7 +130,7 @@ export function renderNav() {
       { label: 'Dark', attrs: 'data-set-theme="dark"', check: storedTheme() === 'dark' }
     ], {
       label: 'Your account',
-      trigger: '<span class="sb-avatar" aria-hidden="true">Y</span><div><b>You</b><span>Your account</span></div>',
+      trigger: `<span class="sb-avatar" aria-hidden="true">Y</span><div><b>You</b><span>${esc(workspaceName())}</span></div>`,
       align: 'left', cls: '--up sb-account', triggerCls: 'sb-profile'
     })}`;
 }

@@ -53,7 +53,10 @@
 .job-note.--allow { color: var(--verdict-allow); }
 .job-note.--block { color: var(--verdict-block); }
 .job-note.--attention { color: var(--verdict-attention); }
-.job-editor, .job-setup-host { margin-top: var(--s-3); }
+.job-editor, .job-setup-host { grid-column: 1 / -1 !important; margin-top: var(--s-4); padding-top: var(--s-5); border-top: 1px solid var(--line-hairline); }
+.job-editor-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-5); }
+.job-editor-head h3 { margin: 0; font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
+.job-editor .model-editor { max-width: 620px; }
 .job-setup { display: grid; gap: var(--s-3); }
 .job-task { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; margin-top: var(--s-2); }
 .job-task b { font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }

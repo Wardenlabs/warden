@@ -149,7 +149,7 @@ function writerBlock() {
     <h2 class="section-title" id="compilerTitle">Rule writer</h2>
     <div class="job-value">${valueMenu('compiler', writerChoices(), 'Change the rule writer')}${statusText(s.text, s.tone)}</div>
     ${c?.configurationError ? feedback({ tone: 'error', icon: true, title: 'Compiler configuration needs attention', body: esc(c.configurationError) }) : ''}
-    ${writerOpen ? `<div class="job-editor">${compilerSettings()}</div>` : ''}
+    ${writerOpen ? `<div class="job-editor"><div class="job-editor-head"><h3>Rule writer settings</h3>${button('Close', { kind: 'link', compact: true, id: 'closeCompilerSettings' })}</div>${compilerSettings()}</div>` : ''}
   </section>`;
 }
 
@@ -301,6 +301,7 @@ function bindModels() {
     $('promptTemplateText')?.focus({ preventScroll: true });
   };
   if ($('closePromptTemplate')) $('closePromptTemplate').onclick = () => { closePromptEditor(); render(); };
+  if ($('closeCompilerSettings')) $('closeCompilerSettings').onclick = () => { clearCompilerSecret(); writerOpen = false; render(); };
 
   const from = () => inForceName('adjudicator');
   for (const b of document.querySelectorAll('[data-judge-builtin]')) b.onclick = () => {
