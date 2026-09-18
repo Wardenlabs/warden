@@ -39,7 +39,7 @@ export function compilerName() {
  */
 function transparencyLine() {
   const c = state.compiler;
-  if (!c?.provider || c.provider === 'local') return 'Drafting runs on this machine — nothing leaves it.';
+  if (!c?.provider || c.provider === 'local') return '';
   return `Your sentence, the role names and the team list${c.redactNames ? ' (names replaced by IDs)' : ''} go to the compiler — requests under judgement never leave this machine.`;
 }
 
@@ -117,7 +117,10 @@ function heroPage() {
 
 function renderTurn(t) {
   if (t.from === 'you') return turn('person', { body: esc(t.text), end: true });
-  if (t.pending) return turn('warden', { body: `<b class="turn-title">${t.html}</b><span class="turn-note">${esc(t.note ?? transparencyLine())}</span>` });
+  if (t.pending) {
+    const note = t.note ?? transparencyLine();
+    return turn('warden', { body: `<b class="turn-title">${t.html}</b>${note ? `<span class="turn-note">${esc(note)}</span>` : ''}` });
+  }
   // Answers that are plates already (a decline, a failure) stand on their own.
   if (String(t.html).trimStart().startsWith('<div class="feedback')) return t.html;
   return `<div class="warden-note"><div class="warden-label">Warden</div><p>${t.html}</p></div>`;
