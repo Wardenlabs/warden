@@ -14,7 +14,7 @@ import { formatSchema, managedModelsDir, managedRoleSchema, modelPath, putModel,
 export const MAX_MODEL_BYTES = 20 * 1024 ** 3;
 export const importMetadata = z.object({ name: z.string().trim().min(1).max(100),
   roles: z.array(managedRoleSchema).min(1).max(2), format: formatSchema,
-  filename: z.string().max(255).optional() });
+  filename: z.string().max(255).optional() }).refine(m => !['shieldstral', 'granite-guardian'].includes(m.format) || !m.roles.includes('compiler'), { message: 'Native guard models are analyzer-only' });
 type Metadata = z.infer<typeof importMetadata>;
 export type DownloadJob = { id: string; name: string; state: 'downloading' | 'complete' | 'failed' | 'cancelled'; received: number; total: number | null; modelId: string | null; error: string | null };
 const jobs = new Map<string, { public: DownloadJob; controller: AbortController }>();

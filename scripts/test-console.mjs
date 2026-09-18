@@ -1212,3 +1212,32 @@ test('records open over their lists while creation and team settings remain full
     }
   } finally { Object.assign(state, saved); }
 });
+
+
+test('native guards are selectable in Models and listed with their own formats', () => {
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState(), {
+      view: 'models', sel: null, canLeaveDemo: true,
+      models: { state: 'ready', models: [], judging: { model: 'DynaGuard-4B.Q6_K.gguf' } },
+      compiler: compilerConfiguration({ setupRequired: false }), company: { roles: [], employees: [] },
+      adjudicator: { model: 'default', choices: [
+        { id: 'shieldstral', label: 'Shieldstral 1.0 3B', filename: 'Shieldstral-1.0-3B-Q6_K.gguf', format: 'shieldstral', approxMB: 2822, onDisk: true },
+        { id: 'granite-guardian', label: 'Granite Guardian 4.1 8B', filename: 'granite-guardian-4.1-8b-Q6_K.gguf', format: 'granite-guardian', approxMB: 6880, onDisk: false }
+      ] }
+    });
+    library.catalog = { models: [], selections: {}, overrides: {} };
+    const picker = VIEWS.models.body();
+    for (const id of ['shieldstral', 'granite-guardian']) {
+      assert.match(picker, new RegExp(`data-judge-builtin="${id}"`));
+      assert.ok(!picker.match(new RegExp(`<button[^>]*data-judge-builtin="${id}"[^>]*>`))?.[0].includes('disabled'));
+    }
+    assert.match(picker, /Granite Guardian 4.1 8B · download required/);
+    const table = libraryMarkup();
+    assert.match(table, /Shieldstral 1.0 3B/);
+    assert.match(table, /Granite Guardian 4.1 8B/);
+    assert.match(table, />shieldstral<\/span>/);
+    assert.match(table, />granite-guardian<\/span>/);
+    assert.match(table, /Select for download/);
+  } finally { Object.assign(state, saved); }
+});

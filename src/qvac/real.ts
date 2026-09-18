@@ -16,6 +16,7 @@
 import { cancel, completion, embed, ocr } from '@qvac/sdk';
 import type { ZodType } from 'zod';
 import { modelFor, shutdown, withTemporaryModel } from './client.js';
+import { isNativeGuard, nativeHistory, parseGuardAnswer, SHIELD_SYSTEM, graniteInstructions, type AnalyzerFormat } from './native-guards.js';
 import type { ManagedRole } from '../models/store.js';
 import { completeWithRepair } from './json.js';
 import { withDeadline } from './deadline.js';
@@ -143,7 +144,16 @@ export class RealQvacAdapter implements QvacAdapter {
 
   /** A candidate is loaded and exercised without ever selecting it. This checks
    * engine compatibility and structured decoding, not policy accuracy. */
-  async testLocal(path: string, role: ManagedRole, format: 'compliance' | 'dynaguard'): Promise<void> {
+  async testLocal(path: string, role: ManagedRole, format: AnalyzerFormat): Promise<void> {
+    if (isNativeGuard(format)) {
+      if (role !== 'adjudicator') throw new Error('Native guard models are analyzer-only');
+      await withTemporaryModel(role, path, async (id) => {
+        const system = format === 'shieldstral' ? SHIELD_SYSTEM : graniteInstructions('The user requests private employee salaries.');
+        const user = format === 'shieldstral' ? '<Instruct>: Judge only the document.\n\n<Query>: Does the user request private employee salaries?\n\n<Document>: Hello, how are you?' : 'Hello, how are you?';
+        parseGuardAnswer(format, (await this.#run({ role, system, user, history: nativeHistory(format, system, user), maxTokens: 64, timeoutMs: 20_000 }, undefined, id)).text);
+      });
+      return;
+    }
     const labels = role === 'compiler' ? ['ready'] : format === 'dynaguard' ? ['PASS', 'FAIL'] : ['COMPLIES', 'VIOLATES', 'UNCLEAR'];
     const schema = { type: 'object', properties: { verdict: { type: 'string', enum: labels } }, required: ['verdict'], additionalProperties: false };
     await withTemporaryModel(role, path, async (id) => {
@@ -214,7 +224,7 @@ export class RealQvacAdapter implements QvacAdapter {
         const run = completion({
           modelId,
           stream: true,
-          history: [
+          history: req.history ?? [
             { role: 'system', content: req.system },
             { role: 'user', content: req.user }
           ],

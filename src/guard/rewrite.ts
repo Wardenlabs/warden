@@ -26,6 +26,8 @@
  * ALLOW. The suggestion is verified, not asserted.
  */
 import { z } from 'zod';
+import { formFromEnv } from './passes/forms.js';
+import { isNativeGuard } from '../qvac/native-guards.js';
 import { renderPrompt, withPromptSnapshot } from '../prompts/store.js';
 import { withModelRole } from '../qvac/coordination.js';
 import type { PolicySpec, Rule } from '../policy/types.js';
@@ -233,6 +235,8 @@ async function suggestRewriteBody(
 ): Promise<RewriteResult> {
   const { actor, prompt, decision, policy } = args;
 
+  // These classifiers can return a binary score, not a rewritten request.
+  if (isNativeGuard(formFromEnv())) return { suggestion: null, reason: 'model-unavailable' };
   const refusal = rewriteGate(args);
   if (refusal) return { suggestion: null, reason: refusal };
 

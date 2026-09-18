@@ -47,6 +47,8 @@ export type CompleteRequest = {
   system: string;
   /** Untrusted content. Callers must pass this through `isolate()` first. */
   user: string;
+  /** Explicit native chat turns; content must retain the isolation envelope. */
+  history?: { role: 'system' | 'user'; content: string }[];
   maxTokens?: number;
   temp?: number;
   seed?: number;

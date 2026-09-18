@@ -104,8 +104,8 @@ function inForceName(role) {
 function judgeChoices() {
   const a = state.adjudicator;
   const customId = library.catalog?.selections?.adjudicator;
-  const builtIn = (a?.choices ?? []).filter((c) => c.onDisk || (!customId && c.id === a.model))
-    .map((c) => ({ label: c.label, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: !c.onDisk }));
+  const builtIn = (a?.choices ?? [])
+    .map((c) => ({ label: c.onDisk ? c.label : `${c.label} · download required`, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));
   const custom = (library.catalog?.models ?? []).filter((m) => (m.testedRoles ?? []).includes('adjudicator'))
     .map((m) => ({ label: m.name, check: (m.activeRoles ?? []).includes('adjudicator'), attrs: `data-judge-custom="${attr(m.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));
   return [...builtIn, ...custom, { label: 'Add a model…', attrs: 'data-go="models" data-sel="library"' }];

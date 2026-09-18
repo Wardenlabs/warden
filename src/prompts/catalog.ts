@@ -1,7 +1,7 @@
 /** Defaults are rendered from the existing builders in token mode. Keeping the
  * builder as the source of truth avoids a second, drifting copy of its words. */
 import { defaultCompilePrompt, defaultSplitPrompt } from '../policy/prompts.js';
-import { defaultDynaguardClauses, defaultDynaguardPolicyUser, defaultDynaguardUser, defaultSystemPrompt, type Form, type FormOptions } from '../guard/passes/forms.js';
+import { nativeDefaults, defaultDynaguardClauses, defaultDynaguardPolicyUser, defaultDynaguardUser, defaultSystemPrompt, type Form, type FormOptions } from '../guard/passes/forms.js';
 import type { Rule } from '../policy/types.js';
 import type { Isolated } from '../guard/isolate.js';
 import { defaultRewriteSystem } from '../guard/rewrite.js';
@@ -60,6 +60,12 @@ export function definitions(): PromptDefinition[] {
       definition(`analyzer.${form}.user`, `${form} · message`, 'Policy and isolated dialogue for a single-rule analyzer call.', defaultDynaguardUser(rule, iso, shots, opts, true), ['policy', 'message'], CONTRACT[form]),
       definition(`analyzer.${form}.screen.user`, `${form} · policy screening`, 'Optional whole-policy screening; document checks do not use this shortcut.', defaultDynaguardPolicyUser([], iso, opts, true), ['policies', 'nextRuleIndex', 'message'], CONTRACT[form]));
   }
+  for (const form of ['shieldstral', 'granite-guardian'] as const) {
+    const defaults = nativeDefaults(form);
+    const contract = 'Native yes/no verdict. yes maps to VIOLATES and no to COMPLIES. Invalid or incomplete output fails closed. Accuracy is not yet measured in Warden.';
+    result.push(definition(`analyzer.${form}.system`, `${form} · instructions`, form === 'granite-guardian' ? 'Judging instructions sent as the second user turn required by Granite Guardian.' : 'Publisher-native system instructions.', defaults.system, form === 'granite-guardian' ? ['rule', 'boundary', 'examples', 'isolation'] : [], contract),
+      definition(`analyzer.${form}.user`, `${form} · message`, 'The isolated message judged against one rule.', defaults.user, form === 'shieldstral' ? ['rule', 'boundary', 'examples', 'isolation', 'message'] : ['message'], contract));
+  }
   for (const policy of ['v1', 'v2'] as const) result.push(definition(`analyzer.dynaguard.policy.${policy}`, `DynaGuard policy · ${policy}`, policy === 'v1' ? 'Rule policy block used by the shipped DynaGuard form.' : 'Experimental policy variant, used only when explicitly selected.', defaultDynaguardClauses(rule, shots, policy, true).join('\n'), ['rule', 'examples'], CONTRACT.dynaguard));
   result.push(definition('analyzer.rewrite.system', 'Suggest a rewrite · instructions', 'Auxiliary analyzer instructions for an employee-requested rewrite after a refusal. The result must pass the ordinary guard.', defaultRewriteSystem(rule, '', true), ['rule', 'guidance', 'allowed', 'isolation', 'thinking'], CONTRACT.rewrite),
     definition('analyzer.rewrite.user', 'Suggest a rewrite · request', 'The isolated refused message to rephrase. Existing rewrite eligibility and recheck gates remain unchanged.', '{{message}}\n\nRewrite the message.', ['message'], CONTRACT.rewrite));
@@ -67,7 +73,8 @@ export function definitions(): PromptDefinition[] {
 }
 
 export function templateIsActive(id: string, form: Form, policy: 'v1' | 'v2', screen: boolean): boolean {
-  if (id.startsWith('compiler.') || id.startsWith('analyzer.rewrite.')) return true;
+  if (id.startsWith('compiler.')) return true;
+  if (id.startsWith('analyzer.rewrite.')) return form !== 'shieldstral' && form !== 'granite-guardian';
   if (id.startsWith('analyzer.dynaguard.policy.')) return (form === 'dynaguard' || form === 'dynaguard-native') && id.endsWith(policy);
   if (id.includes('.screen.')) return id.startsWith(`analyzer.${form}.`) && screen;
   return id.startsWith(`analyzer.${form}.`);

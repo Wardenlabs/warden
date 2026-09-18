@@ -168,7 +168,7 @@ const LOAD_TIMEOUT_MS = 90_000;
 
 const loaded = new Map<ModelRole, Promise<string>>();
 const inForce = new Map<ModelRole, string>();
-const inForceFormats = new Map<ModelRole, 'compliance' | 'dynaguard' | null>();
+const inForceFormats = new Map<ModelRole, 'compliance' | 'dynaguard' | 'shieldstral' | 'granite-guardian' | null>();
 
 function selectedLocalModel(role: ModelRole) {
   const settings = role === 'adjudicator' ? loadAdjudicatorSettings() : role === 'compiler' ? loadCompilerSettings() : null;
@@ -180,7 +180,7 @@ function selectedLocalModel(role: ModelRole) {
 
 /** Custom files carry a declared dialect; a renamed file cannot silently change
  * PASS/FAIL into a general instruction model's compliance prompt. */
-export function customAdjudicatorForm(): 'compliance' | 'dynaguard' | null {
+export function customAdjudicatorForm(): 'compliance' | 'dynaguard' | 'shieldstral' | 'granite-guardian' | null {
   if (inForceFormats.has('adjudicator')) return inForceFormats.get('adjudicator') ?? null;
   if (process.env['WARDEN_MODEL_ADJUDICATOR']) return null;
   return selectedLocalModel('adjudicator')?.format ?? null;

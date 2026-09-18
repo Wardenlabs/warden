@@ -264,6 +264,7 @@ export class LlamaCppAdapter implements QvacAdapter {
     jsonSchema: Record<string, unknown> | undefined
   ): Promise<{ text: string; stats: GenStats }> {
     throwIfCompletionCancelled(req);
+    if (req.history) throw new FailClosedError('Native guard chat turns require the QVAC adapter', { role: req.role, attempts: 0 });
     const started = Date.now();
     const { LlamaChatSession } = await sdk();
     throwIfCompletionCancelled(req);

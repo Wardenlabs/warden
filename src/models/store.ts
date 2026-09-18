@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 export const managedRoleSchema = z.enum(['compiler', 'adjudicator']);
 export type ManagedRole = z.infer<typeof managedRoleSchema>;
-export const formatSchema = z.enum(['compliance', 'dynaguard']);
+export const formatSchema = z.enum(['compliance', 'dynaguard', 'shieldstral', 'granite-guardian']);
 const common = {
   id: z.string().uuid(), name: z.string().trim().min(1).max(100), revision: z.number().int().positive(),
   tests: z.record(z.string(), z.object({ fingerprint: z.string(), at: z.string() })).default({})

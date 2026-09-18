@@ -81,6 +81,8 @@ export const MODEL_CATALOG: DownloadSpec[] = [
     approxMB: 3310,
     required: false
   },
+  { role: 'adjudicator-shieldstral', filename: 'Shieldstral-1.0-3B-Q6_K.gguf', url: 'https://huggingface.co/noctrex/Shieldstral-1.0-3B-GGUF/resolve/c6baba9c3299630d7d6e3fdd40371683b5cb0e5c/Shieldstral-1.0-3B-Q6_K.gguf', approxMB: 2822, required: false },
+  { role: 'adjudicator-granite-guardian', filename: 'granite-guardian-4.1-8b-Q6_K.gguf', url: 'https://huggingface.co/ibm-granite/granite-guardian-4.1-8b-GGUF/resolve/bc78f0995361543a70438fe44a60bb7613fed2f0/granite-guardian-4.1-8b-Q6_K.gguf', approxMB: 6880, required: false },
   {
     role: 'ocr',
     filename: 'latin_g2.gguf',
