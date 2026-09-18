@@ -65,7 +65,7 @@ function findingWords(f) {
  * rule a test double wrote.
  */
 function checkLine(it, { revised = false, result = false } = {}) {
-  if (it.status === 'active') return '<span class="proposal-check --allow">● Active · this rule is enforcing now</span>';
+  if (it.status === 'active') return '<span class="proposal-check">Active</span>';
   if (it.status === 'activating') return '<span class="proposal-check">Activating… · waiting for confirmation</span>';
   if (it.status === 'failed' && result) return `<span class="proposal-check --attention">! Not activated · your draft was kept</span>${it.error ? `<span class="proposal-why">${esc(it.error)}</span>` : ''}`;
   if (it.status === 'excluded') return '<span class="proposal-check --muted">Excluded · this draft will not be activated</span>';
