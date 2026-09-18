@@ -49,6 +49,7 @@
  * exempt key, from anywhere.
  */
 import type { NextFunction, Request, Response } from 'express';
+import { browserAllowsLocalTrust } from './browser-trust.js';
 import { actorForCredential } from '../policy/people.js';
 import { isExempt, loadPolicy } from '../policy/store.js';
 import { callerKey, persistentLimiter } from './rate-limit.js';
@@ -168,7 +169,7 @@ export function isLoopback(req: Request): boolean {
   const address = req.socket.remoteAddress;
   if (!address) return false;
   const bare = address.startsWith('::ffff:') ? address.slice(7) : address;
-  return bare === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bare);
+  return (bare === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bare)) && browserAllowsLocalTrust(req);
 }
 
 /**

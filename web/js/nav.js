@@ -85,23 +85,6 @@ const SOLO_NAV_ITEM = { view: 'soloRules', label: 'This device', icon: 'device' 
 const GATEWAY_NAV_ITEM = { view: 'gateway', label: 'Gateway', icon: 'gateway' };
 const SOLO_SETTINGS_NAV_ITEM = { view: 'soloSettings', label: 'Settings', icon: 'settings' };
 
-/**
- * A directory nobody has put a second person into yet, or one where the only
- * entries are the "protect this device" identity itself, is a pure solo
- * install (docs/specs/solo-mode.md §7) — every other tab would open onto an
- * empty team console, so it does not show. `employees.length === 0` covers
- * the instant before anyone has pressed anything here: nobody has called
- * `/api/solo/setup` yet either, and this still counts as pure rather than as
- * "wait and find out", because the view itself triggers that setup on entry.
- *
- * The moment a second, non-`solo` role shows up, this machine also has a
- * directory worth administering — coexistence (PRD §4) — and "This device"
- * becomes one tab among the rest rather than the only one. In practice that
- * second role is always an exempt admin (only an admin can add people at
- * all), which is the framing spec §7 uses; the two describe the same
- * boundary and this is the one `state.company` can answer without an extra
- * round trip to learn which employee `/api/solo/*` resolved as the identity.
- */
 export function soloIsPureInstall() {
   const emps = state.company.employees;
   return emps.length === 0 || emps.every((e) => e.role === 'solo');
@@ -141,7 +124,7 @@ export function renderNav() {
   $('sidebar').innerHTML = `<button type="button" class="sb-brand" data-go="policy" data-sel="new" aria-label="Warden — write a rule"><span class="brand-lockup">${ICONS.brand}</span><span class="brand-mark">${ICONS.brandMark}</span></button>
     <div class="sb-workspace">${workspaceLine()}</div>
     ${navItems().map((it) => {
-      if (it.group) return '<div class="sb-group" role="separator" aria-hidden="true"></div>';
+      if (it.group) return `<div class="sb-group">${esc(it.group)}</div>`;
       const n = it.count ? it.count() : 0;
       const on = here === it.view;
       return `<button type="button" class="sb-item${on ? ' on' : ''}"${on ? ' aria-current="page"' : ''} data-go="${it.view}"${it.sel ? ` data-sel="${it.sel}"` : ''} aria-label="${esc(it.label)}">

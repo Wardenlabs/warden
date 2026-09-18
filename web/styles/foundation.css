@@ -1,0 +1,268 @@
+/* The console keeps full-width lists inside a breathing frame. Selected
+ * records open in one shared right-hand panel; only prose keeps a reading
+ * measure. Colours remain Warden's green-grey palette and verdict signals. */
+@font-face {
+  font-family: "Manrope";
+  src: url("/assets/fonts/Manrope-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* ink */
+  --ink: #22282A;
+  --ink-body: #444D4F;
+  --muted: #656E6F;
+
+  /* surfaces */
+  --surface-page: #FFFFFF;
+  --surface-subtle: #F4F5F4;
+  /* "This one is chosen", and it has to be a second grey. Sharing
+     --surface-subtle with hover is what made a hovered filter read exactly
+     like the selected one. It used to be --sidebar-selected-bg and answered
+     only to the sidebar; with the tab and the filter becoming the same card,
+     the sidebar's selection and theirs are one role. */
+  --surface-selected: #E6E8E6;
+  --surface-disabled: #ECEEEC;
+  --surface-raised: #FFFFFF;
+
+  /* lines */
+  --line-hairline: #E7EAE8;
+  --line-control: #DDE2DF;
+  --line-accessible: #7D8788;
+
+  /* action — the graphite primary */
+  --action: #22282A;
+  --action-ink: #FFFFFF;
+  --action-hover: #323B3E;
+
+  /* verdicts — the only saturated colour in the product */
+  --verdict-block: #B91C41;     --verdict-block-bg: #FFF0F3;
+  --verdict-allow: #087356;     --verdict-allow-bg: #E8F8F1;
+  --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
+  --signal-red: #FF3B5C;
+
+  /* roles — identity, never severity */
+  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+
+  /* Sidebar. It used to be one dark slab in both modes, and the note here said
+     so; the redesign made it light on light and dark on dark, so the six below
+     are redefined in each dark block. In light --sidebar-bg is the same
+     #F4F5F4 as --surface-subtle, on purpose: the navigation and a hovered row
+     are the same grey. In dark they separate. */
+  --sidebar-bg: #F4F5F4;
+  --sidebar-text: #444D4F;
+  --sidebar-muted: #656E6F;
+  --sidebar-avatar: #E6E8E6;
+  --sidebar-selected-text: #22282A;
+
+  /* Accessibility, and it shares the blue of --role-admin. Left where it was:
+     the collection does not name it and the neutrals moving is not a reason to
+     move a focus indicator. It is worth looking at against the light sidebar,
+     which is a different contrast problem from the near-black one it was
+     drawn against. */
+  --focus-ring: #365FA5;
+
+  /* Elevation and the dialog scrim have no Figma variable; they are the
+     Menu component's two-layer drop shadow and the scrim the dialog frames
+     render, kept here so no colour lives outside the theme blocks. Both are
+     derived from --ink, so they moved with it — a shadow still mixed from the
+     old #17181C reads blue over a green-grey page. */
+  --shadow-float: 0 1px 1px rgba(34, 40, 42, .06), 0 8px 12px rgba(34, 40, 42, .12);
+  --scrim: rgba(34, 40, 42, .22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
+
+    --surface-page: #171717;
+    --surface-subtle: #242424;
+    --surface-selected: #343434;
+    --surface-disabled: #202020;
+    --surface-raised: #292929;
+
+    --line-hairline: #353535;
+    --line-control: #424242;
+    /* Derived, not a Figma decision: the collection gives --line-accessible
+       only in light (#7D8788). This holds the same contrast against the dark
+       page that #7D8788 holds against white. Replace it the day the collection
+       names one. */
+    --line-accessible: #6A6A66;
+
+    --action: #F3F3F1;
+    --action-ink: #171717;
+    --action-hover: #E4E4E1;
+
+    --verdict-block: #F0708F;     --verdict-block-bg: #391820;
+    --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
+    --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
+    --signal-red: #FF5C77;
+
+    --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+    --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+    --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+    --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+    --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+
+    --sidebar-bg: #202020;
+    --sidebar-text: #CACAC7;
+    --sidebar-muted: #999995;
+    --sidebar-avatar: #343434;
+    --sidebar-selected-text: #F2F2EF;
+
+    --focus-ring: #6E96E8;
+
+    --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
+    --scrim: rgba(0, 0, 0, .55);
+  }
+}
+
+/* The same dark tokens again, for an explicit choice overriding a light OS.
+   A byte-for-byte copy of the block above — see the note at the top. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #F3F3F1;  --ink-body: #CCCCCA;  --muted: #9E9E99;
+
+  --surface-page: #171717;
+  --surface-subtle: #242424;
+  --surface-selected: #343434;
+  --surface-disabled: #202020;
+  --surface-raised: #292929;
+
+  --line-hairline: #353535;
+  --line-control: #424242;
+  /* Derived, not a Figma decision: the collection gives --line-accessible
+     only in light (#7D8788). This holds the same contrast against the dark
+     page that #7D8788 holds against white. Replace it the day the collection
+     names one. */
+  --line-accessible: #6A6A66;
+
+  --action: #F3F3F1;
+  --action-ink: #171717;
+  --action-hover: #E4E4E1;
+
+  --verdict-block: #F0708F;     --verdict-block-bg: #391820;
+  --verdict-allow: #4CC29A;     --verdict-allow-bg: #12352B;
+  --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
+  --signal-red: #FF5C77;
+
+  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
+  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
+  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
+  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
+  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+
+  --sidebar-bg: #202020;
+  --sidebar-text: #CACAC7;
+  --sidebar-muted: #999995;
+  --sidebar-avatar: #343434;
+  --sidebar-selected-text: #F2F2EF;
+
+  --focus-ring: #6E96E8;
+
+  --shadow-float: 0 1px 1px rgba(0, 0, 0, .30), 0 8px 12px rgba(0, 0, 0, .40);
+  --scrim: rgba(0, 0, 0, .55);
+}
+
+:root {
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --display: "Manrope", -apple-system, system-ui, sans-serif;
+  --fs-display: clamp(26px, 2.5vw, 36px);
+  --frame-inset: 12px;
+  --page-gutter: clamp(24px, 3vw, 52px);
+  --panel-width: 760px;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /*
+   * A console is scanned, not read, so the chrome is small and the reading is
+   * not. That distinction is the whole scale: --fs-1 to --fs-4 are the things
+   * you sweep — labels, rows, controls, menus — and they sit at 11 to 13.
+   * --fs-5 and up are the things somebody actually stops and reads: the rule
+   * a judge was given, what a decision said, the turn in a conversation.
+   * Shrinking those with the rest would be the mistake that makes a dense UI
+   * hostile rather than efficient.
+   *
+   * --fs-1 stays at 11 while everything around it comes down. It is the only
+   * size set in uppercase with .06em of tracking, which is the worst case for
+   * legibility in the whole stylesheet; 10px there makes a column header a
+   * thing you decode rather than read, and nobody reads "APPLIES TO" with any
+   * enthusiasm to spare.
+   */
+  --fs-1: 11px;  /* kickers and column headers, uppercase */
+  --fs-2: 12px;  /* chips, mono metadata — Figma's "Code / Small" */
+  --fs-3: 12px;  /* secondary: datums, helpers, notes beside a value */
+  --fs-4: 13px;  /* the body: labels, values, rows, buttons, menus, ledes */
+  --fs-5: 15px;  /* block title, and the prose you stop to read */
+  --fs-6: 18px;  /* section title, page title, the dominant verdict */
+  --fs-7: 22px;  /* the page's own name, and the first-run h1 */
+
+  --fw-normal: 400; --fw-medium: 500; --fw-semi: 600;
+  --lh-tight: 1.25; --lh-snug: 1.45; --lh-body: 1.6;
+  --ls-label: .06em; --ls-tight: -.011em;
+
+  /*
+   * The small end does not move and the large end does, because they are two
+   * different jobs wearing one scale. --s-1 to --s-4 are the air *inside*
+   * things — the padding of a pill, the gap between a dot and its word — and
+   * that air answers to the shape of a letter, not to the size of the page: a
+   * 13px label in a chip needs the same 12px beside it that a 14px one did.
+   * Compressing them is what makes a dense interface feel cramped rather than
+   * efficient, which is a different thing and a worse one.
+   *
+   * --s-5 upward is the distance *between* things, and that is what a scale
+   * change is actually for. --s-5 lands on 14, which is what the frames draw
+   * inside a tab (Tabs / Item, 697:913) and what Figma's own `space-14` says.
+   */
+  --s-1: 4px; --s-2: 6px; --s-3: 8px; --s-4: 12px; --s-5: 14px;
+  --s-6: 18px; --s-7: 20px; --s-8: 24px; --s-9: 28px; --s-10: 34px;
+  --s-11: 42px; --s-12: 52px;
+
+  /* The distance between two blocks on a page, and the only spacing a page
+     layout is allowed to use. Still `--s-7`, which is now 20 rather than 24:
+     the frames and "01 · Fundamentos / ESPACIADO" draw 24 against a 14px body
+     and a 56px row, and neither of those is what this stylesheet has any more.
+     Keeping the one absolute number while every size around it came down would
+     leave the page rhythm loose in proportion to everything it separates.
+     `--s-6` and `--s-8` are in the scale for padding inside things and are not
+     page rhythm. Blocks do not carry outer margins to reach it — see `.sheet`. */
+  --s-block: var(--s-7);
+
+  --r-control: 8px;   /* everything with a box */
+  --r-selected: 8px;  /* the sidebar's selection band, and nothing else */
+  /* The composer, and the only box in the product that is not 6.
+     Corners read as concentric when the outer radius clears the inner one by
+     the inset between them, and the composer is the one place the product
+     nests a control inside a box: a 6px attach and a 6px button sit 14px in
+     from its edge. At 6 and 6 the two corners fight, which is what reads as
+     a stiff 2015 form field rather than a place to write. 10 is the smallest
+     step that resolves it while still belonging to the 6px family — 12 works
+     too and 16 starts arguing with the turn bubbles above it. */
+  --r-composer: 22px;
+  --r-avatar: 17px;
+
+  --h-control: 34px;
+  --h-control-compact: 28px;
+  --h-nav-row: 34px;  /* a row in the sidebar */
+  --h-page-row: 48px; /* Header / Page v4 (720:959): the one row that says where you are */
+  --h-tabs: 40px;     /* the strip under it, tabs or toolbar */
+  --h-record-row: 32px; /* Condition / * — one fact, a label and a value */
+  --w-sidebar: 220px;
+  --w-reading: 700px; /* the measure, not a fixed column: 700 at 15px is the
+                         same ~75 characters 760 held at 16 */
+  --w-table: 1120px;  /* the frames' table width, and the one number here that
+                         does not move: it is a layout, not a size */
+  --w-bleed: 16px;    /* how far a table row reaches past the grid, each side */
+  --prose: 68ch;
+}
+

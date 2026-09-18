@@ -1,3 +1,4 @@
+import { safeExternalUrl } from './navigation.js';
 /**
  * Warden Desktop: the Electron shell around the gateway.
  *
@@ -364,8 +365,14 @@ function openConsole(port: number, hash?: string): void {
   // The console has no outbound links today; if one ever appears it belongs
   // in the system browser, not inside the shell.
   consoleWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (safeExternalUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
+  });
+  consoleWindow.webContents.on('will-navigate', (event, target) => {
+    if (new URL(target).origin !== new URL(url).origin) {
+      event.preventDefault();
+      if (safeExternalUrl(target)) void shell.openExternal(target);
+    }
   });
   if (SMOKE) {
     consoleWindow.webContents.once('did-finish-load', () => {

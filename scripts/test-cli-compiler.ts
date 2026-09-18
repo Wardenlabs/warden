@@ -30,6 +30,7 @@ const mode = process.env.FAKE_CLAUDE;
 const args = process.argv.slice(2);
 writeFileSync(process.env.FAKE_ARGS_FILE, JSON.stringify(args));
 const answer = '\\n\`\`\`json\\n{"severity":"block","statement":"No customer data leaves the company."}\\n\`\`\`\\n';
+if (mode === 'private-error') { process.stderr.write('token=do-not-leak /private/home/private-project'); process.exit(1); }
 if (mode === 'old' && args.includes('--safe-mode')) {
   // A CLI that predates the flag refuses the command line before touching stdin.
   process.stderr.write("error: unknown option '--safe-mode'\\n");
@@ -85,6 +86,13 @@ async function main(): Promise<void> {
     assert.deepEqual(args.slice(0, 2), ['-p', '--safe-mode']);
     console.log('✓ compiles under --safe-mode, and never under --bare');
 
+    process.env['FAKE_CLAUDE'] = 'private-error';
+    await assert.rejects(adapter().completeJSON(req, schema, jsonSchema), (err) => {
+      assert(!String(err).includes('do-not-leak'));
+      assert(!String(err).includes('/private/home'));
+      assert.match(String(err), /Test the connection in Models/);
+      return true;
+    });
     process.env['FAKE_CLAUDE'] = 'old';
     const old = adapter();
     const first = await old.completeJSON(req, schema, jsonSchema);

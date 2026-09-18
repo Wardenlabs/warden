@@ -61,6 +61,9 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  // Templates use inline CSS for measured layout, but all executable code is
+  // served as local modules. Block inline scripts and embedded documents.
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
 
   const proto = req.header('x-forwarded-proto');
   if (proto === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000');

@@ -99,7 +99,7 @@ try {
 
   mode('signed-in', 'old'); const legacy = await request('/api/settings/compiler/test', 'POST', { provider: 'claude-cli', model: 'sonnet' }); assert.equal(legacy.status, 200);
   const lastGenerations = calls().filter((call) => call.kind === 'generation').slice(-2); assert(lastGenerations[0].args.includes('--safe-mode')); assert(!lastGenerations[1].args.includes('--safe-mode')); assert(lastGenerations[1].args.includes('sonnet')); assert(!lastGenerations[1].args.includes('--bare'));
-  mode('signed-in', 'timeout'); const started = Date.now(); await assert.rejects(new CliCompilerAdapter(new MockQvacAdapter(), { tool: 'claude', model: '', timeoutMs: 100 }).complete({ role: 'compiler', system: 'probe', user: 'probe', timeoutMs: 50 }), /deadline/i); assert(Date.now() - started < 2000);
+  mode('signed-in', 'timeout'); const started = Date.now(); await assert.rejects(new CliCompilerAdapter(new MockQvacAdapter(), { tool: 'claude', model: '', timeoutMs: 100 }).complete({ role: 'compiler', system: 'probe', user: 'probe', timeoutMs: 50 }), /timed out|deadline/i); assert(Date.now() - started < 2000);
   const generations = calls().filter((call) => call.kind === 'generation').length;
   await new CliCompilerAdapter(new MockQvacAdapter(), { tool: 'claude', model: '', timeoutMs: 100 }).completeJSON({ role: 'adjudicator', system: 'schema probe', user: 'schema probe' }, schema, json);
   assert.equal(calls().filter((call) => call.kind === 'generation').length, generations);

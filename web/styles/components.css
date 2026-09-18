@@ -1,0 +1,735 @@
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  display: flex;
+  background: var(--sidebar-bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-4);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══ shell ══════════════════════════════════════════════════════════════ */
+
+/* ── the sidebar ──────────────────────────────────────────────────────────
+   Drawn once into its own element and never part of the pane's innerHTML, so
+   a decision arriving on the live stream re-renders the page without the
+   navigation flickering under the pointer. It reads only --sidebar-* tokens:
+   --ink and --action invert in dark mode and the sidebar must not. */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  width: var(--w-sidebar);
+  height: 100vh;
+  padding: var(--s-6);
+  overflow-y: auto;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+}
+.sb-brand { display: flex; align-items: center; flex: none; height: 50px; padding: 0 var(--s-2); border: 0; background: none; color: var(--sidebar-selected-text); cursor: pointer; }
+.sb-brand svg { display: block; width: 100px; height: 30px; }
+.brand-mark { display: none; }
+.sb-workspace { display: grid; flex: none; padding-inline: var(--s-2); margin-bottom: var(--s-4); line-height: var(--lh-snug); }
+.sb-workspace span { font-size: var(--fs-3); color: var(--sidebar-muted); text-transform: uppercase; }
+.sb-workspace b, .sb-workspace button {
+  font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sb-workspace button { border: 0; padding: 0; background: none; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.sb-group { flex: none; padding: 20px 12px 8px; font-size: 11px; font-weight: 600; color: var(--sidebar-muted); letter-spacing: .06em; text-transform: uppercase; }
+.sb-item {
+  display: flex; align-items: center; gap: var(--s-4); flex: none;
+  width: 100%; height: var(--h-nav-row); padding: 0 var(--s-4);
+  border: 0; border-radius: var(--r-selected);
+  background: none; color: var(--sidebar-text);
+  font: inherit; font-size: var(--fs-4); text-align: left; cursor: pointer;
+}
+.sb-item svg { width: 20px; height: 20px; flex: none; color: var(--sidebar-muted); }
+.sb-item:hover { background: var(--sidebar-avatar); }
+.sb-item.on { background: var(--surface-selected); color: var(--sidebar-selected-text); font-weight: var(--fw-semi); }
+.sb-item.on svg { color: var(--sidebar-selected-text); }
+.sb-item:focus-visible { outline: 2px solid var(--sidebar-selected-text); outline-offset: -2px; }
+.sb-count { font-variant-numeric: tabular-nums; }
+.sb-fill { flex: 1; }
+.sb-profile { display: flex; align-items: center; gap: var(--s-4); flex: none; height: 46px; }
+.sb-avatar {
+  display: grid; place-items: center; flex: none;
+  width: 30px; height: 30px; border-radius: var(--r-avatar);
+  background: var(--sidebar-avatar); color: var(--sidebar-selected-text);
+  font-size: var(--fs-4); font-weight: var(--fw-medium);
+}
+.sb-profile div { display: grid; line-height: var(--lh-snug); }
+.sb-profile b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-selected-text); }
+.sb-profile span { font-size: var(--fs-3); color: var(--sidebar-muted); }
+.sb-account { flex: none; }
+.sb-account > .sb-profile { border-radius: var(--r-selected); cursor: pointer; }
+.sb-account > .sb-profile:hover, .sb-account[open] > .sb-profile { background: var(--sidebar-avatar); }
+.sb-account .menu-list { min-width: 176px; }
+
+/* ── the pane ─────────────────────────────────────────────────────────────
+   One origin for content: 40px in from the sidebar. Everything left-aligned
+   at that edge; the one exception is the New rule conversation, which is
+   centred end to end (`.--centred`, see "writing rules" below). */
+
+.pane { flex: 1; min-width: 0; height: calc(100dvh - 2 * var(--frame-inset)); overflow-y: auto; overscroll-behavior: contain; margin: var(--frame-inset) var(--frame-inset) var(--frame-inset) 0; padding: var(--s-6) var(--page-gutter); border: 1px solid var(--line-hairline); border-radius: var(--s-4); background: var(--surface-page); }
+.pane:focus { outline: none; }
+.pane.flush { overflow: hidden; display: flex; flex-direction: column; }
+.pane.flush > * { flex: 1; min-height: 0; }
+/* A banner is a notice, not a panel. The rule above hands every direct child
+   of a flush pane an equal share of the column, which is right for the one
+   view that fills the screen and wrong for anything stacked above it — the
+   demo-mode and first-run banners are rendered by the shell, so they became
+   direct children and grew to half the window with nothing in them. The
+   compiler-setup nudge is a feedback plate from the same shell line and
+   stretched the same way on the New rule and Test conversations. */
+.pane.flush > .banner, .pane.flush > .feedback { flex: 0 0 auto; }
+
+/*
+ * The page, and the only thing that decides how far apart its blocks sit.
+ *
+ * Every view has the same shape — a header and a body — and until this was one
+ * container each block carried its own outer margin to space itself from the
+ * next one. That
+ * works in one layout and nowhere else: `.tabs` shipped `margin: -8px 0 24px`,
+ * which in `.sheet`'s old flow collapsed against the header's 24 to 16 above
+ * and stood as 24 below, but inside the grid wrappers on This device and
+ * Gateway the same margins *added* to the container's gap and produced 20/52
+ * and 12/44. One component, four rhythms, none of them the 24 the frames draw.
+ *
+ * So spacing between blocks is the container's, always, and a block carries no
+ * margin to its siblings. If something needs to sit closer, the container says
+ * so (`.flush-head`), never the block.
+ *
+ * A column flex rather than a grid, and that part is not a preference. A grid
+ * item's containing block is its own grid area, so `position: sticky` on one
+ * has nowhere to travel — the header's row is exactly the header's height and
+ * it would never leave the top of the page. A flex item's containing block is
+ * the whole flex container, which is what the sticky header needs. Everything
+ * the grid was here for survives: one gap, spent by the container.
+ *
+ * `justify-content` stays at its start default so a short page sits at the
+ * top: `.pane.flush` hands its child the full column height, and spreading
+ * three blocks down a 900px screen is what a stretched container would do.
+ */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-block);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 var(--s-12);
+}
+
+/* ═══ components ══════════════════════════════════════════════════════════
+   One class per Figma component in "Warden · Sistema", modifiers as `--name`
+   classes. The templates that emit this markup live in web/js/ui.js; a view
+   that needs one of these asks ui.js rather than re-typing it. */
+
+button, input, select, textarea { font: inherit; font-size: var(--fs-4); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+::placeholder { color: var(--muted); }
+
+/* ── Button (258:119) ─────────────────────────────────────────────────────
+   40px, 6px corners, 14 medium. Quiet is outlined with the accessible line,
+   danger is the same outline with the refusal red on the label only: a
+   destructive action is explicit in its words, never a red slab. Disabled
+   drops the border and goes to the disabled surface. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  height: var(--h-control); padding: 0 var(--s-5); flex: none;
+  border: 1px solid var(--line-accessible); border-radius: var(--r-control);
+  background: var(--surface-page); color: var(--ink);
+  font-size: var(--fs-4); font-weight: var(--fw-medium); line-height: 20px;
+  white-space: nowrap; text-decoration: none; cursor: pointer;
+}
+.btn:hover { background: var(--surface-subtle); }
+.btn:active { background: var(--surface-disabled); }
+.btn.--primary { background: var(--action); border-color: var(--action); color: var(--action-ink); }
+.btn.--primary:hover, .btn.--primary:active { background: var(--action-hover); border-color: var(--action-hover); }
+/* On the primary the ring sits outside the fill, or it disappears into it. */
+.btn.--primary:focus-visible { outline-offset: 2px; }
+.btn.--danger { color: var(--verdict-block); }
+.btn.--link { border-color: transparent; background: none; padding: 0 var(--s-4); }
+.btn.--link:hover { background: var(--surface-subtle); }
+.btn:disabled { background: var(--surface-disabled); border-color: var(--surface-disabled); color: var(--muted); cursor: default; }
+.btn.--busy:disabled { background: var(--action); border-color: var(--action); color: var(--action-ink); cursor: progress; }
+.btn.--busy:not(.--primary):disabled { background: var(--surface-page); border-color: var(--line-accessible); color: var(--ink); }
+/* Button / Compact (378:1962): inline editors and section footers. */
+.btn.--compact { height: var(--h-control-compact); padding: 0 var(--s-4); }
+.btn-row { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+
+/* A word that is a link: "View activity →", "Open person to set up". */
+.linkbtn {
+  border: none; background: none; padding: 0;
+  font: inherit; font-size: inherit; font-weight: var(--fw-medium);
+  color: var(--ink); text-align: left; cursor: pointer; text-decoration: none;
+}
+.linkbtn:hover { text-decoration: underline; text-underline-offset: 2px; }
+.linkbtn.--danger { color: var(--verdict-block); }
+.linkish {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+
+/* ── Field (261:105) and Field / Compact (489:89) ─────────────────────────── */
+input[type="text"], input[type="number"], input[type="password"], input[type="url"], select, textarea {
+  width: 100%; min-height: var(--h-control);
+  padding: 0 var(--s-5);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface-page); color: var(--ink);
+  font-size: var(--fs-4); line-height: var(--lh-snug);
+}
+textarea { padding: var(--s-4) var(--s-5); resize: vertical; line-height: var(--lh-body); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
+input:disabled, select:disabled, textarea:disabled, textarea[readonly] { background: var(--surface-disabled); color: var(--muted); }
+/* The chevron is drawn with two gradients so its colour is a token; an SVG
+   data URI would carry a hex value past the theme blocks. */
+select {
+  -webkit-appearance: none; appearance: none; padding-right: var(--s-10);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.field { display: grid; gap: var(--s-2); min-width: 0; }
+.field > label, .field-label { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.field-help { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.field.--error input, .field.--error textarea { border-color: var(--verdict-block); }
+.field.--error .field-help { color: var(--verdict-block); }
+input.field-compact { width: 90px; min-height: var(--h-control-compact); height: var(--h-control-compact); padding: 0 var(--s-4); }
+.optional { color: var(--muted); font-weight: var(--fw-normal); }
+.check { display: inline-flex; align-items: center; gap: var(--s-3); font-size: var(--fs-4); color: var(--ink); cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--action); }
+
+/* Search: the magnifier inside a hairline box. */
+.search {
+  display: flex; align-items: center; gap: 10px; width: 230px; height: var(--h-control); flex: none;
+  padding: 0 var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-page); color: var(--muted); cursor: text;
+}
+.search svg { width: 18px; height: 18px; flex: none; }
+.search input { min-height: 0; height: 100%; padding: 0; border: 0; background: none; }
+.search input:focus-visible { outline: none; }
+.search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
+
+/* Segmented filters are Tabs / Item — see the page-anatomy block below. The
+   toolbar they used to sit in is gone: filters and a search field are the
+   header's strip now, which is what the strip is for. */
+
+/* ── Trigger / Value (515:7968): the value is the control ───────────────── */
+.trigger-value {
+  display: inline-flex; align-items: center; gap: var(--s-4);
+  min-height: 0; padding: 7px var(--s-5);
+  border: 1px solid var(--line-accessible); border-radius: var(--r-control);
+  background: var(--surface-page); color: var(--ink);
+  font-size: var(--fs-4); cursor: pointer; white-space: nowrap;
+}
+.trigger-value i { font-style: normal; font-size: var(--fs-1); color: var(--muted); }
+.trigger-value:hover, .trigger-value.--open, details[open] > .trigger-value { background: var(--surface-subtle); }
+
+/* ── Menu (404:5947) and Menu / Item (404:5942) ───────────────────────────
+   Every floating list of actions. Raised surface, hairline, 4px padding, the
+   two-layer shadow; anchored to its trigger 6px below, right edges meeting
+   for a row's ···, left edges for a menu hanging from a value. The trigger
+   stays in its hover state while the menu is open. */
+.menu { position: relative; flex: none; }
+.menu > summary { list-style: none; cursor: pointer; user-select: none; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu-trigger.--dots {
+  display: grid; place-items: center; width: var(--h-control); height: var(--h-control);
+  border-radius: var(--r-control); color: var(--muted);
+  font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: 1; letter-spacing: .02em;
+}
+.menu-trigger.--dots:hover, .menu[open] > .menu-trigger.--dots { background: var(--surface-subtle); color: var(--ink); }
+.menu-list {
+  position: absolute; top: calc(100% + 6px); z-index: 20;
+  display: grid; min-width: 240px; padding: var(--s-1);
+  background: var(--surface-raised); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  box-shadow: var(--shadow-float);
+}
+.menu.--right > .menu-list { right: 0; }
+.menu.--left > .menu-list { left: 0; }
+.menu.--up > .menu-list { top: auto; bottom: calc(100% + 6px); }
+.menu-item {
+  display: flex; align-items: center; gap: var(--s-4); width: 100%; min-height: var(--h-control);
+  padding: 0 var(--s-4); border: 0; border-radius: var(--r-control);
+  background: none; color: var(--ink); font-size: var(--fs-4); text-align: left; cursor: pointer; white-space: nowrap;
+}
+.menu-item > span { flex: 1; min-width: 0; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--surface-subtle); outline: none; }
+.menu-item.--destructive { color: var(--verdict-block); }
+.menu-item:disabled { color: var(--muted); cursor: default; background: none; }
+.menu-check { font-weight: var(--fw-medium); }
+.menu-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--role-everyone); }
+.menu-dot.--admin { background: var(--role-admin); }
+.menu-dot.--employee { background: var(--role-employee); }
+.menu-dot.--sales { background: var(--role-sales); }
+.menu-dot.--solo { background: var(--role-solo); }
+.menu-note { padding: var(--s-3) var(--s-4); font-size: var(--fs-4); color: var(--muted); }
+.menu-sub { display: block; font-size: var(--fs-3); color: var(--muted); white-space: normal; }
+
+/* ── Page anatomy: Header / Page v4 (720:959), Tabs / Item (697:913) ───────
+ *
+ * One region, one hairline. The bar that carried the breadcrumb, the 90px
+ * header and the free-standing tab strip were three blocks with three heights
+ * and three margins, and Rules spent 266px of them before its first row of
+ * data — 64 + 24 + 90 + 24 + 40 + 24, not one pixel of which was content.
+ *
+ * It is sticky because the primary action left the screen the moment anybody
+ * scrolled, and a header that has to be scrolled back to is a header that gets
+ * scrolled past. The background exists only so the rows can pass underneath
+ * it: in repose it is the page's own colour and invisible. It is deliberately
+ * **not** `--surface-subtle` — that grey is a *state* in its 26 other uses
+ * (hover, open, pressed, a sunk box), and in light it is the same #F4F5F4 as
+ * the sidebar, so a band of it here fused the header with the navigation.
+ *
+ * The bleed is `--w-bleed`, the same 20 the tables and the bands already use,
+ * so the hairline ends where the row dividers under it end.
+ */
+.page-head {
+  position: sticky; top: 0; z-index: 10;
+  margin-inline: calc(-1 * var(--w-bleed)); padding-inline: var(--w-bleed);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--line-hairline);
+}
+.page-head::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--s-6); background: var(--surface-page); }
+.page-head-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-7); height: var(--h-page-row);
+}
+/* Baseline, not centre: the crumb is 14px and the title 20, and centring two
+   type sizes on a box leaves neither of them sitting on a line. */
+.page-where { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
+/* A button with a box, never a span folded into the title. Folded in it is
+   the picture of a link with no hover, no focus ring and no tab stop. */
+.page-crumb {
+  border: 0; padding: 3px var(--s-2); border-radius: var(--r-control);
+  background: none; font-size: var(--fs-4); color: var(--muted);
+  white-space: nowrap; cursor: pointer;
+}
+button.page-crumb:hover { background: var(--surface-subtle); color: var(--ink); }
+.page-sep { color: var(--muted); }
+/*
+ * `--fs-7`, and the reason is that `--fs-6` was never the page title's size.
+ *
+ * Five other things use 18: a section title, a section disclosure, the
+ * confirmation card's headline, the tester's verdict card, and the ··· glyph.
+ * What they have in common is being the dominant thing inside *a block*. The
+ * page's own name is not one of those — it outranks everything in every block
+ * on the page — and at 18 it tied with "Rule instruction" two blocks below it,
+ * which is a hierarchy that says nothing.
+ *
+ * It costs no height: the header row is a fixed `--h-page-row` of 48 and a
+ * 22/28 title sits in it with ten pixels to spare. Figma's Header / Page v4
+ * carries the same change, on the Title style rather than Heading.
+ */
+.page-title {
+  margin: 0; font-family: var(--display); font-size: var(--fs-7); font-weight: var(--fw-semi);
+  line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-title.--block { color: var(--ink); }
+.page-title.--attention { color: var(--ink); }
+.page-title.--allow { color: var(--ink); }
+.page-title.--muted { color: var(--ink-body); }
+/* In the top row between the title and the actions, never under the title.
+   That is what keeps the row one line tall and `align-items` honest. */
+.page-meta { margin: 0; font-size: var(--fs-2); color: var(--muted); white-space: nowrap; }
+/* Every control in this row is 32 and 13px — Button / Compact, which is what
+   the frames draw here. Said once on the container rather than passed as
+   `compact: true` at twenty call sites, because it is a property of the row. */
+.page-actions { display: flex; align-items: center; gap: var(--s-3); flex: none; }
+.page-actions .btn { height: var(--h-control-compact); padding: 0 var(--s-4); font-size: var(--fs-3); }
+.page-actions .btn.--link { padding: 0 var(--s-3); }
+.page-actions .menu-trigger.--dots { width: var(--h-control-compact); height: var(--h-control-compact); }
+.page-strip { display: flex; align-items: center; gap: var(--s-1); height: var(--h-tabs); }
+
+/*
+ * The one switch, for tabs and for filters alike.
+ *
+ * Card, not underline: the 2px rail and its accent appear in no frame and were
+ * a decision taken only in code. Tabs live in four views and a toolbar in two,
+ * with no overlap anywhere, so collapsing them into one rule removes a
+ * component rather than confusing two.
+ *
+ * Hover and selected must not share a fill — which is the bug `.filter` shipped
+ * with, where both were `--surface-subtle` and hovering an unselected filter
+ * read exactly like the selected one. That is what `--surface-selected` is for.
+ */
+.tabs, .filter-set { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.tab, .filter {
+  display: inline-flex; align-items: center;
+  height: var(--h-control-compact); padding: 0 var(--s-5);
+  border: 0; border-radius: var(--r-control); background: none;
+  font-size: var(--fs-4); font-weight: var(--fw-medium);
+  color: var(--muted); cursor: pointer; white-space: pre;
+}
+.tab:hover, .filter:hover { background: var(--surface-subtle); color: var(--ink-body); }
+.tab.--on, .filter.--on { background: var(--surface-selected); color: var(--ink); }
+
+/* Inside the strip the field is a word with a magnifier, not a box: a 42px
+   outlined input beside three 32px cards is the tallest thing in a row that
+   is meant to read as one set of controls. Outside the strip it keeps its box. */
+.page-strip .search {
+  width: auto; height: var(--h-control-compact);
+  border-color: transparent; background: none;
+  margin-left: auto; padding-inline: var(--s-3);
+}
+.page-strip .search:hover { background: var(--surface-subtle); }
+/* The person filter is a value you open, and in the strip it is a card like
+   everything beside it rather than the 42px boxed field it is elsewhere. */
+.page-strip .person-trigger {
+  width: auto; height: var(--h-control-compact); padding: 0 var(--s-4);
+  border-color: transparent; border-radius: var(--r-control);
+}
+.page-strip .person-filter { margin-left: auto; }
+
+/* That section has work that is not finished. The status block at the top of a
+   page says a gap exists; this is the only thing that says which section. */
+.tab-dot {
+  display: inline-block; width: 5px; height: 5px; margin-left: var(--s-2);
+  border-radius: 50%; background: var(--verdict-attention);
+}
+
+.reading { max-width: var(--w-reading); }
+.section-title { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-snug); }
+.section-title.--big { font-size: var(--fs-6); }
+/* --fs-4, not --fs-3, and it is the only thing in this file that got bigger.
+   A lede is a paragraph, and this is where the sentences that used to sit in
+   the page header now live; moving them into the reading column and shrinking
+   them on the way would be making them worse twice. */
+.section-lede { margin: var(--s-2) 0 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+.hairline { height: 1px; background: var(--line-hairline); border: 0; margin: 0; }
+
+/* ── Tables and rows (Row / Rule, Decision, Inbox, Person, Role) ──────────
+   The block sits on the grid; header, rows, bands and dividers reach 20px
+   past it on each side, and the row's own 20px padding puts the text back on
+   the grid. Hover and the focus ring land in that gutter. */
+.table { margin: 0 calc(-1 * var(--w-bleed)); }
+.thead, .trow {
+  display: grid; align-items: center; column-gap: 10px;
+  padding: 0 var(--w-bleed);
+}
+.thead {
+  height: 32px; font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.trow {
+  width: 100%; min-height: 44px; border: 0; border-bottom: 1px solid var(--line-hairline);
+  background: none; color: var(--ink-body); font-size: var(--fs-4); text-align: left;
+}
+.trow:last-child { border-bottom: 0; }
+.trow.--link { cursor: pointer; }
+.trow.--link:hover, .trow:has(> .menu[open]), .trow:has(.row-menu .menu[open]) { background: var(--surface-subtle); }
+.trow:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.trow > * { min-width: 0; }
+.cell-strong { color: var(--ink); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-muted { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/*
+ * A cell is one line.
+ *
+ * Almost every second line in this console defined what the line above it had
+ * already said — "No device has ever checked in" under "Never reported" — and
+ * a table cell is the worst place in the product to put an explanation,
+ * because it is repeated once per row. What survives a second line is what
+ * changes from row to row, and it changes side rather than level: the datum
+ * joins the first line after a `·`. Rows went from 80 to 56.
+ *
+ * The separator is generated rather than typed into sixteen call sites; it is
+ * punctuation between two facts, not one of the facts.
+ */
+.cell-stack { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; line-height: var(--lh-snug); }
+.cell-stack small { font-size: var(--fs-3); color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-stack > small::before { content: "· "; }
+/* The one cell with five facts in it. Two short facts do not need two lines;
+   `Claude Code · wired · hook v0.2.5` over `Reported 40 min · last judged
+   5 min` is not two short facts, and joined it is a run-on. */
+.cell-stack.--stacked { display: grid; }
+.cell-stack.--stacked > small::before { content: none; }
+.row-menu { display: flex; justify-content: flex-end; }
+/*
+ * A list with nothing in it, said at the grid origin.
+ *
+ * Never a `.trow`: that puts the sentence in whichever column the table's
+ * template makes second — 120px in on This device — while the band under it
+ * starts at 0 and the page title at 0. A sentence aligned to a column that has
+ * no other occupant is aligned to nothing, and it carries a row's bottom
+ * hairline as well, so an empty list looks like a broken one.
+ *
+ * Nothing uses this yet. This device had the only empty sentence in the
+ * console and it went, because the conditions block above it already said the
+ * same thing in amber with the fix beside it; see `rulesSection`. Kept because
+ * the next empty list will want it and the row is the wrong answer.
+ */
+.table-empty { margin: 0; padding: 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+
+.table-foot { margin-top: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+/* The one container whose own rhythm (8) is tighter than a footnote wants. */
+.settings-task > .table-foot { margin-top: var(--s-4); }
+
+/* Group band (246:759): the day in Activity, the group in Inbox. */
+.group-band {
+  display: flex; align-items: center; height: 28px; padding: 0 var(--w-bleed);
+  background: var(--surface-subtle); border-top: 1px solid var(--line-hairline);
+  font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label);
+  text-transform: uppercase; color: var(--ink-body);
+}
+
+/* ── Status words: effect, verdict, state — coloured text, no box ──────── */
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--muted); }
+.effect-text, .verdict-text, .status-text { display: inline-flex; align-items: center; gap: var(--s-2); white-space: nowrap; }
+.effect-text .dot, .status-text .dot { margin-right: var(--s-1); }
+.status-text .dot { width: 8px; height: 8px; }
+.--block.effect-text, .--block.verdict-text, .--block.status-text { color: var(--verdict-block); }
+.--attention.effect-text, .--attention.verdict-text, .--attention.status-text { color: var(--verdict-attention); }
+.--allow.verdict-text { color: var(--verdict-allow); }
+.status-text, .status-text.--allow { color: var(--ink-body); }
+.--muted.status-text, .--muted.verdict-text { color: var(--muted); }
+.effect-text.--block .dot { background: var(--signal-red); }
+.effect-text.--attention .dot, .status-text.--attention .dot { background: var(--verdict-attention); }
+.status-text.--allow .dot { background: var(--verdict-allow); }
+.status-text.--block .dot { background: var(--verdict-block); }
+.dot.--allow { background: var(--verdict-allow); }
+.dot.--block { background: var(--verdict-block); }
+.dot.--attention { background: var(--verdict-attention); }
+
+/* Badge / Effect (210:393) and Badge / Verdict (229:11): tinted, cards only. */
+.badge-effect, .badge-verdict {
+  display: inline-flex; align-items: center; gap: var(--s-1); flex: none;
+  padding: var(--s-1) 10px; border-radius: var(--r-control);
+  font-size: var(--fs-3); line-height: 20px; white-space: nowrap;
+  background: var(--surface-subtle); color: var(--muted);
+}
+.badge-effect.--block, .badge-verdict.--block { background: var(--verdict-block-bg); color: var(--verdict-block); }
+.badge-effect.--attention, .badge-verdict.--attention { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
+.badge-effect.--allow, .badge-verdict.--allow { background: var(--verdict-allow-bg); color: var(--verdict-allow); }
+
+/* Label / Role (210:404): outlined, no fill, the role's colour on the text. */
+.role-label {
+  display: inline-flex; align-items: center; flex: none;
+  padding: 5px var(--s-4); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-page); font-size: var(--fs-3); line-height: 18px; white-space: nowrap;
+  color: var(--role-everyone);
+}
+.role-label.--admin { color: var(--role-admin); }
+.role-label.--employee { color: var(--role-employee); }
+.role-label.--sales { color: var(--role-sales); }
+.role-label.--solo { color: var(--role-solo); }
+button.role-label { cursor: pointer; }
+button.role-label:hover { background: var(--surface-subtle); }
+.labels { display: inline-flex; flex-wrap: wrap; gap: var(--s-2); }
+
+/* Chip / File (212:9) */
+.file-chip {
+  display: inline-flex; align-items: center; max-width: 100%;
+  padding: var(--s-2) 10px; border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-page); font-size: var(--fs-4); color: var(--ink-body);
+  overflow-wrap: anywhere;
+}
+
+/* ── Feedback (262:97) ────────────────────────────────────────────────────
+   A plate across the width. Info is grey; attention carries the amber tint;
+   success the green; error keeps the grey plate and puts the red on the
+   title, so a failure is loud in its words and not a red slab. */
+.feedback {
+  display: grid; gap: var(--s-2); padding: var(--s-5) 18px;
+  border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-subtle); color: var(--ink-body); font-size: var(--fs-4); line-height: var(--lh-snug);
+}
+.feedback-title { display: flex; align-items: center; gap: var(--s-3); font-weight: var(--fw-medium); color: var(--ink); }
+.feedback-icon { font-style: normal; }
+.feedback-body { color: var(--ink-body); overflow-wrap: anywhere; }
+.feedback.--attention { background: var(--verdict-attention-bg); border-color: var(--verdict-attention-bg); }
+.feedback.--attention .feedback-title { color: var(--verdict-attention); }
+.feedback.--success { background: var(--verdict-allow-bg); border-color: var(--verdict-allow-bg); }
+.feedback.--success .feedback-title { color: var(--verdict-allow); }
+.feedback.--error .feedback-title { color: var(--verdict-block); }
+.list-state { display: grid; gap: var(--s-7); justify-items: start; }
+.list-state > .feedback { justify-self: stretch; }
+.empty-center { display: grid; place-items: center; align-content: center; gap: var(--s-3); min-height: 60vh; text-align: center; }
+.empty-center b { font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); }
+.empty-center span { font-size: var(--fs-4); color: var(--muted); }
+
+/* ── Disclosure / Row (515:91) and Section / Expandable header (371:61) ────
+   Title left, datum and chevron right. Expanded, the row gives its hairline
+   to the content under it. */
+.disclosure { border-bottom: 1px solid var(--line-hairline); }
+.disclosure > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+  padding: var(--s-5) 0; list-style: none; cursor: pointer;
+}
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure-title { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.disclosure-datum { display: inline-flex; align-items: center; gap: var(--s-3); min-width: 0; font-size: var(--fs-3); color: var(--muted); text-align: right; }
+.chev::before { content: "⌄"; font-style: normal; font-size: var(--fs-3); color: var(--muted); }
+.disclosure[open] > summary .chev::before { content: "⌃"; }
+.disclosure > summary:hover .disclosure-title { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-control); }
+.disclosure-body { display: grid; gap: var(--s-5); padding: 0 0 var(--s-6); }
+.disclosure.--section { border-bottom: 0; }
+.disclosure.--section > summary { padding: var(--s-5) 0; }
+.disclosure.--section > summary .disclosure-title { font-size: var(--fs-6); font-weight: var(--fw-semi); }
+.disclosures { border-top: 1px solid var(--line-hairline); }
+
+/* ── Card / Turn (259:649) ─────────────────────────────────────────────── */
+.turn { display: grid; gap: var(--s-3); padding: 18px; border-radius: var(--r-control); font-size: var(--fs-5); line-height: var(--lh-snug); color: var(--ink); overflow-wrap: anywhere; }
+.turn.--person { background: var(--surface-subtle); }
+.turn.--person.--end { margin-left: auto; width: min(100%, 620px); }
+.turn.--warden { background: var(--surface-raised); border: 1px solid var(--line-hairline); }
+.turn-who { font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.turn-note { font-size: var(--fs-4); color: var(--ink-body); }
+.turn-meta { font-size: var(--fs-3); color: var(--muted); }
+.turn-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.turn-head b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.warden-label { font-size: var(--fs-3); color: var(--muted); margin: var(--s-4) 0 calc(-1 * var(--s-2)); }
+.masked { display: inline-block; min-width: 6em; height: 1em; vertical-align: -.1em; background: var(--ink); border-radius: 1px; }
+
+/* ── Confirmation / Result (310:3483) and Toast (310:3487) ─────────────── */
+.confirm-result {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: var(--s-4); row-gap: var(--s-5);
+  padding: var(--s-8) var(--s-7) var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-raised);
+}
+.confirm-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-control); font-style: normal; font-weight: var(--fw-semi); }
+.confirm-result.--success .confirm-mark { background: var(--verdict-allow-bg); color: var(--verdict-allow); }
+.confirm-result.--attention .confirm-mark { background: var(--verdict-attention-bg); color: var(--verdict-attention); }
+.confirm-text { display: grid; gap: var(--s-2); font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); }
+.confirm-text b { font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-tight); }
+.confirm-action { grid-column: 2; display: flex; justify-content: flex-end; gap: var(--s-4); }
+
+.toast {
+  position: fixed; right: var(--s-10); bottom: var(--s-8); z-index: 60;
+  display: flex; align-items: flex-start; gap: var(--s-4); width: min(420px, calc(100vw - 2 * var(--s-5)));
+  padding: var(--s-5) 18px; border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  background: var(--surface-raised); box-shadow: var(--shadow-float);
+}
+.toast-mark { font-style: normal; color: var(--verdict-allow); font-weight: var(--fw-semi); line-height: 24px; }
+.toast-text { flex: 1; display: grid; gap: var(--s-1); font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); }
+.toast-text b { font-weight: var(--fw-medium); color: var(--ink); }
+.toast-close, .dialog-close { border: 0; background: none; padding: 0 var(--s-2); font-size: var(--fs-5); color: var(--ink); cursor: pointer; line-height: 24px; border-radius: var(--r-control); }
+.toast-close:hover, .dialog-close:hover { background: var(--surface-subtle); }
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
+.dialog-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--s-5); background: var(--scrim); }
+.dialog {
+  display: grid; gap: var(--s-7); width: min(520px, 100%); max-height: calc(100vh - 2 * var(--s-5)); overflow-y: auto;
+  padding: var(--s-7); border-radius: var(--r-control);
+  background: var(--surface-raised); box-shadow: var(--shadow-float);
+}
+.dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); }
+.dialog-head h2 { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
+.dialog-body { display: grid; gap: var(--s-5); font-size: var(--fs-5); line-height: 1.5; color: var(--ink-body); }
+.dialog-body p { margin: 0; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-4); flex-wrap: wrap; }
+
+/* ── Composer (263:479) ────────────────────────────────────────────────── */
+/* The line stays `--line-accessible` and the surface stays the page's own.
+   Both were tried the other way: on `--line-control` the box vanishes in dark
+   and stops reading as somewhere to type, and filled with `--surface-subtle`
+   it becomes the person's own turn bubble, which is that exact grey. */
+.composer {
+  display: grid; gap: var(--s-5); width: 100%; max-width: var(--w-reading);
+  padding: var(--s-5);
+  border: 1px solid var(--line-control); border-radius: var(--r-composer); background: var(--surface-page);
+}
+.composer:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -1px; border-color: transparent; }
+.composer textarea { min-height: var(--h-control-compact); padding: 0; border: 0; background: none; resize: none; font-size: var(--fs-5); line-height: var(--lh-snug); }
+.composer textarea:focus-visible { outline: none; }
+.composer textarea:disabled { background: none; }
+.composer-row { display: flex; align-items: center; gap: var(--s-4); }
+.composer-fill { flex: 1; }
+.composer-attach {
+  display: grid; place-items: center; width: var(--h-control); height: var(--h-control); flex: none;
+  border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-page);
+  font-size: var(--fs-6); font-weight: var(--fw-semi); color: var(--ink-body); cursor: pointer;
+}
+.composer-attach:hover { background: var(--surface-subtle); }
+.composer-attach:disabled { color: var(--muted); cursor: default; }
+.composer .btn.--primary:disabled:not(.--busy) { background: var(--surface-disabled); border-color: var(--surface-disabled); color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.suggestion {
+  padding: var(--s-2) var(--s-4); border: 0; border-radius: var(--s-6);
+  background: none; font-size: var(--fs-4); color: var(--ink-body); cursor: pointer; text-align: left;
+}
+.suggestion:hover { background: var(--surface-subtle); color: var(--ink); }
+
+/* ── Segmented control / Tool (371:86) ─────────────────────────────────── */
+.seg-tool { display: inline-flex; gap: var(--s-1); padding: var(--s-1); border-radius: var(--r-control); background: var(--surface-subtle); }
+.seg-tool button { height: var(--h-control-compact); padding: 0 var(--s-4); border: 0; border-radius: var(--r-control); background: none; font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--ink); cursor: pointer; }
+.seg-tool button[aria-pressed="true"] { background: var(--surface-page); }
+
+/* ── Rule proposal (291:2027, 263:91) ──────────────────────────────────── */
+.proposal { display: grid; gap: var(--s-4); padding: var(--s-6); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
+.proposal-head { display: flex; align-items: center; gap: var(--s-4); min-height: var(--h-control-compact); }
+.proposal-head b { flex: 1; min-width: 0; font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.proposal-head .menu-trigger.--dots { width: 32px; height: 32px; font-size: var(--fs-4); }
+.proposal-text { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.proposal-check { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.proposal-check.--allow { color: var(--verdict-allow); }
+.proposal-check.--attention { color: var(--verdict-attention); }
+.proposal-check.--block { color: var(--verdict-block); }
+.proposal-check.--muted { color: var(--muted); font-weight: var(--fw-normal); }
+.proposal.--excluded { background: var(--surface-page); }
+.proposal.--excluded .proposal-text { color: var(--ink-body); }
+
+/* ═══ views: shared ═══════════════════════════════════════════════════════ */
+
+.shell-notices { display: grid; gap: var(--s-4); }
+.feedback-actions { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; margin-top: var(--s-4); color: var(--muted); font-size: var(--fs-3); }
+.kicker { font-size: var(--fs-1); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* Header / Detail's fact lines: state, then labelled values, on one row. */
+.facts { display: flex; align-items: center; flex-wrap: wrap; column-gap: var(--s-7); row-gap: var(--s-3); min-height: 32px; font-size: var(--fs-4); color: var(--ink-body); }
+
+.facts.--second { color: var(--muted); column-gap: var(--s-5); }
+.fact { display: inline-flex; align-items: center; gap: var(--s-5); }
+.fact-k { color: var(--muted); }
+.fact-v { color: var(--muted); }
+.fact-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+
+
+.disclosure-text { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.record { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--s-3) var(--s-5); margin: 0; font-size: var(--fs-4); }
+.record dt { color: var(--muted); }
+.record dd { margin: 0; color: var(--ink-body); overflow-wrap: anywhere; }
+
+/* ═══ rules ══════════════════════════════════════════════════════════════ */
+
+.rules-table .thead, .rules-table .trow {
+  grid-template-columns: minmax(0, 540fr) minmax(110px, 140fr) minmax(110px, 130fr) minmax(150px, 230fr) 40px;
+}
+.rule-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rule-name .dot { width: 8px; height: 8px; }
+.rule-activity { font-weight: var(--fw-medium); color: var(--ink-body); }
+.rules-table .labels { flex-wrap: nowrap; overflow: hidden; }
+
+.rule-instruction { display: grid; gap: var(--s-4); margin: var(--s-10) 0 var(--s-8); }
+.rule-instruction p { margin: 0; font-size: var(--fs-5); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.rule-instruction p.rule-means { font-size: var(--fs-3); color: var(--muted); }
+.example-list { display: grid; gap: var(--s-2); }
+.example-list p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); overflow-wrap: anywhere; }
+
+.trigger-value.--effect { padding: var(--s-1) 10px; border-color: var(--line-hairline); gap: var(--s-3); }
+.trigger-value .caret, .audience-trigger .caret { font-style: normal; font-size: var(--fs-1); color: var(--muted); }
+.effect-picker .menu-list, .audience-picker .menu-list { min-width: 200px; }
+.audience-picker .menu-list { max-height: 320px; overflow-y: auto; }
+.audience-trigger { display: inline-flex; align-items: center; gap: var(--s-3); padding: 2px; border-radius: var(--r-control); }
+.audience-trigger:hover, .audience-picker[open] > .audience-trigger { background: var(--surface-subtle); }
+
+.rule-field { max-width: none; }
+.rule-field textarea { min-height: 88px; font-size: var(--fs-5); }
+

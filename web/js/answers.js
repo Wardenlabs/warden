@@ -102,7 +102,7 @@ export function compileFailure(j) {
     return feedback({ tone: 'attention', title: 'Choose what writes your rules first.', body: `${why}<div class="feedback-actions"><button type="button" class="btn --primary --compact" data-go="models" data-q="setup=compiler">Set up the rule writer</button></div>` });
   }
   if (j?.kind !== 'model-down') {
-    return feedback({ tone: 'error', title: 'No rule was drafted', body: `I could not compile that: ${why}. Try saying it more plainly.`, icon: true });
+    return feedback({ tone: 'error', title: 'No rule was drafted', body: `The rule writer did not return a valid draft.<div class="feedback-actions">${button('Check rule writer', { attrs: 'data-go="models" data-q="setup=compiler"' })}</div><details class="compile-error-detail"><summary>Details</summary><p>${why}</p></details>`, icon: true });
   }
   return feedback({
     tone: 'error', icon: true,

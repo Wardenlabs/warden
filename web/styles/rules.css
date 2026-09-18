@@ -1,0 +1,261 @@
+/* ── writing rules: the hero, the thread, the composer at the foot ────────── */
+
+/* The conversation is centred in the actual workspace; the text and
+   composer keep their own reading measure at every stage. */
+.new-rule, .chatwrap { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+
+/*
+ * The one centred column in the product, and it is the whole New rule flow
+ * rather than just its opening frame.
+ *
+ * The hero was centred and the thread under it was not, so the composer left
+ * the middle of the screen and reappeared at the bottom-left corner the
+ * moment a sentence was sent — a 180px sideways jump in the middle of the
+ * one interaction the screen exists for. The box now keeps its x and its
+ * width from the empty frame through the conversation to the activation
+ * result; sending only slides it down the column it was already in.
+ *
+ * The page header stays at the content origin. A title that travelled with
+ * the thread would be a second convention, and the crumb above it has to line
+ * up with every other crumb in the product.
+ */
+.--centred .thread { margin-inline: auto; }  /* `.hero` centres itself */
+/* A conversation's header sits tight above its hairline, so the container
+   says 12 rather than the page's 24. The blocks themselves stay margin-free. */
+.flush-head { flex: none; width: 100%; padding-bottom: 0; gap: var(--s-4); }
+.hero-fill { flex: 1; min-height: 0; overflow-y: auto; display: flex; }
+.hero { margin: auto; width: 100%; max-width: var(--w-reading); display: grid; gap: var(--s-5); justify-items: center; padding: var(--s-10) 0 var(--s-12); text-align: center; }
+.hero-q { margin: 0 0 var(--s-4); font-family: var(--display); letter-spacing: -.04em; font-size: var(--fs-display); font-weight: var(--fw-semi); color: var(--ink); line-height: var(--lh-tight); }
+.hero-sub { margin: 0 0 var(--s-3); font-size: var(--fs-4); color: var(--muted); }
+.hero .composer { text-align: left; padding: var(--s-8); }
+.hero .composer textarea { min-height: 68px; }
+.composer .btn { border-radius: var(--s-6); padding-inline: var(--s-6); }
+.hero .suggestions { justify-content: center; }
+
+.chat { flex: 1; min-height: 0; overflow-y: auto; }
+.thread { display: flex; flex-direction: column; gap: var(--s-4); width: 100%; max-width: var(--w-reading); }
+.chat > .thread { min-height: 100%; justify-content: flex-end; padding: var(--s-8) 0 var(--s-5); }
+.chat-foot { flex: none; padding: var(--s-4) 0 var(--s-5); background: var(--surface-page); }
+.chat-foot > .thread { gap: var(--s-4); }
+.thread-empty { margin: auto 0; font-size: var(--fs-4); color: var(--muted); }
+.thread-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.thread-divider { margin: var(--s-5) 0 var(--s-2); font-size: var(--fs-3); color: var(--muted); }
+.thread-page .thread { margin-top: 0; }
+.thread .turn.--person { font-size: var(--fs-5); }
+.turn-title { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.turn .turn-note { font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+.turn.--warden:has(.turn-title) { gap: var(--s-4); }
+.warden-note { display: grid; gap: var(--s-2); }
+.warden-note p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.warden-lead { margin: 0; font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
+.warden-label + .warden-lead { margin-top: calc(-1 * var(--s-2)); }
+.refinement { display: grid; gap: var(--s-2); }
+.refinement p { margin: 0; font-size: var(--fs-5); color: var(--ink-body); }
+.proposals { display: flex; flex-direction: column; gap: var(--s-3); }
+.proposals > .feedback { margin-top: var(--s-2); }
+.proposal-applies { display: flex; align-items: center; gap: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
+.proposal-examples { margin: calc(-1 * var(--s-2)) 0 0; padding-left: var(--s-6); font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.proposal-why { font-size: var(--fs-3); color: var(--muted); }
+.proposal-foot { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; margin-top: var(--s-2); font-size: var(--fs-3); color: var(--muted); }
+.proposal-limits { font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
+.limits-lead { margin: 0; }
+.limit-plan { display: grid; grid-template-columns: max-content max-content; gap: var(--s-1) var(--s-6); margin: var(--s-3) 0 0; font-size: var(--fs-4); }
+.limit-plan dt { color: var(--ink); }
+.limit-plan dd { margin: 0; color: var(--ink-body); }
+.review-list { margin: 0; padding-left: var(--s-6); font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-body); }
+.preset-menu .menu-list { max-height: 360px; overflow-y: auto; min-width: 360px; }
+.preset-menu .menu-item span { white-space: normal; }
+.preset-menu .menu-note { font-size: var(--fs-1); letter-spacing: var(--ls-label); text-transform: uppercase; }
+span.composer-attach { color: var(--muted); cursor: default; }
+
+/* ── Test: a thread of verdicts ──────────────────────────────────────────── */
+
+.test-subject { display: grid; gap: var(--s-3); }
+.test-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.test-instruction { margin: 0; font-size: var(--fs-4); color: var(--ink-body); max-width: var(--w-reading); }
+.select-inline { width: auto; max-width: 100%; min-height: 28px; height: 28px; padding: 0 var(--s-9) 0 10px; font-size: var(--fs-3); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; }
+.verdict-card { gap: var(--s-4); padding: var(--s-7); }
+.verdict-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
+.verdict-title { margin: 0; font-size: var(--fs-6); font-weight: var(--fw-semi); line-height: var(--lh-tight); color: var(--ink); }
+.verdict-title.--block { color: var(--verdict-block); }
+.verdict-title.--attention { color: var(--verdict-attention); }
+.verdict-title.--allow { color: var(--verdict-allow); }
+.verdict-title.--muted { color: var(--ink-body); }
+.verdict-meta { font-size: var(--fs-3); color: var(--muted); }
+.verdict-line { margin: 0; font-size: var(--fs-4); color: var(--muted); line-height: var(--lh-snug); }
+.verdict-card .kicker { margin-top: var(--s-1); }
+.verdict-reason { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.verdict-reason p { margin: 0; }
+.verdict-aside { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
+.verdict-aside.--allow { color: var(--verdict-allow); }
+.verdict-aside.--block { color: var(--verdict-block); }
+.verdict-notice { font-size: var(--fs-4); color: var(--verdict-attention); display: grid; gap: var(--s-2); }
+.verdict-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; padding-top: var(--s-5); border-top: 1px solid var(--line-hairline); font-size: var(--fs-4); color: var(--muted); }
+.verdict-card.--previous .verdict-reason { color: var(--ink-body); }
+.follow-up { display: grid; gap: var(--s-3); }
+.extraction-report .document-records { margin: 0; }
+.composer-notes { display: grid; gap: var(--s-1); margin-top: calc(-1 * var(--s-2)); font-size: var(--fs-3); color: var(--muted); }
+.composer-notes p { margin: 0; }
+.composer-notes .--error { color: var(--verdict-block); }
+.document-selection { display: flex; flex-wrap: wrap; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+.file-chip-remove { margin-left: var(--s-3); padding: 0 var(--s-1); border: 0; border-radius: var(--r-control); background: none; color: var(--muted); cursor: pointer; }
+.file-chip-remove:hover { background: var(--surface-subtle); color: var(--ink); }
+.composer.dragging { outline: 2px dashed var(--line-accessible); outline-offset: 2px; }
+.labels-more { align-self: center; font-size: var(--fs-3); color: var(--muted); }
+
+/* ═══ activity and inbox ═════════════════════════════════════════════════ */
+
+.activity-table .thead, .activity-table .trow {
+  grid-template-columns: minmax(110px, 170fr) minmax(0, 450fr) minmax(0, 220fr) minmax(80px, 110fr) minmax(56px, 170fr);
+  min-height: 40px;
+}
+.activity-table .thead { min-height: 32px; }
+.who-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.who-cell .dot { width: 6px; height: 6px; }
+.request-cell { color: var(--ink-body); }
+.dot.--muted { background: var(--line-control); }
+.person-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  width: 230px; height: var(--h-control); padding: 0 var(--s-5);
+  border: 1px solid var(--line-hairline); border-radius: var(--r-control);
+  font-size: var(--fs-4); color: var(--muted);
+}
+.person-trigger:hover, .person-filter[open] > .person-trigger { background: var(--surface-subtle); }
+.person-filter .menu-list { max-height: 360px; overflow-y: auto; }
+.filter-line { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+
+
+.exchange { display: flex; flex-direction: column; gap: var(--s-4); }
+.request-turn .turn-text { font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.turn-text.muted { color: var(--muted); }
+.turn .labels { margin-top: var(--s-1); }
+.rule-card { gap: var(--s-4); padding: var(--s-6) var(--s-7); }
+.rule-card-reason { margin: 0; font-size: var(--fs-5); color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.rule-card .turn-meta { margin: 0; }
+.exchange-note { margin: 0; font-size: var(--fs-4); color: var(--muted); max-width: var(--w-reading); }
+.exchange-kicker { margin-top: var(--s-6); }
+
+.dispute-card { gap: var(--s-3); padding: var(--s-6); }
+
+.passes { display: grid; }
+.pass { display: grid; grid-template-columns: minmax(0, 1fr) 80px 72px 64px; align-items: center; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-hairline); font-size: var(--fs-3); }
+.pass:last-child { border-bottom: 0; }
+.pass-name { color: var(--ink-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pass-verdict { font-size: var(--fs-3); }
+.pass-verdict.--block { color: var(--verdict-block); }
+.pass-verdict.--attention { color: var(--verdict-attention); }
+.pass-verdict.--allow { color: var(--verdict-allow); }
+.pass-track { height: 3px; border-radius: 2px; background: var(--surface-subtle); overflow: hidden; }
+.pass-track i { display: block; height: 100%; background: var(--line-control); }
+.pass-ms { text-align: right; color: var(--muted); }
+.pass-why { margin: 0 0 var(--s-2); font-family: var(--mono); font-size: var(--fs-2); color: var(--verdict-block); overflow-wrap: anywhere; }
+.chain { display: grid; gap: var(--s-2); font-size: var(--fs-3); }
+.chain-link { display: flex; align-items: center; gap: var(--s-3); color: var(--muted); }
+.chain-link b { font-weight: var(--fw-normal); color: var(--ink-body); }
+.chain-line { width: 1px; height: 10px; margin-left: 3px; background: var(--line-control); }
+
+.inbox-table .trow { grid-template-columns: minmax(0, 470fr) minmax(0, 290fr) minmax(120px, 200fr) minmax(90px, 160fr); min-height: 40px; }
+.inbox-table .group-band:first-child { border-top: 0; }
+.time-cell { text-align: right; }
+
+.answer-block { display: grid; gap: var(--s-4); margin: 0; }
+.answer-block .section-title { margin-bottom: var(--s-1); }
+.answer-lead { margin: 0; font-size: var(--fs-4); color: var(--ink-body); }
+.answer-block textarea { min-height: 88px; font-size: var(--fs-5); }
+.recorded-note { margin: 0; font-size: var(--fs-5); color: var(--ink-body); }
+.answer-block .confirm-result { margin-top: var(--s-2); }
+
+
+/* ═══ team ═══════════════════════════════════════════════════════════════ */
+
+.subhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-height: var(--h-control); }
+.subhead-count { font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); }
+.people-table .thead, .people-table .trow { grid-template-columns: minmax(0, 296fr) minmax(150px, 200fr) minmax(0, 336fr) minmax(80px, 250fr) 40px; }
+/* 56, the height of every other row in the console. It was 72 because the
+   wiring cell had a second line and the role cell had a sentence under the
+   pill; neither is there now. */
+.people-table .trow { padding-block: var(--s-3); }
+.person-name { font-size: var(--fs-5); font-weight: var(--fw-normal); }
+.role-cell { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+/* A role nothing in the company policy measures. It was a sentence under the
+   role pill and it is a chip beside it — the fact is not negotiable, a default
+   that hides a bypass is the one default nobody gets to ship, but the fact is
+   one word and the sentence was six. */
+.exempt-chip {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--s-3);
+  border-radius: 4px; font-size: var(--fs-2); font-weight: var(--fw-medium);
+  color: var(--verdict-attention); background: var(--verdict-attention-bg);
+}
+.role-menu > summary { display: inline-flex; border-radius: var(--r-control); }
+.role-menu > summary:hover .role-label, .role-menu[open] > summary .role-label { background: var(--surface-subtle); }
+.role-menu .menu-list { min-width: 280px; max-height: 360px; overflow-y: auto; }
+input.menu-search { min-height: 38px; margin-bottom: var(--s-1); border: 0; border-bottom: 1px solid var(--line-hairline); border-radius: 0; background: none; }
+.cell-stack .cell-strong { font-weight: var(--fw-medium); }
+
+.person-role { gap: var(--s-4); margin: 0; }
+.person-card {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); flex-wrap: wrap;
+  padding: var(--s-6) var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised);
+}
+.person-card > div:first-child { display: grid; gap: var(--s-2); }
+.person-card p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); }
+.person-card.--setup { flex-direction: column; align-items: flex-start; }
+
+.setup-share { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-5); }
+.setup-share b { font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--ink); }
+.setup-share p { margin: var(--s-2) 0 0; font-size: var(--fs-4); color: var(--ink-body); }
+.reading-wide .disclosure.--section > .disclosure-body { padding-bottom: var(--s-2); }
+.key-row { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
+.key-row .mono { color: var(--ink-body); overflow-wrap: anywhere; }
+#onboarding { display: grid; gap: var(--s-5); }
+.setup-step { display: grid; gap: var(--s-2); }
+.setup-step b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+.setup-step p { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.code {
+  margin: 0; padding: var(--s-4); overflow-x: auto;
+  border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-subtle);
+  font-family: var(--mono); font-size: var(--fs-3); line-height: var(--lh-snug); color: var(--ink-body);
+  white-space: pre-wrap; word-break: break-word;
+}
+.codewrap { position: relative; }
+.codewrap .btn { position: absolute; top: var(--s-2); right: var(--s-2); }
+.person-rules { display: grid; gap: var(--s-4); }
+.person-rules-table .thead, .person-rules-table .trow { grid-template-columns: minmax(0, 660fr) minmax(0, 280fr) minmax(100px, 180fr); }
+/* One row per machine: the name on the left, what it reported on the right,
+   with when it was last heard from under it. Wired and quiet is ink. */
+.person-devices { display: grid; gap: var(--s-2); max-width: var(--w-reading); }
+.person-devices .setting-rows { margin-top: var(--s-3); }
+.person-devices .setting-row { align-items: flex-start; }
+.device-cell { text-align: right; justify-items: end; justify-content: end; }
+.cell-strong.--attention { color: var(--verdict-attention); }
+
+.roles-table .thead, .roles-table .trow { grid-template-columns: minmax(0, 310fr) minmax(90px, 170fr) minmax(0, 350fr) minmax(90px, 260fr) 40px; }
+.roles-table .trow.--editing { background: var(--surface-subtle); border-bottom: 0; }
+.inline-editor {
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  min-height: 52px; padding: var(--s-3) var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
+}
+.inline-editor b { font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--ink); }
+.inline-editor-help { font-size: var(--fs-3); color: var(--muted); }
+.inline-editor-error { flex-basis: 100%; font-size: var(--fs-3); color: var(--verdict-block); }
+
+.role-choices { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.role-choice { cursor: pointer; }
+.role-choice.--chosen { outline: 2px solid currentColor; outline-offset: -1px; }
+.field-help.--attention { color: var(--verdict-attention); }
+.added-list { display: grid; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+.added-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); font-size: var(--fs-5); color: var(--ink); }
+.dialog .confirm-result { padding: 0; border: 0; background: none; }
+.role-change { display: flex; align-items: center; gap: var(--s-4); color: var(--muted); }
+
+
+/* The embossed W belongs to the composer, not to a generic status badge. */
+.rule-emblem { width: 56px; height: 56px; display: grid; place-items: center; margin-bottom: 6px; color: var(--ink); transform: rotate(-6deg); transition: transform 220ms ease; }
+.rule-emblem svg { width: 44px; height: 44px; filter: drop-shadow(0 3px 0 var(--line-hairline)); }
+.hero:focus-within .rule-emblem { transform: rotate(0); }
+.hero-q { font-size: clamp(30px, 3.4vw, 46px); line-height: 1.12; letter-spacing: -.05em; }
+.hero-q span { color: var(--muted); }
+.hero { gap: 20px; animation: rule-arrive 340ms ease both; }
+.hero .composer { box-shadow: 0 6px 20px -14px var(--muted); transition: border-color 180ms, box-shadow 180ms; }
+.hero .composer:focus-within { box-shadow: 0 8px 24px -14px var(--muted); }
+@keyframes rule-arrive { from { transform: translateY(8px); } to { transform: translateY(0); } }

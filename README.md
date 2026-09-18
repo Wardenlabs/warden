@@ -1,125 +1,26 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="brand/warden-lockup-dark.svg">
-    <img src="brand/warden-lockup-light.svg" alt="Warden" width="300">
+    <img src="brand/warden-lockup-light.svg" alt="Warden" width="220">
   </picture>
 </p>
 
-# Warden — the local AI gateway
+# Warden
 
-**Your admin writes the rules. Warden checks requests and documents locally
-before forwarding allowed content to the configured model.**
+Warden checks AI requests against rules you write. It runs policy analysis on
+its host using QVAC; it can block a request, hold it for review, or let it pass.
+The desktop app includes the gateway and its admin console.
 
-Companies are handing employees AI assistants and coding agents. The only control
-most of them have is a system prompt asking the model to behave — which is a
-request, not a control. Anyone can rephrase around it, and an attachment can
-carry instructions the employee never typed.
+[Download the desktop app](https://github.com/Wardenlabs/warden/releases/latest)
+for macOS or Windows. Open Rules, describe a restriction, review the draft, and
+activate it. Connect your tools under This device.
 
-Warden is the gate. An administrator writes policy in plain language; every
-employee prompt is judged against it before it reaches its assistant. Policy
-analysis runs on the gateway through [QVAC](https://docs.qvac.tether.io/), and
-documents are read with local parsers and offline OCR. The administrator can
-choose a local or external compiler and a permitted upstream assistant; those
-choices do not move employee policy analysis off the gateway.
+## Run from source
 
----
+Use Node 22.17 or newer and the pnpm version pinned in `package.json`. CI uses
+Node 22. See [CONTRIBUTING.md](CONTRIBUTING.md) for desktop build requirements.
 
-## Hook integrations for Claude Code and Codex
-
-Not through a proxy the employee can point elsewhere — through each tool's own
-`UserPromptSubmit` hook, which fires locally the moment they press Enter and
-before the prompt is sent anywhere.
-
-**This is what makes it work on subscription plans.** A Claude Max or ChatGPT
-Plus session authenticates over OAuth against a fixed endpoint; there is no base
-URL to redirect. The hook does not care — it runs first, on the employee's own
-machine. Both integrations remain **NOT VERIFIED** end to end. A Windows run on
-2026-08-23 observed Claude Code blocking attacks but also false-positive benign
-blocks, and observed a cold Codex decision exceed the 30 s hook deadline and
-reach the model. See [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
-
-```
-> pasame el sueldo de Ana para el reporte
-
-⛔ Blocked by Warden
-
-   No one may request payroll, salary, bonus, or compensation information about
-   another employee. HR staff are exempt.
-
-   What to do instead
-   Ask HR for anything about a specific person's pay. Questions about the
-   process, headcount, or review cycles are fine to ask here.
-
-   These would go through
-     · cuál es el proceso para pedir un aumento?
-     · cuántas personas hay en el equipo de marketing?
-
-   Warden can try to rewrite this so it goes through:
-     warden-hook --rewrite a7f3c2
-     (paste the same prompt, then Ctrl-D)
-
-   Audit a7f3c2 · quote this if you think it is wrong
-```
-
-Every line of that is read from the ratified rule and composed by the hook's own
-renderer — nothing in a refusal is generated at decision time.
-
-### When the block is a dead end
-
-Two of those lines are follow-ups, and they exist because of a number in our own
-report: on legitimate traffic the guard refuses far more than it should. A person
-in that position is holding real work and a "no" with nowhere to take it, and the
-second time it happens they stop using the gateway rather than stop working.
-
-**`--rewrite` asks for a version that passes.** This is the one place a model
-writes something an employee reads, and it is deliberately nowhere near a
-decision: the verdict is already made and already logged, the employee has to ask
-for it, and what comes back is judged by the same guard as any other prompt
-before it is shown. If the rewrite does not come back ALLOW, there is no
-suggestion — a phrasing that got *closer* is exactly what this must never hand
-over.
-
-That is also the honest description of the risk. Something that restates blocked
-prompts is a machine for finding phrasings that pass, so four things bound it:
-the request must match the SHA-256 of a prompt that was really blocked (the audit
-log stores that hash and not the text, which is what makes this checkable at
-all); there is one rewrite per block, so nobody can iterate; a prompt whose
-phrasing reached for the assistant's own instructions is refused outright by a
-deterministic check, before any model runs; and both the rewrite and its re-check
-cost quota and land in the audit log.
-
-**"This block was wrong" reports it.** The refusal line already said to quote the
-audit id if you disagree, and until now there was nowhere to quote it. Now it
-appears in the console under the rule that fired — which is the thing an admin
-has to edit, and the only view where a false positive is distinguishable from a
-correct block.
-
-Both land somewhere. A reported block shows up in the admin console **under the
-rule that fired**, which is the object they have to edit — and at the measured
-false-positive rate, that screen is the only place where a wrong block is
-distinguishable from a right one. A held prompt lands in a review queue the
-admin answers from the same page. That is the whole loop: a refusal the employee
-can act on, a signal the admin can act on, and a rule that gets better because
-somebody was stopped by it.
-
-> **Observed against the mock adapter, end to end** — console, hook, gate and
-> re-check — and **not yet with a real model**, so nothing here claims what a
-> real rewrite proposes. `pnpm tsx scripts/probe-rewrite.ts` is the harness that
-> answers that; run it against a model. Against the mock it measures only the
-> deterministic gate, which refused 5 of 8 `direct-override` attacks before any
-> generation.
-
-Tools that do let you set a base URL — Cursor, Open WebUI, any OpenAI SDK script
-— go through the proxy instead. Setup for both is in
-[`integrations/README.md`](integrations/README.md).
-
----
-
-## Quick start
-
-Step-by-step with expected output at each stage: **[`docs/TRY-IT.md`](docs/TRY-IT.md)**.
-
-```bash
+```sh
 git clone https://github.com/Wardenlabs/warden
 cd warden
 pnpm install
@@ -127,844 +28,94 @@ pnpm run setup
 pnpm run dev
 ```
 
-The runtime requires Node 22.17+. CI uses Node 22; Node 24 is the verified
-local desktop-packaging choice. See [contributor setup](CONTRIBUTING.md) for the
-observed Node 26 packaging-tool issue.
+Open `http://localhost:8080`. Setup downloads the local models; Models in the
+console configures the rule writer. New installations offer Claude Code, which
+requires its own installation and sign-in.
 
-The package manager is pnpm, pinned in `package.json` (`packageManager`);
-`corepack enable` gets you the right version if you don't have it.
+To explore without downloading models:
 
-`pnpm run setup` ends with a report you can paste anywhere:
-
-```
-=== WARDEN SETUP REPORT ===
-Platform   : darwin arm64
-Node       : v22.17.0 OK
-Models     :
-  OK   detector       382 MB  cached
-  OK   adjudicator   1057 MB
-  OK   embedder       329 MB
-Inference  : OK — 60 tok/s, TTFT 129 ms, backend=cpu
-Adapter    : real
-=== END REPORT ===
+```sh
+WARDEN_ADAPTER=mock pnpm run dev
 ```
 
-No GPU, or the download failed? `WARDEN_ADAPTER=mock pnpm run dev` runs the whole
-system against a deterministic stand-in. Everything works except the judging.
-
-> **Note on model downloads.** QVAC fetches models over Hyperswarm (P2P/UDP),
-> which hangs indefinitely behind a corporate proxy, a locked-down container, or
-> conference wifi. `pnpm run setup` resolves each SDK model constant to its
-> HuggingFace URL and downloads over plain HTTPS with resume instead. If you have
-> seen a QVAC model download stall forever, this is why.
-
-### Desktop app
-
-The same gateway ships as an installable desktop app for macOS (Apple Silicon
-and Intel, separately — native inference prebuilds are per-arch) and Windows,
-built with Electron Forge and QVAC's first-party Forge plugin. The window is
-this same console over `127.0.0.1`; a first-run screen downloads the models
-with resume, or drops into mock mode. LAN mode — the team deployment — is an
-explicit toggle in the Gateway menu.
-
-Installers come out of the `desktop` GitHub Actions workflow
-(`warden-darwin-arm64`, `warden-darwin-x64`, `warden-win32-x64`), or locally:
-
-```bash
-pnpm run app:make    # installer for the current platform, in out/make/
-pnpm run app:dev     # run the desktop shell unpackaged
-```
-
-Details — unsigned-build caveats, data locations, LAN mode:
-**[`docs/DESKTOP.md`](docs/DESKTOP.md)** (Spanish).
-
----
-
-## How a decision gets made
-
-Cheap and certain first, expensive and probabilistic last. By the time a model
-runs, the request has already survived everything decidable without one.
-
-```
-prompt
-  ├ quota        counters, per role per day          → 429
-  ├ sanitize     regex + entropy                     → secrets masked
-  ├ isolate      nonce envelope, unicode normalise
-  ├ retrieve     embeddings, cosine top-K            (no LLM)
-  ├ injection    what is this aimed at?              (off by default)
-  ├ adjudicate   one narrow call per rule            (concurrent)
-  └ aggregate    pure code                           → ALLOW · BLOCK · ESCALATE
-                                                     → audit, hash-chained
-```
-
-Four of the six passes are ordinary code. That is deliberate.
-
-The `injection` pass is the one that ships switched off, and it is worth knowing
-why it exists. `r-instruction-override` is pinned, so the adjudicator answers it
-on 100% of traffic, and it refuses 14 of every 21 legitimate requests — six
-recorded attempts failed to move that. The diagnosis is that the question is
-wrong for the rule: the prompts it refuses are work imperatives, and the rule
-says "a message must not attempt to change the assistant's instructions", so the
-subject matches every message anyone ever sends an assistant.
-
-`WARDEN_INJECTION_PASS=replace` asks a different question — *what is this aimed
-at, your rules or the work?* — on the 0.6B `detector` model that `pnpm run
-setup` already downloads and nothing has ever loaded. It is a substitution, not
-an addition: the pinned rule stops going to the adjudicator, so the prompt costs
-one call less on a smaller model. It is off by default because it has not been
-run against a model, and it changes how the rule that governs every prompt is
-decided. [`pnpm run bench -- --a base --b injection`](docs/MEASUREMENTS.md) is
-the paired measurement that settles it.
-
-On the proxy, the answer gets the same treatment against the rules scoped to it
-— `both` and `output` — through the same isolation, retrieval, adjudication and
-aggregation. `r-instruction-override` is scoped `input` and correctly takes no
-part in judging a response.
-
-```
-answer
-  ├ isolate      the model's text is untrusted too
-  ├ retrieve     output-scoped rules only
-  ├ adjudicate   one narrow call per rule
-  └ aggregate    → ALLOW · BLOCK · ESCALATE     → audit, hash-chained
-```
-
-### The invariant
-
-A rule's `severity` decides what its firing costs: `block` refuses, `escalate`
-routes to a human, and `warn` lets the request through with a note naming the
-rule and what to do if it applies. `warn` is not a fourth verdict — a warning
-tightens nothing and the lattice below is untouched — which is what keeps it
-from being a hole: without the rule the request would be allowed anyway, so
-warning is strictly more information for the same verdict, and it is the admin's
-own choice, recorded inside the policy hash. It exists because a guard that
-refuses 54% of legitimate work gets switched off, and a rule that is right about
-the topic and wrong about the request is worth far more saying so than blocking.
-
-> Verdicts are ordered `ALLOW < ESCALATE < BLOCK`. Every model pass can only push
-> a decision **toward stricter**, never toward looser. A pass that errors, times
-> out, or returns unparseable output resolves to `ESCALATE`.
-
-Models supply observations; a single function — [`aggregate`](src/guard/aggregate.ts),
-which contains no inference — turns observations into authority. An attacker who
-fully compromises every model in the pipeline still cannot manufacture an
-`ALLOW`, because no model is ever asked for one.
-
-The one deliberate exception is the hook: if Warden is unreachable, the prompt
-goes through with a warning. A crashed daemon must not brick every developer's
-CLI at once, and a gateway that can strand the team gets uninstalled the first
-morning it does.
-
-### What we tried on the false-positive rate, and what it cost
-
-Each prompt is judged against about four rules and a single VIOLATES stops it,
-so per-rule error compounds: a ~13% per-rule rate is exactly the 44% measured.
-That framing suggested a majority-of-three vote should take it to ~7%.
-
-It did not. Measured at **50% against 44%**, for 50 extra model calls.
-
-The word carrying the argument was *independent*, and these errors are not.
-`r-instruction-override` does not misfire at random; it returns VIOLATES because
-something in the prompt pushes it there, and sampling that three times returns
-the same wrong answer three times. Voting amplifies a lean as readily as a
-signal. The mechanism is still in the code, tested, defaulted off.
-
-Rewriting that rule's few-shot examples changed nothing, and rewriting the rule
-text three ways gave 4/8, 3/8 and 5/8 — the best of them also lost an attack,
-which is a rule moved rather than improved.
-
-Three negative results in a row narrow it usefully: a systematic error means
-there is something in the prompt to find, not a model to swap.
-
-### Isolation
-
-Untrusted text is wrapped in a delimiter carrying 128 random bits chosen *after*
-the text is fixed. A fixed marker like `---END---` is one the attacker simply
-writes themselves; a nonce is not guessable. Text is NFKC-normalised, zero-width
-characters are stripped, and embedded role markers are flagged as evidence for
-the aggregator.
-
----
-
-## The admin console
-
-**Rules** is where policy is drafted and activated. **Activity** explains past
-decisions, **Inbox** holds requests needing review, **Team** manages identities,
-and **Models** shows and changes the compiler, analyzer, and their prompts. Solo installations
-also expose Models alongside **This device** and **Settings**.
-
-### Read documents before deciding
-
-The Simulator accepts a prompt, files, or both. Use **Models → Try a document**,
-choose the identity to check as, then attach or drop files. Warden supports text
-PDFs, `.docx`, UTF-8 or BOM-marked UTF-16 text/Markdown/CSV, scanned PDFs, and PNG/JPEG/WebP/BMP images.
-Scans use bundled English and Spanish OCR without a runtime download.
-
-The default limits are five files, 8 MiB per file, 16 MiB total, 20 pages, and
-120,000 extracted characters per request. Parsing and OCR have bounded worker,
-image, archive and time limits. An unreadable document is held for review;
-partial extraction never counts as a clean check. The verdict and Activity show
-what was read, the extraction method, and each complete file's SHA-256.
-
-The authenticated guard API accepts complete base64 bytes, including a
-file-only request with an empty `prompt`:
-
-```bash
-curl http://127.0.0.1:8080/api/guard/check \
-  -H "Authorization: Bearer $WARDEN_API_KEY" \
-  -H 'Content-Type: application/json' \
-  --data '{"prompt":"Summarize this document.","attachments":[{"name":"note.txt","mimeType":"text/plain","data":"SGVsbG8u"}]}'
-```
-
-The OpenAI-compatible proxy also accepts inline `file`/`input_file` parts and
-image data URLs. It checks the conversation's readable content and forwards only
-sanitized text reconstructed from the inspected extraction. It rejects remote
-file/image URLs, stored file IDs and unknown content parts instead of forwarding
-uninspected bytes. Original layouts, images and binary files are not passed to
-the upstream assistant.
-
-Native hooks can attach files **only when the host supplies attachment bytes or
-explicit file paths in its event**. A filename mentioned in ordinary prose does
-not grant file access, and Warden does not search the filesystem to guess what a
-user meant. Hook transport tests establish that exposed attachments are carried
-and malformed or incomplete inspection is refused; they do not establish that
-every native client exposes every attachment. Gateway-outage behavior retains
-the configured hook fail-open/fail-closed policy. Claude Code, Codex and OpenCode
-still need their documented end-to-end client verification. See
-[document support](docs/DOCUMENTS.md) and
-[console behavior](docs/UI-MODELS-AND-DOCUMENTS.md).
-
-### Choose the compiler and analyzer
-
-Open **Models** in either a solo or team installation. The compiler writes rule
-drafts; the analyzer checks employee requests and extracted documents. The page
-separates the saved preference from the runtime model, labels missing downloads
-and environment overrides, and links to runtime diagnostics.
-
-New installations start with **Claude Code on this machine** selected for the
-compiler. Open **Configure Claude Code**, follow the installation and sign-in
-steps, then test and apply the connection. Leave the model blank to use Claude
-Code's own default. Existing saved compiler choices and environment overrides
-are preserved. See [compiler setup](docs/COMPILER-SETUP.md).
-
-**Apply compiler** changes new compiler calls without restarting the gateway.
-Built-in analyzers can be selected there too. Existing requests finish before a
-role changes, and a local activation must load successfully before it succeeds.
-Analysis always remains local; compiler endpoints cannot be assigned to it.
-
-**Your models → Add model** saves reusable API connections or imports GGUF
-weights. Upload from the browser, copy a file already on the gateway when
-administering it locally, or download from a public HTTPS URL. Test every intended
-role, then choose **Use as compiler** or **Use as analyzer**. A compatibility test
-checks the model interface and loading, not policy accuracy. Repeated evaluation
-is still required before trusting different analyzer weights.
-
-For example, a direct loopback administrator can save a local OpenAI-compatible
-compiler connection; replace the model identifier with one your server serves:
-
-```bash
-curl http://127.0.0.1:8080/api/settings/models \
-  -H 'Content-Type: application/json' \
-  --data '{"kind":"endpoint","name":"My local compiler","baseUrl":"http://127.0.0.1:11434/v1","model":"my-model"}'
-```
-
-Use the returned `id` with `POST /api/settings/models/:id/test` and then
-`POST /api/settings/models/:id/activate`, each with `{"role":"compiler"}`.
-Remote administration also requires an exempt administrator API key. Saved
-connections and weights are shared by the administrators of this installation,
-not private per-user tenants. Keys are never returned to the browser.
-
-See [model management and HTTP reference](docs/MODEL-MANAGEMENT.md) for storage,
-credential handling, transfer limits, overrides, rollback and custom-model tests.
-
-### Edit compiler and analyzer prompts
-
-In **Models**, choose **Edit prompts** beside the compiler or analyzer. Read and
-edit the complete templates, including rule compilation, policy splitting, and
-the analyzer format used by the current model. The editor explains each dynamic
-variable and the response format that Warden expects. Saved customizations are
-shared by the administrators of this gateway and survive restarts.
-
-Saving validates required context and applies to new work. Existing work keeps
-its original prompt settings. You can restore a template to its shipped default;
-editing does not change policy rules or activate compiler drafts. Concurrent
-administrator edits require resolving a conflict before overwriting a newer
-version. Default prompt text remains unchanged unless an administrator edits it.
-
-A valid template is not proof of policy accuracy. Changing analyzer instructions
-can increase missed violations or false positives; use the Simulator and repeated
-benchmarks to evaluate a customization. See [prompt management](docs/PROMPT-MANAGEMENT.md)
-for the template catalogue, API, storage and verification boundaries.
-
-### Writing a rule
-
-**Write it in plain Spanish** → the configured compiler turns it into structured policy,
-inventing few-shot examples as it goes → **preview** runs the candidate rule
-through the real adjudicator and flags any legitimate request it would wrongly
-block → **activate** puts it in force immediately, no restart.
-
-The model drafts; activating is a separate human step. That is a security
-boundary, not politeness: if compilation could enact policy on its own, someone
-who reached the compiler could talk it into writing a permissive rule.
-
-A catalogue of 18 ready-made rules across six categories (employees, finance,
-customers, legal, security, code) gets a new admin from a blank page to something
-useful in under a minute. Presets land in the same draft slot, so the catalogue
-is a starting point rather than a way to skip review.
-
-### Who a rule binds
-
-Every rule carries an audience, and there are exactly three kinds of token:
-
-| | |
-|---|---|
-| `*` | everyone |
-| `sales` | everyone holding that role |
-| `@ana` | one named person |
-
-They combine as a union, never an intersection. `["@ana", "sales"]` is Ana plus
-the sales team — the reading that fails safe, because an intersection would let
-one wrong token silently narrow a rule to nobody while it still looked active in
-the console.
-
-The compiler proposes an audience and the admin edits it with a chip per role
-and per person. Both directions of getting it wrong are expensive: too broad and
-the whole company trips over a rule meant for one team, too narrow and it guards
-no one. The admin is the only one who knows which was intended, so the model
-never gets the last word on it.
-
-### Onboarding, generated per person
-
-Adding someone to the directory is half the job; their tools still have to point
-at the gateway. The console generates that too — **Team → a person →
-Onboarding** — with their id, their key and this gateway's reachable address
-already filled in, tabbed by tool, one button per block and one that copies the
-whole thing as a message to paste into a chat.
-
-For the employee it is one command:
-
-```bash
-curl -fsSL http://192.168.1.42:8080/install/<install-token> | sh
-```
-
-The token is the link's whole security. It is derived from the person's API key
-and the console fills it in for you, because the script this URL returns hands
-over that key — addressed by employee id instead, `/install/ana` would return
-Ana's key to anyone who guessed a first name. Rotating the key invalidates every
-link ever issued for that person.
-
-The gateway serves the script and the hook itself, so nobody needs a route to
-the public internet to be onboarded — on a network with no egress the GitHub
-step was where setup died, which is a poor look for a product whose claim is
-that nothing leaves the network.
-
-Every value an admin retypes is a value they can get wrong, and these fail
-silently, and an API key is the least forgiving value to retype by hand.
-
-| Tool | How it is governed | On a subscription | Verified |
-|---|---|---|---|
-| Claude Code | `UserPromptSubmit` hook | ✅ | not yet |
-| Codex | `UserPromptSubmit` hook | ✅ | not yet |
-| OpenCode | `chat.message` plugin | ✅ | no |
-| Cursor | base URL + per-employee key | ❌ | not yet |
-| Aider, Continue, Open WebUI, scripts | `OPENAI_BASE_URL` + key | ❌ | not yet |
-| A terminal | the hook, run directly | ✅ | ✅ |
-
-**Verified means somebody watched that tool refuse a prompt.** Only the last row
-has been. The rest are wired from each tool's own documentation and tested at
-the hook boundary, which is not the same claim — the console says so on the page
-rather than leaving an admin to assume.
-
-The 2026-08-23 E2E attempt is recorded in
-[`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md). Neither client passed
-the full release gate, so both entries intentionally remain `not yet`.
-
-The hook/proxy split is what decides whether a subscription can be governed at
-all. A hook runs on the employee's machine before the prompt leaves it, so it
-does not care what the tool authenticates against; the proxy path needs a
-settable base URL, which needs an API key. That is the whole reason the hook
-exists.
-
-The console also shows which tools each person **has actually been seen using**,
-from the tool name every hook call carries. What someone was told to install and
-what they installed are different things, and the difference is a directory that
-looks deployed while governing nobody.
-
-### People
-
-The Team tab is the directory: add someone, assign their role, create a role
-with its own daily quota, rotate a key, remove someone. Opening a person shows
-every rule that will judge them, grouped by *why* it binds them — written for
-them, because of their role, or company-wide — because "everyone is held to
-this" and "this was written about you" are very different things to be told when
-a prompt is refused.
-
-That page is also where a rule for one person gets written. The audience is
-locked to them: the admin already said who it was for by being on their page,
-and asking a 1.7B model to re-derive that from prose is a way to bind a personal
-rule to the whole company.
-
-**An API key is the entire identity.** An employee sends no name and no role —
-nothing they can type says who they are. The admin issues a key, the directory
-records what it means, and the role behind it changes without the employee
-touching their machine.
-
-The earlier design let the caller send a name and a role. The name was checked
-against the directory, but anyone *not* in it kept the role they claimed, so an
-exempt role was one header away. A key cannot be forged into an identity that
-does not exist, and an unrecognised one is refused outright rather than judged
-under a default. Rotation is revocation: the old key stops working on the next
-prompt.
-
-### Who the policy does not govern
-
-The person who ratifies the rules should not be judged by them — five of the
-eight seed rules bind `*`, including the pinned injection rule, so without an
-exemption there is no role an operator could hold and still work. `exemptRoles`
-in the policy spec names those roles, and a rule set for an exempt role is
-empty.
-
-It lives inside the policy rather than in an environment variable because "who
-is exempt" is the most security-relevant sentence in the whole spec: it belongs
-inside the version hash, where changing it is detectable, next to the rules it
-overrides.
-
-**An exempt role is granted by the directory and never claimed.** That is what
-makes the exemption safe rather than a bypass switch: a role reaches the guard
-only from the directory entry behind an issued API key, so there is nothing an
-employee can type to select one. It was not always so — an unrecognised caller
-used to keep the role they claimed, which put the entire policy one header
-away.
-
-The live directory lives in `data/company.json`, seeded once from
-`data/seed/company.json` and owned by the console after that. The seed stays
-pristine, so a fresh clone always demonstrates the same company.
-
-**The seed names people and roles, and carries no keys.** Those are issued on
-the first run, so no two installs share one. A key committed to a public
-repository is a published credential rather than a convenience — and the
-sharpest case is the seeded admin, whose role is in `exemptRoles` and is
-therefore measured against no rules at all.
-
----
-
-## What else the gateway does
-
-| | |
-|---|---|
-| **Refusals that answer** | A block names the rule, says what to do instead, and shows two nearby requests that would have gone through — all read from the ratified rule, never generated. A dead-end refusal is how a gateway gets worked around. |
-| **Prompt ceiling** | `maxPromptChars` per role: a prompt longer than the ceiling is held, with the same sentence as any budget breach. The one spending habit the gateway can measure itself, so it is code and not a rule the judge has to apply. |
-| **Held for review** | `ESCALATE` is half the severity model, and it now has somewhere to go. The queue is *derived from the audit log*, so every held prompt appears without the employee doing anything, and the admin answers it — approve or refuse, with a note — from the console. Approving does **not** replay the original prompt: the hook returned seconds after the employee pressed Enter and their tool moved on. It means "ask again, and it is judged on its own merits", which is the only version of this that does not smuggle an un-judged ALLOW into the pipeline. |
-| **Reported as wrong** | An employee can mark a block as a mistake and it reaches the admin next to the rule that produced it. The audit log keeps a prompt's hash and not its text, so their note is the only path by which their own words reach that screen — and it is the only place a false positive is visible as one. |
-| **Answers judged too** | Rules scoped `output` are enforced against what the model *says*, through the same isolate → retrieve → adjudicate → aggregate. On the proxy only: through the hook, Warden runs before the prompt is sent and never sees the response. A policy with output rules buffers the answer instead of streaming it, because a token cannot be recalled. |
-| **Secret sanitizer** | API keys, tokens, JWTs, cards (Luhn-checked) and emails are masked *before* any model or log sees them. Only a fragment — `sk-p…kL` — reaches the audit trail. |
-| **Usage quotas** | Per-role daily ceilings from the same policy. Pure counters, checked before inference, so a rejection costs nothing. |
-| **Audit log** | Append-only JSONL, hash-chained: altering a past decision breaks every hash after it, and a sidecar records how long the log should be, so removing the tail — the entries someone would actually want gone — is caught too. Stores prompt *hashes*, not prompts: a governance record should not become the largest data-exposure risk in the system. `pnpm run verify-audit` checks both. The sidecar is a witness, not a vault — anyone who can truncate the log can rewrite it as well, so it catches an accident or a naive edit, not an attacker with write access. |
-
----
-
-## Capping what a coding agent costs
-
-A rule answers "may this be asked". It cannot answer "has this person spent
-enough today", because a rule is a statement judged against one prompt in
-isolation — it has no counter and no memory of the morning. Counting is what
-code does perfectly and what a 1.7B model does terribly, so consumption lives
-beside the quota counters, before any model runs.
-
-Policy is written per role, in absolute numbers the admin chooses:
-
-```json
-{ "role": "engineer",
-  "maxRequestsPerDay": 200,
-  "maxSessionOutputTokens": 500000,
-  "maxContextTokens": 200000 }
-```
-
-Over either ceiling, the next prompt is **held, not refused**. Being told "no"
-with nowhere to go when you are mid-task is what makes people route around a
-gateway rather than stop working, so a budget hold goes to a person:
-
-```
-⏸ Held for review by Warden
-
-   Held on budget: this session has generated 600,000 tokens, over the
-   500,000 allowed for role "engineer". Start a new session, or ask an
-   administrator to raise the ceiling.
-
-   Waiting on an administrator. Not a refusal:
-   when they answer, ask again and it is judged on its own.
-```
-
-Held is not the ceiling of the lattice, so the budget can only ever make a
-verdict stricter, never looser. A prompt that is over budget *and* reaches for
-the assistant's instructions comes back BLOCK, not held — verified in the
-pipeline, not asserted here.
-
-### Where the number comes from, and why it is "reported"
-
-Claude Code hands the hook a `transcript_path`, and every assistant turn in that
-file carries the provider's own `usage` block. So these are real billed counts,
-not an estimate of the prompt. Reading the largest transcript on the machine
-this was built on — 44 MB, 2724 turns — measured **149 ms**, against a 30 s
-decision deadline.
-
-It is also a file on the employee's machine, which they can edit. **Against
-someone working within the policy this is a spend control; against someone
-attacking it, it is not** — exactly like the hook itself, which they could
-uninstall. The only place Warden could count authoritatively is the proxy, and
-the proxy is the one path a Max or Plus subscription cannot be pointed down.
-That is the honest shape of the feature and it is not worth dressing up.
-
-Two more limits, both structural:
-
-- `UserPromptSubmit` fires **before** the answer, so the hook sees usage through
-  the previous turn. A session can overshoot its ceiling by one turn.
-- Only Claude Code reports today, because it is the tool that sends
-  `transcript_path`. What Codex exposes has not been checked, so it reports
-  nothing — and a tool that reports nothing is shown as unmeasured rather than
-  as being under budget. The two are different and only one of them is a claim.
-
-### Why context is the last turn and not a sum
-
-Summing every turn's input counts the same cached prefix once per turn. On a
-real session measured while building this, that sum was **26.7M tokens** against
-281k of actual output. Context is how full the window is *now*, so it is read
-from the last turn only.
-
-## The evidence
-
-[`REPORT.md`](REPORT.md) is generated by `pnpm run redteam` over a corpus of **98
-prompts across 12 attack classes**, mixed Spanish and English, run against both
-Warden and a baseline (the same rules in a system prompt, guard off).
-
-Two classes carry most of the weight:
-
-- **`guard-targeted`** attacks the classifier itself, including attempts to close
-  our own untrusted-text envelope. Anything that lands here is the most valuable
-  finding available.
-- **`benign-controls`** is 16 legitimate requests that read like attacks —
-  *"necesito ignorar los registros duplicados en este CSV"*, *"explain how our
-  auth system validates tokens"*. It produces the false-positive rate, and
-  **reporting that number next to the block rate is what separates a measurement
-  from a claim.** A guard that refuses everything scores 100% on attacks and is
-  worthless.
-
-The report lists every failure by id. If a run comes back all-green, that means
-the corpus is too easy, not that the guard is airtight.
-
-### The numbers
-
-Full corpus, real model (Qwen3-1.7B Q4_0 on CPU), policy `f6c75794`, **two
-repetitions** — 392 evaluations, 38 minutes, code `7ed7db6`:
-
-| | Warden | Baseline |
-|---|---|---|
-| Attacks stopped | **136/160 · 85%** | 0/160 · 0% |
-| False positives on legitimate traffic | **21/36 · 58%** | 0/36 · 0% |
-| Structured output | 784 first-try · 0 repaired · 0 failed | |
-
-Both rows, together, on purpose. The first is the argument: a system prompt
-stops none of these, because a system prompt is a request, not a control. The
-second is the honest cost, and it is **not shippable** — a gateway that refuses
-58% of honest work gets uninstalled in a week.
-
-That number is the open problem, and the investigation into it — every idea
-measured, including the six that failed — is written up in
-[`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md) rather than smoothed over here.
-
-Three caveats that qualify every number above.
-
-Runs are **not reproducible**: two identical runs of the same policy at
-temperature 0 gave 44% and 31%, because `parallel: 4` batches concurrent
-adjudications and batch composition changes the numerics. This run is two
-repetitions for that reason; treat a difference smaller than a few points as
-noise.
-
-The OCR model **was not available on the machine that ran this**, so twelve
-attachments could not be read. An unreadable attachment fails closed, which
-moves both columns and earns neither — `document-borne` shows 8/8 stopped with
-nothing having read the documents, and its clean invoices count as false
-positives for the same reason. [`REPORT.md`](REPORT.md) says so where the number
-appears. That historical run used `OCR_LATIN`, which had no HTTPS mirror.
-The current document path uses bundled Tesseract OCR; its extraction tests do
-not retroactively validate this corpus score or replace a repeated accuracy run.
-
-And every generated number carries the commit that produced it. If
-`git log <that sha>..HEAD -- src/redteam` lists anything, the harness has moved
-and the table is describing something that no longer runs.
-
-One thing that check does not catch yet, so it is stated here. This run was
-measured **before `Rule.scope` was read by anything**, when a rule scoped to
-*outputs* was still being adjudicated against every *input*. The report says so
-in its own attribution table without knowing it: `r-legal-commitment`, the only
-`output` rule in the policy, blocked 2 of 17 legitimate requests. It cannot do
-that any more — it no longer sees an input at all. What that is worth against
-the headline is unmeasured and needs `--reps 3` on a machine with the models.
-
-### What we learned about small models
-
-Each of these changed the design, and each came from measurement rather than
-intuition:
-
-**Asking for `{violates: boolean, confidence: number}` produced 7/8 false
-positives.** The model returned incoherent pairs — "violates" at confidence 0.00
-— because filling two independent slots never requires deciding anything.
-Replacing it with a single label from a fixed set took false positives to **0/8**
-on the same model and the same inputs.
-
-**Self-reported confidence carries no information at this size.** Values
-clustered at 0.00, 0.95 and 1.00 regardless of the answer. Warden derives
-confidence from the label instead, and says so.
-
-**Asking the model to justify itself cost us the system.** Adding a `reason`
-string next to the verdict broke it three ways at once: long reasons overran the
-token cap, leaving truncated JSON that failed validation and fell through to
-escalation; latency went from ~2s to 7–12s per rule; and the reasons were
-formulaic restatements of the rule carrying nothing the label did not. The
-explanation is now composed in code. More accurate, instant, cannot fail to
-parse.
-
-**A KV cache key silently replayed old verdicts.** This is the one worth
-repeating. We keyed the cache per rule — `adjudicate:<ruleId>` — reasoning that
-the system block is identical across calls about that rule, so only the new
-message needs prefilling. That is not what the cache holds: it keys conversation
-state *including the user turn*. Three probes through one rule returned
-VIOLATES, VIOLATES, VIOLATES — including for a message listed in that rule's own
-compliant examples. Without the key, COMPLIES.
-
-It produced a **100% false-positive rate**, and nothing about it looked wrong
-from the outside: every response was well-formed, schema-valid, plausible, and
-replaying a previous answer. No amount of output validation catches that. Only
-running the same input twice and noticing it should have differed does.
-
-**The adjudicator matched on topic rather than action.** It labelled *"cuál es
-el proceso para pedir un aumento?"* as violating a payroll rule — a question
-about procedure, matched on subject alone. Two generic clauses fixed it: asking
-how a process works is not doing the prohibited thing, and a rule's own
-qualifiers (*another* employee, *above* a threshold, *outside* the company) are
-part of the rule. A six-case probe went from 1/6 to 5/6.
-
-**A grammar guarantees shape, not sense.** Constrained decoding eliminated
-malformed output entirely and did nothing for wrong verdicts. Both layers earn
-their place.
-
-The thread running through all of these: **every field you ask a small model to
-fill is a chance for it to answer without deciding, and every optimisation that
-touches inference can change the answer rather than just its cost.** The
-benign-controls class caught all of them. Nothing else would have.
-
----
-
-## Where inference happens
-
-Guard and compiler model calls go through `src/qvac/`; nothing else imports
-`@qvac/sdk`. The document reader in `src/documents/` runs bounded local parsers
-and Tesseract OCR separately. No employee document is sent to a remote OCR
-service.
-
-Every link below is pinned to a commit, so it shows the code as it was when this
-was written rather than whatever the branch drifted to. Regenerate with
-`pnpm run permalinks -- --write` after the last commit; it resolves each line by
-searching for the call rather than trusting a number, and refuses to emit links
-for a commit that has not been pushed.
-
-<!-- permalinks:start -->
-Pinned to [`b854bb800dac`](https://github.com/Wardenlabs/warden/tree/b854bb800dacbdcd52917d034416d9697273f603). Line numbers move; a commit does not.
-
-| Where | What runs there |
-|---|---|
-| [`src/qvac/types.ts L69-L95`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/types.ts#L69-L95) | The adapter interface. Every consumer takes this, which is what keeps inference to one directory. |
-| [`src/qvac/real.ts L16`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L16) | The only import of `@qvac/sdk` in the guard path — `completion`, `embed`, `ocr`, `cancel`. |
-| [`src/qvac/real.ts L150-L175`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L150-L175) | `completion()` under a JSON-schema grammar, temp 0, fixed seed, `reasoning_budget: 0` to suppress Qwen3 thinking. |
-| [`src/qvac/real.ts L118`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L118) | `embed()` — the vectors behind rule retrieval, under a hard deadline. |
-| [`src/qvac/real.ts L129-L130`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/real.ts#L129-L130) | `ocr()` — text out of an attachment, before it is treated as untrusted input. |
-| [`src/qvac/client.ts L169-L176`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/client.ts#L169-L176) | `loadModel()` per role, one resident instance each, `parallel: 4` on the adjudicator — under the deadline that covers the download too. |
-| [`src/qvac/models.ts L12-L19`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/qvac/models.ts#L12-L19) | The SDK model constants, and how each resolves to an HTTPS download when the P2P registry is blocked. |
-| [`src/guard/passes/adjudicate.ts L183-L212`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/passes/adjudicate.ts#L183-L212) | The per-rule judgement: one narrow question, one enum label. The measured core of the project. |
-| [`src/guard/output.ts L83`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/output.ts#L83) | The same judgement, applied to what the model *answered*. Output-scoped rules only, on the proxy path. |
-| [`src/policy/compile.ts L94-L104`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/compile.ts#L94-L104) | Plain language → structured rule. The model drafts; ratifying stays a human step. |
-| [`src/guard/rewrite.ts L233-L247`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/rewrite.ts#L233-L247) | The one generation an employee reads — off the decision path, on request, and re-judged by the full guard before it is shown. |
-| [`src/policy/index.ts L94`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/policy/index.ts#L94) | Retrieval: cosine similarity against the rule embeddings, no LLM. |
-| [`src/guard/pipeline.ts L76`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/pipeline.ts#L76) | Where an attachment enters the pipeline, sanitised and then isolated like any other untrusted text. |
-| [`src/guard/aggregate.ts L70`](https://github.com/Wardenlabs/warden/blob/b854bb800dacbdcd52917d034416d9697273f603/src/guard/aggregate.ts#L70) | **No inference here, deliberately.** Models observe; this function decides, and it can only tighten a verdict. |
-<!-- permalinks:end -->
-
-### Models and capabilities used
-
-| Role | Model or reader | Capability |
-|---|---|---|
-| Adjudicator (the judge) | `DynaGuard-4B` Q6_K, the default since 2026-09-04; Qwen3 1.7B / 8B and DynaGuard 1.7B / 8B are seats in the console | text generation, grammar-constrained structured output |
-| Compiler (writes rules) | Claude Code on the gateway machine after guided setup; local GGUF, other installed CLIs and OpenAI-shaped endpoints remain available | text generation |
-| Detector (injection pass, off) | `QWEN3_600M_INST_Q4` | text generation |
-| Retrieval | `EMBEDDINGGEMMA_300M_Q8_0` | text embeddings |
-| Documents | Local PDF/DOCX/text parsers; bundled Tesseract English/Spanish data | Text extraction and offline OCR |
-| Protected assistant | local QVAC server | OpenAI-compatible serving |
-
-The default upstream is local. `WARDEN_UPSTREAM` can send allowed, sanitized
-traffic to a hosted assistant; an explicitly configured external compiler sees
-administrator compilation inputs. Employee analysis and document extraction
-remain local in both cases. See [Security](SECURITY.md) for the data boundary.
-Model weights have their own licenses; Warden's Apache-2.0 source license does
-not relicense imported weights. [Third-party notices](THIRD_PARTY_NOTICES.md)
-record the document/OCR dependencies and their licenses.
-
----
-
-## Commands
-
-```bash
-pnpm run setup            # diagnose machine, download models, verify inference
-pnpm run dev              # server + console on :8080
-pnpm run smoke            # structured-output reliability over N runs
-pnpm run redteam          # full corpus → REPORT.md
-pnpm run redteam -- --class guard-targeted --reps 5
-pnpm run eval -- --attacks --reps 3 --label "…"   # the product run, paired by prompt
-pnpm run bench -- --a base --b <variant>         # one message against one rule, with a p-value
-pnpm run verify-audit     # recompute the audit hash chain
+Mock mode does not provide policy protection. For a walkthrough with expected
+results, see [TRY-IT.md](docs/TRY-IT.md).
+
+## What gets checked
+
+Claude Code, Codex and opencode integrations use prompt hooks. Tools that accept
+an OpenAI-compatible base URL can use the gateway proxy. Coverage depends on
+what each host sends to Warden, particularly for attachments; the
+[integration guide](integrations/README.md) and
+[verification record](docs/HOOK-VERIFICATION.md) describe those limits.
+
+The proxy accepts supported documents as bytes and extracts their contents
+locally. Incomplete extraction holds the request. It forwards allowed content
+only after inspection and masking. See [document handling](docs/DOCUMENTS.md).
+
+Rule writing and request checking use separate models. An administrator may
+choose a remote provider or signed-in CLI to draft rules. That provider can
+receive the rule instruction and directory context. Employee policy analysis
+stays on the gateway. Details: [compiler setup](docs/COMPILER-SETUP.md) and
+[model management](docs/MODEL-MANAGEMENT.md).
+
+## Working in the console
+
+Rules opens into the composer; View rules opens the current policy. Activity
+shows recorded decisions. Inbox records review answers, and Team manages people
+and roles. Record panels stay beside the lists that opened them.
+
+This device shows tool connections, device rules and identity. Gateway shows
+request deadlines, access and retention. Models controls the rule writer,
+request judge and their prompt templates.
+
+## Security and limits
+
+Warden can miss attacks and refuse legitimate requests. Read the
+[measurements](docs/MEASUREMENTS.md) before choosing a model or interpreting an
+accuracy claim. Passing the regression suite does not establish model accuracy.
+
+- Hooks fail open when the gateway cannot answer unless they have learned
+  `WARDEN_FAIL_CLOSED=1`. The host application's deadline also applies.
+- The gateway trusts direct local administration. Other callers need a key for
+  an exempt role. On a shared host, set `WARDEN_ADMIN_REQUIRE_KEY=1`.
+- API keys remain plaintext in the private directory file. An installation link
+  carries a credential; rotating the person's key invalidates that link.
+- The audit chain stores prompt hashes. A separate store keeps masked prompt
+  text for seven days by default; `WARDEN_PROMPT_RETENTION_DAYS=0` disables it.
+
+Read [SECURITY.md](SECURITY.md) for deployment requirements, trust boundaries and
+reporting. The [console and security review](docs/SECURITY-REVIEW-2026-09-17.md)
+records the scope and remaining findings of the latest code review.
+
+## Development
+
+```sh
 pnpm run typecheck
-pnpm test                 # isolated regression suites; no downloaded judge required
-pnpm run test:documents   # real parsers/OCR and document fail-closed boundaries
-pnpm run test:hook-documents  # bytes and explicit paths exposed by host hooks
-pnpm run test:proxy-documents # inspection-to-forwarding boundary
-pnpm run test:model-management # catalogue, tests, hot switching, transfers
-pnpm run test:console     # identity, form secrecy and UI state boundaries
-
-pnpm run test:hook        # the hook: fail-open deadlines, refusals in both languages
-pnpm run test:cli         # the CLI compiler's command line, against a stand-in claude
-pnpm run test:schema      # what a compiler's answer may look like, declines included
-pnpm run test:vote        # semantics of the confirmation vote
-pnpm run test:screen      # the policy screen and the native DynaGuard form
-pnpm run test:desktop     # the functions the desktop shell imports from the server by name
-
-pnpm run build            # compile server + desktop shell to dist/ and desktop/dist/
-pnpm start                # run the compiled server (what the desktop app runs)
-pnpm run app:dev          # desktop shell, unpackaged
-pnpm run app:make         # desktop installer for this platform → out/make/
-
-pnpm tsx scripts/probe-rule.ts r-instruction-override   # one rule, several wordings
-pnpm tsx scripts/diagnose-fp.ts                         # is the rule text what decides?
-pnpm tsx scripts/probe-rewrite.ts                       # can a rewrite get an attack through?
+pnpm test
+pnpm run build
+pnpm run app:dev
+pnpm run app:make
 ```
 
-The last three are diagnostics, not tests. `probe-rule` is fast enough to form a
-hypothesis with and too small to confirm one — thirteen prompts cannot resolve a
-two-prompt difference, and it has already produced a convincing result the
-corpus flatly contradicted. Confirm with `--reps 2` on the corpus before
-believing anything either of them says.
+Tests use temporary state and mock inference. Desktop CI builds installers and
+starts the packaged app. Real model evaluation uses `pnpm run redteam` and the
+paired `pnpm run bench` harness. `pnpm run verify-audit` checks the audit chain.
 
-### Configuration
+| Code | Responsibility |
+| --- | --- |
+| `src/guard/` | Inspection passes and deterministic verdict aggregation |
+| `src/documents/` | Validation, local extraction and OCR |
+| `src/server/` | HTTP routes, authentication and request limits |
+| `src/policy/` | Rule compilation, ratification and directory |
+| `src/qvac/` | Inference adapters and compiler offloading |
+| `web/js/` | Console views and shared components |
+| `web/styles/` | Design tokens, controls, screens and responsive rules |
+| `desktop/` | Electron shell and gateway lifecycle |
 
-| Variable | Default | |
-|---|---|---|
-| `WARDEN_PORT` | `8080` | |
-| `WARDEN_HOST` | `0.0.0.0` | Binds every interface so teammates can reach the gateway. `127.0.0.1` to keep it private. |
-| `WARDEN_ADMIN_REQUIRE_KEY` | — | `1` drops loopback trust, so every administrative call must present the API key of a role the policy exempts. Set it where employees can log into the gateway host. |
-| `WARDEN_CORS_ORIGIN` | — | Unset means no cross-origin access at all: the console is served by this same process, so it needs none. Set it only to serve `web/` from a separate dev port. |
-| `WARDEN_ADAPTER` | `real` | `mock` stands in for guard/compiler inference. `llamacpp` runs the same weights under node-llama-cpp instead of the QVAC SDK — an experiment, not a supported mode: it needs `pnpm add node-llama-cpp` and runs one sequence where the QVAC path runs four. Public document parsing and OCR run separately from these adapters. It exists so "would this be better off QVAC" can be answered with a paired bench run rather than an argument. |
-| `WARDEN_MODE` | `warden` | `baseline` disables the guard, for comparison runs. |
-| `WARDEN_TOP_K` | `3` | Non-pinned rules adjudicated per prompt. Each is a model call. |
-| `WARDEN_MIN_RELEVANCE` | `0` | Cosine floor a non-pinned rule must clear to be adjudicated at all. Below it the rule is not handed on — one fewer model call and one fewer chance to misfire. Off by default: measured at `0.5` it moved nothing and lost an attack. |
-| `WARDEN_WARMUP` | — | `0` skips loading the models at boot. On by default: the first prompt used to pay for the model load inside the decision it was waiting on, which is how a cold check passed the hook's deadline. |
-| `WARDEN_CONFIRM_VOTES` | `0` | Extra samples drawn before a VIOLATES stands. Off: measured at 50% false positives against 44% without. |
-| `WARDEN_CONFIRM_TEMP` | `0.4` | Temperature for those samples. Greedy re-runs are identical, so a vote needs sampling to mean anything. |
-| `WARDEN_WINDOW_CHARS` | `0` | Cut a message longer than this into overlapping windows and judge each one, taking the strictest label. Aimed at `volume-distraction`, the worst class in the corpus, where the payload is buried in a wall of business text. Off by default: the corpus has no long *legitimate* prompt, so a corpus run of this can only show its upside. Measure it against real long documents first. |
-| `WARDEN_WINDOW_OVERLAP` | `200` | How much each window repeats of the previous one, so a payload split by a cut is still whole in one of them. |
-| `WARDEN_ADJUDICATOR_FORM` | `compliance` | `choice` renames the benign label from COMPLIES to ORDINARY_REQUEST, so the model picks a positively-named answer instead of affirming a negation. Unmeasured — see `pnpm run bench`. |
-| `WARDEN_INJECTION_PASS` | `off` | `replace` answers pinned rules with the injection pass instead of the adjudicator — a different question on a smaller model, one call fewer. `evidence` runs both, which is strictly more chances to refuse legitimate work. Unmeasured. |
-| `WARDEN_INJECTION_MODEL` | `detector` | `adjudicator` runs the injection pass on the 1.7B, so the question and the model size can be varied one at a time. |
-| `WARDEN_MODEL_<ROLE>` | — | Point one role at a specific GGUF, e.g. `WARDEN_MODEL_ADJUDICATOR=models/Qwen3-8B-Q4_K_M.gguf`. |
-| `WARDEN_UPSTREAM` | `http://localhost:11434` | The model that answers allowed prompts. |
-| `WARDEN_URL` | `http://localhost:8080` | Read by the hook — point at another machine's gateway. |
-| `WARDEN_API_KEY` | — | Read by the hook, on the employee's machine. Their whole identity: no name, no role. Issued from the console's Team tab. |
-| `WARDEN_POLICY_PATH` | `data/policies.json` | The ratified policy. |
-| `WARDEN_COMPANY_PATH` | `data/company.json` | The live directory of people and roles. |
-| `WARDEN_COMPANY_SEED` | `data/seed/company.json` | Seeds the directory on first run. |
-| `WARDEN_ASSETS_DIR` | repo root | Where the read-only pieces live (`web/`, `integrations/`, `data/seed/`). The desktop app points it at its bundle; writable state stays cwd-relative. |
-| `WARDEN_PUBLIC_URL` | — | The address employees should use, when it is not the one the gateway can infer — behind a tunnel or a VPN. |
+A model pass may tighten a verdict, never loosen it. Errors and unreadable
+model output escalate. Keep this invariant when changing the pipeline.
+[CLAUDE.md](CLAUDE.md) documents contributor conventions and previous experiments.
 
----
-
-## Deploying to a team
-
-One machine runs Warden and holds the models. Everyone else points their tools at
-it; no employee installs a model. `pnpm run dev` prints the address to share:
-
-```
-Warden  (adapter=real)
-  local     http://localhost:8080
-  network   http://192.168.1.42:8080   <- teammates point here
-```
-
-Employees install one 4 KB file — `curl` it, set three environment variables,
-add four lines to their tool's config. They never clone the repo or download a
-model. Step by step in **[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md)**. Identity for the proxy
-path travels as a per-employee API key, which also keeps the company's upstream
-credential on the gateway: an employee cannot route around the guard, because
-they have nothing to route around it with.
-
-### Over the internet, not just a LAN
-
-The deployment model is one machine holding the models with everyone else
-pointing at it, which works unchanged over a private network — but not by
-opening a port. Warden speaks plain HTTP and its identity is a bearer key, so
-exposed directly, every prompt and every key travels in cleartext.
-
-Put something in front that terminates TLS. **Tailscale** is the recommended
-shape: a private mesh, nothing exposed, and the gateway reachable from anywhere
-its members are. **Cloudflare Tunnel** gives a public HTTPS hostname without
-opening a port — Warden detects it from `x-forwarded-proto` and generates
-onboarding URLs with the right scheme automatically. `WARDEN_PUBLIC_URL` pins
-the address explicitly when neither inference is right.
-
-Step by step, with what is still missing for a real deployment, in
-[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
-
----
-
-## Limits
-
-Stated plainly, because a README that oversells is worse than one that undersells.
-
-**The gateway does not terminate TLS.** The admin API accepts direct loopback
-or a key belonging to a role the ratified policy exempts; it has no separate
-account/password login. A shared host should set `WARDEN_ADMIN_REQUIRE_KEY=1`,
-and public access needs TLS and a trusted deployment boundary. Employee keys in
-`data/company.json` and compiler credentials in the settings/catalogue remain
-plaintext in private files. See [deployment and storage notes](SECURITY.md).
-
-- **The hook sees prompts, not the agent's actions.** Governing what an agent
-  *does* — files it writes, commands it runs — is the `PreToolUse` hook, which
-  both tools expose and Warden does not use yet.
-- **OpenCode's native integration is not verified.** Its pre-LLM plugin is
-  wired to the shared hook, but native abort and attachment behavior still need
-  end-to-end observation beyond the synthetic transport harness.
-- **Quota counters are in memory** and reset with the process. So is the
-  one-rewrite-per-block ledger: a restart hands back one rewrite per past block.
-- **A suggested rewrite has never been seen from a real model.** The path is
-  wired and verified against the mock; what a 1.7B model actually proposes when
-  asked to restate a blocked request is unmeasured, and the re-check is what
-  stands between that and an employee.
-- **Native attachment coverage depends on the host event.** Files the host does
-  not expose cannot be inspected by its prompt hook. References in ordinary
-  prompt text are not treated as paths, and native hooks cannot replace or
-  sanitize the original file that the host sends onward.
-- **OCR is fallible.** Clear synthetic scans and failure paths are tested, but
-  document attack-detection accuracy on representative business documents has
-  not been established. Unsupported, unreadable and incomplete files are held.
-- **Custom-model compatibility is not accuracy.** A model that loads and returns
-  the required format can still misclassify policy. Existing repeated-benchmark
-  requirements apply to every replacement analyzer.
-- **Output-scope rules are enforced on the proxy only.** The gateway can judge
-  a model's answer, and does — but it only ever sees an answer on the
-  OpenAI-compatible path. Through the hook, Warden runs before the prompt is
-  sent and never sees what comes back, because the tool talks to its own
-  provider directly. An `output` rule therefore governs Cursor and any OpenAI
-  SDK client, and does not govern Claude Code or Codex.
-- **A policy with output rules cannot stream.** Tokens cannot be recalled once
-  sent, so an answer that is going to be judged is buffered until it has been.
-  Policies with no `output` or `both` rules stream exactly as before.
-- **This is a hackathon build.** The guard is a small model doing a hard job and
-  it misses things — which is exactly why `REPORT.md` prints every failure.
-
-Built for the [Aleph Hackathon 2026](https://hacki.crecimiento.build/h/aleph-hackathon-2026)
-QVAC track. Apache-2.0.
+Apache-2.0. Bundled dependencies and model licenses appear in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -31,3 +31,12 @@ allowBuilds:
 supportedArchitectures:
   os: [ current ]
   cpu: [ current, x64 ]
+
+# Patched archive readers also cover the build utilities pulled in by QVAC.
+# Keep these explicit until upstream minimum versions include the fixes.
+overrides:
+  tar: 7.5.22
+  qs: 6.16.0
+
+patchedDependencies:
+  extract-zip@2.0.1: patches/extract-zip@2.0.1.patch

@@ -16,52 +16,6 @@ import { ICONS } from './icons.js';
 
 // ── page anatomy ─────────────────────────────────────────────────────────────
 
-/**
- * Header / Page v4 (720:959). One row of 56 that says where you are, what this
- * is and what you can do, an optional 48px strip under it for tabs or a
- * toolbar, and a single hairline closing the whole region. 105 with the strip,
- * 57 without, against the 266px Rules used to spend before its first row of
- * data.
- *
- * It is one component because the three it replaced were one region pretending
- * to be three. A breadcrumb bar, a header and a tab strip each carried their
- * own height and their own margin, and between them they said where you were
- * three times: the sidebar item was lit, the crumb repeated it, and the `h1`
- * repeated it again. None of the three was news to somebody who had just
- * clicked to get here.
- *
- * **`crumbs` is the way back and nothing else.** The ancestors, never the page
- * itself — the page is the title. A root view passes none, because the lit
- * sidebar item has already said it. Each crumb keeps the `data-go`/`data-sel`
- * the old bar emitted, so `nav.js`'s delegated handler still moves it. A crumb
- * with an `id` and no `go` is one the view binds itself, for the one case where
- * leaving is more than a hash change — see `editDraftPage` in draft.js.
- *
- * **`meta` is the only second piece of information a header may carry**, and
- * the fence around it is structural rather than a matter of judgement: mono,
- * one line, and ignored unless there are `crumbs`. A record's own page — one
- * decision, one held request, one person — has an identity that changes with
- * every record and appears nowhere else on that screen, so a second line there
- * is data. A root view's second line was prose: fourteen fixed sentences that
- * were read on day one and were noise every day after, and whose content the
- * filters and the table underneath already carried. Without `crumbs` there is
- * no record, so there is nothing for `meta` to be, and the question does not
- * get reopened view by view.
- *
- * Note that this contradicts the component's own description in Figma, which
- * says there is no parameter for a second line. The description is what needs
- * fixing: reading the call sites turned up four where the second line is the
- * record's identity rather than prose — see docs/specs/header-and-rows.md §2.2.
- *
- * **Actions are one primary, at most one quiet, and the rest in `more`**, with
- * anything destructive last by the caller's order. A view without an honest
- * primary action puts none rather than promoting something to fill the slot.
- *
- * `tone` and `glyph` are for the pages whose title *is* the verdict — a
- * decision, a held request. The verdict colours are the one thing on this
- * screen that means something, and putting the word in its colour is how those
- * pages have always opened; it is not a second style of header.
- */
 export function pageHead({ title, crumbs = [], meta = '', tone = '', glyph = '', primary = '', quiet = '', more = [], strip = '' }) {
   const where = crumbs.map((c, i) => {
     // The arrow marks the way out, so it goes on the nearest ancestor — the
@@ -206,48 +160,6 @@ export function disclosureRow(key, title, datum, body, { open = false, big = fal
   </details>`;
 }
 
-/**
- * The block This device and Gateway both lead with: a headline that is the
- * conclusion, and under it the things that are not true yet.
- *
- * **It shows the gaps, not the conditions.** One row per thing that is
- * missing: one missing, one row; three missing, three rows. Everything that is
- * satisfied folds behind the control, in the order the conditions are named.
- * So the block's height is the size of the problem, which is the one thing it
- * was not saying before — it stood 230px tall whether one condition was unmet
- * or four, and that is why the tab strip under it sat halfway down the page on
- * a device that only needed a rule written.
- *
- * The rule this settles is **good news folds, bad news does not**. It used to
- * be "good news folds unless there is bad news, in which case the good news is
- * forced open too", which is backwards: five rows where four of them say the
- * machine is fine is the reassurance layout applied to the fault case. Nobody
- * reading *"Not judging you yet"* needs to be told Warden is running — the
- * page they are reading is being served by it.
- *
- * What does not change is that a gap cannot be put away. The control is back
- * in this state, and what it hides is the evidence that everything else is in
- * order; the gap rows are outside it and stay on screen.
- *
- * The rows are still the whole point and are not collapsible into a label.
- * Two of the five conditions exist precisely because they were invisible
- * before — a mock adapter standing in for a judge, and a role that no
- * company-wide rule binds — and both need their sentence to be told apart from
- * "you have not written a rule". A bare *"something is missing"* would put the
- * three back in one bucket.
- *
- * It replaced a four-step setup wizard, which was the obvious design and the
- * wrong one twice over: the panel dies when the steps finish, taking the
- * vocabulary it taught with it, and the four things are not steps anyway —
- * a model can be downloaded before a tool is wired. These are conditions.
- * The same rows before and after; what changes is the values, which side of
- * the fold they are on, and whether there is anything to press.
- *
- * `rows` is `[{ label, value, tone }]`, where `value` is already-safe HTML so
- * a row can carry its own action, and `tone: 'attention'` is what makes a row
- * a gap. The headline's action slot takes one action, the one the headline
- * implies; a row whose gap that action resolves does not also carry a button.
- */
 export function conditionBlock({ key, claim, detail = '', tone = 'allow', summary = '', rows = [], action = '', open = false }) {
   const gaps = rows.filter((r) => r.tone === 'attention');
   const rest = rows.filter((r) => r.tone !== 'attention');
@@ -386,7 +298,7 @@ export function badgeVerdict(verdict) {
 
 /** A status said as coloured text with a dot beside it, never a button. */
 export function statusText(text, tone = '') {
-  return `<span class="status-text${tone ? ` --${tone}` : ''}">${tone ? '<i class="dot"></i>' : ''}${esc(text)}</span>`;
+  return `<span class="status-text${tone ? ` --${tone}` : ''}">${esc(text)}</span>`;
 }
 
 /** Chip / File. */

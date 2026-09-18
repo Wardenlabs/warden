@@ -64,3 +64,21 @@ removed. Rule effect explanations and persistent editing instructions are
 removed from the templates; validation errors remain conditional. Inbox uses
 explicit recording actions and reports the non-resumption in the saved result.
 The composer uses a 22px radius, a quiet border and unboxed example actions.
+
+## Refinement after v0.2.6
+
+The sidebar lockup is 100px wide. Overview, Manage and Local return as compact
+navigation labels; helper paragraphs stay omitted. Setup facts use neutral text
+without decorative status dots. The rule composer owns the shield mark, a
+brief entrance movement and a two-line Manrope heading. Reduced-motion settings
+disable that movement.
+
+`settings-layout.js` owns the page structure shared by This device, Gateway and
+Models. Connections is the device landing tab. `device-rules.js` owns the rule
+list; the device controller retains mutations and confirmation state. Add and
+Remove replace the duplicate checkbox/menu controls.
+
+`style.css` imports five ordered layers from `web/styles/`: foundation,
+components, rules, settings and responsive. New settings use the shared grid,
+section headings and action footer. Views must escape API strings before
+passing HTML to a component. Labels remain plain strings that components escape.

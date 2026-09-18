@@ -566,7 +566,7 @@ test('Gateway leads with whether it is judging, not with whether it is running',
   try {
     Object.assign(state, gatewayState());
     const healthy = VIEWS.gateway.body();
-    assert.match(healthy, /Judging every request/);
+    assert.match(healthy, /Policy checks on/);
     // If the page renders at all the gateway is up: saying so is furniture.
     assert.ok(!/Running and enforcing|>Running</.test(healthy), 'the headline must not claim liveness the page already proves');
     assert.match(healthy, /aria-expanded="false"[^>]*>/, 'all clear folds away');
@@ -575,12 +575,12 @@ test('Gateway leads with whether it is judging, not with whether it is running',
     // is the control, so the browser hid the row it was in — the claim and the
     // button with it — and drew its own "Details" triangle instead. Both have
     // to survive the block being closed, which is the state this asserts.
-    assert.match(healthy, /conditions-claim[\s\S]*Judging every request/, 'the claim is visible while it is closed');
+    assert.match(healthy, /conditions-claim[\s\S]*Policy checks on/, 'the claim is visible while it is closed');
     assert.ok(!/<details[^>]*conditions/.test(healthy), 'and it is not a <details>, which is what hid it');
 
     Object.assign(state, gatewayState(), { mock: true, health: { ...gatewayState().health, mock: true } });
     const blind = VIEWS.gateway.body();
-    assert.match(blind, /Not judging anything/);
+    assert.match(blind, /Policy checks off/);
     assert.match(blind, /stand-in/, 'and it has to say that nothing is reading the prompts');
     // The gap is outside the fold, so no control can put it away — which is
     // the promise. What the control now hides in this state is the evidence
@@ -615,7 +615,7 @@ test('Gateway names baseline mode as the guard being off', async () => {
   try {
     Object.assign(state, gatewayState(), { health: { ...gatewayState().health, mode: 'baseline' } });
     const body = VIEWS.gateway.body();
-    assert.match(body, /Not judging anything/);
+    assert.match(body, /Policy checks off/);
     assert.match(body, /the guard is off/);
     assert.match(body, /exactly like one that is working/, 'the whole point is that it is indistinguishable from a healthy one');
   } finally { Object.assign(state, saved); }

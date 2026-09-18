@@ -1,23 +1,10 @@
-/**
- * "Gateway": the server itself — which installation this is, what it is
- * running, where it can be reached, and what it keeps.
- *
- * The line between this screen and "This device" does not get crossed. This
- * device answers *is my machine wired up*; Gateway answers *what is this
- * server and is it running honestly*. So there are no models here (they have
- * their own screen), no rules, no people, and nothing about the wiring of
- * whoever happens to be reading.
- *
- * The headline deliberately does not say "running". If you can read this page
- * the gateway is running — it is the thing serving the page. What can surprise
- * somebody is whether it is *judging*, which is a different question with two
- * separate ways of being no (§3.4 of docs/prd/console-f5-f6.md).
- */
+
 import { $, attr, esc, post, state } from './core.js';
 import { refreshChain, refreshHealth } from './data.js';
 import { modelLabel, plural } from './format.js';
 import { render } from './render.js';
-import { button, conditionBlock, feedback, groupBand, pageHead, statusText, tabs } from './ui.js';
+import { button, conditionBlock, feedback, groupBand, statusText } from './ui.js';
+import { settingsPage } from './settings-layout.js';
 import { VIEWS } from './views.js';
 
 const TABS = [['', 'Overview'], ['access', 'Access'], ['retention', 'Retention']];
@@ -68,7 +55,7 @@ function conditions() {
     },
     state.mock
       ? { label: 'The judge', tone: 'attention', value: 'Mock adapter · a stand-in answers, no model reads these prompts' }
-      : { label: 'The judge', value: `${esc(judgeName())} · on this device, nothing leaves it` },
+      : { label: 'The judge', value: `${esc(judgeName())} · local analysis` },
     isBaseline()
       ? { label: 'Mode', tone: 'attention', value: 'Baseline · the guard is off; requests are recorded and let through' }
       : { label: 'Mode', value: 'Warden · every request is judged against the rules in force' },
@@ -82,13 +69,13 @@ function conditions() {
       label: 'Reach',
       value: state.publicUrl
         ? 'Open to the internet · anyone holding the address reaches it'
-        : 'Only from this device · no public address'
+        : 'No public tunnel'
     }
   ];
   const judging = !state.mock && !isBaseline();
   return conditionBlock({
     key: 'gw:conditions',
-    claim: judging ? 'Judging every request' : 'Not judging anything',
+    claim: judging ? 'Policy checks on' : 'Policy checks off',
     tone: judging ? 'allow' : 'attention',
     summary: judging ? esc(summaryLine()) : '',
     rows,
@@ -144,17 +131,17 @@ function alarm() {
 function overviewTab() {
   const devices = deviceSummary();
   return `<div class="gw-rows">
-    ${groupBand('What this gateway promises every hook')}
+    <h2 class="settings-section-title">Request handling</h2>
     <dl class="record gw-record">
       <dt>Decision deadline</dt>
-      <dd>${deadlineSeconds()} s · the gateway states it, so no laptop chooses its own</dd>
+      <dd>${deadlineSeconds()} seconds</dd>
       <dt>If it cannot answer</dt>
       <dd>${health().failClosed
         ? 'The request is refused'
         : 'The prompt goes through unchecked'}
         <small class="gw-note">${health().failClosed
-          ? 'WARDEN_FAIL_CLOSED=1 is set here. A gateway that stops answering stops everyone working, which is the trade this setting takes.'
-          : 'Open by default, so a crashed gateway does not stop everyone working. WARDEN_FAIL_CLOSED=1 refuses instead.'}</small></dd>
+          ? 'Requests remain blocked until the gateway responds.'
+          : 'Set WARDEN_FAIL_CLOSED=1 to refuse requests during an outage.'}</small></dd>
       <dt>Devices</dt>
       <dd${devices.tone ? ` class="--${devices.tone}"` : ''}>${esc(devices.text)}</dd>
     </dl>
@@ -180,18 +167,6 @@ function deviceSummary() {
 
 // ── Access ───────────────────────────────────────────────────────────────────
 
-/**
- * The public address, and the only write on this screen.
- *
- * `POST /api/gateway/expose` answers 202 and never 200: the tunnel takes
- * seconds and the gateway restarts on the far side of it, so asking is not
- * having. `expose.asked` is that in-between, and the outcome is learned from
- * `/health` once the gateway is back.
- *
- * The consequence is written beside the button and not inside a disclosure.
- * Somebody deciding whether to put their gateway on the internet is owed the
- * sentence at the moment they decide, not one click later.
- */
 const expose = { asked: null, error: '', timer: null };
 
 async function watchAddress(want) {
@@ -226,7 +201,7 @@ function accessTab() {
     <dl class="record gw-record">
       <dt>You reached it at</dt>
       <dd><span class="mono">${esc(here)}</span>${button('Copy', { compact: true, attrs: `data-copy="${attr(here)}"` })}
-        <small class="gw-note">Anyone who can reach this address still needs a key. A key is what identifies a person here; an address identifies nobody.</small></dd>
+        <small class="gw-note">Remote access requires an API key.</small></dd>
     </dl>
     ${groupBand('Public address')}
     ${publicAddress()}
@@ -323,18 +298,10 @@ function chainLine(chain) {
 
 function gatewayBody() {
   const tab = tabOf();
-  // No strip: `conditions()` sits between the title and the tabs and is true
-  // whichever tab is open, so the switch belongs to the content it switches.
-  // The description goes because `conditions()` says the same thing in facts.
-  return `<div class="sheet">
-    ${pageHead({ title: 'Gateway' })}
-    <div class="reading-wide gw-page">
-      ${conditions()}
-      ${alarm()}
-      ${tabs('gateway', TABS, tab, 'Gateway sections')}
-      ${tab === 'access' ? accessTab() : tab === 'retention' ? retentionTab() : overviewTab()}
-    </div>
-  </div>`;
+  return settingsPage({ title: 'Gateway', view: 'gateway', sections: TABS, selected: tab,
+    status: conditions(), notices: alarm(),
+    content: tab === 'access' ? accessTab() : tab === 'retention' ? retentionTab() : overviewTab()
+  });
 }
 
 function bindGateway() {

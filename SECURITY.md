@@ -445,3 +445,15 @@ audit chain, hook integrations, console identity boundaries and desktop packagin
 
 Out of scope: vulnerabilities in `@qvac/sdk` or in the models themselves (report
 those upstream), and social engineering of an administrator.
+
+### Browser access to local administration
+
+Local administration also validates the HTTP Host and browser Origin. A web
+page on another origin cannot borrow loopback trust with a simple POST, and an
+attacker-controlled DNS name cannot gain it by resolving to a local address.
+`WARDEN_CORS_ORIGIN` may name one explicit development origin; `*` and `null`
+do not grant local trust. Custom hostnames need an administrative key.
+
+The [2026-09-17 review](docs/SECURITY-REVIEW-2026-09-17.md) records the tests,
+dependency updates and local extract-zip patch, including the advisories that
+remain visible in the dependency scanner.

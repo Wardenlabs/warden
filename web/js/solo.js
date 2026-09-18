@@ -8,7 +8,9 @@ import { render } from './render.js';
 import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
 import { soloIsPureInstall } from './nav.js';
-import { button, conditionBlock, dialog, effectText, feedback, listState, menu, pageHead, statusText, tabs } from './ui.js';
+import { button, conditionBlock, feedback, pageHead, statusText } from './ui.js';
+import { settingsPage, settingsSection } from './settings-layout.js';
+import { rulesSection } from './device-rules.js';
 import { VIEWS } from './views.js';
 
 // ═══ THIS DEVICE ═════════════════════════════════════════════════════════════
@@ -52,27 +54,6 @@ async function refreshSoloRules() {
   return ok;
 }
 
-/**
- * Whether the first run should take over instead of this screen.
- *
- * Four conditions, and each one is a way of not asking somebody a question
- * that has already been answered:
- *
- * - **A pure solo install.** Somebody who chose the team console at the splash
- *   is setting up a directory, not this machine, and must not be handed a
- *   recipe for wiring their own laptop. (Known gap: an empty directory reads as
- *   pure solo, so a team admin who has added nobody yet sees this once. The
- *   splash's answer is not written anywhere the gateway can read — see
- *   docs/specs/first-run-and-theme.md §2.2.)
- * - **Not demo.** Demo mode is the splash's other door, and it guards nothing,
- *   so there is no protection to verify. Leaving demo brings this back on its
- *   own: `/health` is re-read on every entry here.
- * - **Never completed.** Completion is durable and survives every withdrawal.
- *   Unwiring a tool changes what this screen says; it does not reopen setup.
- * - **The gateway answered.** With no identity there is nothing to ask about,
- *   and redirecting on a failed fetch would trap somebody on a screen whose own
- *   retry button lives here.
- */
 function firstRunIsDue() {
   if (!soloIsPureInstall()) return false;
   if (state.mock) return false;
@@ -114,20 +95,6 @@ async function onEnterSolo() {
  */
 const HOOK_OF = { claude: 'claude-code', codex: 'codex', opencode: 'opencode', 'cursor-agent': 'cursor' };
 
-/**
- * The three facts about one tool, kept apart all the way to the screen.
- *
- * `found` is "this program is installed here" — the compiler's own CLI probe.
- * `wired` is what the machine reported about its own configuration, from
- * `devices`, on disk. `connected` is traffic the gateway actually judged, in
- * memory. A tool can be any combination of the three, and collapsing them is
- * how "installed but never wired" and "wired but quiet since Friday" ended up
- * wearing the same sentence.
- *
- * Wiring that was never reported is **absent**, not false: `wired === null`
- * means nobody knows, which is a different thing from "not wired" and gets a
- * different sentence.
- */
 function toolState() {
   const found = state.compiler?.cliTools ?? [];
   const connected = state.soloIdentity?.connected ?? [];
@@ -149,21 +116,6 @@ function toolState() {
 
 const wiredTools = () => toolState().filter((t) => t.wired === true);
 const judgedTools = () => toolState().filter((t) => t.connected);
-
-function toolLine(t) {
-  if (t.wired === true) {
-    return t.connected
-      ? statusText(`Wired · last judged ${ago(Date.parse(t.connected.at))}`, 'allow')
-      : `<span class="cell-muted">Wired · nothing judged through it yet</span>`;
-  }
-  if (t.wired === false) return statusText('Not wired · the hook is not in its settings', 'attention');
-  if (t.connected) return statusText(`Judging requests · last seen ${ago(Date.parse(t.connected.at))}`, 'allow');
-  return `<span class="cell-muted">${t.found ? 'Installed · has not reported its wiring' : 'Not found on this device'}</span>`;
-}
-
-function toolRows() {
-  return toolState().map((t) => `<div class="setting-row"><span>${esc(t.name)}</span>${toolLine(t)}</div>`).join('');
-}
 
 function ago(ts) {
   if (!Number.isFinite(ts)) return 'recently';
@@ -187,61 +139,6 @@ function ago(ts) {
 
 let removing = null;
 
-function rulesSection() {
-  const identity = state.soloIdentity;
-  const onRules = state.soloRules.filter((r) => r.applies !== false);
-  const exemptRules = state.soloRules.filter((r) => r.applies === false);
-  const offPresets = state.soloPresets.filter((p) => !p.active);
-  const loading = !identity && !state.soloLoadError;
-
-  const row = (r, on) => {
-    const busy = state.soloToggling === r.id;
-    return `<div class="trow" role="row">
-      <span>${effectText(r.severity)}</span>
-      <span class="${on ? 'cell-strong' : 'cell-muted'} solo-text">${esc(r.text)}</span>
-      <label class="check"><input type="checkbox"${on ? ` checked data-rule-off="${attr(r.id)}"` : ` data-preset="${attr(r.id)}"`}${busy ? ' disabled' : ''} aria-label="${on ? 'Turn off' : 'Turn on'}: ${esc(r.text)}"></label>
-      <span class="row-menu">${on ? menu([{ label: 'Remove', act: 'remove', attrs: `data-id="${attr(r.id)}"`, destructive: true }], { label: 'Actions for this rule' }) : ''}</span>
-    </div>`;
-  };
-
-  return `<section class="device-rules">
-    ${state.soloToggleError ? feedback({ tone: 'error', icon: true, title: 'That rule did not change', body: esc(state.soloToggleError) }) : ''}
-    ${state.soloLoadError && !onRules.length && !offPresets.length
-      ? listState({ tone: 'attention', title: 'Could not load the rules for this device', body: state.soloLoadError, action: button('Retry loading', { kind: 'primary', id: 'soloRetry' }) })
-      : loading ? feedback({ title: 'Loading the rules for this device…', body: '' })
-        /*
-         * No empty sentence, and the reason is not the layout.
-         *
-         * It read as orphaned because it was: an empty list here means no rule
-         * is addressed at you, which is a gap, which means the conditions
-         * block above is open and its `Rules for you` row is already saying
-         * *"None. Nothing is addressed at you, so there is nothing to judge a
-         * request against"* in amber, with the button that fixes it beside the
-         * headline. `rulesRow` returns `tone: 'attention'` on every path where
-         * this list can be empty, so the two are never apart.
-         *
-         * A second grey sentence a hundred pixels below the first, saying the
-         * same thing with less of the reason, is not an empty state. The
-         * Suggested band and a column of unchecked boxes are the empty state.
-         */
-        : `<div class="table device-table" role="table" aria-label="Rules on this device">
-          ${onRules.map((r) => row(r, true)).join('')}
-          ${exemptRules.map((r) => `<div class="trow" role="row"><span>${effectText(r.severity)}</span><span class="cell-stack"><span class="cell-muted solo-text">${esc(r.text)}</span><small>everyone</small></span><span></span><span></span></div>`).join('')}
-          ${offPresets.length ? `<div class="group-band">Suggested · ${offPresets.length}</div>${offPresets.map((p) => row(p, false)).join('')}` : ''}
-        </div>
-        <div class="inline-form device-add">
-          <input type="text" id="soloRuleText" placeholder="Write your own rule…" autocomplete="off"${state.soloBusy ? ' disabled' : ''}>
-          ${button(state.soloBusy ? 'Checking…' : 'Add rule', { id: 'soloRuleSend', busy: state.soloBusy })}
-        </div>
-        ${state.soloRuleNote ? `<div class="device-note">${state.soloRuleNote}</div>` : ''}`}
-    ${removing ? dialog({
-      id: 'soloRemove', title: 'Remove this rule?',
-      body: `<p>${esc(removing.text)}</p><p>There is no catalogue to restore it from — this deletes it.</p>`,
-      actions: button('Cancel', { attrs: 'data-dialog-close="soloRemove"' }) + button('Remove rule', { kind: 'danger', id: 'confirmSoloRemove' })
-    }) : ''}
-  </section>`;
-}
-
 // ── what is true of this device ──────────────────────────────────────────────
 
 /**
@@ -256,25 +153,6 @@ function pausedNow() {
   return Number.isFinite(t) && t > Date.now() ? p : null;
 }
 
-/**
- * Five conditions, and the headline is their conclusion.
- *
- * This replaced a page that led with `isProtected = connected.length > 0` —
- * protection defined as traffic seen. Somebody who installed the hook,
- * downloaded the model and wrote a rule was told *"Not protected yet · no
- * tool on this machine has sent a request through Warden"*, in amber, until
- * they went and sent a prompt; and a gateway restart said it to everybody at
- * once, because the traffic lived in a Map. Wiring is now its own fact, read
- * from what the machine reported about itself, and traffic is the separate
- * line "last judged".
- *
- * Two of these conditions were invisible before and are the reason the block
- * exists rather than a status line. **The judge**: with no weights downloaded
- * the mock adapter answers, which is a stand-in and not a judgement, and every
- * screen looked identical. **Rules for you**: an exempt role is bound by no
- * company-wide rule, so a perfectly wired machine whose owner is exempt and
- * has written nothing is a machine nothing protects.
- */
 function conditions() {
   const identity = state.soloIdentity;
   const where = state.health?.installation ?? {};
@@ -316,18 +194,7 @@ function conditions() {
   const gaps = rows.filter((r) => r.tone === 'attention');
   return conditionBlock({
     key: 'dev:conditions',
-    /*
-     * Paused says itself once.
-     *
-     * It used to say itself four times over: an amber claim reading "Paused ·
-     * nothing of yours is being judged", an amber gap row repeating it with the
-     * consequence spelled out, an amber dot, and a primary button. Four alarms
-     * for a state the person had just chosen on purpose, and amber elsewhere in
-     * this console means something is wrong — which a pause is not. So: the
-     * claim is the word, the detail is how long it lasts, and the tone is muted.
-     * What the pause actually costs you is a fact like the other five, and it
-     * sits with them in the evidence rather than shouting over the headline.
-     */
+
     claim: paused ? 'Paused' : gaps.length ? 'Setup incomplete' : 'Protection on',
     detail: paused ? pauseDetail(paused) : '',
     tone: paused ? 'muted' : gaps.length ? 'attention' : 'allow',
@@ -445,23 +312,9 @@ function judgeName() {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-const TABS = [['', 'Rules'], ['tools', 'Tools'], ['identity', 'Identity']];
-const tabOf = () => (state.sel === 'tools' || state.sel === 'identity' ? state.sel : '');
+const TABS = [['tools', 'Connections'], ['rules', 'Rules'], ['identity', 'Identity']];
+const tabOf = () => (state.sel === 'rules' || state.sel === 'identity' ? state.sel : 'tools');
 
-/**
- * Tools that cannot be wired here, ever, and it is not about this machine.
- *
- * Cursor has no prompt hook to write into: there is nothing in `integrations/`
- * for it and there will not be, because that is somebody else's product
- * decision. The hook knows this — `AGENTS` in integrations/warden-hook.mjs
- * carries `governable: false` — but it cannot tell us: `reportWiring()` filters
- * ungovernable tools out before it builds the report, and including them would
- * mean sending a row whose `wired: false` is a fact about nothing.
- *
- * So the list is here, and the day somebody writes that integration this is the
- * line to delete. The console test on the impossible row is what fails if they
- * forget.
- */
 const UNGOVERNABLE = new Set(['cursor']);
 
 /**
@@ -570,25 +423,6 @@ const maskKey = (key) => {
   return cut > 0 && k.length > cut + 12 ? `${k.slice(0, cut + 1)}${'•'.repeat(16)}${k.slice(-6)}` : k || 'not issued yet';
 };
 
-/*
- * There is no band here saying a request was just blocked, and that is a
- * decision rather than an omission.
- *
- * There was one: drawn from the verification record, shown for a day, green.
- * The trouble is where it was shown. The person who made that block happen was
- * sitting in Claude Code or Cursor when their prompt came back refused — they
- * already watched it happen, in the window it happened in, with the rule's own
- * sentence attached. This page then told them about it again, hours later, in
- * the one place on the screen that is supposed to say what is true *now*, and
- * it stayed there while they read the five conditions underneath it.
- *
- * What a block leaves behind belongs in the record, not in the headline:
- * Activity has every one of them with its rule and its time, and "last judged"
- * in the conditions block is the live version of the same fact. If proof that
- * setup worked is wanted again, it belongs to first run, which is where that
- * question is actually being asked.
- */
-
 /**
  * The wide column, not the 760px reading one.
  *
@@ -610,36 +444,15 @@ const maskKey = (key) => {
  */
 function soloBody() {
   const tab = tabOf();
-  const gaps = gapsBySection();
-  return `<div class="sheet">
-    ${pageHead({ title: 'This device' })}
-    <div class="reading-wide device-page">
-      ${conditions()}
-      ${state.soloProtectError ? feedback({ tone: 'error', icon: true, title: 'This device is not protected yet', body: esc(state.soloProtectError) }) : ''}
-      ${state.soloPauseError ? feedback({ tone: 'error', icon: true, title: 'Warden did not change', body: esc(state.soloPauseError) }) : ''}
-      ${tabs('soloRules', TABS.map(([sel, label]) => [sel, label, gaps[sel || 'rules']]), tab, 'This device sections')}
-      ${tab === 'tools' ? toolsTab() : tab === 'identity' ? identityTab() : rulesSection()}
-    </div>
-  </div>`;
-}
-
-/**
- * Which tab each unmet condition lives behind.
- *
- * The conditions block says a gap exists; until now nothing said which section
- * to open to fix it, so somebody reading "Not judging you yet" had three tabs
- * and no reason to prefer one. Read off the same rows the block is built from,
- * so the dot and the amber row can never disagree.
- */
-function gapsBySection() {
-  const identity = state.soloIdentity;
-  const onRules = state.soloRules.filter((r) => r.applies !== false);
-  const exemptRules = state.soloRules.filter((r) => r.applies === false);
-  return {
-    rules: rulesRow(onRules, exemptRules, identity && roleExempt(identity.role)).tone === 'attention',
-    tools: wiringRow(wiredTools(), judgedTools()).tone === 'attention',
-    identity: !identity
-  };
+  const notices = [
+    state.soloProtectError && feedback({ tone: 'error', title: 'Connection failed', body: esc(state.soloProtectError) }),
+    state.soloPauseError && feedback({ tone: 'error', title: 'Could not change protection', body: esc(state.soloPauseError) })
+  ].filter(Boolean).join('');
+  return settingsPage({ title: 'This device', view: 'soloRules', sections: TABS, selected: tab,
+    status: conditions(), notices,
+    content: tab === 'tools' ? settingsSection('Connected tools', toolsTab())
+      : tab === 'identity' ? settingsSection('Device identity', identityTab()) : rulesSection(removing)
+  });
 }
 
 /** A setup refusal did not use up the rule the person typed. A later edit
@@ -652,43 +465,23 @@ export function restoreSoloRuleText(originalText) {
 function bindSolo() {
   const pane = $('pane');
 
-  pane.onchange = async (e) => {
-    const preset = e.target.closest('[data-preset]');
-    if (preset) {
-      const id = decodeURIComponent(preset.dataset.preset);
-      state.soloToggling = id;
-      state.soloToggleError = '';
-      render();
+  const addPreset = async (id) => {
+    if (state.soloToggling) return;
+    state.soloToggling = id;
+    state.soloToggleError = '';
+    render();
+    try {
       const r = await post(`/api/solo/presets/${encodeURIComponent(id)}/toggle`, { active: true });
-      state.soloToggling = null;
-      // A checkbox that goes back to where it was is the whole report a failed
-      // toggle used to make. It reads as a control that does not work, which is
-      // indistinguishable from a click the page never received, and both look
-      // like the product is broken rather than like something went wrong.
-      if (!r.ok) { state.soloToggleError = toggleFailure(r, 'turn that rule on'); render(); return; }
-      await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
-      render();
-      return;
-    }
-    const off = e.target.closest('[data-rule-off]');
-    if (off) {
-      const id = decodeURIComponent(off.dataset.ruleOff);
-      // A preset just moves back to Suggested — its text lives in the
-      // catalogue, so nothing is lost and no confirmation earns its cost.
-      // A rule you wrote has no such backup: unchecking it deletes it, so
-      // this is the one place that asks first.
-      if (!id.startsWith('solo-')) {
-        off.checked = true;
-        removing = state.soloRules.find((r) => r.id === id) ?? { id, text: '' };
-        render();
-        return;
-      }
-      await removeSoloRule(id, true);
-    }
+      if (!r.ok) state.soloToggleError = toggleFailure(r, 'add that rule');
+      else await Promise.all([refreshSoloPresets(), refreshSoloRules()]);
+    } catch { state.soloToggleError = 'The gateway did not respond. Try again.'; }
+    finally { state.soloToggling = null; render(); }
   };
 
   pane.onclick = async (e) => {
     if (state.view !== 'soloRules') return;
+    const add = e.target.closest('[data-add-preset]');
+    if (add) { await addPreset(decodeURIComponent(add.dataset.addPreset)); return; }
 
     /*
      * Connect and Unwire, per row.
@@ -740,7 +533,7 @@ function bindSolo() {
     const el = e.target.closest('[data-act="remove"]');
     if (!el) return;
     el.closest('details.menu')?.removeAttribute('open');
-    const id = el.dataset.id;
+    const id = decodeURIComponent(el.dataset.id);
     if (id.startsWith('solo-')) { await removeSoloRule(id, true); return; }
     removing = state.soloRules.find((r) => r.id === id) ?? { id, text: '' };
     render();
@@ -828,7 +621,7 @@ function bindSolo() {
   // Rules tab, so the headline's button goes there and puts the caret in it.
   const focusRule = $('soloFocusRule');
   if (focusRule) focusRule.onclick = () => {
-    if (tabOf() !== '') { go('soloRules'); return; }
+    if (tabOf() !== 'rules') { go('soloRules', 'rules'); return; }
     $('soloRuleText')?.focus();
   };
 }

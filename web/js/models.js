@@ -8,7 +8,8 @@ import { limitValue, quotaOf, saveQuota } from './limits.js';
 import { bindLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
 import { bindPromptEditor, closePromptEditor, hasPromptChanges, loadPrompts, promptEditor, promptEditorMarkup, promptIsDirty, togglePromptEditor } from './prompt-editor.js';
 import { render } from './render.js';
-import { button, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
+import { button, disclosureRow, feedback, statusText } from './ui.js';
+import { settingsPage } from './settings-layout.js';
 import { VIEWS } from './views.js';
 
 /**
@@ -69,7 +70,7 @@ function writerState() {
   if (compilerNeedsSetup()) return { text: 'needs setup', tone: 'attention' };
   if (c.overriddenByEnv) return { text: 'set by the environment', tone: 'attention' };
   const where = state.models?.drafting?.where;
-  return { text: c.provider === 'local' ? 'drafting on this machine' : `drafting ${where ? `· ${where}` : 'through the configured compiler'}`, tone: 'allow' };
+  return { text: c.provider === 'local' ? 'Local' : `${where || 'Configured provider'}`, tone: 'allow' };
 }
 
 // ── Active: two jobs ─────────────────────────────────────────────────────────
@@ -172,7 +173,7 @@ function judgeBlock() {
     ${a?.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment', body: `${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.` }) : ''}
     ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. ${state.canLeaveDemo ? '<button type="button" class="linkish js-get-models">Download models</button>' : 'Run the model setup on the gateway to download it.'}</p>` : ''}
     ${judgeNote ? `<p class="job-note --${judgeNote.ok ? 'allow' : 'block'}" role="${judgeNote.ok ? 'status' : 'alert'}">${esc(judgeNote.text)}</p>` : ''}
-    <div><button type="button" class="linkish" data-go="engine">Runtime details</button></div>
+    <div class="settings-section-footer"><button type="button" class="btn --compact" data-go="engine">Runtime details</button></div>
   </section>`;
 }
 
@@ -269,16 +270,11 @@ function promptRow(item) {
 
 function modelsPage() {
   const tab = tabOf();
-  // One sentence per tab, and the lit tab was already saying which one you were
-  // on. The strip carries the same information in the words you clicked.
-  return `<div class="sheet models-page">
-    ${pageHead({
-      title: 'Models',
-      primary: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '',
-      strip: tabs('models', TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), tab, 'Models sections')
-    })}
-    ${tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()}
-  </div>`;
+  return settingsPage({ title: 'Models', view: 'models',
+    sections: TABS.map(([sel, label]) => [sel, label, sel === 'prompts' && hasPromptChanges()]), selected: tab,
+    primary: tab === 'library' ? button('Add model', { kind: 'primary', id: 'addCustomModel', disabled: !library.catalog }) : '',
+    content: tab === 'library' ? libraryMarkup() : tab === 'prompts' ? promptsTab() : activeTab()
+  });
 }
 
 async function switchJudge(label, from, request) {

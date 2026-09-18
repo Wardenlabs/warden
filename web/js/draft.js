@@ -10,6 +10,7 @@ import { go } from './router.js';
 import { compileFailure, notARuleAnswer, readable } from './answers.js';
 import { audience, effectMenu, isExempt } from './rules.js';
 import { bindSet, included, proposalsBlock, replayMarkup, resultPage, revisionBlock, runSetPreviews } from './draft-set.js';
+import { ICONS } from './icons.js';
 import { button, composer, feedback, menu, pageHead, roleTone, statusText, turn } from './ui.js';
 
 // ── the conversation ─────────────────────────────────────────────────────────
@@ -105,9 +106,9 @@ function heroPage() {
     <div class="sheet flush-head">${pageHeader()}</div>
     <div class="hero-fill">
       <div class="hero">
-        <h2 class="hero-q">What should your AI never do?</h2>
+        <div class="rule-emblem" aria-hidden="true">${ICONS.brandMark}</div><h2 class="hero-q">Your AI.<br><span>Your rules.</span></h2>
         ${scopeNote() ? `<p class="hero-sub">${scopeNote().trim()}</p>` : ''}
-        ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'What shouldn’t happen? Write it in your own words…', sendLabel: 'Draft rules', disabled: true, attach: presetMenu() })}
+        ${composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'Describe a rule for your AI', sendLabel: 'Draft rules', disabled: true, attach: presetMenu() })}
         <div class="suggestions">${TRIES.map((t) => `<button type="button" class="suggestion" data-try="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       </div>
     </div>
@@ -131,7 +132,7 @@ function composerFor() {
   if (state.ruleBusy && !hasProposal()) return composer({ id: 'ruleMsg', sendId: 'ruleSend', placeholder: 'Waiting for the draft…', sendLabel: 'Draft rules', busy: true, attach: '<span class="composer-attach" aria-hidden="true">+</span>' });
   return composer({
     id: 'ruleMsg', sendId: 'ruleSend',
-    placeholder: hasProposal() ? 'Refine this proposal…' : 'What shouldn’t happen? Write it in your own words…',
+    placeholder: hasProposal() ? 'Refine this proposal…' : 'Describe a rule for your AI',
     sendLabel: 'Draft rules', disabled: true,
     attach: hasProposal() ? '<span class="composer-attach" aria-hidden="true">+</span>' : presetMenu()
   });
@@ -202,22 +203,6 @@ const newSet = (rules, j = {}) => ({
   remote: Boolean(rules[0]?.draftedRemotely)
 });
 
-/**
- * One button, and the console works out what you meant.
- *
- * There were two: "Write it" for a sentence, and "Write the set" for a worry.
- * That is a real distinction in `compile.ts` and it is not the administrator's
- * to make — they typed a sentence, and whether it contains one prohibition or
- * three is a question about the sentence, not about which button to press.
- *
- * So the split pass runs whenever the compiler can do it well, and does not
- * when it cannot. On the local 1.7B it returned one statement on three of three
- * inputs and cost thirty seconds to do it, so that model gets the direct path.
- * On a CLI or a configured endpoint it splits correctly and quickly, so those
- * get the pass that makes a policy out of one sentence. Either way a specific
- * sentence still yields exactly one rule; the difference is only whether a
- * broad one is allowed to yield more.
- */
 function writeRule(text) {
   // `capable` is the gateway saying which compiler is in force, environment
   // included; `provider` is only what was saved from this page, and a CLI set

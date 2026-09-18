@@ -1,0 +1,223 @@
+/* ═══ narrow windows ═════════════════════════════════════════════════════
+   The frames are drawn at 1440 with a 1280 reference; below that nothing may
+   push the page sideways. The sidebar folds to its icons, a table keeps its
+   columns and scrolls inside its own box, and headers let their actions fall
+   under the title. Breakpoints are the two the console already had. */
+
+@media (max-width: 760px) {
+  .sidebar { width: 64px; padding: var(--s-6) var(--s-3); align-items: center; }
+  .sb-brand { justify-content: center; padding: 0; }
+  .brand-mark { display: block; }
+  .brand-mark svg { width: 30px; height: 30px; }
+  .brand-lockup, .sb-workspace, .sb-item > span:not(.sb-count), .sb-profile div { display: none; }
+  .sb-group { height: var(--s-5); font-size: 0; border-top: 1px solid var(--sidebar-avatar); align-self: stretch; }
+  .sb-item { position: relative; justify-content: center; width: var(--h-nav-row); padding: 0; }
+  .sb-count {
+    position: absolute; top: var(--s-1); right: var(--s-1); min-width: 16px; padding: 0 var(--s-1);
+    border-radius: var(--r-selected); background: var(--surface-selected); color: var(--sidebar-selected-text);
+    font-size: var(--fs-1); line-height: 16px; text-align: center;
+  }
+  :root { --w-sidebar: 64px; --frame-inset: 8px; --w-bleed: 8px; }
+  .pane { padding: var(--s-4) var(--s-6); }
+  .status-text { white-space: normal; }
+  .page-head-top { flex-wrap: wrap; align-items: flex-start; height: auto; padding-block: var(--s-4); gap: var(--s-4); }
+  .page-actions { flex-wrap: wrap; }
+  .page-strip { overflow-x: auto; }
+  .table { overflow-x: auto; }
+  .table > .thead, .table > .trow, .table > .group-band, .table > .inline-editor, .table > .trow-note { min-width: 640px; }
+  .model-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .prompt-variables li { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .page-title { white-space: normal; }
+  .setting-row, .job-task, .device-rules-head, .claude-setup-head { flex-wrap: wrap; }
+  .dialog { max-width: calc(100vw - 2 * var(--s-5)); }
+}
+.device-page, .models-active, .test-subject, .job-block, .device-rules { grid-template-columns: minmax(0, 1fr); }
+.test-meta select { min-width: 0; }
+
+/* ── the first run ────────────────────────────────────────────────────────────
+   A screen with no sidebar, no breadcrumb and one thing to do. `body[data-bare]`
+   is set by render() for a view that declares `bare`, and the first run is the
+   only one. The column is 880 centred in the window, with the wordmark and its
+   rule in a band above it at the page margin — the proportions come from the
+   Figma frames at 1440 (see docs/specs/first-run-and-theme.md §5.6). */
+body[data-bare] .sidebar { display: none; }
+body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border-radius: 0; }
+
+.first-run { min-height: 100vh; }
+.first-run > header {
+  padding: var(--s-9) var(--s-10) var(--s-6);
+  border-bottom: 1px solid var(--line-hairline);
+}
+/* The wordmark is the way out, and the only one. Styled as the mark rather than
+   as a button because that is what it is; it keeps a button's focus ring and a
+   button's keyboard behaviour, which a div with a click handler does not. */
+.first-run-mark {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; font-size: var(--fs-5); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); color: var(--ink); cursor: pointer;
+}
+.first-run-mark:hover { color: var(--ink-body); }
+
+.first-run-body {
+  width: min(880px, 100% - 2 * var(--s-10));
+  margin: 0 auto;
+  padding: var(--s-11) 0 var(--s-10);
+  display: flex; flex-direction: column;
+  /* The gaps between blocks are set on the blocks, not here: the rail sits
+     closer to its label than the cards sit to each other. */
+  gap: 0;
+}
+.first-run-eyebrow {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-body h1 {
+  margin-top: var(--s-4);
+  font-size: var(--fs-7); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
+}
+
+.first-run-rail { margin-top: var(--s-9); }
+.first-run-rail p {
+  font-size: var(--fs-1); font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
+}
+.first-run-rail > div { display: flex; gap: var(--s-6); margin-top: var(--s-4); }
+/* Three equal segments sharing the column, rather than the file's five fixed
+   at 160px. Reached and not reached; the label above says which one is now,
+   and the file draws no third state. */
+.first-run-rail i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-control); }
+.first-run-rail i.--done { background: var(--action); }
+
+.first-run-cards { margin-top: var(--s-8); display: flex; flex-direction: column; gap: var(--s-7); }
+
+/* Two on every screen. On steps 1 and 2 they are choices and `--lead` is the
+   selected one; from step 3 on they are a state and an instruction, and
+   `--lead` is the one carrying the state. The tone is about the outcome, never
+   about the verdict: the confirmation is green under a card that says
+   "Blocked", because blocking was the good ending. */
+.choice-card {
+  min-height: 132px;
+  padding: var(--s-7) var(--s-7) var(--s-7) 26px;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface-page);
+}
+.choice-card b { font-size: var(--fs-5); font-weight: var(--fw-semi); }
+.choice-card span { font-size: var(--fs-3); color: var(--ink-body); }
+[data-choice] { cursor: pointer; }
+[data-choice]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* The border goes 1px → 2px as well as changing colour, so the selection is
+   legible without colour at all. Padding compensates so nothing shifts. */
+.choice-card.--lead {
+  border-width: 2px; border-color: var(--action);
+  background: var(--surface-subtle);
+  padding: calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) 25px;
+}
+.choice-card.--lead.--block { border-color: var(--verdict-block); background: var(--verdict-block-bg); }
+.choice-card.--lead.--block b { color: var(--verdict-block); }
+.choice-card.--lead.--allow { border-color: var(--verdict-allow); background: var(--verdict-allow-bg); }
+.choice-card.--lead.--allow b { color: var(--verdict-allow); }
+
+.first-run-note { margin-top: var(--s-7); font-size: var(--fs-3); color: var(--muted); }
+.first-run-actions {
+  margin-top: var(--s-9);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+}
+.first-run-back {
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; color: var(--ink-body); cursor: pointer;
+}
+.first-run-back:hover { color: var(--ink); }
+
+@media (max-width: 900px) {
+  .first-run > header { padding: var(--s-7) var(--s-6) var(--s-5); }
+  .first-run-body { width: calc(100% - 2 * var(--s-6)); padding-top: var(--s-9); }
+  .first-run-rail > div { gap: var(--s-4); }
+}
+
+/* Tools, on This device. Three columns: the name, two stacked facts, and at
+   most one button. The second fact always names where the first came from — a
+   screen that asserts protection without saying who told it is asking to be
+   believed. */
+/* 200 for the name and 18 above and below are the frame's numbers (547:475 is
+   78 tall with its two facts inset 18); the container spaces this, not a
+   margin on the list. */
+.tool-rows { display: grid; margin-inline: calc(-1 * var(--w-bleed)); }
+.tool-row {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr) auto;
+  align-items: center; gap: var(--s-5);
+  /* 12, not 18: with the facts on one line the floor is the 32px button, and
+     18+32+18 is 68 where 12+32+12 is 56 — the height every other row here is. */
+  padding: var(--s-4) var(--w-bleed); border-bottom: 1px solid var(--line-hairline);
+}
+.tool-rows > .tool-row:last-child { border-bottom: 0; }
+.tool-name { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
+/* One line, like every other cell. The second fact still names where the first
+   came from — a screen that asserts protection without saying who told it is
+   asking to be believed — it just does not need a line of its own to do it. */
+.tool-facts { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
+.tool-facts small { font-size: var(--fs-3); color: var(--muted); }
+.tool-facts > small::before { content: "· "; }
+
+@media (max-width: 900px) {
+  .tool-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tool-name { grid-column: 1 / -1; }
+}
+
+/* A record lives beside its list. Native dialog supplies focus containment
+   and makes the background inert; the URL still addresses the same record. */
+.pane.has-detail { overflow: hidden; }
+.detail-panel {
+  position: fixed; inset: var(--frame-inset) var(--frame-inset) var(--frame-inset) auto;
+  margin: 0; padding: 0; width: min(var(--panel-width), calc(100vw - var(--w-sidebar) - 2 * var(--frame-inset)));
+  max-width: none; height: calc(100dvh - 2 * var(--frame-inset)); max-height: none;
+  border: 1px solid var(--line-control); border-radius: var(--s-4);
+  color: var(--ink); background: var(--surface-page); box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+.detail-panel[open] { display: flex; flex-direction: column; }
+.detail-panel::backdrop { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.detail-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: var(--s-4) var(--s-8); color: var(--muted); font-size: var(--fs-4); border-bottom: 1px solid var(--line-hairline); }
+.detail-close { display: grid; place-items: center; width: var(--h-control); height: var(--h-control); border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); font-size: var(--fs-7); cursor: pointer; }
+.detail-close:hover { background: var(--surface-selected); }
+.detail-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-9) var(--s-9); }
+.detail-panel .page-head { margin-inline: 0; padding-inline: 0; }
+.detail-panel .page-head-top { display: flex; flex-wrap: wrap; height: auto; min-height: 80px; padding-block: var(--s-6); gap: var(--s-4); }
+.detail-panel .page-where { flex: 1; }
+.detail-panel .page-title { white-space: normal; overflow-wrap: anywhere; }
+.detail-panel .page-crumb, .detail-panel .page-sep { display: none; }
+.detail-panel .page-meta { order: 3; width: 100%; white-space: normal; }
+.detail-panel .reading { max-width: none; }
+.detail-panel .disclosure > summary { flex-wrap: wrap; }
+.detail-panel .disclosure-datum { white-space: normal; }
+.detail-panel .table { overflow-x: auto; }
+.detail-enter { animation: detail-in 180ms ease-out; }
+@keyframes detail-in { from { transform: translateX(32px); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .detail-enter { animation: none; } }
+@media (max-width: 760px) {
+  .detail-panel { inset: 0 0 0 auto; width: 100%; height: 100dvh; border-radius: 0; }
+  .detail-scroll { padding-inline: var(--s-6); }
+  .detail-toolbar { padding-inline: var(--s-6); }
+  .hero .composer { padding: var(--s-6); }
+}
+
+@media (max-width: 760px) {
+  .sb-group { padding: 0; overflow: hidden; }
+  .settings-layout { gap: 20px; padding-top: 20px; }
+  .settings-layout .conditions { padding: 18px; }
+  .settings-layout .conditions-head { flex-wrap: wrap; }
+  .settings-layout .conditions-claim { flex-basis: 100%; font-size: 20px; }
+  .settings-layout .tool-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  .settings-layout .tool-facts { grid-column: 1; }
+  .settings-layout .tool-action { grid-column: 2; grid-row: 1 / span 2; }
+  .settings-layout .gw-record { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .settings-layout .gw-record dt { border: 0; padding-bottom: 0; }
+  .device-table .trow { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+  .device-table .solo-text { grid-column: 1; }
+  .device-rule-action { grid-column: 2; grid-row: 1 / span 2; }
+}
+@media (prefers-reduced-motion: reduce) { .hero { animation: none; } .rule-emblem, .hero .composer { transition: none; } }

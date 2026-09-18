@@ -382,7 +382,7 @@ export class CliCompilerAdapter extends CompilerOffload {
             }
             return reject(
               new FailClosedError(
-                `${spec.label} could not compile this rule: ${detail || 'no output'}`,
+                `${spec.label} could not draft the rule. ${err.killed ? 'The request timed out.' : /auth|login|sign.in|credential/i.test(detail) ? 'Sign in to the CLI, then test the connection in Models.' : 'Test the connection in Models and try again.'}`,
                 { role: req.role, attempts: 1 }
               )
             );

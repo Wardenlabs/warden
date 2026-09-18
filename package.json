@@ -1,6 +1,6 @@
 {
   "name": "warden",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "type": "module",
   "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
@@ -61,7 +61,7 @@
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/spa": "1.0.0",
     "express": "^5.1.0",
-    "image-size": "2.0.2",
+    "image-size": "2.0.4",
     "pdfjs-dist": "6.3.289",
     "require-asset": "^1.2.2",
     "saxes": "6.0.0",
