@@ -1166,14 +1166,11 @@ function unfixClaudeCode() {
 /**
  * Codex keeps its hooks in TOML, and this edits the text rather than parsing it.
  *
- * There is no TOML parser here and adding one for this would be a dependency in
- * the single file whose whole argument is that it has none. What makes text
- * surgery safe enough is that `--fix` writes a block it marks with a comment,
- * so this removes exactly the marked region and nothing else. A file that
- * mentions `warden-hook` without that marker was wired by hand or by a version
- * that did not mark it: this refuses to guess, leaves the file alone, and says
- * which lines to remove. Refusing is recoverable; a bad guess at somebody's
- * config is not.
+ * Current installs carry a marker, but older Warden releases wrote the same
+ * UserPromptSubmit table without one. The inner hook table is still an exact,
+ * safe boundary: remove only a `[[hooks.UserPromptSubmit.hooks]]` section whose
+ * own command names `warden-hook`, then remove its now-empty parent. Sibling
+ * hooks and every unrelated section stay byte-for-byte present.
  */
 const CODEX_MARK = '# Added by warden-hook --fix';
 
@@ -1185,33 +1182,44 @@ function unfixCodex() {
   if (!body.includes('warden-hook')) return { removed: [], note: "nothing of Warden's was in it" };
 
   const lines = body.split('\n');
-  const start = lines.findIndex((line) => line.startsWith(CODEX_MARK));
-  if (start === -1) {
-    return { error: `it mentions warden-hook but not in a block this wrote, so it was left untouched — remove the [[hooks.UserPromptSubmit]] block naming warden-hook in ${file} by hand` };
+  const inner = /^\s*\[\[hooks\.UserPromptSubmit\.hooks\]\]\s*$/;
+  const outer = /^\s*\[\[hooks\.UserPromptSubmit\]\]\s*$/;
+  const header = /^\s*\[/;
+  const remove = new Set();
+
+  // A section ends at the next TOML header. Removing the smallest section that
+  // contains the Warden command keeps another prompt hook under the same event.
+  for (let start = 0; start < lines.length; start++) {
+    if (!inner.test(lines[start])) continue;
+    let end = start + 1;
+    while (end < lines.length && !header.test(lines[end])) end++;
+    if (!lines.slice(start, end).join('\n').includes('warden-hook')) continue;
+    for (let i = start; i < end; i++) remove.add(i);
+  }
+  if (remove.size === 0) {
+    return { error: `the Codex configuration mentions warden-hook outside a UserPromptSubmit hook table, so ${file} was left untouched` };
   }
 
-  // The block runs to the next section header after the inner `.hooks` table,
-  // which is where whatever Codex configures next begins.
-  let end = start + 1;
-  let passedInner = false;
-  while (end < lines.length) {
-    const line = lines[end].trim();
-    if (line.startsWith('[')) {
-      if (passedInner) break;
-      if (line.startsWith('[[hooks.UserPromptSubmit.hooks]]')) passedInner = true;
-    }
-    end++;
+  let rest = lines.filter((_, i) => !remove.has(i));
+  // Drop a parent left with only whitespace. If it still owns another hook or
+  // any setting, it remains exactly where it was.
+  for (let start = rest.length - 1; start >= 0; start--) {
+    if (!outer.test(rest[start])) continue;
+    let end = start + 1;
+    while (end < rest.length && (!header.test(rest[end]) || inner.test(rest[end]))) end++;
+    if (rest.slice(start + 1, end).some((line) => line.trim())) continue;
+    rest.splice(start, end - start);
   }
-  // Trailing blank lines belong to the block, not to what follows it.
-  while (end > start && lines[end - 1].trim() === '') end--;
-
-  const cut = lines.slice(start, end).join('\n');
-  if (!cut.includes('warden-hook')) {
-    return { error: `the marked block does not name warden-hook, which is not a shape this understands — ${file} was left untouched` };
+  // These comments describe only the block that has just gone. Remove them
+  // even when another UserPromptSubmit entry follows.
+  const marker = rest.findIndex((line) => line.startsWith(CODEX_MARK));
+  if (marker !== -1) {
+    let end = marker + 1;
+    while (end < rest.length && rest[end].trim().startsWith('#')) end++;
+    rest.splice(marker, end - marker);
   }
 
   if (!backup(file)) return { error: 'backup failed, so nothing was written' };
-  const rest = [...lines.slice(0, start), ...lines.slice(end)];
   writeFileSync(file, rest.join('\n').replace(/\n{3,}$/, '\n'));
   const leftover = rest.join('\n').includes('warden-hook');
   return {
@@ -1258,6 +1266,7 @@ function unfixMode(agents) {
   process.stdout.write('\nUnwiring what Warden wired\n\n');
   const unfixers = { 'claude-code': unfixClaudeCode, codex: unfixCodex, opencode: unfixOpenCode };
   let touched = 0;
+  let failed = false;
 
   for (const agent of agents) {
     const unfix = unfixers[agent.id];
@@ -1272,6 +1281,7 @@ function unfixMode(agents) {
     }
     const name = agent.name.padEnd(12);
     if (outcome.error) {
+      failed = true;
       process.stdout.write(`  ✗ ${name} ${outcome.error}\n`);
     } else if (outcome.removed.length === 0) {
       process.stdout.write(`  · ${name} ${outcome.note ?? 'nothing to remove'}\n`);
@@ -1293,6 +1303,7 @@ function unfixMode(agents) {
   process.stdout.write(`    · every backup, at <file>.warden-bak\n`);
   if (touched) process.stdout.write('\n  Run --fix to wire it back.\n');
   process.stdout.write('\n');
+  if (failed) process.exitCode = 1;
 }
 
 /**

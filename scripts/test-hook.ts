@@ -5,6 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { join, resolve } from 'node:path';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { buildUnwireScript } from '../src/server/routes/install.js';
 
 type HookResult = { code: number | null; stdout: string; stderr: string };
 type Handler = (req: IncomingMessage, res: ServerResponse) => void;
@@ -321,12 +322,30 @@ async function main(): Promise<void> {
   assert.match(codexAfter.body, /\[\[hooks\.SessionStart\]\]/, "somebody else's hook survives");
   assert.match(codexAfter.body, /theme = "dark"/, 'and so does what came after it');
 
-  // Wired by hand, or by a version that did not leave the marker: refuse.
-  writeFileSync(codexConfig, '[[hooks.UserPromptSubmit.hooks]]\ncommand = "node ~/warden-hook.mjs"\n');
-  const handWired = await unfixCodex();
-  assert.equal(handWired.body, '[[hooks.UserPromptSubmit.hooks]]\ncommand = "node ~/warden-hook.mjs"\n', 'a block this did not write is left byte for byte');
-  assert.match(handWired.said, /not in a block this wrote/, 'and it says which lines to remove by hand');
-  console.log('✓ --unfix cuts its own marked TOML block and refuses one it did not write');
+  // Older Warden releases left no marker. The exact inner hook section still
+  // identifies what to remove, while a sibling prompt hook must survive.
+  writeFileSync(codexConfig, [
+    '[[hooks.UserPromptSubmit]]',
+    '',
+    '[[hooks.UserPromptSubmit.hooks]]',
+    'command = "node ~/warden-hook.mjs"',
+    '',
+    '[[hooks.UserPromptSubmit.hooks]]',
+    'command = "node /somebody/else.mjs"',
+    '',
+    '[tui]',
+    'theme = "dark"',
+    ''
+  ].join('\n'));
+  const legacyCodex = await unfixCodex();
+  assert.doesNotMatch(legacyCodex.body, /warden-hook/, 'a legacy unmarked Warden hook is removed');
+  assert.match(legacyCodex.body, /somebody\/else/, 'a sibling prompt hook survives');
+  assert.match(legacyCodex.body, /theme = "dark"/, 'unrelated Codex settings survive');
+
+  const refreshScript = buildUnwireScript('http://localhost:8080', 'wk-test', 'codex');
+  assert.match(refreshScript, /warden-hook\.mjs" -o "\$NEXT_HOOK"/, 'Unwire refreshes a stale hook before asking it to remove Codex');
+  assert.match(refreshScript, /--unfix --only codex/, 'the refreshed hook removes only Codex');
+  console.log('✓ --unfix removes marked and legacy Codex hooks while preserving sibling hooks');
 
   /*
    * --status answers the three questions the PRD opens with, and its exit code

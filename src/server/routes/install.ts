@@ -213,12 +213,11 @@ echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboa
  * Take one tool's hook back out. The counterpart of the `--fix` line above,
  * and deliberately much smaller.
  *
- * Nothing is downloaded, no credentials are written and no profile is touched:
- * unwiring a tool is not a reason to forget the key, and somebody who presses
- * Unwire on one row usually presses Connect on another a minute later. The
- * hook has to already be on disk, which it is — it could not have been wired
- * without it — and if it is not, there is nothing to unwire and saying so is
- * the right answer.
+ * Credentials and profiles are left alone: unwiring a tool is not a reason to
+ * forget the key, and somebody who presses Unwire on one row may press Connect
+ * on another a minute later. The hook itself is refreshed before it runs. An
+ * older desktop may have installed a hook from before `--unfix` existed; using
+ * that stale copy makes the button report success while changing nothing.
  *
  * This only ever runs against the machine the gateway is on. A hook in an
  * employee's home directory on their own laptop is not ours to remove, and the
@@ -229,10 +228,14 @@ export function buildUnwireScript(url: string, apiKey: string, tool: string): st
 set -e
 
 HOOK="$HOME/.warden-hook.mjs"
-if [ ! -f "$HOOK" ]; then
-  echo "No Warden hook on this machine, so there is nothing to unwire."
-  exit 0
-fi
+NEXT_HOOK="$HOOK.next"
+trap 'rm -f "$NEXT_HOOK"' EXIT
+
+# Run the implementation shipped by this gateway. The copy on disk may come
+# from an older Warden that did not support per-tool unwiring yet.
+curl -fsSL "${url}/warden-hook.mjs" -o "$NEXT_HOOK"
+chmod 700 "$NEXT_HOOK"
+mv "$NEXT_HOOK" "$HOOK"
 
 # Same lookup as the install script, and for the same reason: run from the
 # desktop app this shell inherits launchd's PATH, where a Homebrew or nvm node
