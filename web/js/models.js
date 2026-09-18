@@ -158,21 +158,24 @@ function judgeBlock() {
   const a = state.adjudicator;
   const selected = a?.choices?.find((c) => c.id === a.model && !library.catalog?.selections?.adjudicator);
   const firstRun = compilerNeedsSetup();
+  const currentName = switching ? switching.label : inForceName('adjudicator');
+  const currentStatus = switching
+    ? `Loading ${switching.label}. Current requests finish on ${switching.from}; new requests wait until it is ready.`
+    : s.text;
   return `<section class="job-block" aria-labelledby="adjudicatorTitle">
     <h2 class="section-title" id="adjudicatorTitle">Request judge</h2>
     ${firstRun
-      // While the rule writer is still being set up, the judge is the settled
-      // half of the page: its state reads as one line and the change is a
-      // button beside it, so the one open task stays the setup above.
-      ? `<div class="job-task">${statusText(`${switching ? switching.label : inForceName('adjudicator')} · ${switching ? `loading… requests already being judged finish on ${switching.from}; new ones wait until it is ready` : s.text}`, switching ? 'attention' : s.tone)}${valueMenu('adjudicator', judgeChoices(), 'Change the request judge', 'Change model')}</div>`
-      : `<div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge')}${switching
-          ? statusText(`Loading ${switching.label}… requests already being judged finish on ${switching.from}; new ones wait until it is ready.`, 'attention')
-          : statusText(s.text, s.tone)}</div>`}
+      // While the rule writer is still being set up, the judge remains the
+      // settled half of the page: actions stay together and its state sits on
+      // a quieter line below them, so the open task remains the setup above.
+      ? `<div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge', 'Change model')}<button type="button" class="btn --compact" data-go="engine">Runtime details</button></div>
+        <div class="job-status">${statusText(`${currentName}. ${currentStatus}`, switching ? 'attention' : s.tone)}</div>`
+      : `<div class="job-value">${valueMenu('adjudicator', judgeChoices(), 'Change the request judge')}<button type="button" class="btn --compact" data-go="engine">Runtime details</button></div>
+        <div class="job-status">${statusText(currentStatus, switching ? 'attention' : s.tone)}</div>`}
     ${!a ? feedback({ tone: 'error', icon: true, title: 'Analyzer choices could not be loaded', body: 'Refresh Models to try again.' }) : ''}
     ${a?.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment', body: `${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.` }) : ''}
     ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. ${state.canLeaveDemo ? '<button type="button" class="linkish js-get-models">Download models</button>' : 'Run the model setup on the gateway to download it.'}</p>` : ''}
     ${judgeNote ? `<p class="job-note --${judgeNote.ok ? 'allow' : 'block'}" role="${judgeNote.ok ? 'status' : 'alert'}">${esc(judgeNote.text)}</p>` : ''}
-    <div class="settings-section-footer"><button type="button" class="btn --compact" data-go="engine">Runtime details</button></div>
   </section>`;
 }
 

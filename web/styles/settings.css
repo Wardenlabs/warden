@@ -45,6 +45,7 @@
 .job-block > :not(.section-title) { grid-column: 2; }
 .job-block .section-lede { margin: 0 0 var(--s-2); font-size: var(--fs-3); }
 .job-value { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
+.job-status { font-size: var(--fs-3); line-height: var(--lh-snug); color: var(--muted); }
 .value-menu .menu-list { min-width: 240px; }
 .trigger-name { font-weight: var(--fw-normal); color: var(--ink); }
 .job-warning { margin: 0; font-size: var(--fs-4); color: var(--verdict-attention); }
@@ -250,7 +251,7 @@
 .settings-section { display: grid; gap: 20px; }
 .settings-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .settings-section-head h2, .settings-section-title { margin: 0; font: 600 16px/1.4 var(--display); color: var(--ink); }
-.settings-section-footer { padding-top: 16px; }
+.settings-section-footer { padding-top: 20px; }
 .settings-layout .conditions { border: 1px solid var(--line-hairline); border-radius: 14px; padding: 24px; background: var(--surface-subtle); }
 .settings-layout .conditions-head { gap: 16px; }
 .settings-layout .conditions-claim { flex: 1; flex-wrap: wrap; font: 600 22px/1.4 var(--display); letter-spacing: -.025em; }

@@ -39,7 +39,7 @@ body {
 .sb-brand { display: flex; align-items: center; flex: none; height: 50px; padding: 0 var(--s-2); border: 0; background: none; color: var(--sidebar-selected-text); cursor: pointer; }
 .sb-brand svg { display: block; width: 100px; height: 30px; }
 .brand-mark { display: none; }
-.sb-workspace { display: grid; flex: none; padding-inline: var(--s-2); margin-bottom: var(--s-4); line-height: var(--lh-snug); }
+.sb-workspace { display: grid; row-gap: var(--s-1); flex: none; padding-inline: var(--s-2); margin-bottom: var(--s-4); line-height: var(--lh-snug); }
 .sb-workspace span { font-size: var(--fs-3); color: var(--sidebar-muted); text-transform: uppercase; }
 .sb-workspace b, .sb-workspace button {
   font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--sidebar-text);
@@ -598,7 +598,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .turn-meta { font-size: var(--fs-3); color: var(--muted); }
 .turn-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .turn-head b { font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
-.warden-label { font-size: var(--fs-3); color: var(--muted); margin: var(--s-4) 0 calc(-1 * var(--s-2)); }
+.warden-label { font-size: var(--fs-3); color: var(--muted); margin: var(--s-5) 0 0; }
 .masked { display: inline-block; min-width: 6em; height: 1em; vertical-align: -.1em; background: var(--ink); border-radius: 1px; }
 
 /* ── Confirmation / Result (310:3483) and Toast (310:3487) ─────────────── */
@@ -687,7 +687,7 @@ button.role-label:hover { background: var(--surface-subtle); }
 .seg-tool button[aria-pressed="true"] { background: var(--surface-page); }
 
 /* ── Rule proposal (291:2027, 263:91) ──────────────────────────────────── */
-.proposal { display: grid; gap: var(--s-4); padding: var(--s-6); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
+.proposal { display: grid; gap: var(--s-5); padding: var(--s-7); border: 1px solid var(--line-hairline); border-radius: var(--r-control); background: var(--surface-raised); }
 .proposal-head { display: flex; align-items: center; gap: var(--s-4); min-height: var(--h-control-compact); }
 .proposal-head b { flex: 1; min-width: 0; font-size: var(--fs-4); font-weight: var(--fw-medium); color: var(--ink); }
 .proposal-head .menu-trigger.--dots { width: 32px; height: 32px; font-size: var(--fs-4); }

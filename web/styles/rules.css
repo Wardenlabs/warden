@@ -48,15 +48,15 @@
 .warden-note { display: grid; gap: var(--s-2); }
 .warden-note p { margin: 0; font-size: var(--fs-4); color: var(--ink-body); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .warden-lead { margin: 0; font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
-.warden-label + .warden-lead { margin-top: calc(-1 * var(--s-2)); }
+.warden-label + .warden-lead { margin-top: 0; }
 .refinement { display: grid; gap: var(--s-2); }
 .refinement p { margin: 0; font-size: var(--fs-5); color: var(--ink-body); }
-.proposals { display: flex; flex-direction: column; gap: var(--s-3); }
+.proposals { display: flex; flex-direction: column; gap: var(--s-5); }
 .proposals > .feedback { margin-top: var(--s-2); }
 .proposal-applies { display: flex; align-items: center; gap: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
 .proposal-examples { margin: calc(-1 * var(--s-2)) 0 0; padding-left: var(--s-6); font-size: var(--fs-3); color: var(--muted); line-height: var(--lh-snug); }
 .proposal-why { font-size: var(--fs-3); color: var(--muted); }
-.proposal-foot { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; margin-top: var(--s-2); font-size: var(--fs-3); color: var(--muted); }
+.proposal-foot { display: flex; align-items: center; gap: var(--s-6); flex-wrap: wrap; margin-top: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
 .proposal-limits { font-size: var(--fs-4); color: var(--ink); line-height: var(--lh-snug); }
 .limits-lead { margin: 0; }
 .limit-plan { display: grid; grid-template-columns: max-content max-content; gap: var(--s-1) var(--s-6); margin: var(--s-3) 0 0; font-size: var(--fs-4); }
