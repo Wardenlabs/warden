@@ -33,6 +33,28 @@ const PATTERNS: Pattern[] = [
   { kind: 'email',   label: 'email',         re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g }
 ];
 
+/**
+ * A person can identify a credential even when its value is too short or too
+ * simple for a vendor or entropy pattern. `the api key is 2323` is still a
+ * disclosure: sending those four digits to the judge before masking them would
+ * make Warden's protection depend on how convincing the value looks.
+ *
+ * The value is deliberately one token unless it is quoted. That keeps ordinary
+ * prose such as "the API key is required for setup" out of the mask, while
+ * still covering the assignment forms people actually paste into messages.
+ */
+const LABELED_SECRET = /\b(api[\s_-]*key|access[\s_-]*token|auth(?:entication)?[\s_-]*token|client[\s_-]*secret|secret[\s_-]*key|password|passwd|passcode|clave\s+(?:de\s+)?api|token\s+de\s+acceso|contrase(?:ñ|n)a)\b\s*(is|was|es|era|:|=)\s*(?:"([^"\r\n]{1,200})"|'([^'\r\n]{1,200})'|([A-Za-z0-9][A-Za-z0-9._~+/=-]{2,198}[A-Za-z0-9_~+/=-]))/gi;
+
+/** Status words describe a credential; they are not credential values. */
+const NON_SECRET_VALUES = /^(?:unset|missing|required|optional|configured|invalid|expired|available|stored|hidden|masked|redacted|unknown|none|null|empty)$/i;
+
+function credentialLabel(raw: string): { kind: MaskedSpan['kind']; label: string } {
+  if (/password|passwd|passcode|contrase/i.test(raw)) return { kind: 'token', label: 'password' };
+  if (/token/i.test(raw)) return { kind: 'token', label: 'access token' };
+  if (/secret/i.test(raw)) return { kind: 'token', label: 'secret' };
+  return { kind: 'api-key', label: 'API key' };
+}
+
 /** Shannon entropy in bits per character. */
 function entropy(s: string): number {
   const counts = new Map<string, number>();
@@ -95,6 +117,18 @@ export function sanitize(text: string): SanitizeResult {
       if (kind === 'card' && !isPlausibleCard(m[0])) continue;
       hits.push({ kind, start, end, raw: m[0], label });
     }
+  }
+
+  for (const m of text.matchAll(LABELED_SECRET)) {
+    const raw = m[3] ?? m[4] ?? m[5] ?? '';
+    if (!raw || NON_SECRET_VALUES.test(raw)) continue;
+    const wholeStart = m.index ?? 0;
+    const relativeStart = m[0].lastIndexOf(raw);
+    const start = wholeStart + relativeStart;
+    const end = start + raw.length;
+    if (claim(start, end)) continue;
+    const { kind, label } = credentialLabel(m[1] ?? 'credential');
+    hits.push({ kind, start, end, raw, label });
   }
 
   for (const m of text.matchAll(HIGH_ENTROPY)) {

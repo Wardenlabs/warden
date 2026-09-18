@@ -179,24 +179,27 @@ function bindList() {
 // ── one decision ─────────────────────────────────────────────────────────────
 
 /**
- * One row of the pass table, and the reason when the row failed closed.
- *
- * `adjudicateAll` has always recorded why a pass threw, in `detail.error`, and
- * nothing has ever rendered it. So the guard would fail closed correctly, the
- * decision would read "rule could not be evaluated, escalated rather than
- * assumed clean", and the sentence that says whether the model timed out or the
- * worker never started sat in the record with no way to see it. Somebody whose
- * models are installed and whose rules still will not evaluate could not find
- * out why from the screen telling them it happened.
- *
- * Shown only when the pass actually failed: a healthy run keeps the tight table
- * it had.
+ * Adjudicators report whether a rule matched; the rule's configured effect is
+ * applied later by aggregate. Calling a warning-rule match "Held" describes an
+ * action that never happened and can contradict the final Allowed verdict.
  */
+export function passOutcome(p) {
+  if (String(p.pass ?? '').startsWith('adjudicate:')) {
+    const label = p.detail?.label;
+    if (label === 'VIOLATES') return { word: 'Matched', tone: 'attention' };
+    if (label === 'COMPLIES') return { word: 'Clear', tone: 'allow' };
+    if (label === 'UNCLEAR') return { word: 'Unclear', tone: 'attention' };
+  }
+  return { word: VERDICT_WORD[p.verdict] ?? p.verdict ?? '', tone: VERDICT_TONE[p.verdict] ?? 'muted' };
+}
+
+/** One row of evidence, plus the cause when a pass failed closed. */
 export function passRow(p, slowest) {
   const why = p.failedClosed && p.detail?.error ? String(p.detail.error) : '';
+  const result = passOutcome(p);
   return `<div class="pass">
       <span class="pass-name">${esc(p.pass)}${p.failedClosed ? ' ⚠' : ''}</span>
-      <span class="pass-verdict --${VERDICT_TONE[p.verdict] ?? 'muted'}">${esc(VERDICT_WORD[p.verdict] ?? p.verdict ?? '')}</span>
+      <span class="pass-verdict --${result.tone}">${esc(result.word)}</span>
       <span class="pass-track"><i style="width:${Math.round(((p.ms ?? 0) / slowest) * 100)}%"></i></span>
       <span class="pass-ms num">${p.ms ?? 0} ms</span>
     </div>${why ? `<div class="pass-why">${esc(why)}</div>` : ''}`;

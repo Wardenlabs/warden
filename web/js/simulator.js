@@ -148,6 +148,12 @@ function bindPolicyTest() {
 
 const LABEL = { ALLOW: ['allow', '✓', 'Allowed'], BLOCK: ['block', '⊘', 'Blocked'], ESCALATE: ['attention', '↗', 'Held for review'] };
 
+export function resultTitle(message, fallback) {
+  if (message.exemptAllow) return 'Allowed without being judged';
+  if (message.warningCount) return 'Allowed with warnings';
+  return fallback;
+}
+
 function renderMessage(m, i) {
   if (m.from === 'employee') return personTurn(m);
   if (m.verdict === 'error') {
@@ -168,7 +174,7 @@ function renderMessage(m, i) {
     : '';
   return verdictCard({
     tone, glyph,
-    title: m.exemptAllow ? 'Allowed without being judged' : word,
+    title: resultTitle(m, word),
     meta: `${seconds(m.totalMs)} · ${where()}`,
     line: m.line,
     kicker: m.kicker, reason: m.why,
@@ -239,29 +245,9 @@ async function judge(text, person, attachments) {
     return false;
   }
 
-  const rule = j.firedRules?.[0];
   const exempt = isExempt(person.role);
   const exemptAllow = exempt && j.verdict === 'ALLOW';
-  const first = person.name.split(' ')[0];
-
-  const line = exemptAllow
-    ? `<b>${esc(person.role)} is exempt from company-wide rules</b>, so none of those were applied and nothing here tells you whether the request would pass. Send it as somebody the policy governs to find out.`
-    : { BLOCK: `The active rules stop this request from ${esc(first)}. It was checked like a real one and is in Activity.`,
-      ESCALATE: `The active rules hold this request for a person to review. It is waiting in your Inbox like a real one.`,
-      ALLOW: `Nothing in the active rules stops this request from ${esc(first)}. It would go through.` }[j.verdict];
-
-  let why = '';
-  let kicker = '';
-  if (rule) {
-    // A refusal that only names the rule leaves the person holding a question
-    // with nowhere to take it. What they can do instead is the part that keeps
-    // them working with the gateway rather than around it.
-    kicker = j.verdict === 'ESCALATE' ? 'Why it needs a person' : j.verdict === 'BLOCK' ? 'Why it matches' : 'Why it was flagged';
-    why = `<p><b>${esc(ruleName(rule.ruleId))}:</b> ${esc(rule.guidance || rule.reason)}</p>`;
-    if (rule.allowedExamples?.length) why += `<p class="verdict-aside">These would go through: ${rule.allowedExamples.map((x) => `“${esc(x)}”`).join(' · ')}</p>`;
-  } else if (j.verdict !== 'ALLOW' && j.explanation) {
-    kicker = 'Why'; why = `<p>${esc(j.explanation)}</p>`;
-  }
+  const presentation = policyDecisionPresentation(j, person, exemptAllow);
   const facts = [
     j.maskedSpans?.length ? `${plural(j.maskedSpans.length, 'secret')} masked before checking.` : '',
     j.quota?.limit ? `Used ${j.quota.used} of ${j.quota.limit} today.` : ''
@@ -271,13 +257,39 @@ async function judge(text, person, attachments) {
   // These two are the way out, and they belong to the employee: the console
   // shows them because the tester is where it stands in for one.
   state.chat.push({
-    from: 'warden', verdict: j.verdict, exemptAllow, line, kicker, why,
+    from: 'warden', verdict: j.verdict, exemptAllow, ...presentation,
     notice: documentAnalysisNotice(j) ? `<div class="verdict-notice">${documentAnalysisNotice(j)}</div>` : '',
     extraFacts: facts.length ? `<p class="verdict-aside">${facts.join(' ')}</p>` : '',
     passes: j.passes, totalMs: j.totalMs, documents: j.documents, maskedSpans: j.maskedSpans?.length ?? 0, auditId: j.auditId,
     ...(j.verdict !== 'ALLOW' && j.auditId ? { followUp: { auditId: j.auditId, prompt: text, who: person.id, hasDocuments: Boolean(attachments.length) } } : {})
   });
   return true;
+}
+
+/** The result copy is derived from the decision, including non-blocking warnings. */
+export function policyDecisionPresentation(j, person, exemptAllow = false) {
+  const warnings = j.warnings ?? [];
+  const rule = j.firedRules?.[0] ?? warnings[0];
+  const first = person.name.split(' ')[0];
+  const line = exemptAllow
+    ? `<b>${esc(person.role)} is exempt from company-wide rules</b>, so none of those were applied and nothing here tells you whether the request would pass. Send it as somebody the policy governs to find out.`
+    : { BLOCK: `The active rules stop this request from ${esc(first)}. It was checked like a real one and is in Activity.`,
+      ESCALATE: `The active rules hold this request for a person to review. It is waiting in your Inbox like a real one.`,
+      ALLOW: warnings.length
+        ? `${plural(warnings.length, 'warning')} matched. The request would still go through.`
+        : `Nothing in the active rules stops this request from ${esc(first)}. It would go through.` }[j.verdict];
+  let why = '';
+  let kicker = '';
+  if (rule) {
+    kicker = j.verdict === 'ESCALATE' ? 'Why it needs a person' : j.verdict === 'BLOCK' ? 'Why it matches' : 'Warnings';
+    const shown = j.verdict === 'ALLOW' ? warnings : [rule];
+    why = shown.map((item) => `<p><b>${esc(ruleName(item.ruleId))}:</b> ${esc(item.guidance || item.reason)}</p>`).join('');
+    if (rule.allowedExamples?.length) why += `<p class="verdict-aside">These would go through: ${rule.allowedExamples.map((x) => `“${esc(x)}”`).join(' · ')}</p>`;
+  } else if (j.verdict !== 'ALLOW' && j.explanation) {
+    kicker = 'Why';
+    why = `<p>${esc(j.explanation)}</p>`;
+  }
+  return { warningCount: warnings.length, line, kicker, why };
 }
 
 // ── the two ways out of a refusal ────────────────────────────────────────────

@@ -11,6 +11,8 @@ globalThis.window = { prompt: () => { throw new Error('An employee request must 
 globalThis.sessionStorage = { getItem: () => 'administrator-secret' };
 const { api, post, state } = await import('../web/js/core.js');
 const { documentAnalysisNotice, documentMetadataMarkup, documentReason, documentReviewPendingMarkup } = await import('../web/js/documents.js');
+const { passOutcome } = await import('../web/js/activity.js');
+const { policyDecisionPresentation, resultTitle } = await import('../web/js/simulator.js');
 const { library, libraryMarkup } = await import('../web/js/model-library.js');
 const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindCompiler } = await import('../web/js/compiler.js');
 const { compileFailure } = await import('../web/js/answers.js');
@@ -89,6 +91,22 @@ test('attachment names and server explanations are rendered as text, with unread
   assert.ok(html.includes('&lt;img'));
   assert.ok(html.includes('Could not read'));
   assert.ok(!html.includes('>Read<'));
+});
+
+test('rule checks describe model evidence without pretending a warning held the request', () => {
+  assert.deepEqual(passOutcome({ pass: 'adjudicate:r-warning', verdict: 'ESCALATE', detail: { label: 'VIOLATES' } }), { word: 'Matched', tone: 'attention' });
+  assert.deepEqual(passOutcome({ pass: 'adjudicate:r-clear', verdict: 'ALLOW', detail: { label: 'COMPLIES' } }), { word: 'Clear', tone: 'allow' });
+  assert.deepEqual(passOutcome({ pass: 'budget', verdict: 'ESCALATE', detail: {} }), { word: 'Held', tone: 'attention' });
+});
+
+test('the Simulator explains allowed warning matches instead of claiming no rule applied', () => {
+  const warning = { ruleId: 'r-api', reason: 'An API key was included.' };
+  const shown = policyDecisionPresentation({ verdict: 'ALLOW', warnings: [warning], firedRules: [] }, { name: 'Martín Pulitano', role: 'analyst' });
+  assert.equal(shown.warningCount, 1);
+  assert.match(shown.line, /1 warning matched/);
+  assert.match(shown.why, /An API key was included/);
+  assert.equal(resultTitle(shown, 'Allowed'), 'Allowed with warnings');
+  assert.ok(!shown.line.includes('Nothing in the active rules'));
 });
 
 test('prepared attachments do not claim the document was read or policy checked', () => {
