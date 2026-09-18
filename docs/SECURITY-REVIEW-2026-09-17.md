@@ -55,3 +55,18 @@ borrowing that trust. Hooks retain the documented fail-open default and host
 coverage limits. Archive extraction assumes other local processes cannot mutate
 the destination concurrently; use a private build directory. This is a scoped
 code review with regression tests, not a claim that the product has no defects.
+
+### Build-only dependencies
+
+The full audit also found tmp 0.0.33 through Forge's interactive editor and
+image-size 0.7.5 through appdmg. tmp now resolves to 0.2.7. appdmg still needs
+the older image-size callback API, so a second pnpm patch validates ICNS entry
+lengths instead of forcing an incompatible major version. A bounded child-process
+test rejects a zero-length entry and verifies the existing PNG callback API.
+The separate JXL/HEIF advisory does not describe a parser present in 0.7.5;
+its type registry contains neither format.
+
+The full version-based scan still lists four high advisories: the two ZIP
+entries, the patched legacy ICNS issue and the JXL/HEIF range match. No advisory
+is hidden or ignored. The patch files and tests document the difference between
+the published version number and the code this lockfile installs.

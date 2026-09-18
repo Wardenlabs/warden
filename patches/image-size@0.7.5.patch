@@ -1,0 +1,22 @@
+diff --git a/lib/types/icns.js b/lib/types/icns.js
+index 199b0e651b3f9e310a821b80a517c76050fc44e6..bfa3c9abb93b9b304be2834ba7b71b76deb2c03b 100644
+--- a/lib/types/icns.js
++++ b/lib/types/icns.js
+@@ -71,11 +71,12 @@ var ICON_TYPE_SIZE = {
+ 
+ function readImageHeader(buffer, imageOffset) {
+   var imageLengthOffset = imageOffset + ENTRY_LENGTH_OFFSET;
+-  // returns [type, length]
+-  return [
+-    buffer.toString('ascii', imageOffset, imageLengthOffset),
+-    buffer.readUInt32BE(imageLengthOffset)
+-  ];
++  // Every entry must advance within the supplied bytes. A zero length keeps
++  // calculate() on the same attacker-controlled header forever.
++  if (imageOffset + 8 > buffer.length) throw new TypeError('Truncated ICNS entry');
++  var length = buffer.readUInt32BE(imageLengthOffset);
++  if (length < 8 || length > buffer.length - imageOffset) throw new TypeError('Invalid ICNS entry length');
++  return [buffer.toString('ascii', imageOffset, imageLengthOffset), length];
+ }
+ 
+ function getImageSize(type) {
