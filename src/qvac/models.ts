@@ -126,6 +126,10 @@ export const MODEL_SPECS: ModelSpec[] = [
  * their card for exactly that reason.
  */
 export const ALTERNATE_MODELS: Record<string, ModelSpec> = {
+  'adjudicator-granite-guardian': { role: 'adjudicator', entry: { name: 'Granite Guardian 4.1 8B', src: 'registry://hf/ibm-granite/granite-guardian-4.1-8b-GGUF/resolve/bc78f0995361543a70438fe44a60bb7613fed2f0/granite-guardian-4.1-8b-Q6_K.gguf' }, filename: 'granite-guardian-4.1-8b-Q6_K.gguf', approxMB: 6880, required: false, why: 'Optional native binary guard; policy accuracy is not yet measured in Warden.' },
+
+  'adjudicator-shieldstral': { role: 'adjudicator', entry: { name: 'Shieldstral 1.0 3B', src: 'registry://hf/noctrex/Shieldstral-1.0-3B-GGUF/resolve/c6baba9c3299630d7d6e3fdd40371683b5cb0e5c/Shieldstral-1.0-3B-Q6_K.gguf' }, filename: 'Shieldstral-1.0-3B-Q6_K.gguf', approxMB: 2822, required: false, why: 'Optional native binary guard; policy accuracy is not yet measured in Warden.' },
+
   'adjudicator-large': {
     role: 'adjudicator',
     // Pinned by hand rather than the SDK constant: `QWEN3_8B_INST_Q4_K_M`
@@ -261,7 +265,7 @@ export function modelsDir(): string {
  * are in the sentence, because the machine decides which one applies.
  */
 export type AdjudicatorChoice = {
-  id: 'default' | 'dynaguard' | 'dynaguard-8b' | 'base' | 'large';
+  id: 'default' | 'dynaguard' | 'dynaguard-8b' | 'base' | 'large' | 'shieldstral' | 'granite-guardian';
   label: string;
   filename: string;
   approxMB: number;
@@ -276,6 +280,8 @@ export type AdjudicatorChoice = {
 };
 
 export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
+
+
   {
     id: 'default',
     label: 'DynaGuard 4B',
@@ -309,6 +315,8 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     trade: 'The largest of the family that judges by default. Nothing measured yet; a seat so the measurement can be taken.',
     note: 'Added 2026-09-05 as the one unmeasured candidate with a mechanism behind it: the same training as the default, on twice the weights, at DynaBench F1 72.5 against 68.2. Choosing it downloads 5 GB. Run pnpm run eval -- --attacks --reps 3 against the default before trusting it with anyone\'s traffic.'
   },
+  { id: 'shieldstral', label: 'Shieldstral 1.0 3B', filename: 'Shieldstral-1.0-3B-Q6_K.gguf', approxMB: 2822, attacksCaught: 'not measured', falsePositives: 'not measured', perDecision: 'Not measured in Warden.', trade: 'Optional local guard · Q6_K · not yet benchmarked.', note: 'Native binary policy judgments. Text only. Apache 2.0. Accuracy must be evaluated against your policies before production use.' },
+  { id: 'granite-guardian', label: 'Granite Guardian 4.1 8B', filename: 'granite-guardian-4.1-8b-Q6_K.gguf', approxMB: 6880, attacksCaught: 'not measured', falsePositives: 'not measured', perDecision: 'Not measured in Warden.', trade: 'Optional local guard · Q6_K · not yet benchmarked.', note: 'Native binary policy judgments. Text only. Apache 2.0. Accuracy must be evaluated against your policies before production use.' },
   {
     id: 'base',
     label: 'Qwen3 1.7B',

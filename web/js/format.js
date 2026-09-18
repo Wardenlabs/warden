@@ -132,6 +132,8 @@ export function sendOnEnter(el, send) {
  * the quantisation and the instruct suffix are not.
  */
 const FAMILIES = [
+  [/shieldstral[-_ ]1[._]0/i, 'Shieldstral 1.0'],
+  [/granite[-_ ]guardian[-_ ]4[._]1/i, 'Granite Guardian 4.1'],
   [/dynaguard/i, 'DynaGuard'], [/qwen3/i, 'Qwen3'], [/embeddinggemma/i, 'EmbeddingGemma'],
   [/llama[-_]?3[._]2/i, 'Llama 3.2'], [/ocr[-_]latin|latin_g2/i, 'OCR (Latin)']
 ];

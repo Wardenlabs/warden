@@ -1,3 +1,4 @@
+import { isNativeGuard, nativeHistory, parseGuardAnswer } from '../../qvac/native-guards.js';
 import { withModelRole } from '../../qvac/coordination.js';
 import { promptMetadata, withPromptSnapshot } from '../../prompts/store.js';
 /**
@@ -23,6 +24,7 @@ import { windows, type Isolated } from '../isolate.js';
 import type { PassTrace } from '../types.js';
 import {
   LABEL_STRICTNESS,
+  nativePrompts,
   dynaguardPolicyUser,
   dynaguardUser,
   formFromEnv,
@@ -218,6 +220,7 @@ async function ask(
     maxTokens: 24,
     timeoutMs: ADJUDICATE_TIMEOUT_MS
   };
+  if (isNativeGuard(form)) return parseGuardAnswer(form, (await qvac.complete({ ...req, maxTokens: 64, history: nativeHistory(form, system, user) })).text);
   if (form === 'dynaguard-native') return parseNative((await qvac.complete(req)).text);
   const schema = schemaFor(form);
   return toLabel((await qvac.completeJSON(req, schema.zod, schema.json)).value.verdict);
@@ -233,6 +236,10 @@ async function sampleLabel(
 ): Promise<Label> {
   const shots = await pickShots(qvac, rule, iso, opts.shotSelection, opts.shotsPerSide);
   const form = opts.form;
+  if (isNativeGuard(form)) {
+    const prompts = nativePrompts(form, rule, iso, shots);
+    return ask(qvac, form, prompts.system, prompts.user, sampling);
+  }
   if (form === 'dynaguard' || form === 'dynaguard-native') {
     // The whole thing is the user turn: the model card's template has no
     // separate system role, so the system slot carries only the thinking

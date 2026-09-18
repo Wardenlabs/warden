@@ -79,7 +79,7 @@ try {
   assert.deepEqual(roles(), localRoles, 'Qwen analyzer needs its shared file even with a Claude compiler');
   assert.deepEqual(roles(true), localRoles, 'shared compiler/base-analyzer file is never downloaded twice');
   assert.deepEqual(roles(true, { WARDEN_MODEL_ADJUDICATOR: '/explicit/analyzer.gguf' }), baseRoles);
-  for (const seat of ['large', 'dynaguard', 'dynaguard-8b']) {
+  for (const seat of ['large', 'dynaguard', 'dynaguard-8b', 'shieldstral', 'granite-guardian']) {
     save({ compiler: savedCompiler('claude-cli'), adjudicator: { model: seat } });
     assert.deepEqual(roles(), baseRoles, 'optional analyzer download does not gate automatic demo exit');
     assert.deepEqual(roles(true), [...baseRoles, `adjudicator-${seat}`], `desktop explicitly downloads selected ${seat} analyzer`);

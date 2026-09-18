@@ -35,7 +35,8 @@ not change analyzer weights, aggregation rules or measured accuracy claims.
   a GGUF from the browser, or download one from a public HTTPS URL.
 - For local weights, choose the permitted roles and the analysis format:
   `compliance` for general instruction models or `dynaguard` for weights trained
-  for DynaGuard's policy PASS/FAIL question. Custom formats are stored explicitly;
+  for DynaGuard's policy PASS/FAIL question. Use `shieldstral` or
+  `granite-guardian` for their native binary formats (analyzer-only). Custom formats are stored explicitly;
   renaming the file cannot change them.
 - Test each intended role, then select it. A test checks loadability and
   structured-output compatibility. It does **not** measure the model's policy
@@ -55,6 +56,27 @@ removes Warden's managed copy; it does not delete the original source file.
 Changing an endpoint address never silently carries its saved credential to the
 new address. Supply the new endpoint's key or use an unauthenticated loopback
 server.
+
+## Optional native guards
+
+Models → Request judge → Change model offers Shieldstral 1.0 3B (Q6_K,
+2.82 GB) and Granite Guardian 4.1 8B (Q6_K, 6.88 GB). They also appear in
+Models → Library. Select a missing model, then use Download models; an already
+loaded judge remains in force until the download and restart finish. Installed
+weights are tested before switching, and a failed test restores the selection.
+Both run locally. DynaGuard remains the default.
+
+Shieldstral uses its native instruction/query/document question and bare yes/no
+answer. Granite uses its two-user-turn guardian protocol and a score tag.
+For each rule, yes means VIOLATES and no means COMPLIES. Invalid or truncated
+answers fail closed. Both retain nonce isolation and editable, request-snapshot
+prompt templates. These binary classifiers cannot generate suggested rewrites.
+Shieldstral is text-only here; attachments use Warden's existing local extraction.
+
+Downloads are pinned to upstream revisions. Shieldstral's GGUF is from noctrex;
+Granite's GGUF is from IBM. Both are Apache 2.0. These are optional, unmeasured
+candidates: successful runtime tests do not establish policy accuracy. See
+[measurements](MEASUREMENTS.md) for the limited integration evidence.
 
 ## Storage and transfers
 

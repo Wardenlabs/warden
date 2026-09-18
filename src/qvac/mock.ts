@@ -65,6 +65,12 @@ export class MockQvacAdapter implements QvacAdapter {
 
   async complete(req: CompleteRequest): Promise<{ text: string; stats: GenStats }> {
     await tick();
+    if (req.history) {
+      const subject = untrustedPart(req.user);
+      const flagged = hits(subject, INJECTION_SIGNALS).length > 0 || hits(subject, VIOLATION_SIGNALS).length > 0;
+      const answer = flagged ? 'yes' : 'no';
+      return { text: req.history[0]?.role === 'user' ? `<think>\n</think>\n<score>${answer}</score>` : answer, stats: mockStats() };
+    }
     // The native DynaGuard form asks for free text and reads `<answer>PASS</answer>`
     // out of it. The stand-in answers it from the same keyword signals the
     // JSON forms use, so demo mode under that form judges the way it does

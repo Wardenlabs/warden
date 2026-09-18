@@ -8,6 +8,7 @@
  */
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { analyzerFormat } from '../../qvac/native-guards.js';
 import { Router } from 'express';
 import { cliCompilerConfig, detectCliTools, type CliTool } from '../../qvac/cli-compiler.js';
 import { claudeStatus, CliConnectionError, testCliCompiler } from '../../qvac/cli-setup.js';
@@ -61,6 +62,7 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
       id: c.id,
       label: c.label,
       filename: c.filename,
+      format: analyzerFormat(c.filename),
       approxMB: c.approxMB,
       perDecision: c.perDecision,
       trade: c.trade,
@@ -97,7 +99,7 @@ settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => 
     }
     await forgetRole('adjudicator');
     try {
-      await new RealQvacAdapter().testLocal(path, 'adjudicator', /dynaguard/i.test(choice.filename) ? 'dynaguard' : 'compliance');
+      await new RealQvacAdapter().testLocal(path, 'adjudicator', analyzerFormat(choice.filename));
       saveAdjudicatorSettings(parsed.data);
       await modelFor('adjudicator');
     } catch (error) {

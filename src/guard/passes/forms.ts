@@ -12,6 +12,7 @@
  * the trace and the audit record know three labels and keep knowing three.
  */
 import { z } from 'zod';
+import { analyzerFormat, isNativeGuard, SHIELD_SYSTEM, graniteInstructions, type NativeGuard } from '../../qvac/native-guards.js';
 import { promptOverride, renderPrompt } from '../../prompts/store.js';
 import { customAdjudicatorForm, resolvedModel, thinkingMarker } from '../../qvac/client.js';
 import type { Rule } from '../../policy/types.js';
@@ -45,7 +46,7 @@ export const LABEL_STRICTNESS: Record<Label, number> = { COMPLIES: 0, UNCLEAR: 1
  * `<answer>` rather than started there; whether that costs anything is what
  * the bench is for. Unmeasured, off, `pnpm run bench -- --a dynaguard --b dynaguard-native`.
  */
-export type Form = 'compliance' | 'choice' | 'dynaguard' | 'dynaguard-native';
+export type Form = 'compliance' | 'choice' | 'dynaguard' | 'dynaguard-native' | NativeGuard;
 
 export type FormOptions = {
   form: Form;
@@ -69,8 +70,8 @@ export type Shots = { violating: string[]; compliant: string[] };
  */
 export function formFromEnv(): Form {
   const raw = process.env['WARDEN_ADJUDICATOR_FORM'];
-  if (raw === 'choice' || raw === 'dynaguard' || raw === 'compliance' || raw === 'dynaguard-native') return raw;
-  return customAdjudicatorForm() ?? (/dynaguard/i.test(resolvedModel('adjudicator')) ? 'dynaguard' : 'compliance');
+  if (raw === 'choice' || raw === 'dynaguard' || raw === 'compliance' || raw === 'dynaguard-native' || (raw && isNativeGuard(raw))) return raw;
+  return customAdjudicatorForm() ?? analyzerFormat(resolvedModel('adjudicator'));
 }
 
 export function isDynaguard(form: Form): boolean {
@@ -93,7 +94,7 @@ function labelSchema(values: readonly string[]): { zod: z.ZodType<{ verdict: str
   };
 }
 
-export function schemaFor(form: Exclude<Form, 'dynaguard-native'>): ReturnType<typeof labelSchema> {
+export function schemaFor(form: Exclude<Form, 'dynaguard-native' | NativeGuard>): ReturnType<typeof labelSchema> {
   if (form === 'dynaguard') return labelSchema(['FAIL', 'PASS']);
   return labelSchema(['VIOLATES', BENIGN_LABEL[form], 'UNCLEAR']);
 }
@@ -289,4 +290,20 @@ export function analyzerUser(form: 'compliance' | 'choice', envelope: string): s
 }
 export function dynaguardSystem(form: Form): string {
   return renderPrompt(`analyzer.${form}.system`, { thinking: thinkingMarker('adjudicator') }, () => thinkingMarker('adjudicator'));
+}
+
+/** Publisher-native binary questions, with the same policy scope and nonce isolation. */
+export function nativeDefaults(form: NativeGuard): { system: string; user: string } {
+  const criteria = "The user's message violates this rule: {{rule}}\n{{boundary}}\nAsking about a process or policy is not performing the prohibited action. Respect all limits in the rule.\nExamples:\n{{examples}}\n{{isolation}}";
+  return form === 'shieldstral'
+    ? { system: SHIELD_SYSTEM, user: `<Instruct>: {{isolation}}\nRespect all limits in the rule. Asking about a process is not performing the prohibited action.\n\n<Query>: Does the user's message violate this rule? {{rule}}\n{{boundary}}\nExamples:\n{{examples}}\n\n<Document>: {{message}}` }
+    : { system: graniteInstructions(criteria), user: '{{message}}' };
+}
+export function nativePrompts(form: NativeGuard, rule: Rule, iso: Isolated, shots: Shots): { system: string; user: string } {
+  const defaults = nativeDefaults(form);
+  const values = { rule: rule.text, boundary: rule.boundary ? `NOT COVERED: ${rule.boundary}` : '',
+    examples: [...shots.violating.map(t => `yes: ${t}`), ...shots.compliant.map(t => `no: ${t}`)].join('\n'),
+    isolation: isolationPreamble(iso.nonce), message: iso.envelope };
+  return { system: renderPrompt(`analyzer.${form}.system`, values, () => defaults.system.replace(/\{\{([^{}]*)\}\}/g, (_m, key: string) => values[key as keyof typeof values])),
+    user: renderPrompt(`analyzer.${form}.user`, values, () => defaults.user.replace(/\{\{([^{}]*)\}\}/g, (_m, key: string) => values[key as keyof typeof values])) };
 }
