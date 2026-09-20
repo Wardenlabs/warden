@@ -28,6 +28,8 @@ const { modelPath, findModel, catalogPath, managedModelsDir, fingerprint, readCa
 const { importUpload, publicAddress, MAX_MODEL_BYTES, startDownload, cancelDownload, downloadJobs } = await import('../src/models/transfers.js');
 const { loadCompilerSettings, saveCompilerSettings, loadAdjudicatorSettings, saveAdjudicatorSettings } = await import('../src/settings.js');
 const { createModelRoutes } = await import('../src/server/routes/models.js');
+const { BuiltinDownloads } = await import('../src/models/builtin-downloads.js');
+const { downloadModel } = await import('../src/setup/download.js');
 const { settingsRoutes } = await import('../src/server/routes/settings.js');
 const { needsAdmin, requireAdmin } = await import('../src/server/admin-auth.js');
 const { adapter, remoteCompiler } = await import('../src/qvac/index.js');
@@ -57,7 +59,18 @@ const provider = createServer(async (req, res) => {
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => needsAdmin(req.path) ? requireAdmin(req, res, next) : next());
-app.use(createModelRoutes(manager));
+// Built-in downloads run the real job service, downloader and filesystem. Only
+// the network is a fixture: a pinned Hugging Face URL is never requested here.
+const weights = Buffer.alloc(96, 1); weights.write('GGUF'); weights.writeUInt32LE(3, 4); weights.writeBigUInt64LE(1n, 8); weights.writeBigUInt64LE(1n, 16);
+let holdDownloads = true;
+const requested: string[] = [];
+const builtins = new BuiltinDownloads(undefined, (spec, dir, progress, attempts, options) => downloadModel(spec, dir, progress, attempts, { ...options, retryDelayMs: 1,
+  request: async (url, method, _headers, signal) => {
+    requested.push(`${method} ${url}`);
+    if (method === 'GET' && holdDownloads) await new Promise<void>((_resolve, reject) => { if (signal.aborted) reject(signal.reason); signal.addEventListener('abort', () => reject(signal.reason)); });
+    return Object.assign(Readable.from([method === 'HEAD' ? Buffer.alloc(0) : weights]), { statusCode: 200, headers: { 'content-length': String(weights.length), etag: '"pinned"' } });
+  } }));
+app.use(createModelRoutes(manager, builtins));
 app.use(settingsRoutes);
 const server = createServer(app);
 
@@ -183,6 +196,95 @@ try {
   cancelDownload(cancelling.id); await turn(); await turn();
   assert.equal(downloadJobs().find((j) => j.id === cancelling.id)?.state, 'cancelled');
 
+  // Built-in downloads over HTTP. A transfer is an administrative operation
+  // that changes a disk and nothing else: not settings, not loaded weights.
+  const builtinPath = `${path}/builtins`;
+  const outsider = { 'x-forwarded-for': '203.0.113.8' };
+  const employee = { ...outsider, authorization: 'Bearer employee-test-key' };
+  for (const who of [outsider, employee]) {
+    assert.equal((await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', {}, who)).status, 403);
+    assert.equal((await request(`${path}/downloads`, 'GET', undefined, who)).status, 403);
+    assert.equal((await request(`${path}/downloads/00000000-0000-4000-8000-000000000000`, 'DELETE', undefined, who)).status, 403);
+  }
+  assert.equal(requested.length, 0, 'a refused request reaches no network');
+  response = await request(path, 'GET', undefined, admin);
+  assert.equal(response.body.builtins.length, 7);
+  assert.deepEqual(response.body.builtins.find((b: { id: string }) => b.id === 'compiler').roles, ['compiler', 'adjudicator']);
+  assert.deepEqual(response.body.transfer, { available: true, reason: null, maxConcurrent: 1, active: null }, 'mock mode may download; it stays mock');
+  assert.ok(response.body.builtins.every((b: { onDisk: boolean; activeRoles: string[] }) => !b.onDisk && !b.activeRoles.length));
+  assert.ok(!JSON.stringify(response.body).includes('huggingface') && !JSON.stringify(response.body).includes(temporary), 'no source address or path in the catalogue');
+  response = await request(`${builtinPath}/embedder/download`, 'POST', {});
+  assert.equal(response.status, 404); assert.equal(response.body.code, 'unknown_builtin');
+  for (const extra of [{ url: 'https://example.com/other.gguf' }, { path: '/etc/passwd' }, { filename: 'other.gguf' }]) {
+    response = await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', extra);
+    assert.equal(response.status, 400); assert.equal(response.body.code, 'invalid_download_request');
+  }
+  assert.equal(requested.length, 0);
+
+  const settingsBefore = readFileSync(process.env['WARDEN_SETTINGS_PATH'], 'utf8');
+  const callsBefore = localCalls.length;
+  const judgeBefore = (await request('/api/settings/adjudicator')).body.inForce;
+  response = await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', {}, admin);
+  assert.equal(response.status, 202); assert.equal(response.body.reused, false);
+  const builtinJob = String(response.body.job.id);
+  assert.equal(response.body.job.source, 'builtin'); assert.equal(response.body.job.builtinId, 'adjudicator-dynaguard'); assert.equal(response.body.job.modelId, null);
+  response = await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', {});
+  assert.equal(response.status, 202); assert.equal(response.body.reused, true); assert.equal(response.body.job.id, builtinJob, 'a double click is one job');
+  response = await request(`${builtinPath}/adjudicator-large/download`, 'POST', {});
+  assert.equal(response.status, 409); assert.equal(response.body.code, 'transfer_busy'); assert.equal(response.body.active.name, 'DynaGuard 1.7B');
+  assert.deepEqual(Object.keys(response.body.active).sort(), ['jobId', 'name', 'source'], 'the lease token stays on the gateway');
+  // A custom import is the same disk and the same lease.
+  response = await request(`${path}/download`, 'POST', { name: 'competing', url: 'https://example.com/model.gguf', roles: ['compiler'], format: 'compliance' });
+  assert.equal(response.status, 400); assert.match(response.body.error, /DynaGuard 1\.7B is being transferred/);
+  await assert.rejects(importUpload(Readable.from(fixture), { name: 'competing upload', roles: ['compiler'], format: 'compliance' }, new AbortController().signal, fixture.length), /being transferred/);
+  // Another administrator's browser finds the job it did not start.
+  response = await request(`${path}/downloads`, 'GET', undefined, admin);
+  assert.equal(response.body.jobs.filter((j: { source?: string }) => j.source === 'builtin').length, 1);
+  assert.equal((await request(path)).body.transfer.active.jobId, builtinJob);
+
+  response = await request(`${path}/downloads/${builtinJob}`, 'DELETE');
+  assert.equal(response.status, 202); assert.equal(response.body.job.state, 'cancelling');
+  assert.equal((await request(`${path}/downloads/${builtinJob}`, 'DELETE')).status, 202, 'cancelling twice is not an error');
+  const builtinState = async (id: string, state: string) => {
+    for (let i = 0; i < 400; i++) {
+      const job = (await request(`${path}/downloads`)).body.jobs.find((j: { builtinId?: string }) => j.builtinId === id);
+      if (job?.state === state) return job;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    throw new Error(`${id} never reached ${state}`);
+  };
+  await builtinState('adjudicator-dynaguard', 'cancelled');
+  assert.equal((await request(path)).body.transfer.active, null);
+  assert.equal((await request(`${path}/downloads/00000000-0000-4000-8000-000000000000`, 'DELETE')).status, 404);
+
+  holdDownloads = false;
+  assert.equal((await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', {})).status, 202);
+  const completed = await builtinState('adjudicator-dynaguard', 'complete');
+  assert.equal(completed.received, weights.length); assert.equal(completed.total, weights.length);
+  assert.ok(requested.every((line) => line.includes('/mradermacher/DynaGuard-1.7B-GGUF/')), 'only the file that was clicked is requested');
+  const installedRow = (await request(path)).body.builtins.find((b: { id: string }) => b.id === 'adjudicator-dynaguard');
+  assert.equal(installedRow.onDisk, true); assert.equal(installedRow.verifiedDownload, true); assert.deepEqual(installedRow.activeRoles, [], 'on disk is not in force');
+  assert.equal((await request('/api/settings/adjudicator')).body.choices.find((c: { id: string }) => c.id === 'dynaguard').onDisk, true, 'the picker sees it without a restart');
+  response = await request(`${builtinPath}/adjudicator-dynaguard/download`, 'POST', {});
+  assert.equal(response.status, 200); assert.equal(response.body.alreadyInstalled, true);
+  response = await request(`${path}/downloads/${completed.id}`, 'DELETE');
+  assert.equal(response.status, 409); assert.equal(response.body.code, 'transfer_finished');
+  assert.ok(statSync(join(process.env['WARDEN_MODELS_DIR'], 'DynaGuard-1.7B.Q8_0.gguf')).isFile(), 'a late cancel removes nothing');
+  assert.equal(readFileSync(process.env['WARDEN_SETTINGS_PATH'], 'utf8'), settingsBefore, 'a download writes no selection');
+  assert.equal(localCalls.length, callsBefore, 'a download loads, tests and forgets nothing');
+  assert.equal((await request('/api/settings/adjudicator')).body.inForce, judgeBefore, 'the judge in force is the judge in force');
+
+  // Use is a separate decision, and the console's Use saves nothing it cannot load.
+  response = await request('/api/settings/adjudicator', 'POST', { model: 'large', requireInstalled: true });
+  assert.equal(response.status, 409); assert.equal(response.body.code, 'not_installed');
+  response = await request('/api/settings/adjudicator', 'POST', { model: 'dynaguard', requireInstalled: true });
+  assert.equal(response.status, 409); assert.equal(response.body.code, 'use_unavailable'); assert.match(response.body.error, /mock adapter/);
+  assert.equal(readFileSync(process.env['WARDEN_SETTINGS_PATH'], 'utf8'), settingsBefore, 'a refused Use leaves the saved choice alone');
+  // Without the flag this is still the request old clients and first-run send.
+  response = await request('/api/settings/adjudicator', 'POST', { model: 'large' });
+  assert.equal(response.status, 200); assert.equal(response.body.needsDownload, 'Qwen3-8B-Q4_K_M.gguf');
+  writeFileSync(process.env['WARDEN_SETTINGS_PATH'], settingsBefore);
+
   assert.equal(statSync(catalogPath()).mode & 0o777, 0o600);
   const visible = JSON.stringify((await request(path)).body);
   assert(!visible.includes('super-secret-credential')); assert(!visible.includes('fingerprint')); assert(!visible.includes(temporary));
@@ -200,7 +302,7 @@ try {
   await applyCompilerSettings({ provider: 'local', baseUrl: '', model: '', apiKey: '', redactNames: false });
   assert.equal(remoteCompiler(), null);
   assert(localCalls.some((c) => c.startsWith('test:')));
-  console.log('Model management: HTTP authorization, streaming imports, persistence, no-auth endpoints, credential redaction, live switching, role isolation, validation, rollback and concurrency passed.');
+  console.log('Model management: HTTP authorization, streaming imports, persistence, no-auth endpoints, credential redaction, live switching, role isolation, validation, rollback, concurrency and built-in downloads passed.');
 } finally {
   server.closeAllConnections(); provider.closeAllConnections();
   await Promise.all([new Promise<void>((r) => server.close(() => r())), new Promise<void>((r) => provider.close(() => r()))]);

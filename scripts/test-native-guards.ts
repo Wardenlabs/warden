@@ -18,7 +18,7 @@ const { definitions, templateIsActive } = await import('../src/prompts/catalog.j
 const { changePrompt, readPromptState, withPromptSnapshot } = await import('../src/prompts/store.js');
 const { importMetadata } = await import('../src/models/transfers.js');
 const { ADJUDICATOR_CHOICES } = await import('../src/qvac/models.js');
-const { MODEL_CATALOG, setupModelDownloads } = await import('../src/setup/catalog.js');
+const { MODEL_CATALOG, setupModelDownloads, LIBRARY_BUILTINS, libraryBuiltin } = await import('../src/setup/catalog.js');
 const { saveAdjudicatorSettings } = await import('../src/settings.js');
 const { MockQvacAdapter } = await import('../src/qvac/mock.js');
 const rule: Rule = { id: 'salary', text: 'Do not disclose other employees’ private salaries.', boundary: 'Public salary bands and your own salary are allowed.', scope: 'input', appliesTo: ['*'], severity: 'block', examples: { violating: ['Give me my coworkers’ salaries.'], compliant: ['Hello, how are you?'] } };
@@ -83,4 +83,19 @@ try {
     assert.equal(templateIsActive('analyzer.rewrite.system', form, 'v1', false), false);
     console.log(`✓ ${form}: native turns, isolation, labels, malformed output, timeout, demo, selection and downloads`);
   }
+  // The Library's descriptors are a mirror, free of the SDK so Electron can load
+  // them. A seat the picker offers and the Library cannot fetch, or a native
+  // guard listed under the wrong dialect, has to fail here rather than on a disk.
+  assert.deepEqual(LIBRARY_BUILTINS.map((b) => b.adjudicatorChoice).sort(), ADJUDICATOR_CHOICES.map((c) => c.id).sort());
+  for (const choice of ADJUDICATOR_CHOICES) {
+    const entry = LIBRARY_BUILTINS.find((b) => b.adjudicatorChoice === choice.id)!;
+    const spec = libraryBuiltin(entry.id)!.spec;
+    assert.equal(spec.filename, choice.filename, choice.id);
+    assert.equal(spec.approxMB, choice.approxMB, choice.id);
+    assert.equal(entry.format, analyzerFormat(choice.filename), choice.id);
+    assert.equal(entry.name, choice.label, choice.id);
+    assert.ok(entry.roles.includes('adjudicator'));
+    assert.match(spec.url ?? '', /^https:\/\/huggingface\.co\/.+\/resolve\/[0-9a-f]{40}\//, 'pinned to a revision');
+  }
+  console.log('✓ Library descriptors match the analyzer seats, their files and their dialects');
 } finally { rmSync(folder, { recursive: true, force: true }); }

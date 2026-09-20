@@ -22,5 +22,8 @@ export const ICONS = {
   // Not in the Figma sidebar: a pure solo install has a Settings item the
   // frames never drew. Same grid and stroke as the others, nothing more.
   settings: svg(20, '<path d="M3.33333 5.83333H11.6667M15 5.83333H16.6667M3.33333 14.1667H5M8.33333 14.1667H16.6667M13.3333 4.16667V7.5M6.66667 12.5V15.8333"/>', 1.41667),
+  // Not in the Figma sidebar either: the Library's in-row transfer mark, drawn
+  // on the 16 grid a table row's text sits on.
+  download: svg(16, '<path d="M8 2.5V10.5M4.5 7L8 10.5L11.5 7M3 13.5H13"/>', 1.4),
   search: svg(20, '<path d="M17.5 17.5L13.3333 13.3333M8.33333 15C10.1014 15 11.7971 14.2976 13.0474 13.0474C14.2976 11.7971 15 10.1014 15 8.33333C15 6.56522 14.2976 4.86953 13.0474 3.61929C11.7971 2.36905 10.1014 1.66667 8.33333 1.66667C6.56522 1.66667 4.86953 2.36905 3.61929 3.61929C2.36905 4.86953 1.66667 6.56522 1.66667 8.33333C1.66667 10.1014 2.36905 11.7971 3.61929 13.0474C4.86953 14.2976 6.56522 15 8.33333 15Z"/>', 1.41667)
 };

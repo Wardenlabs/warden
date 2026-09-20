@@ -244,6 +244,26 @@ export function loadAdjudicatorSettings(settingsPath = SETTINGS_PATH): Adjudicat
   }
 }
 
+/**
+ * The built-in seat somebody actually chose, or null when nobody has.
+ *
+ * `loadAdjudicatorSettings` answers `default` for a missing file, a corrupt one
+ * and a deliberate click alike, which is right for deciding what to load and
+ * wrong for deciding what outranks `warden.local.json`: an installation that
+ * never opened the picker keeps the path setup recorded, and one whose
+ * administrator pressed Use on DynaGuard 4B gets the file that was tested.
+ */
+export function savedAdjudicatorChoice(settingsPath = SETTINGS_PATH): AdjudicatorSettings['model'] | null {
+  if (!existsSync(settingsPath)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as { adjudicator?: unknown };
+    const parsed = adjudicatorSettingsSchema.safeParse(raw.adjudicator);
+    return parsed.success && !parsed.data.modelId ? parsed.data.model : null;
+  } catch {
+    return null;
+  }
+}
+
 export function saveAdjudicatorSettings(next: AdjudicatorSettings): AdjudicatorSettings {
   const settings = adjudicatorSettingsSchema.parse(next);
   mkdirSync(dirname(SETTINGS_PATH), { recursive: true });

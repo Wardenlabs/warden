@@ -52,10 +52,12 @@ function localCompilerMissing() {
   return state.models?.models?.some((model) => model.role === 'compiler' && model.onDisk === false) ?? false;
 }
 
+/** The weights are a file in the Library, fetched from its row. Whether local
+ * compilation is the applied selection has nothing to do with whether the file
+ * can be downloaded, so the link no longer waits for Apply. */
 function localCompilerNote() {
   if (!localCompilerMissing()) return '';
-  const selected = state.compiler?.provider === 'local' && !compilerNeedsSetup();
-  return `<div class="compiler-local-missing"><p class="form-note --attention">The local compiler model is not downloaded. ${selected ? 'Download its weights before drafting a rule.' : 'Apply this selection, then download its weights before drafting a rule.'}</p>${state.canLeaveDemo ? `<button type="button" class="btn js-get-models"${selected ? '' : ' disabled'}>Download models</button>` : '<p class="field-help">After applying, run <code>pnpm run setup</code> on the gateway to download the local compiler.</p>'}</div>`;
+  return `<div class="compiler-local-missing"><p class="form-note --attention">The local compiler model is not downloaded. Download its weights before drafting a rule.</p><button type="button" class="btn" data-go="models" data-sel="library" data-q="model=compiler">Download in Library</button></div>`;
 }
 
 function compilerFeedback() {

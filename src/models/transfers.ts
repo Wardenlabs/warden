@@ -1,47 +1,38 @@
 /** Bounded disk streaming for weights. A partial file never becomes a catalogue
  * entry; import paths are server-owned UUIDs, independent of supplied names. */
 import { createHash, randomUUID } from 'node:crypto';
-import { lookup } from 'node:dns';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, openSync, closeSync, readSync, renameSync, statSync, statfsSync, unlinkSync } from 'node:fs';
-import { get } from 'node:https';
-import { isIP } from 'node:net';
+import { createReadStream, createWriteStream, existsSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { basename, isAbsolute, join } from 'node:path';
 import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
-import { formatSchema, managedModelsDir, managedRoleSchema, modelPath, putModel, type LocalModel } from './store.js';
+import { checkModelSpace, inspectModelGGUF, MAX_MODEL_BYTES } from '../setup/model-files.js';
+import { requestModel, requireModelResponse } from '../setup/model-http.js';
+import { acquireTransfer } from '../setup/transfer-lock.js';
+import { formatSchema, managedModelsDir, managedRoleSchema, modelPath, modelsRoot, putModel, type LocalModel } from './store.js';
 
-export const MAX_MODEL_BYTES = 20 * 1024 ** 3;
+// The limits, the GGUF check and the pinned-address transport moved to
+// `src/setup/` on 2026-09-20 so built-in downloads run under the same ones.
+// Re-exported because the routes and the regression suite name them from here.
+export { MAX_MODEL_BYTES };
+export { publicAddress } from '../setup/model-http.js';
+export const inspectGGUF = inspectModelGGUF;
 export const importMetadata = z.object({ name: z.string().trim().min(1).max(100),
   roles: z.array(managedRoleSchema).min(1).max(2), format: formatSchema,
   filename: z.string().max(255).optional() }).refine(m => !['shieldstral', 'granite-guardian'].includes(m.format) || !m.roles.includes('compiler'), { message: 'Native guard models are analyzer-only' });
 type Metadata = z.infer<typeof importMetadata>;
 export type DownloadJob = { id: string; name: string; state: 'downloading' | 'complete' | 'failed' | 'cancelled'; received: number; total: number | null; modelId: string | null; error: string | null };
 const jobs = new Map<string, { public: DownloadJob; controller: AbortController }>();
-let busy = false;
 
-function enter(): () => void {
-  if (busy) throw new Error('Another model is being imported. Finish or cancel it first.');
-  busy = true;
-  return () => { busy = false; };
+/** One writer per models directory, whoever it is. This used to be a private
+ * flag, which could not see a built-in download, terminal setup or the desktop
+ * first run filling the same disk against the same free-space check. */
+function enter(name: string, jobId: string | null = null): () => void {
+  const lease = acquireTransfer(modelsRoot(), { name, source: 'custom', jobId });
+  return () => lease.release();
 }
 function remove(path: string): void { if (existsSync(path)) unlinkSync(path); }
-function checkSpace(bytes: number): void {
-  mkdirSync(managedModelsDir(), { recursive: true });
-  if (!Number.isFinite(bytes) || bytes < 0 || bytes > MAX_MODEL_BYTES) throw new Error('Model files must be at most 20 GB');
-  const disk = statfsSync(managedModelsDir());
-  if (disk.bavail * disk.bsize < bytes + 512 * 1024 ** 2) throw new Error('There is not enough free disk space for this model');
-}
-export function inspectGGUF(path: string): void {
-  const header = Buffer.alloc(24);
-  const file = openSync(path, 'r');
-  try {
-    if (readSync(file, header, 0, 24, 0) !== 24 || header.toString('ascii', 0, 4) !== 'GGUF') throw new Error('Choose a GGUF model file');
-    if (![2, 3].includes(header.readUInt32LE(4)) || header.readBigUInt64LE(8) === 0n || header.readBigUInt64LE(16) === 0n) {
-      throw new Error('This GGUF header is unsupported or incomplete');
-    }
-  } finally { closeSync(file); }
-}
+function checkSpace(bytes: number): void { checkModelSpace(managedModelsDir(), bytes); }
 
 async function receive(source: Readable, metadata: Metadata, signal: AbortSignal, expected: number | null,
   progress?: (received: number) => void): Promise<LocalModel> {
@@ -79,59 +70,26 @@ export async function importLocalFile(path: string, raw: unknown): Promise<Local
   const stat = statSync(path);
   if (!stat.isFile()) throw new Error('Choose a regular GGUF file');
   inspectGGUF(path);
-  const leave = enter();
+  const leave = enter(metadata.name);
   try { return await receive(createReadStream(path), { ...metadata, filename: basename(path) }, AbortSignal.timeout(30 * 60_000), stat.size); }
   finally { leave(); }
 }
 
 export async function importUpload(source: Readable, raw: unknown, signal: AbortSignal, expected: number | null): Promise<LocalModel> {
   const metadata = importMetadata.parse(raw);
-  const leave = enter();
+  const leave = enter(metadata.name);
   try { return await receive(source, metadata, AbortSignal.any([signal, AbortSignal.timeout(30 * 60_000)]), expected); }
   finally { leave(); }
 }
 
 /** Resolve and pin a public address for every HTTPS hop. A remote admin may
  * download weights, but that is not a capability to read gateway-local URLs or
- * cloud metadata through a redirect or a DNS rebinding. */
-export function publicAddress(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b] = address.split('.').map(Number);
-    return !(a === 0 || a === 10 || a === 127 || a! >= 224 || (a === 100 && b! >= 64 && b! <= 127) ||
-      (a === 169 && b === 254) || (a === 172 && b! >= 16 && b! <= 31) || (a === 192 && (b === 168 || b === 0)) ||
-      (a === 198 && (b === 18 || b === 19)));
-  }
-  if (isIP(address) !== 6) return false;
-  const a = address.toLowerCase();
-  // Global unicast only. IPv4-mapped and transition address spaces can hide
-  // loopback/private addresses and have no place in a weight download.
-  return /^[23]/.test(a) && !a.startsWith('2001:') && !a.startsWith('2002:');
-}
-
-function downloadResponse(raw: string, signal: AbortSignal, redirects = 0): Promise<import('node:http').IncomingMessage> {
-  const url = new URL(raw);
-  if (url.protocol !== 'https:' || url.username || url.password || redirects > 5) throw new Error('Use a public HTTPS download URL without credentials');
-  if (isIP(url.hostname.replace(/^\[|\]$/g, '')) && !publicAddress(url.hostname.replace(/^\[|\]$/g, ''))) throw new Error('Model downloads require a public internet address');
-  return new Promise((resolve, reject) => {
-    const req = get(url, { signal, lookup(hostname, options, callback) {
-      lookup(hostname, { all: true }, (error, addresses) => {
-        if (error) return callback(error, '', 4);
-        if (!addresses.length || addresses.some((a) => !publicAddress(a.address))) return callback(new Error('Model downloads require a public internet address'), '', 4);
-        const first = addresses[0]!;
-        if (options.all) callback(null, addresses);
-        else callback(null, first.address, first.family);
-      });
-    } }, (response) => {
-      if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0) && response.headers.location) {
-        response.resume();
-        try { resolve(downloadResponse(new URL(response.headers.location, url).href, signal, redirects + 1)); } catch (error) { reject(error); }
-      } else if (response.statusCode !== 200) {
-        response.resume(); reject(new Error(`Model download returned HTTP ${response.statusCode}`));
-      } else resolve(response);
-    });
-    req.setTimeout(30_000, () => req.destroy(new Error('The model download stopped responding')));
-    req.on('error', reject);
-  });
+ * cloud metadata through a redirect or a DNS rebinding. The transport itself is
+ * `requestModel`; a custom URL gets no Range, so anything but 200 is a failure. */
+async function downloadResponse(raw: string, signal: AbortSignal): Promise<Readable & { headers: import('node:http').IncomingHttpHeaders }> {
+  const response = await requestModel(raw, 'GET', {}, signal);
+  requireModelResponse(response, [200]);
+  return response;
 }
 
 export function downloadJobs(): DownloadJob[] { return [...jobs.values()].map((j) => ({ ...j.public })); }
@@ -144,11 +102,12 @@ export function startDownload(raw: unknown): DownloadJob {
   const input = importMetadata.extend({ url: z.string().url().max(2000) }).parse(raw);
   const url = new URL(input.url);
   if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Use a public HTTPS download URL without credentials');
-  const leave = enter();
+  const id = randomUUID();
+  const leave = enter(input.name, id);
   // Keep progress bounded in memory even if this gateway runs for months.
   for (const [id, job] of jobs) { if (jobs.size < 20) break; if (job.public.state !== 'downloading') jobs.delete(id); }
   const controller = new AbortController();
-  const job: DownloadJob = { id: randomUUID(), name: input.name, state: 'downloading', received: 0, total: null, modelId: null, error: null };
+  const job: DownloadJob = { id, name: input.name, state: 'downloading', received: 0, total: null, modelId: null, error: null };
   jobs.set(job.id, { public: job, controller });
   void (async () => {
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30 * 60_000)]);
