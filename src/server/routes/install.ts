@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Router } from 'express';
 import { findByInstallToken, findEmployee, type Employee } from '../../policy/people.js';
-import { ASSETS } from '../config.js';
+import { ASSETS, PORT } from '../config.js';
 import { gatewayUrl } from '../http.js';
 
 export const installRoutes = Router();
@@ -68,7 +68,10 @@ installRoutes.get('/install/:credential', (req, res) => {
       .send('# No such employee in the directory. Ask your admin for the right link.\nexit 1\n');
   }
 
-  res.type('text/plain').send(buildInstallScript(person, gatewayUrl(req)));
+  // Null means nothing but this machine can reach the gateway, and a request
+  // that got here anyway came from this machine. `localhost` is then not a
+  // guess: it is the address that just worked, for the only caller there is.
+  res.type('text/plain').send(buildInstallScript(person, gatewayUrl(req) ?? `http://localhost:${PORT}`));
 });
 
 /**

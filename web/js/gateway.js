@@ -13,6 +13,16 @@ const health = () => state.health ?? {};
 const installation = () => health().installation ?? {};
 const isBaseline = () => health().mode === 'baseline';
 
+/**
+ * Bound to loopback with no public address: nobody but this machine gets in.
+ *
+ * "Private network only" was the screen's word for every gateway without a
+ * tunnel, and on the desktop app's default bind it was false — the network
+ * could not reach it either. `reach` is absent from a gateway older than the
+ * field, and absent has to keep the old wording: not known is not loopback.
+ */
+const loopbackOnly = () => !state.publicUrl && state.reach?.listening === 'loopback';
+
 /** The deadline this gateway hands every hook, in the words a person uses. */
 function deadlineSeconds() {
   const ms = Number(health().deadlines?.decisionMs);
@@ -68,7 +78,7 @@ function conditions() {
       label: 'Access',
       value: state.publicUrl
         ? 'Public address on'
-        : 'Private network only'
+        : loopbackOnly() ? 'This computer only' : 'Private network only'
     }
   ];
   const judging = !state.mock && !isBaseline();
@@ -87,7 +97,7 @@ function summaryLine() {
   const where = installation();
   const name = where.label ? `“${where.label}”` : 'This gateway';
   const version = where.version ? ` v${where.version}` : '';
-  const reach = state.publicUrl ? 'public access' : 'private network';
+  const reach = state.publicUrl ? 'public access' : loopbackOnly() ? 'this computer only' : 'private network';
   return `${name}${version} · ${judgeName()} · ${deadlineSeconds()} s timeout · ${reach}`;
 }
 
@@ -221,7 +231,14 @@ function publicAddress() {
   }
   return `<div class="gw-block">
     <p class="gw-line">Off</p>
-    <p class="gw-note">Only devices on this network can reach Warden.</p>
+    <p class="gw-note">${loopbackOnly()
+      // Where the switch is depends on what started this gateway: the desktop
+      // app has a menu item, a checkout has an environment variable, and
+      // sending somebody to a menu that does not exist is its own dead end.
+      ? `Only this computer can reach Warden. To let teammates on this network in, ${state.reach?.canChange
+        ? 'turn on Allow LAN access in the Warden menu.'
+        : 'start it with <span class="mono">WARDEN_HOST=0.0.0.0</span>.'}`
+      : 'Only devices on this network can reach Warden.'}</p>
     ${state.canLeaveDemo
       ? `${button('Turn on public access', { kind: 'primary', id: 'startExpose', disabled: state.mock })}${state.mock ? '<p class="gw-note">Unavailable in demo mode.</p>' : ''}`
       : '<p class="gw-note">Public access is managed outside the desktop app for this gateway.</p>'}

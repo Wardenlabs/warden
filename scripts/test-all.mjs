@@ -8,7 +8,7 @@ const suites = [
   'test-browser-boundary.ts', 'test-archive-security.mjs',
   'test-sanitize.ts',
   'test-vote.ts', 'test-hook.ts', 'test-cli-compiler.ts', 'test-claude-setup.ts', 'test-draft-schema.ts',
-  'test-native-guards.ts', 'test-screen.ts', 'test-desktop-lib.ts', 'test-auth.ts', 'test-installation.ts', 'test-devices.ts', 'test-verification.ts', 'test-pause.ts', 'test-rules-for-actor.ts',
+  'test-native-guards.ts', 'test-screen.ts', 'test-desktop-lib.ts', 'test-auth.ts', 'test-installation.ts', 'test-reach.ts', 'test-devices.ts', 'test-verification.ts', 'test-pause.ts', 'test-rules-for-actor.ts',
   'test-remote-boundary.ts', 'test-hook-documents.ts', 'test-proxy-documents.ts',
   'test-documents.ts', 'test-document-budget.ts', 'test-qvac-cancellation.ts', 'test-model-management.ts', 'test-prompt-management.ts', 'test-console.mjs'
 ];

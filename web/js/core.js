@@ -127,6 +127,7 @@ export const state = {
   /** True when a desktop shell is listening that can fetch the models. */
   canLeaveDemo: false,
   publicUrl: null,
+  reach: null,
   /** What weights are on disk and which seat each model fills. Null until loaded. */
   models: null,
   adjudicator: null,

@@ -14,7 +14,7 @@ import { isMock, remoteCompiler } from '../../qvac/index.js';
 import { isLoopback } from '../admin-auth.js';
 import { hookDecisionDeadlineMs } from '../config.js';
 import { shellAttached, tellShell } from '../desktop-bridge.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, lanUrl, listeningOn } from '../http.js';
 import { installationReport } from '../installation.js';
 import { modelState } from '../lifecycle.js';
 
@@ -61,6 +61,23 @@ systemRoutes.get('/health', (req, res) =>
     // screen where somebody is handing out addresses rather than leaving them
     // to guess whether the tunnel came up.
     publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
+    /*
+     * How another machine gets here, as the three facts and not as a verdict.
+     *
+     * `publicUrl` above only ever knew about the tunnel. What it could not say
+     * is the commoner case: a desktop install bound to loopback, where there is
+     * no address to give anybody and the console was handing one out anyway.
+     * "Reachable" is left for the reader to work out — either URL being set —
+     * because a computed field here would be a second copy of these two, and
+     * second copies drift. `canChange` is whether a desktop shell is attached
+     * to ask; without one this is set by `WARDEN_HOST` and a restart.
+     */
+    reach: {
+      listening: listeningOn(),
+      lanUrl: lanUrl(),
+      publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
+      canChange: shellAttached()
+    },
     /*
      * How long this gateway asks a hook to wait for a decision.
      *

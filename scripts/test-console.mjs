@@ -1295,3 +1295,68 @@ test('native guards are selectable in Models and listed with their own formats',
     assert.match(table, /Select for download/);
   } finally { Object.assign(state, saved); }
 });
+
+/*
+ * docs/prd/teams-onboarding.md §0. A desktop install binds loopback until its
+ * administrator allows LAN access, and the console described that gateway as
+ * "Private network only" while handing out setup messages the network could
+ * not use. Both halves: the screen that names the state, and the page where
+ * the message is asked for.
+ */
+test('Gateway tells a loopback bind apart from a private network, and guesses neither', async () => {
+  await import('../web/js/gateway.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, gatewayState(), { reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: true } });
+    assert.match(VIEWS.gateway.body(), /This computer only/);
+    state.sel = 'access';
+    const access = VIEWS.gateway.body();
+    assert.match(access, /Only this computer can reach Warden/);
+    assert.ok(!/Only devices on this network/.test(access), 'a loopback gateway is not on the network');
+    assert.match(access, /Allow LAN access in the Warden menu/, 'with a desktop shell, the switch is its menu');
+    Object.assign(state, gatewayState(), { sel: 'access', reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: false } });
+    const checkout = VIEWS.gateway.body();
+    assert.match(checkout, /WARDEN_HOST=0\.0\.0\.0/, 'without one, it is the variable');
+    assert.ok(!/Warden menu/.test(checkout), 'and nobody is sent to a menu that is not there');
+
+    Object.assign(state, gatewayState(), { reach: { listening: 'network', lanUrl: 'http://192.168.1.42:8080', publicUrl: null, canChange: true } });
+    assert.match(VIEWS.gateway.body(), /Private network only/);
+
+    // A gateway older than the field says nothing, and nothing is not loopback.
+    Object.assign(state, gatewayState(), { reach: null });
+    assert.match(VIEWS.gateway.body(), /Private network only/, 'not known keeps the old wording');
+
+    Object.assign(state, gatewayState(), { publicUrl: 'https://quiet-river.trycloudflare.com', reach: { listening: 'loopback', lanUrl: null, publicUrl: 'https://quiet-river.trycloudflare.com', canChange: true } });
+    assert.match(VIEWS.gateway.body(), /Public address on/, 'a tunnel outranks the bind');
+  } finally { Object.assign(state, saved); }
+});
+
+test('a refused setup message becomes something to do on the person page, and only when the gateway said why', async () => {
+  const { noteUnreachable } = await import('../web/js/team.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, {
+      view: 'people', sel: 'ana', audit: [],
+      company: { name: 'Acme', roles: ['admin', 'employee'], employees: [{ id: 'ana', name: 'Ana López', role: 'employee', apiKey: 'wk-ana-0000000000000000' }], demo: false },
+      policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+      loads: { ...state.loads, policy: { loading: false } },
+      devices: {}, open: new Set(), query: {}
+    });
+    assert.ok(!/reach this gateway/.test(VIEWS.people.body()), 'nothing is claimed before the gateway is asked');
+
+    assert.equal(noteUnreachable(500, { error: 'boom' }), false, 'an ordinary failure is not this');
+    assert.equal(noteUnreachable(409, { error: 'something else' }), false, 'nor is a conflict that does not name the reach');
+    assert.ok(!/reach this gateway/.test(VIEWS.people.body()));
+
+    assert.equal(noteUnreachable(409, { error: 'Nobody else can reach this gateway yet.', reach: 'loopback' }), true);
+    const told = VIEWS.people.body();
+    assert.match(told, /Nobody else can reach this gateway yet/);
+    assert.match(told, /data-go="gateway" data-sel="access"[^>]*>\s*Make Warden reachable/, 'and it offers the way to change it');
+    assert.ok(!/Force|Reinstall|Guarantee/.test(told));
+
+    // Leaving is how somebody goes to fix it; the notice must not outlive that.
+    VIEWS.people.onLeave();
+    assert.ok(!/reach this gateway/.test(VIEWS.people.body()), 'coming back, the next request decides again');
+  } finally { VIEWS.people.onLeave(); Object.assign(state, saved); }
+});
+
