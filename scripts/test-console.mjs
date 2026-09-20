@@ -1360,3 +1360,36 @@ test('a refused setup message becomes something to do on the person page, and on
   } finally { VIEWS.people.onLeave(); Object.assign(state, saved); }
 });
 
+/*
+ * An empty directory is what a solo install looks like, and also what a team
+ * install looks like before anybody is added. Somebody who told the splash
+ * "the team console" got the solo navigation — no Team item — and so had no way
+ * to reach the screen that would have fixed it.
+ */
+test('an install that chose the team console gets the team navigation before anybody is in it', async () => {
+  const { soloIsPureInstall } = await import('../web/js/nav.js');
+  const saved = { ...state };
+  const sidebar = { innerHTML: '' };
+  try {
+    elements.set('sidebar', sidebar);
+    const empty = { name: '', roles: ['admin', 'employee'], employees: [], demo: false };
+
+    Object.assign(state, { view: 'policy', company: empty, health: { installation: { label: 'warden', version: '0.2.18', intent: 'team' } } });
+    assert.equal(soloIsPureInstall(), false, 'the splash answer outranks an empty directory');
+    renderNav();
+    assert.match(sidebar.innerHTML, /data-go="people"/, 'Team is on the nav');
+    assert.ok(!/data-go="soloSettings"/.test(sidebar.innerHTML), 'and the solo escape hatch is not');
+
+    // Never asked — a checkout, or an install older than the field. The
+    // directory decides, exactly as it did.
+    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.18' } } });
+    assert.equal(soloIsPureInstall(), true);
+    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.18', intent: 'solo' } } });
+    assert.equal(soloIsPureInstall(), true);
+
+    // Intent never turns a team into a solo install.
+    Object.assign(state, { company: { ...empty, employees: [{ id: 'ana', name: 'Ana', role: 'employee' }] }, health: { installation: { intent: 'solo' } } });
+    assert.equal(soloIsPureInstall(), false, 'people in the directory still decide');
+  } finally { Object.assign(state, saved); }
+});
+

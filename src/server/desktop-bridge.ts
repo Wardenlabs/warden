@@ -26,7 +26,7 @@ export function shellAttached(): boolean {
 }
 
 /** Ask the shell to do something. False when there is no shell to ask. */
-export function tellShell(message: 'expose-on' | 'expose-off' | 'leave-demo'): boolean {
+export function tellShell(message: 'expose-on' | 'expose-off' | 'lan-on' | 'lan-off' | 'leave-demo'): boolean {
   if (!parentPort) return false;
   parentPort.postMessage(message);
   return true;

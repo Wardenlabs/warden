@@ -183,6 +183,15 @@ function subscribe() {
   const src = new EventSource('/api/events');
   src.onmessage = async (e) => {
     let payload; try { payload = JSON.parse(e.data); } catch { return; }
+    // Somebody's machine reported its wiring. The event is a doorbell: what
+    // changed is read from the directory, not from the payload. Drawn again
+    // only where people are on screen — anywhere else an arriving event must
+    // not take away what somebody is in the middle of typing.
+    if (payload.type === 'device') {
+      await refreshPeople();
+      if (['people', 'teamSetup'].includes(state.view)) render();
+      return;
+    }
     if (payload.type !== 'decision') return;
     noteFirstRunDecision(payload);
     const { ok, j } = await api('/api/audit?limit=1');

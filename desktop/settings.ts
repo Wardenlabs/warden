@@ -16,6 +16,19 @@ export type DesktopSettings = {
   exposeEnabled: boolean;
   /** 'mock' is the no-models demo mode the first-run screen can fall back to. */
   adapter: 'real' | 'mock';
+  /**
+   * What the splash was told: Warden for me, or for a team.
+   *
+   * It used to be asked, acted on once, and forgotten, and the directory stood
+   * in as the record — somebody in it meant the question had been answered.
+   * That holds for "just me", which creates an identity on the spot. It does
+   * not hold for a team: nobody is in the directory until the administrator
+   * adds them, so until then the console took the install for a solo one, drew
+   * the solo navigation with no Team item in it, and the splash asked again on
+   * every launch. Absent means never asked, which is every install older than
+   * this field and is handled as it always was.
+   */
+  intent?: 'solo' | 'team';
 };
 
 const DEFAULTS: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real' };
@@ -35,7 +48,8 @@ export function readSettings(userData: string): DesktopSettings {
       ...(port !== undefined ? { port } : {}),
       lanEnabled: raw.lanEnabled === true,
       exposeEnabled: raw.exposeEnabled === true,
-      adapter: raw.adapter === 'mock' ? 'mock' : 'real'
+      adapter: raw.adapter === 'mock' ? 'mock' : 'real',
+      ...(raw.intent === 'solo' || raw.intent === 'team' ? { intent: raw.intent } : {})
     };
   } catch {
     return { ...DEFAULTS };

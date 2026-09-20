@@ -162,14 +162,25 @@ export function isLoopback(req: Request): boolean {
   // tunnel in front of the gateway does not have to know to also set an
   // environment variable, and the release that forgets to say so does not
   // silently open somebody's company.
-  for (const name of FORWARDED_HEADERS) {
-    if (req.header(name) !== undefined) return false;
-  }
+  if (isRelayed(req)) return false;
 
   const address = req.socket.remoteAddress;
   if (!address) return false;
   const bare = address.startsWith('::ffff:') ? address.slice(7) : address;
   return (bare === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bare)) && browserAllowsLocalTrust(req);
+}
+
+/**
+ * Did this request come through a proxy rather than straight to the socket?
+ *
+ * The half of `isLoopback` that is also a question of its own. `/health`
+ * answers without a credential and stays reachable through a tunnel, so a fact
+ * about the inside of somebody's network — its LAN address — goes to a caller
+ * who connected directly, and who therefore already had an address for this
+ * machine, and not to one who arrived from the internet.
+ */
+export function isRelayed(req: Request): boolean {
+  return FORWARDED_HEADERS.some((name) => req.header(name) !== undefined);
 }
 
 /**

@@ -70,6 +70,13 @@ async function theAddressItself(): Promise<void> {
   check(gatewayUrl(from({ host: 'warden.example.com', 'x-forwarded-proto': 'https' }), '127.0.0.1') === 'https://warden.example.com', 'and one behind a TLS edge keeps its scheme');
   check(gatewayUrl(from({ host: 'evil.test/$(rm -rf ~)' }), '127.0.0.1') === null, 'a Host header that is not host[:port] is never echoed, and is not replaced by a guess');
 
+  // /health is open and answers through a tunnel. The inside of the network
+  // goes to a caller who connected directly, never to one who was relayed.
+  const { reachFor } = await import('../src/server/http.js');
+  check(reachFor(false, false, '0.0.0.0').lanUrl === lanUrl('0.0.0.0'), 'a direct caller is told the LAN address, when there is one');
+  check(reachFor(true, false, '0.0.0.0').lanUrl === null, 'a caller that came through a tunnel is not');
+  check(reachFor(true, true, '0.0.0.0').listening === 'network' && reachFor(true, true, '0.0.0.0').canChange === true, 'but is still told what is bound, and whether it can be changed');
+
   process.env['WARDEN_PUBLIC_URL'] = 'https://quiet-river.trycloudflare.com/';
   check(gatewayUrl(local, '127.0.0.1') === 'https://quiet-river.trycloudflare.com', 'a public address outranks everything, bound to loopback or not');
   check(gatewayUrl(from({ host: '192.168.1.42:8080' }), '0.0.0.0') === 'https://quiet-river.trycloudflare.com', 'including a console that came in over the LAN');
@@ -113,6 +120,14 @@ async function theRoute(): Promise<void> {
     const now = (await (await fetch(`${base}/health`)).json()) as Health;
     check(now.reach?.publicUrl === 'https://quiet-river.trycloudflare.com' && now.reach.listening === 'loopback', '/health reports the address without pretending the bind changed');
     delete process.env['WARDEN_PUBLIC_URL'];
+
+    // Letting the network in is the desktop shell's to do. With none attached
+    // the route says so instead of answering 202 to a request nobody will act on.
+    const lan = await fetch(`${base}/api/gateway/lan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
+    const lanWhy = (await lan.json()) as { error?: string };
+    check(lan.status === 409 && lanWhy.error?.includes('WARDEN_HOST') === true, 'with no desktop shell, turning the network on is refused and names the variable that does it', `status ${lan.status}`);
+    const relayed = await fetch(`${base}/api/gateway/lan`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' }, body: JSON.stringify({ enabled: true }) });
+    check(relayed.status === 401 || relayed.status === 403, 'and a caller who came through a tunnel cannot ask at all', `status ${relayed.status}`);
 
     // The script is fetched by the machine that will run it. Asked for from
     // here, on a gateway only this machine can reach, `localhost` is the truth.

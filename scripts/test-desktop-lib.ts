@@ -105,3 +105,29 @@ try {
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
+
+/*
+ * What the splash was told has to survive a relaunch. It used to live in a
+ * variable, and for a team the directory could not stand in for it: nobody is
+ * in it until the administrator adds them, so every launch asked again and the
+ * console took the install for a solo one. docs/prd/teams-onboarding.md §0.
+ * `desktop/settings.ts` imports nothing from Electron, which is what lets this
+ * read it directly.
+ */
+{
+  const { readSettings, writeSettings, settingsPath: desktopSettingsPath } = await import('../desktop/settings.js');
+  const userData = mkdtempSync(join(tmpdir(), 'warden-desktop-settings-'));
+  try {
+    assert.equal(readSettings(userData).intent, undefined, 'an install that was never asked has no answer, not a default one');
+    writeSettings(userData, { lanEnabled: false, exposeEnabled: false, adapter: 'real', intent: 'team' });
+    assert.equal(readSettings(userData).intent, 'team', 'the answer survives a relaunch');
+    assert.equal(readSettings(userData).lanEnabled, false, 'and choosing a team does not open the network by itself');
+    writeFileSync(desktopSettingsPath(userData), JSON.stringify({ lanEnabled: true, adapter: 'real', intent: 'admin' }));
+    assert.equal(readSettings(userData).intent, undefined, 'a value that is neither answer is dropped rather than believed');
+    assert.equal(readSettings(userData).lanEnabled, true);
+    console.log('✓ the splash answer is kept across launches, and only the two real answers are read back');
+  } finally {
+    rmSync(userData, { recursive: true, force: true });
+  }
+}
+

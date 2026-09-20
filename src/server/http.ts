@@ -103,6 +103,35 @@ export function lanUrl(host: string = HOST): string | null {
   return lan ? `http://${lan}:${PORT}` : null;
 }
 
+export type Reach = {
+  listening: 'loopback' | 'network';
+  lanUrl: string | null;
+  publicUrl: string | null;
+  canChange: boolean;
+};
+
+/**
+ * How another machine gets here, as facts and not as a verdict.
+ *
+ * "Reachable" is left for the reader to work out — either URL being set —
+ * because a computed field would be a second copy of these two, and second
+ * copies drift. `canChange` is whether a desktop shell is attached to ask;
+ * without one this is set by `WARDEN_HOST` and a restart.
+ *
+ * `relayed` withholds the LAN address. `/health` answers without a credential
+ * and through a tunnel, and the inside of somebody's network is not something
+ * to tell a caller from the internet. A direct caller already had an address
+ * for this machine; a relayed one is told the public address, which is theirs.
+ */
+export function reachFor(relayed: boolean, canChange: boolean, bound: string = HOST): Reach {
+  return {
+    listening: listeningOn(bound),
+    lanUrl: relayed ? null : lanUrl(bound),
+    publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
+    canChange
+  };
+}
+
 /**
  * The address to hand an employee, or null when there is none to hand.
  *

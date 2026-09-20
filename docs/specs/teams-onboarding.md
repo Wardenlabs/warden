@@ -110,6 +110,15 @@ reach: {
 `web/js/data.js` lo guarda en `state.reach` dentro de `refreshHealth()`, junto a
 `state.publicUrl` (`:50`).
 
+**`lanUrl` no viaja por el túnel.** `/health` contesta sin credencial y sigue
+alcanzable cuando hay acceso público, así que la IP interna de la máquina del
+admin no es algo para contarle a quien llegó desde internet. `reachFor(relayed,
+…)` la omite cuando el pedido trae cabeceras de proxy (`isRelayed`, que es la
+mitad de `isLoopback` vuelta pregunta propia). Un llamador directo ya tenía una
+dirección de esta máquina; uno relevado recibe `publicUrl`, que es la que usó.
+No estaba en la primera versión de este documento: apareció al implementar T2 y
+corrige algo que T1 había introducido.
+
 ### 4.2 `gatewayUrl()` deja de inventar
 
 Nueva firma: `gatewayUrl(req): string | null`. Devuelve `null` cuando `HOST` es

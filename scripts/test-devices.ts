@@ -93,6 +93,29 @@ async function main(): Promise<void> {
 
     console.log('\nwiring is reported, and only about the reporter\n');
 
+    // The console's stream, held open across the reports below. Only decisions
+    // used to travel on it, so a report reached the disk and nobody watching.
+    const heard: Record<string, unknown>[] = [];
+    const stream = new AbortController();
+    const listening = fetch(at('/api/events'), { signal: stream.signal }).then(async (res) => {
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const data = frame.split('\n').find((line) => line.startsWith('data: '));
+          if (!data || frame.startsWith('event: hello')) continue;
+          heard.push(JSON.parse(data.slice(6)) as Record<string, unknown>);
+        }
+      }
+    }).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 150));
+
     const reported = await send('/api/devices/report', person.apiKey, {
       machine: { id: LAPTOP, name: LAPTOP_NAME },
       tools: [{ id: 'claude-code', wired: true }, { id: 'codex', wired: false, how: 'add [[hooks.UserPromptSubmit]]' }],
@@ -108,6 +131,14 @@ async function main(): Promise<void> {
     const stranger = await send('/api/devices/report', 'wk-nobody-0000000000000000', { machine: { id: DESKTOP, name: 'theirs' }, tools: [] });
     check(stranger.status === 401, 'a key this gateway never issued cannot report at all', `status ${stranger.status}`);
     check(!(await devices()).some((d) => d.machineId === DESKTOP), 'and nothing of theirs appears under somebody else');
+
+    await new Promise((r) => setTimeout(r, 150));
+    stream.abort();
+    await listening;
+    const rings = heard.filter((e) => e['type'] === 'device');
+    check(rings.length === 1, 'the accepted report rings the console once, and the two refused ones not at all', JSON.stringify(heard));
+    check(rings[0]?.['employeeId'] === 'ana', 'saying whose machine it was');
+    check(Object.keys(rings[0] ?? {}).sort().join() === 'employeeId,type', 'and nothing about the machine: no name, no tools, no hook version', JSON.stringify(rings[0]));
 
     console.log('\na rotated key marks every machine until it reconnects\n');
 

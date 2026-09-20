@@ -48,6 +48,8 @@ const CASES: Case[] = [
   { path: '/API/IDENTITY', admin: false, why: 'same endpoint, upper case' },
   { path: '/api/identity/fede', admin: true, why: 'asking about somebody else is not that' },
   { path: '/api/devices/report', admin: false, why: 'the machine says what it found in its own configuration' },
+  { path: '/api/gateway/lan', admin: true, why: 'opens the gateway to the network; the menu item it mirrors is on the machine' },
+  { path: '/api/gateway/expose', admin: true, why: 'opens the gateway to the internet' },
   { path: '/api/devices', admin: true, why: 'reading the whole inventory is not an employee question' },
   { path: '/api/guard/check/', admin: false, why: 'same endpoint, trailing slash' },
   { path: '/API/GUARD/CHECK', admin: false, why: 'same endpoint, upper case' },

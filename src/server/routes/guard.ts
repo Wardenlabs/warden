@@ -21,7 +21,7 @@ import { loadPolicy } from '../../policy/store.js';
 import { recordVerified } from '../../policy/verification.js';
 import { adapter } from '../../qvac/index.js';
 import { hookDecisionDeadlineMs } from '../config.js';
-import { emitDecision } from '../events.js';
+import { emitDecision, emitDevice } from '../events.js';
 import { asyncRoute } from '../http.js';
 import { evaluateRequest, extractPrompt, resolveActor, unknownKey } from '../identity.js';
 
@@ -113,6 +113,7 @@ guardRoutes.post('/api/devices/report', (req, res) => {
 
   const hookVersion = typeof req.body?.hookVersion === 'string' ? req.body.hookVersion.slice(0, 64) : undefined;
   recordWiringReport(actor.id, machine, parsed.data, hookVersion);
+  emitDevice(actor.id);
   res.json({ ok: true });
 });
 

@@ -28,6 +28,8 @@ export type ServerConfig = {
   modelsDir: string;
   adapter: 'real' | 'mock';
   logPath: string;
+  /** The splash's answer, when there is one. See `DesktopSettings.intent`. */
+  intent?: 'solo' | 'team';
 };
 
 export type RunningServer = {
@@ -89,6 +91,9 @@ export function startServer(
     // menus away from the screen that just failed.
     WARDEN_LOG_PATH: config.logPath
   };
+  // A preference about which console to draw, and nothing else: it authorises
+  // nothing and is not a second notion of administrator.
+  if (config.intent) env['WARDEN_INSTALL_INTENT'] = config.intent;
 
   /*
    * The posture a gateway on the internet has to run in, set here rather than
