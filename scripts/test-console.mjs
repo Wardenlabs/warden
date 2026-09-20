@@ -1313,11 +1313,16 @@ test('Gateway tells a loopback bind apart from a private network, and guesses ne
     const access = VIEWS.gateway.body();
     assert.match(access, /Only this computer can reach Warden/);
     assert.ok(!/Only devices on this network/.test(access), 'a loopback gateway is not on the network');
-    assert.match(access, /Allow LAN access in the Warden menu/, 'with a desktop shell, the switch is its menu');
+    assert.match(access, /id="startLan"[^>]*>Turn on network access/, 'with a desktop shell, the switch is here');
     Object.assign(state, gatewayState(), { sel: 'access', reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: false } });
     const checkout = VIEWS.gateway.body();
     assert.match(checkout, /WARDEN_HOST=0\.0\.0\.0/, 'without one, it is the variable');
-    assert.ok(!/Warden menu/.test(checkout), 'and nobody is sent to a menu that is not there');
+    assert.ok(!/id="startLan"/.test(checkout), 'and no button that would only answer 409');
+
+    Object.assign(state, gatewayState(), { sel: 'access', reach: { listening: 'network', lanUrl: 'http://192.168.1.42:8080', publicUrl: null, canChange: true } });
+    const open = VIEWS.gateway.body();
+    assert.match(open, /http:\/\/192\.168\.1\.42:8080/, 'on, it shows the address teammates use');
+    assert.match(open, /id="stopLan"/);
 
     Object.assign(state, gatewayState(), { reach: { listening: 'network', lanUrl: 'http://192.168.1.42:8080', publicUrl: null, canChange: true } });
     assert.match(VIEWS.gateway.body(), /Private network only/);
@@ -1390,6 +1395,244 @@ test('an install that chose the team console gets the team navigation before any
     // Intent never turns a team into a solo install.
     Object.assign(state, { company: { ...empty, employees: [{ id: 'ana', name: 'Ana', role: 'employee' }] }, health: { installation: { intent: 'solo' } } });
     assert.equal(soloIsPureInstall(), false, 'people in the directory still decide');
+  } finally { Object.assign(state, saved); }
+});
+
+/*
+ * The first run of Team — docs/prd/teams-onboarding.md §9. Like This device's,
+ * it has no cursor: every assertion here moves a fact and reads the screen.
+ */
+const teamSetupState = (over = {}) => ({
+  view: 'teamSetup', sel: null, mock: false, audit: [], query: {}, open: new Set(), devices: {},
+  company: { name: 'Acme Logistics', roles: ['admin', 'employee'], employees: [], demo: false },
+  policy: { rules: [], quotas: [], exemptRoles: ['admin'] },
+  reach: { listening: 'network', lanUrl: 'http://192.168.1.42:8080', publicUrl: null, canChange: true },
+  teamSetup: { step: null, reach: 'lan', company: '', person: '', role: null, busy: false, asked: null, error: '', left: false },
+  ...over
+});
+const ana = (devices = []) => ({ id: 'ana', name: 'Ana López', role: 'employee', apiKey: 'wk-ana-0000000000000000', devices });
+const laptop = (tools, extra = {}) => ({ machineId: 'a1b2c3d4e5f60718', name: 'ana-laptop', lastSeen: new Date().toISOString(), ...(tools ? { tools } : {}), ...extra });
+const withPeople = (...people) => ({ name: 'Acme Logistics', roles: ['admin', 'employee'], employees: people, demo: false });
+
+test('the four steps of Team are four facts, and moving a fact moves the step', async () => {
+  const { stepOf } = await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamSetupState({ company: { name: '', roles: ['admin', 'employee'], employees: [], demo: false } }));
+    assert.equal(stepOf(), 1);
+    assert.match(VIEWS.teamSetup.body(), /1 of 4 · NAME YOUR COMPANY/);
+
+    // The sample company has a name, and it is not theirs.
+    state.company = { name: 'Northwind Logistics SA', roles: ['admin'], employees: [], demo: true };
+    assert.equal(stepOf(), 1, 'a demo name is not a name');
+
+    Object.assign(state, teamSetupState({ reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: true } }));
+    assert.equal(stepOf(), 2);
+    assert.match(VIEWS.teamSetup.body(), /2 of 4 · MAKE WARDEN REACHABLE/);
+
+    Object.assign(state, teamSetupState());
+    assert.equal(stepOf(), 3, 'named and reachable, with nobody in it');
+    assert.match(VIEWS.teamSetup.body(), /3 of 4 · ADD A PERSON/);
+
+    Object.assign(state, teamSetupState({ company: withPeople(ana()) }));
+    assert.equal(stepOf(), 4);
+
+    // A tunnel is as good as a LAN, and the administrator's own identity is
+    // not a teammate.
+    Object.assign(state, teamSetupState({ reach: { listening: 'loopback', lanUrl: null, publicUrl: 'https://quiet-river.trycloudflare.com', canChange: true } }));
+    assert.equal(stepOf(), 3);
+    Object.assign(state, teamSetupState({ company: withPeople({ id: 'you', name: 'You', role: 'solo' }) }));
+    assert.equal(stepOf(), 3, 'the solo identity does not count as somebody on the team');
+  } finally { Object.assign(state, saved); }
+});
+
+test('a gateway that stops being reachable sends the last step back to the second', async () => {
+  const { stepOf } = await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamSetupState({ company: withPeople(ana()) }));
+    assert.equal(stepOf(), 4);
+    state.reach = { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: true };
+    assert.equal(stepOf(), 2, 'the message that was sent no longer works, and the run says so');
+  } finally { Object.assign(state, saved); }
+});
+
+test('the five endings of the last step of Team are five different things', async () => {
+  const { outcomeOf } = await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    const cases = {
+      never: ana(),
+      silent: ana([laptop(null)]),
+      unwired: ana([laptop([{ id: 'claude-code', wired: false }])]),
+      pending: ana([laptop([{ id: 'claude-code', wired: true }], { pendingSince: new Date().toISOString() })]),
+      wired: ana([laptop([{ id: 'claude-code', wired: true }])])
+    };
+    const rails = new Set();
+    const titles = new Set();
+    for (const [kind, person] of Object.entries(cases)) {
+      Object.assign(state, teamSetupState({ company: withPeople(person) }));
+      assert.equal(outcomeOf(), kind);
+      const html = VIEWS.teamSetup.body();
+      rails.add(/first-run-rail"><p class="kicker">([^<]+)</.exec(html)?.[1]);
+      titles.add(/<h1>([^<]+)</.exec(html)?.[1]);
+      // The address is on the screen, not only inside the message: it is the
+      // one value an administrator has to be able to recognise as wrong.
+      if (kind === 'never' || kind === 'pending') assert.match(html, /http:\/\/192\.168\.1\.42:8080/);
+      if (kind === 'wired') assert.ok(!/Back/.test(html), 'nothing to go back to from a finished setup');
+      else { assert.match(html, /id="teamSetupCopy"/); assert.match(html, /id="teamSetupCheck"/, 'and the manual fallback sits beside it'); }
+    }
+    assert.equal(rails.size, 5, [...rails].join(' | '));
+    assert.equal(titles.size, 5, [...titles].join(' | '));
+    assert.ok(rails.has('SETUP COMPLETE · CONNECTED'));
+  } finally { Object.assign(state, saved); }
+});
+
+test('connected with no rules says nothing is being stopped, and sends them to write one', async () => {
+  await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    const wired = withPeople(ana([laptop([{ id: 'claude-code', wired: true }])]));
+    Object.assign(state, teamSetupState({ company: wired }));
+    const bare = VIEWS.teamSetup.body();
+    assert.match(bare, /Nothing is being stopped yet/);
+    assert.match(bare, /id="teamSetupRule"[^>]*>Write a rule/);
+    assert.ok(!/checked against your rules/.test(bare), 'true and misleading is still misleading');
+
+    Object.assign(state, teamSetupState({ company: wired, policy: { rules: [{ id: 'r1' }], quotas: [], exemptRoles: ['admin'] } }));
+    const ruled = VIEWS.teamSetup.body();
+    assert.match(ruled, /checked against your rules/);
+    assert.match(ruled, /id="teamSetupDone"[^>]*>View team/);
+  } finally { Object.assign(state, saved); }
+});
+
+test('the run opens for a first team, and for nobody else', async () => {
+  const { teamSetupIsDue } = await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  const previousLocation = globalThis.location;
+  try {
+    Object.assign(state, teamSetupState({ view: 'people' }));
+    assert.equal(teamSetupIsDue(), true, 'an empty directory');
+
+    // Back the next day: one person, and nothing has reported.
+    state.company = withPeople(ana());
+    assert.equal(teamSetupIsDue(), true);
+
+    state.company = withPeople(ana(), { id: 'pablo', name: 'Pablo Ruiz', role: 'employee' });
+    assert.equal(teamSetupIsDue(), false, 'two people is past the first use; People has a counter for the rest');
+
+    state.company = withPeople(ana([laptop([{ id: 'claude-code', wired: true }])]));
+    assert.equal(teamSetupIsDue(), false, 'somebody wired is what done means');
+
+    Object.assign(state, teamSetupState({ view: 'people', mock: true }));
+    assert.equal(teamSetupIsDue(), false, 'not in demo: there is nothing a run could promise');
+
+    Object.assign(state, teamSetupState({ view: 'people' }));
+    state.teamSetup.left = true;
+    assert.equal(teamSetupIsDue(), false, 'leaving by the wordmark is not undone by arriving at People');
+
+    // The door is the list. Roles, Company and a person are links somebody
+    // followed on purpose.
+    Object.assign(state, teamSetupState({ view: 'people' }));
+    for (const sel of ['roles', 'company', 'ana']) {
+      globalThis.location = { hash: `#/people/${sel}` };
+      state.sel = sel;
+      VIEWS.people.onEnter();
+      assert.equal(globalThis.location.hash, `#/people/${sel}`, `${sel} is left alone`);
+    }
+    globalThis.location = { hash: '#/people' };
+    state.sel = null;
+    VIEWS.people.onEnter();
+    assert.equal(globalThis.location.hash, '#/teamSetup');
+  } finally {
+    Object.assign(state, saved);
+    if (previousLocation === undefined) delete globalThis.location; else globalThis.location = previousLocation;
+  }
+});
+
+test('the first person is never handed an exemption by alphabetical order', async () => {
+  await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamSetupState());
+    const html = VIEWS.teamSetup.body();
+    assert.ok(html.indexOf('data-setup-role="employee"') < html.indexOf('data-setup-role="admin"'), 'exempt roles are offered last');
+    assert.match(html, /aria-checked="true"[^>]*data-setup-role="employee"/, 'and the default is one that is judged');
+    assert.ok(!/exempt from company-wide rules/.test(html));
+
+    state.teamSetup.role = 'admin';
+    assert.match(VIEWS.teamSetup.body(), /admin is exempt from company-wide rules/, 'choosing one says what it hands out');
+  } finally { Object.assign(state, saved); }
+});
+
+test('with no desktop shell, the second step names the switch instead of offering one', async () => {
+  await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, teamSetupState({ reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: false } }));
+    const html = VIEWS.teamSetup.body();
+    assert.match(html, /WARDEN_HOST=0\.0\.0\.0/);
+    assert.ok(!/id="teamSetupReach"/.test(html), 'no Turn on button that would answer 409');
+    assert.ok(!/data-choice=/.test(html), 'and nothing to choose between');
+
+    // Bound to the network on a machine that has none: the LAN card cannot
+    // work, and the other one still can.
+    Object.assign(state, teamSetupState({ reach: { listening: 'network', lanUrl: null, publicUrl: null, canChange: true } }));
+    const offline = VIEWS.teamSetup.body();
+    assert.match(offline, /No network found/);
+    assert.match(offline, /id="teamSetupReach"[^>]*disabled/);
+    state.teamSetup.reach = 'public';
+    assert.ok(!/id="teamSetupReach"[^>]*disabled/.test(VIEWS.teamSetup.body()), 'a public address does not need the LAN');
+  } finally { Object.assign(state, saved); }
+});
+
+test('no screen of the Team run promises more than a connection', async () => {
+  await import('../web/js/team-setup.js');
+  const saved = { ...state };
+  try {
+    const screens = [
+      teamSetupState({ company: { name: '', roles: ['admin', 'employee'], employees: [], demo: false } }),
+      teamSetupState({ reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: true } }),
+      teamSetupState({ reach: { listening: 'loopback', lanUrl: null, publicUrl: null, canChange: false } }),
+      teamSetupState(),
+      teamSetupState({ company: withPeople(ana()) }),
+      teamSetupState({ company: withPeople(ana([laptop(null)])) }),
+      teamSetupState({ company: withPeople(ana([laptop([{ id: 'claude-code', wired: false }])])) }),
+      teamSetupState({ company: withPeople(ana([laptop([{ id: 'claude-code', wired: true }], { pendingSince: new Date().toISOString() })])) }),
+      teamSetupState({ company: withPeople(ana([laptop([{ id: 'claude-code', wired: true }])])) })
+    ];
+    for (const screen of screens) {
+      Object.assign(state, screen);
+      const html = VIEWS.teamSetup.body();
+      assert.ok(!/\b(Force|Reinstall|Guarantee|Protected|Verified)\b/i.test(html.replace(/<[^>]+>/g, ' ')), html.slice(0, 200));
+      assert.match(html, /TEAM · FIRST RUN/);
+      assert.equal((html.match(/<i class="[^"]*"><\/i>/g) ?? []).length, 4, 'four segments on every screen');
+    }
+  } finally { Object.assign(state, saved); }
+});
+
+/*
+ * The wordmark is the only way out of a first run, and on This device it was
+ * not one: it went to the rules screen, which asks on every entry whether the
+ * run is due, and nothing had changed. Found while giving Team's run the same
+ * exit. docs/specs/teams-onboarding.md §2.3.
+ */
+test('leaving the first run of This device by the wordmark does not lead straight back into it', async () => {
+  const { firstRunIsDue } = await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, {
+      mock: false, health: { installation: {} },
+      company: { name: '', roles: ['admin', 'employee'], employees: [{ id: 'you', name: 'You', role: 'solo' }], demo: false },
+      soloIdentity: { id: 'you', completedFirstRun: false, devices: [], verified: [] },
+      firstRun: { ...state.firstRun, left: false }
+    });
+    assert.equal(firstRunIsDue(), true, 'an unfinished run is due');
+    state.firstRun.left = true;
+    assert.equal(firstRunIsDue(), false, 'and having left it, this session, is respected');
+    state.firstRun.left = false;
+    state.soloIdentity = { ...state.soloIdentity, completedFirstRun: true };
+    assert.equal(firstRunIsDue(), false, 'leaving is not what finishes it: the verification is');
   } finally { Object.assign(state, saved); }
 });
 

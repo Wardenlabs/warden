@@ -54,9 +54,10 @@ async function refreshSoloRules() {
   return ok;
 }
 
-function firstRunIsDue() {
+export function firstRunIsDue() {
   if (!soloIsPureInstall()) return false;
   if (state.mock) return false;
+  if (state.firstRun.left) return false;
   if (!state.soloIdentity) return false;
   return !state.soloIdentity.completedFirstRun;
 }

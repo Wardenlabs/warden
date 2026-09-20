@@ -10,7 +10,9 @@ Referencias `archivo:línea` al repo al 2026-09-20, rama
 `RFPKLtSSZjQMHy9XaOOSqp`, página **05 · Team** (`298:1988`), secciones
 `852:6447` y `852:6448`.
 
-Estado: propuesta, sin implementar.
+Estado al 2026-09-20: T1, T2 y T4 implementadas en esta rama. T3 (frames a
+`· Elegida`) es del owner. T5 —dos máquinas— sin hacer, y hasta que pase el
+recorrido es **NOT VERIFIED** (`docs/HOOK-VERIFICATION.md`).
 
 ## 0. Fuentes de verdad
 
@@ -67,9 +69,11 @@ La PRD §4.4 dice que salir no redispara el recorrido en la misma sesión.
 estaban, y se olvida al reabrir. Es lo mínimo para que la única salida no rebote
 contra el `onEnter` que la trajo.
 
-**A mirar al implementar:** `first-run.js:376` sale con `go('soloRules')`, cuyo
-`onEnter` vuelve a preguntar `firstRunIsDue()` (`solo.js:57`). Si hoy rebota, es
-un bug de This device con el mismo arreglo; se corrige en T4 y se anota.
+**Rebotaba, y se corrigió en T4.** `first-run.js` salía con `go('soloRules')`,
+cuyo `onEnter` vuelve a preguntar `firstRunIsDue()` (`solo.js:57`); como salir no
+cambia ningún hecho, la respuesta era la misma y la única salida de This device
+llevaba de vuelta adentro. Mismo arreglo: `state.firstRun.left`, y un test de
+consola que lo fija.
 
 ### 2.4 `WARDEN_INSTALL_INTENT` es preferencia de interfaz
 
@@ -290,6 +294,30 @@ ancho del frame (700) en vez de las tarjetas. Se verifica a ojo (PRD §9.20-21).
 
 T1 se puede mergear sola. T2 no tiene efecto visible sin T4 salvo el nav y el
 splash, que sí se pueden probar solos. T4 depende de T1 y T2.
+
+## 7.1 Dónde T4 se apartó de este documento
+
+- **`watchAddress()` no se generalizó.** §4.3 decía que se volvía
+  `watchReach(predicate)` y salía de `gateway.js`. `watchReach` existe, en
+  `web/js/reach.js`, y lo usan el paso 2 y la sección nueva de Gateway; el código
+  del túnel se quedó como estaba. Reescribir algo que funciona para que dos
+  llamadores compartan doce líneas no pagaba el riesgo.
+- **El `onEnter` de People se registra desde `team-setup.js`**, no en `team.js`
+  como decía §5.3. `team-setup.js` importa `wiring()` de `team.js`; la otra
+  dirección cerraba un ciclo.
+- **`onEnter` no pide `/health`.** Que el recorrido corresponda no depende de
+  `reach`, así que la redirección es inmediata y el refresco lo hace el
+  recorrido al entrar.
+- **Sin shell, el paso 2 sí tiene una acción: `Check again`.** La PRD §6.2 decía
+  "sin acción". Sin ella la pantalla sólo ofrecía `← Back`, y quien acaba de
+  reiniciar su gateway con `WARDEN_HOST` no tenía cómo decírselo.
+- **Gateway → Access ya no repite la frase de loopback en `Public access`.**
+  Vive en `Network access`, que es la sección que puede hacer algo al respecto.
+- **PRD §9.10, hecho a mano y no como test permanente.** Se renderizó el primer
+  uso de This device con la versión anterior y con la nueva sobre once estados
+  —los tres pasos, los cinco desenlaces, error, ocupado, sin herramientas— y el
+  HTML salió idéntico byte a byte. Los doce tests de consola de ese recorrido
+  quedan como la guarda permanente.
 
 ## 8. Huecos declarados
 

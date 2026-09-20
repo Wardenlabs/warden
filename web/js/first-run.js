@@ -30,9 +30,9 @@
 import { $, api, esc, post, state } from './core.js';
 import { refreshHealth } from './data.js';
 import { TOOL_NAMES } from './format.js';
-import { ICONS } from './icons.js';
 import { render } from './render.js';
 import { go } from './router.js';
+import { card, cards as cardGroup, screen as shell } from './run-shell.js';
 import { button, feedback } from './ui.js';
 import { VIEWS } from './views.js';
 
@@ -119,63 +119,23 @@ const OUTCOME_RAIL = {
 };
 
 /**
- * The five segments the file draws are three here, and they share the column
- * rather than keeping their 160px. A bar filled up to where you are; the label
- * above it is what says which step that is. The file does not distinguish the
- * current segment from the finished ones and neither does this — a third state
- * nobody drew is a third state nobody agreed to.
- */
-function rail(step, label) {
-  const bars = [1, 2, 3].map((n) => `<i class="${n <= step ? '--done' : ''}"></i>`).join('');
-  return `<div class="first-run-rail"><p class="kicker">${esc(label)}</p><div>${bars}</div></div>`;
-}
-
-/**
- * Two cards. In steps 1 and 2 they are choices and the led one is the
- * selection; from step 3 on they are a state and an instruction, and `--lead`
- * marks the one carrying the state. Same box, and the design file draws them
- * the same way on purpose.
+ * The shell is run-shell.js; this is only what is This device's about it. The
+ * five segments the design file draws are three here, and they share the column
+ * rather than keeping their 160px.
  *
- * `tone` is never the verdict. The confirmation paints "Blocked · credential
- * request" green because the outcome was good, and the allowed outcome — which
- * really is an ALLOW — is neutral, because it is progress and not an ending.
+ * What went wrong sits between the choice and the note: under the thing that
+ * was tried, above what happens next. Only connecting sets it today.
  */
-function card(title, body, { lead = false, tone = '', choice = '' } = {}) {
-  const cls = `choice-card${lead ? ' --lead' : ''}${tone ? ` --${tone}` : ''}`;
-  const attrs = choice
-    ? ` role="radio" aria-checked="${lead}" tabindex="0" data-choice="${esc(choice)}"`
-    : '';
-  return `<div class="${cls}"${attrs}>
-    <b>${esc(title)}</b>
-    <span>${esc(body)}</span>
-  </div>`;
-}
-
 function screen({ step, label, title, cards, action, note, back = true }) {
-  // What went wrong sits between the choice and the note: under the thing that
-  // was tried, above what happens next. Only connecting sets it today.
   const error = state.firstRun.error
     ? feedback({ tone: 'error', title: 'That did not work', body: esc(state.firstRun.error) })
     : '';
-  return `<div class="first-run">
-    <header><button type="button" class="first-run-mark" id="firstRunLeave" aria-label="Warden — leave setup">${ICONS.brand}</button></header>
-    <div class="first-run-body">
-      <div class="first-run-heading">
-        <p class="kicker">THIS DEVICE · FIRST RUN</p>
-        <h1>${esc(title)}</h1>
-      </div>
-      ${rail(step, label)}
-      <div class="first-run-content">
-        <div class="first-run-cards"${cards.choice ? ' role="radiogroup" aria-label="Choose one"' : ''}>${cards.html}</div>
-        ${error}
-        <p class="first-run-note">${esc(note)}</p>
-      </div>
-      <div class="first-run-actions">
-        ${back ? button('← Back', { kind: 'link', id: 'firstRunBack' }) : '<span></span>'}
-        ${action}
-      </div>
-    </div>
-  </div>`;
+  return shell({
+    kicker: 'THIS DEVICE · FIRST RUN', steps: 3, step, label, title,
+    content: cardGroup(cards.html, cards.choice),
+    error, note, action, back,
+    ids: { leave: 'firstRunLeave', back: 'firstRunBack' }
+  });
 }
 
 function stepConnect() {
@@ -373,7 +333,11 @@ function bindFirstRun() {
   // The wordmark is the way out. The design draws it and does not say it is a
   // link; without it this screen has no exit that is not quitting the app, and
   // leaving without finishing must not mark anything as done.
-  if (leave) leave.onclick = () => go('soloRules');
+  // The flag is what makes it one. `soloRules` asks on every entry whether the
+  // first run is due, nothing about that has changed by leaving, and so without
+  // it the way out led straight back in. Memory only: it says they left this
+  // session, not where they were, and reopening the app asks again.
+  if (leave) leave.onclick = () => { state.firstRun.left = true; go('soloRules'); };
 
   const back = $('firstRunBack');
   if (back) back.onclick = () => {

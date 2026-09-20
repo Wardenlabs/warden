@@ -32,8 +32,8 @@ const TABS = [['', 'People'], ['roles', 'Roles'], ['company', 'Company']];
 const tabOf = () => (state.sel === 'roles' || state.sel === 'company' ? state.sel : state.sel ? null : '');
 
 const exemptRoles = () => new Set(state.policy.exemptRoles ?? ['admin']);
-const isExemptRole = (role) => exemptRoles().has(role);
-const firstName = (p) => String(p?.name ?? '').split(' ')[0];
+export const isExemptRole = (role) => exemptRoles().has(role);
+export const firstName = (p) => String(p?.name ?? '').split(' ')[0];
 const toolsOf = (e) => (e.connected ?? []).map((c) => TOOL_NAMES[c.tool] ?? c.tool);
 const isConnected = (e) => Boolean(e.connected?.length);
 const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? null;
@@ -56,7 +56,7 @@ const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).fil
 const devicesOf = (e) => e.devices ?? [];
 const heardAt = (e) => devicesOf(e).map((d) => Date.parse(d.lastSeen)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? lastActiveAt(e);
 
-function wiring(e) {
+export function wiring(e) {
   const devices = devicesOf(e);
   if (!devices.length) return { kind: 'never' };
 
@@ -132,7 +132,7 @@ const maskKey = (key) => {
  * they had read anything about exemptions, was silently unjudged. A default that
  * hands out a bypass is the wrong default however defensible the sort order.
  */
-const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
+export const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
 
 function teamPage(tab = '', context = false) {
     return `<div class="sheet">

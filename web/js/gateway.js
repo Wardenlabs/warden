@@ -1,6 +1,7 @@
 
 import { $, attr, esc, post, state } from './core.js';
 import { refreshChain, refreshHealth } from './data.js';
+import { askReach, watchReach } from './reach.js';
 import { modelLabel, plural } from './format.js';
 import { render } from './render.js';
 import { button, conditionBlock, feedback, pageHead, tabs } from './ui.js';
@@ -170,6 +171,7 @@ function deviceSummary() {
 // ── Access ───────────────────────────────────────────────────────────────────
 
 const expose = { asked: null, error: '', timer: null };
+const lan = { asked: null, error: '' };
 
 async function watchAddress(want) {
   clearTimeout(expose.timer);
@@ -205,9 +207,58 @@ function accessTab() {
       <div class="gw-address"><span class="mono">${esc(here)}</span>${button('Copy', { compact: true, attrs: `data-copy="${attr(here)}"` })}</div>
     </section>
     <section class="gw-section">
+      <h2>Network access</h2>
+      ${networkAccess()}
+    </section>
+    <section class="gw-section">
       <h2>Public access</h2>
       ${publicAddress()}
     </section>
+  </div>`;
+}
+
+/**
+ * Whether this network can get in, and the switch for it.
+ *
+ * It was a checkbox in the desktop menu and nowhere else. The first run of Team
+ * turns it on, but that is a screen somebody sees once; this is where it lives
+ * afterwards, and where a person's page sends an administrator whose setup
+ * message was refused.
+ *
+ * Where the switch is depends on what started this gateway: the desktop app can
+ * be asked, a checkout has an environment variable, and offering a button that
+ * answers 409 would be its own dead end. A gateway older than `reach` says
+ * nothing here, because nothing is known.
+ */
+function networkAccess() {
+  const reach = state.reach;
+  if (!reach) return '<div class="gw-block"><p class="gw-note">This gateway does not report how it is bound.</p></div>';
+  const on = reach.listening === 'network';
+  const error = lan.error ? feedback({ tone: 'error', icon: true, title: 'Network access did not change', body: esc(lan.error) }) : '';
+  if (lan.asked) {
+    return `<div class="gw-block">
+      <p class="gw-line">${lan.asked === 'on' ? 'Turning on network access…' : 'Turning off network access…'}</p>
+      <p class="gw-note">Warden restarts to change what it listens on. This page reconnects by itself.</p>
+      ${button(lan.asked === 'on' ? 'Turning on…' : 'Turning off…', { kind: 'primary', busy: true })}
+    </div>`;
+  }
+  if (on) {
+    return `<div class="gw-block">
+      <p class="gw-line --allow">On</p>
+      ${reach.lanUrl
+        ? `<p class="mono public-url">${esc(reach.lanUrl)}</p><p class="gw-note">Teammates on this network connect here. A Warden key is still required.</p>`
+        : '<p class="gw-note">Warden is listening, but this computer is not on a network.</p>'}
+      <div class="btn-row">${reach.lanUrl ? button('Copy address', { attrs: `data-copy="${attr(reach.lanUrl)}"` }) : ''}${reach.canChange ? button('Turn off', { id: 'stopLan' }) : ''}</div>
+      ${error}
+    </div>`;
+  }
+  return `<div class="gw-block">
+    <p class="gw-line">Off</p>
+    <p class="gw-note">Only this computer can reach Warden, so no setup message can work for anybody else.</p>
+    ${reach.canChange
+      ? button('Turn on network access', { kind: 'primary', id: 'startLan' })
+      : '<p class="gw-note">Start this gateway with <span class="mono">WARDEN_HOST=0.0.0.0</span> to let this network in.</p>'}
+    ${error}
   </div>`;
 }
 
@@ -231,14 +282,7 @@ function publicAddress() {
   }
   return `<div class="gw-block">
     <p class="gw-line">Off</p>
-    <p class="gw-note">${loopbackOnly()
-      // Where the switch is depends on what started this gateway: the desktop
-      // app has a menu item, a checkout has an environment variable, and
-      // sending somebody to a menu that does not exist is its own dead end.
-      ? `Only this computer can reach Warden. To let teammates on this network in, ${state.reach?.canChange
-        ? 'turn on Allow LAN access in the Warden menu.'
-        : 'start it with <span class="mono">WARDEN_HOST=0.0.0.0</span>.'}`
-      : 'Only devices on this network can reach Warden.'}</p>
+    <p class="gw-note">${loopbackOnly() ? 'Nobody outside this computer can reach Warden.' : 'Only devices on this network can reach Warden.'}</p>
     ${state.canLeaveDemo
       ? `${button('Turn on public access', { kind: 'primary', id: 'startExpose', disabled: state.mock })}${state.mock ? '<p class="gw-note">Unavailable in demo mode.</p>' : ''}`
       : '<p class="gw-note">Public access is managed outside the desktop app for this gateway.</p>'}
@@ -317,6 +361,23 @@ function bindGateway() {
     render();
     void watchAddress(enabled);
   };
+  const askLan = async (enabled) => {
+    lan.error = '';
+    const asked = await askReach('lan', enabled);
+    if (!asked.ok) { lan.error = asked.error; render(); return; }
+    lan.asked = enabled ? 'on' : 'off';
+    render();
+    watchReach(
+      () => (state.reach?.listening === 'network') === enabled,
+      (done) => {
+        lan.asked = null;
+        if (!done) lan.error = 'Warden did not come back with the new setting within two minutes. Try again.';
+        if (state.view === 'gateway') render();
+      }
+    );
+  };
+  if ($('startLan')) $('startLan').onclick = () => void askLan(true);
+  if ($('stopLan')) $('stopLan').onclick = () => void askLan(false);
   if ($('startExpose')) $('startExpose').onclick = () => void askExpose(true);
   if ($('stopExpose')) $('stopExpose').onclick = () => void askExpose(false);
 

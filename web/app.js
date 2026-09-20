@@ -27,6 +27,7 @@ import './js/engine.js';
 import './js/models.js';
 import './js/draft.js';
 import './js/team.js';
+import './js/team-setup.js';
 import './js/simulator.js';
 import './js/redteam.js';
 import './js/solo.js';

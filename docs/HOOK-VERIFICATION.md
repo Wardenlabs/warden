@@ -81,6 +81,32 @@ branch is covered by the test with a stand-in zenity; the Windows branch is
 not executed by any test and has not been watched on a Windows machine,
 which is the next thing a verification run there should do.
 
+## The first run of Team, 2026-09-20
+
+**NOT VERIFIED.** `docs/prd/teams-onboarding.md` §9.17 is the gate: a clean
+desktop install on one machine, the run walked to its last step, the setup
+message pasted on a second machine on the same network, and the first machine's
+screen moving to `SETUP COMPLETE · CONNECTED` with nobody touching it. Nobody
+has done that. Then the same with a public address from another network
+(§9.18), and a restart with the tunnel up (§9.19).
+
+What has been watched, all on one machine against an isolated mock gateway on
+port 8137: a gateway bound to loopback refuses to build a setup message (409,
+`reach: loopback`) and says so on `/health`; with a public address set it
+builds one that points there; and after a wiring report sent with the person's
+key, the last step draws not wired and then connected. Seven screens were
+looked at in headless Chrome, each as a fresh page load — so what was seen is
+that every state draws correctly, not the screen moving by itself. That the
+gateway emits a `device` event on a report is tested; that an open console
+redraws on it has not been watched. The step that asks the desktop shell to
+open the LAN was not exercised at all — a checkout has no shell, so that screen
+shows the environment variable instead — and neither was the splash remembering
+its answer. Both are typechecked and nothing more.
+
+The failure this run exists to prevent — a setup message carrying a LAN address
+on a gateway bound to loopback — was read in the code and never reproduced on a
+second machine either. The fix is tested; the original bug is an inference.
+
 ## Real QVAC observations
 
 Cold benign evaluation: `ALLOW`, 26,602 ms wall / 26,342 ms pipeline. After a

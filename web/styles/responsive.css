@@ -85,8 +85,9 @@ body[data-bare] .pane { margin-left: var(--frame-inset); }
 
 .first-run-rail { display: grid; gap: var(--s-4); }
 .first-run-rail > div { display: flex; gap: var(--s-6); }
-/* Three equal segments sharing the column. Reached and not reached; the label
-   above says which one is now, and the file draws no third state. */
+/* Equal segments sharing the column — three on This device, four on Team.
+   Reached and not reached; the label above says which one is now, and the file
+   draws no third state. */
 .first-run-rail i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-control); }
 .first-run-rail i.--done { background: var(--action); }
 
@@ -131,6 +132,12 @@ body[data-bare] .pane { margin-left: var(--frame-inset); }
   background: var(--verdict-allow-bg);
 }
 
+/* Team's run asks for a name on two of its steps. The field is the dialogs'
+   `.field`, held to the reading measure: a name does not need the 880 the cards
+   take, and a text input that wide reads as a search bar. */
+.first-run-field { width: min(var(--w-reading), 100%); }
+.first-run-field input { width: 100%; }
+
 .first-run-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
 .first-run-actions {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
@@ -138,6 +145,11 @@ body[data-bare] .pane { margin-left: var(--frame-inset); }
 /* `.btn.--link` carries 12 of padding for its hover plate; pulled back by the
    same 12 so the arrow sits on the column's edge, as the frames draw it. */
 .first-run-actions .btn.--link { margin-left: calc(-1 * var(--s-4)); color: var(--ink-body); }
+/* A quiet control beside the action, for a step whose button is not the only
+   thing worth pressing. The pull-back above is for Back on the column's edge;
+   in here the link sits against the button and keeps its own padding. */
+.first-run-actions-end { display: flex; align-items: center; gap: var(--s-3); }
+.first-run-actions-end .btn.--link { margin-left: 0; }
 
 @media (max-width: 900px) {
   .first-run-body { padding-top: var(--s-9); }
