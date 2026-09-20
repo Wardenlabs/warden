@@ -310,9 +310,9 @@ function audiencePicker(e) {
   if (state.draftFor) return `<span class="labels">${audience(e.appliesTo)}</span><span class="fact-note">locked, you started this from their page</span>`;
   const on = new Set(e.appliesTo);
   const opts = [
-    { token: '*', label: 'Everyone', tone: 'everyone' },
+    { token: '*', label: 'Everyone', tone: roleTone('*') },
     ...state.company.roles.map((r) => ({ token: r, label: r, tone: roleTone(r) })),
-    ...state.company.employees.map((p) => ({ token: `@${p.id}`, label: p.name, tone: 'everyone' }))
+    ...state.company.employees.map((p) => ({ token: `@${p.id}`, label: p.name, tone: 'neutral' }))
   ];
   const items = opts.map((o) => `<button type="button" role="menuitemcheckbox" aria-checked="${on.has(o.token)}" class="menu-item" data-token="${esc(o.token)}"><i class="menu-dot --${o.tone}"></i><span>${esc(o.label)}</span>${on.has(o.token) ? '<b class="menu-check">✓</b>' : ''}</button>`).join('');
   return `<details class="menu --left audience-picker"${e.audienceOpen ? ' open' : ''}>

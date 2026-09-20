@@ -212,9 +212,39 @@ export function conditionBlock({ key, claim, detail = '', tone = 'allow', summar
 
 // ── identity and verdicts ────────────────────────────────────────────────────
 
-const ROLE_TONES = new Set(['admin', 'employee', 'sales', 'solo']);
-/** A role has an identity colour only if the system names one; the rest share "everyone". */
-export const roleTone = (role) => (ROLE_TONES.has(role) ? role : 'everyone');
+/**
+ * Which identity colour a role wears.
+ *
+ * A role is a string an administrator invents — `POST /api/roles` takes any
+ * name and there is no fixed set — so the colour cannot be a property of the
+ * name. It used to be: four names were spelled out here and everything else
+ * fell through to the neutral, which meant the four roles of the demo
+ * directory had colours and every role a real company creates was grey.
+ *
+ * So the palette carries four numbered identity slots and a role takes one by
+ * a hash of its own name. That is stable across renders, reloads and machines
+ * with no state to keep, so a role is the same colour in the table, in the
+ * picker and in the menu without anything having to agree beforehand.
+ *
+ * Collisions past four roles are expected and harmless: the colour groups rows
+ * at a glance and never carries the meaning on its own — the word beside it
+ * does, always. Two roles sharing a hue is a weaker signal, not a wrong one.
+ *
+ * "Everyone" is a scope rather than a role, and a person is not a role either;
+ * both take the neutral.
+ */
+const ROLE_SLOTS = 4;
+export function roleTone(role) {
+  const name = String(role ?? '').trim().toLowerCase();
+  if (!name || name === '*' || name === 'everyone') return 'neutral';
+  // FNV-1a: short names, good spread, four lines.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < name.length; i += 1) {
+    hash ^= name.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `r${(hash % ROLE_SLOTS) + 1}`;
+}
 
 /** Label / Role: an outlined chip in the role's colour. Identity, not severity. */
 export function roleLabel(role, text = role) {

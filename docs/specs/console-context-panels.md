@@ -82,3 +82,29 @@ Remove replace the duplicate checkbox/menu controls.
 components, rules, settings and responsive. New settings use the shared grid,
 section headings and action footer. Views must escape API strings before
 passing HTML to a component. Labels remain plain strings that components escape.
+
+## Role colour, reversed after v0.2.18
+
+Role labels are coloured again, and the earlier sentence above — "Attention and
+role labels use neutral ink" — holds only for attention now. Flattening the
+roles to neutral removed the wrong thing: a role is what groups a table, and
+five greys group nothing.
+
+The mistake underneath it was in `roleTone`, not in the palette. It matched
+against four spelled-out names — `admin`, `employee`, `sales`, `solo` — and
+everything else fell through to the neutral. Those four are the demo
+directory's roles, so the only installation where the colours worked was the
+sample one; a real company creating `engineer` got grey. A role is any string
+`POST /api/roles` accepts, so there is no list to colour by hand.
+
+The palette carries four numbered identity slots and a neutral, and a role
+takes a slot by a hash of its own name: stable across renders, reloads and
+machines with no state to keep, so the same role is the same colour in the
+table, the picker and the menu without anything agreeing beforehand.
+Collisions past four roles are expected and harmless — the colour groups rows
+at a glance and never carries the meaning alone; the word beside it does.
+"Everyone" is a scope rather than a role, and a person is not one either; both
+take the neutral. Tokens are `--role-1` … `--role-4` and `--role-neutral`,
+named by slot rather than by role for the same reason. In Figma they are
+`role/1` … `role/4` and `role/neutral`; `Label / Role`'s four variants are four
+example roles standing in for the four slots, not a claim that admin is blue.
