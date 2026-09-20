@@ -45,12 +45,19 @@
   --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
   --signal-red: #FF3B5C;
 
-  /* roles — identity, never severity */
-  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
-  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
-  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
-  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
-  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+  /* roles — identity, never severity.
+     Four identity slots and a neutral, and they are numbered rather than named
+     because a role is a string an administrator invents: there is no list of
+     roles to colour by hand, so a role takes a slot by a hash of its own name
+     (see roleTone in web/js/ui.js). "Everyone" and a person are not roles and
+     take the neutral. The names these four had — admin, employee, sales, solo —
+     were four example roles from a demo directory, and colouring by them left
+     every role a real company invents grey. */
+  --role-1: #365FA5;  --role-1-bg: #EAF1FF;
+  --role-2: #256B78;  --role-2-bg: #E7F5F7;
+  --role-3: #6547B5;  --role-3-bg: #F1EDFF;
+  --role-4: #944473;  --role-4-bg: #F8EDF5;
+  --role-neutral: #596062;  --role-neutral-bg: #EEF0EE;
 
   /* Sidebar. It used to be one dark slab in both modes, and the note here said
      so; the redesign made it light on light and dark on dark, so the six below
@@ -63,7 +70,7 @@
   --sidebar-avatar: #E6E8E6;
   --sidebar-selected-text: #22282A;
 
-  /* Accessibility, and it shares the blue of --role-admin. Left where it was:
+  /* Accessibility, and it shares the blue of --role-1. Left where it was:
      the collection does not name it and the neutrals moving is not a reason to
      move a focus indicator. It is worth looking at against the light sidebar,
      which is a different contrast problem from the near-black one it was
@@ -108,11 +115,11 @@
     --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
     --signal-red: #FF5C77;
 
-    --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
-    --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
-    --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
-    --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
-    --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+    --role-1: #7FA5E8;  --role-1-bg: #1B2536;
+    --role-2: #5FB5C4;  --role-2-bg: #14282C;
+    --role-3: #A78BE8;  --role-3-bg: #241D38;
+    --role-4: #D183B4;  --role-4-bg: #321F2B;
+    --role-neutral: #AAA9A4;  --role-neutral-bg: #2B2B2B;
 
     --sidebar-bg: #202020;
     --sidebar-text: #CACAC7;
@@ -157,11 +164,11 @@
   --verdict-attention: var(--ink-body); --verdict-attention-bg: var(--surface-subtle);
   --signal-red: #FF5C77;
 
-  --role-admin: var(--ink-body);     --role-admin-bg: var(--surface-subtle);
-  --role-employee: var(--ink-body);  --role-employee-bg: var(--surface-subtle);
-  --role-sales: var(--ink-body);     --role-sales-bg: var(--surface-subtle);
-  --role-solo: var(--ink-body);      --role-solo-bg: var(--surface-subtle);
-  --role-everyone: var(--ink-body);  --role-everyone-bg: var(--surface-subtle);
+  --role-1: #7FA5E8;  --role-1-bg: #1B2536;
+  --role-2: #5FB5C4;  --role-2-bg: #14282C;
+  --role-3: #A78BE8;  --role-3-bg: #241D38;
+  --role-4: #D183B4;  --role-4-bg: #321F2B;
+  --role-neutral: #AAA9A4;  --role-neutral-bg: #2B2B2B;
 
   --sidebar-bg: #202020;
   --sidebar-text: #CACAC7;

@@ -30,9 +30,10 @@
 import { $, api, esc, post, state } from './core.js';
 import { refreshHealth } from './data.js';
 import { TOOL_NAMES } from './format.js';
+import { ICONS } from './icons.js';
 import { render } from './render.js';
 import { go } from './router.js';
-import { button } from './ui.js';
+import { button, feedback } from './ui.js';
 import { VIEWS } from './views.js';
 
 // ── what the server says, and what step that makes it ────────────────────────
@@ -126,7 +127,7 @@ const OUTCOME_RAIL = {
  */
 function rail(step, label) {
   const bars = [1, 2, 3].map((n) => `<i class="${n <= step ? '--done' : ''}"></i>`).join('');
-  return `<div class="first-run-rail"><p>${esc(label)}</p><div>${bars}</div></div>`;
+  return `<div class="first-run-rail"><p class="kicker">${esc(label)}</p><div>${bars}</div></div>`;
 }
 
 /**
@@ -151,16 +152,26 @@ function card(title, body, { lead = false, tone = '', choice = '' } = {}) {
 }
 
 function screen({ step, label, title, cards, action, note, back = true }) {
+  // What went wrong sits between the choice and the note: under the thing that
+  // was tried, above what happens next. Only connecting sets it today.
+  const error = state.firstRun.error
+    ? feedback({ tone: 'error', title: 'That did not work', body: esc(state.firstRun.error) })
+    : '';
   return `<div class="first-run">
-    <header><button type="button" class="first-run-mark" id="firstRunLeave">warden</button></header>
+    <header><button type="button" class="first-run-mark" id="firstRunLeave" aria-label="Warden — leave setup">${ICONS.brand}</button></header>
     <div class="first-run-body">
-      <p class="first-run-eyebrow">THIS DEVICE · FIRST RUN</p>
-      <h1>${esc(title)}</h1>
+      <div class="first-run-heading">
+        <p class="kicker">THIS DEVICE · FIRST RUN</p>
+        <h1>${esc(title)}</h1>
+      </div>
       ${rail(step, label)}
-      <div class="first-run-cards"${cards.choice ? ' role="radiogroup" aria-label="Choose one"' : ''}>${cards.html}</div>
-      <p class="first-run-note">${esc(note)}</p>
+      <div class="first-run-content">
+        <div class="first-run-cards"${cards.choice ? ' role="radiogroup" aria-label="Choose one"' : ''}>${cards.html}</div>
+        ${error}
+        <p class="first-run-note">${esc(note)}</p>
+      </div>
       <div class="first-run-actions">
-        ${back ? '<button type="button" class="first-run-back" id="firstRunBack">← Back</button>' : '<span></span>'}
+        ${back ? button('← Back', { kind: 'link', id: 'firstRunBack' }) : '<span></span>'}
         ${action}
       </div>
     </div>
@@ -277,14 +288,14 @@ function stepVerify() {
     disconnected: {
       title: `${name} is not connected`,
       cards: card('Connection failed', `The ${name} hook is missing. Warden could not check this request.`, { lead: true, tone: 'block' })
-        + card('Where to fix it', 'Return to Connect a tool (step 01), enable Warden, then send the safe request again.'),
+        + card('Where to fix it', 'Return to Connect a tool (step 1), enable Warden, then send the safe request again.'),
       action: button('Review connection', { kind: 'primary', id: 'firstRunReconnect' }),
       note: `After reconnecting, verify with a real request from ${name}.`
     },
     'no-decision': {
       title: 'Warden did not respond',
       cards: card('No decision from Warden', 'The hook timed out. This request has no verified rule decision.', { lead: true, tone: 'block' })
-        + card('Retry from Claude Code', `Reopen Warden if needed. Then send the safe credential request from ${name} again.`),
+        + card(`Retry from ${name}`, `Reopen Warden if needed. Then send the safe credential request from ${name} again.`),
       action: button(busy ? 'Trying…' : 'Try again', { kind: 'primary', id: 'firstRunCheck', busy }),
       note: `After Warden responds, repeat the safe request from ${name}.`
     }
@@ -343,6 +354,7 @@ function bindFirstRun() {
       const value = choice.dataset.choice;
       if (value === 'preset' || value === 'own') state.firstRun.rule = value;
       else state.firstRun.tool = value;
+      state.firstRun.error = '';
       render();
       return;
     }

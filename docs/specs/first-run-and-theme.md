@@ -704,6 +704,23 @@ fuente**; el botón no es un camino distinto.
 
 ### 5.6 Los componentes que el archivo no tiene
 
+> **Actualizado 2026-09-20 — la tabla de abajo es histórica.** El recorrido se
+> llevó a la cáscara de v0.2.6, primero en Figma (`06 · This device`, secciones A
+> y B, los siete frames) y después en `web/styles/responsive.css`. Lo que cambió:
+> el panel flota con su marco de 12 en los cuatro lados en vez de ser una hoja a
+> sangre; la banda superior es la fila de `Header / Page v4` (48) con
+> `Brand / Lockup` donde iba el texto "warden"; el título es `Display / Claim`
+> (Manrope 22, −2.5%), el mismo de "Protection on"; el riel son tres tramos que
+> se reparten la columna; la tarjeta toma la caja del bloque de estado (radius
+> 14, padding 24, alto del contenido, sin los 132 fijos), título `Display / Block`
+> y cuerpo de 13; elegida = la placa del bloque de estado, `surface/subtle` sobre hairline (el
+> borde de 2px `--action` se retiró: no existe en ningún otro lado de la consola;
+> `surface/selected` es para pestañas y filas, no para una tarjeta de 880), hover =
+> borde `line/accessible`, sin relleno; el tono de falla tiñe la placa y el título pero deja el borde
+> de 1px `line/control`, como lo dibuja el archivo; `← Back` es `.btn.--link`; y
+> un error al conectar se muestra en una placa `feedback --error`, que antes se
+> guardaba en `state.firstRun.error` y no se pintaba nunca.
+
 Los seis frames del recorrido **instancian un solo componente de la librería**:
 el botón (`605:1120` en el paso 1, y su equivalente en los otros cinco), 176×40,
 que es el `.btn.--primary` que ya existe. Todo lo demás son textos y rectángulos

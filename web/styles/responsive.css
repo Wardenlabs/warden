@@ -41,102 +41,106 @@
 /* ── the first run ────────────────────────────────────────────────────────────
    A screen with no sidebar, no breadcrumb and one thing to do. `body[data-bare]`
    is set by render() for a view that declares `bare`, and the first run is the
-   only one. The column is 880 centred in the window, with the wordmark and its
-   rule in a band above it at the page margin — the proportions come from the
-   Figma frames at 1440 (see docs/specs/first-run-and-theme.md §5.6). */
+   only one. It keeps the console's frame: the pane still floats on the sidebar
+   grey with its hairline and radius, and only gains the left inset the sidebar
+   used to stand in for. The band on top is Header / Page v4's row with the
+   lockup where a title would be; the column under it is 880, centred. Drawn in
+   Figma on `06 · This device`, sections A and B. */
 body[data-bare] .sidebar { display: none; }
-body[data-bare] .pane { padding: 0; margin: 0; height: 100dvh; border: 0; border-radius: 0; }
+body[data-bare] .pane { margin-left: var(--frame-inset); }
 
-.first-run { min-height: 100vh; }
 .first-run > header {
-  padding: var(--s-9) var(--s-10) var(--s-6);
+  display: flex; align-items: center; height: var(--h-page-row);
   border-bottom: 1px solid var(--line-hairline);
 }
-/* The wordmark is the way out, and the only one. Styled as the mark rather than
+/* The lockup is the way out, and the only one. Styled as the mark rather than
    as a button because that is what it is; it keeps a button's focus ring and a
-   button's keyboard behaviour, which a div with a click handler does not. */
+   button's keyboard behaviour, which a div with a click handler does not. Same
+   100 × 30 the sidebar draws it at. */
 .first-run-mark {
   appearance: none; border: 0; background: none; padding: 0;
-  font: inherit; font-size: var(--fs-5); font-weight: var(--fw-semi);
-  letter-spacing: var(--ls-tight); color: var(--ink); cursor: pointer;
+  display: flex; color: var(--ink); cursor: pointer;
 }
+.first-run-mark svg { display: block; width: 100px; height: 30px; }
 .first-run-mark:hover { color: var(--ink-body); }
 
 .first-run-body {
-  width: min(880px, 100% - 2 * var(--s-10));
+  width: min(880px, 100%);
   margin: 0 auto;
   padding: var(--s-11) 0 var(--s-10);
   display: flex; flex-direction: column;
-  /* The gaps between blocks are set on the blocks, not here: the rail sits
-     closer to its label than the cards sit to each other. */
-  gap: 0;
+  /* One rhythm between the four blocks — heading, rail, cards, actions — and
+     the tighter gaps live inside each of them. */
+  gap: var(--s-9);
 }
-.first-run-eyebrow {
-  font-size: var(--fs-1); font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-}
+.first-run-body p { margin: 0; }
+.first-run-heading { display: grid; gap: var(--s-4); }
+/* Display / Claim: the same 22 Manrope as "Protection on", the headline this
+   screen hands over to when it finishes. */
 .first-run-body h1 {
-  margin-top: var(--s-4);
-  font-size: var(--fs-7); font-weight: var(--fw-semi);
-  letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
+  margin: 0;
+  font: var(--fw-semi) var(--fs-7)/1.4 var(--display);
+  letter-spacing: -.025em; color: var(--ink);
 }
 
-.first-run-rail { margin-top: var(--s-9); }
-.first-run-rail p {
-  font-size: var(--fs-1); font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted);
-}
-.first-run-rail > div { display: flex; gap: var(--s-6); margin-top: var(--s-4); }
-/* Three equal segments sharing the column, rather than the file's five fixed
-   at 160px. Reached and not reached; the label above says which one is now,
-   and the file draws no third state. */
+.first-run-rail { display: grid; gap: var(--s-4); }
+.first-run-rail > div { display: flex; gap: var(--s-6); }
+/* Three equal segments sharing the column. Reached and not reached; the label
+   above says which one is now, and the file draws no third state. */
 .first-run-rail i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-control); }
 .first-run-rail i.--done { background: var(--action); }
 
-.first-run-cards { margin-top: var(--s-8); display: flex; flex-direction: column; gap: var(--s-7); }
+.first-run-content { display: grid; gap: var(--s-7); }
+.first-run-cards { display: flex; flex-direction: column; gap: var(--s-7); }
 
 /* Two on every screen. On steps 1 and 2 they are choices and `--lead` is the
    selected one; from step 3 on they are a state and an instruction, and
    `--lead` is the one carrying the state. The tone is about the outcome, never
    about the verdict: the confirmation is green under a card that says
-   "Blocked", because blocking was the good ending. */
+   "Blocked", because blocking was the good ending.
+
+   The box is the status block's — 14 and 24, as `.settings-layout .conditions`
+   — because that is the block this run ends on. The height is the content's. */
 .choice-card {
-  min-height: 132px;
-  padding: var(--s-7) var(--s-7) var(--s-7) 26px;
+  padding: var(--s-8);
   display: flex; flex-direction: column; gap: var(--s-3);
-  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  border: 1px solid var(--line-control); border-radius: 14px;
   background: var(--surface-page);
 }
-.choice-card b { font-size: var(--fs-5); font-weight: var(--fw-semi); }
-.choice-card span { font-size: var(--fs-3); color: var(--ink-body); }
+.choice-card b { font: var(--fw-semi) var(--fs-5)/var(--lh-snug) var(--display); color: var(--ink); }
+.choice-card span { font-size: var(--fs-4); line-height: var(--lh-snug); color: var(--ink-body); }
 [data-choice] { cursor: pointer; }
+/* Hover moves the border and not the fill, because the fill is what says
+   "chosen" and a hovered card must not read as the chosen one. */
+[data-choice]:not(.--lead):hover { border-color: var(--line-accessible); }
 [data-choice]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-/* The border goes 1px → 2px as well as changing colour, so the selection is
-   legible without colour at all. Padding compensates so nothing shifts. */
-.choice-card.--lead {
-  border-width: 2px; border-color: var(--action);
-  background: var(--surface-subtle);
-  padding: calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) calc(var(--s-7) - 1px) 25px;
-}
-.choice-card.--lead.--block { border-color: var(--verdict-block); background: var(--verdict-block-bg); }
+/* The chosen card is the status block's plate — --surface-subtle on a hairline,
+   as `.settings-layout .conditions` — the grey every block on the main views
+   uses. --surface-selected is for a tab, a filter and a sidebar row; across
+   880px it reads as a disabled slab. There was a 2px --action border here too,
+   so the choice read without colour; nothing else in the console draws one, and
+   the radio's `aria-checked` already says it to whoever cannot see the grey. */
+.choice-card.--lead { border-color: var(--line-hairline); background: var(--surface-subtle); }
+/* A failure is loud in its words and not a red slab: the plate tints, the
+   title takes the red, and the border stays the quiet one. */
+.choice-card.--lead.--block { border-color: var(--line-control); background: var(--verdict-block-bg); }
 .choice-card.--lead.--block b { color: var(--verdict-block); }
-.choice-card.--lead.--allow { border-color: var(--verdict-allow); background: var(--verdict-allow-bg); }
-.choice-card.--lead.--allow b { color: var(--verdict-allow); }
+/* The one ending, and the one card that keeps a second pixel. */
+.choice-card.--lead.--allow {
+  border-width: 2px; border-color: var(--verdict-allow); padding: calc(var(--s-8) - 1px);
+  background: var(--verdict-allow-bg);
+}
 
-.first-run-note { margin-top: var(--s-7); font-size: var(--fs-3); color: var(--muted); }
+.first-run-note { margin: 0; font-size: var(--fs-3); color: var(--muted); }
 .first-run-actions {
-  margin-top: var(--s-9);
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
 }
-.first-run-back {
-  appearance: none; border: 0; background: none; padding: 0;
-  font: inherit; color: var(--ink-body); cursor: pointer;
-}
-.first-run-back:hover { color: var(--ink); }
+/* `.btn.--link` carries 12 of padding for its hover plate; pulled back by the
+   same 12 so the arrow sits on the column's edge, as the frames draw it. */
+.first-run-actions .btn.--link { margin-left: calc(-1 * var(--s-4)); color: var(--ink-body); }
 
 @media (max-width: 900px) {
-  .first-run > header { padding: var(--s-7) var(--s-6) var(--s-5); }
-  .first-run-body { width: calc(100% - 2 * var(--s-6)); padding-top: var(--s-9); }
+  .first-run-body { padding-top: var(--s-9); }
   .first-run-rail > div { gap: var(--s-4); }
 }
 

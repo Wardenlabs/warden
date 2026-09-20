@@ -49,6 +49,9 @@ data/escalations.jsonl
 # which machines each person has Warden on. Hostnames are personal data — they
 # usually carry somebody's name — so this is 0600 and never committed.
 data/devices.json
+# which tools on this machine finished the first run with a real judged request.
+# Evidence about one installation, written by src/policy/verification.ts.
+data/verified.json
 data/cache/
 
 # Generated reports (REPORT.md and BENCHMARKS.md ARE committed — they are deliverables)
