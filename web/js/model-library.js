@@ -1,6 +1,8 @@
 /** Named model connections and imports. Credentials exist only in requests. */
 import { $, api, attr, del, esc, post, state } from './core.js';
-import { fileSize, modelLabel } from './format.js';
+import { refreshAdjudicator, refreshCompiler } from './data.js';
+import { downloadSize, fileSize } from './format.js';
+import { ICONS } from './icons.js';
 import { render } from './render.js';
 import { button, feedback, menuItem } from './ui.js';
 
@@ -9,6 +11,19 @@ const editor = { draft: null, busy: '', note: null, pendingFile: null, controlle
 let jobs = [];
 let timer;
 let generation = 0;
+/** The last status read failed: what is on screen is a memory, not a reading. */
+let stale = false;
+let reading = false;
+/** Requests in flight per row, so a double click is one request. */
+const pending = new Set();
+/** A start or cancel that failed says so beside its row, not in a toast. */
+const rowNotes = new Map();
+/** The deep link whose row has been focused, so revisiting does nothing twice. */
+let focused = null;
+const BUILTIN_ACTIVE = ['connecting', 'downloading', 'retrying', 'verifying', 'cancelling'];
+const isBuiltin = (job) => job.source === 'builtin';
+const running = (job) => (isBuiltin(job) ? BUILTIN_ACTIVE : ['queued', 'downloading']).includes(job.state);
+const builtinJob = (id) => jobs.find((job) => isBuiltin(job) && job.builtinId === id) ?? null;
 const roleLabel = (role) => role === 'adjudicator' ? 'analyzer' : 'compiler';
 const jobLabel = (role) => role === 'adjudicator' ? 'Analysis' : 'Compilation';
 const activePage = () => ['models', 'compiler'].includes(state.view);
@@ -25,23 +40,107 @@ export async function loadLibrary() {
     if (own !== generation) return;
     library.catalog = catalog.ok ? catalog.j : null;
     library.error = catalog.ok ? '' : safeError(catalog.j, 'Your models could not be loaded. Refresh to try again.');
-    jobs = transfers.ok ? transfers.j?.jobs ?? [] : [];
+    // A failed read is not an empty list. Emptying it made a running download
+    // vanish from its row and re-enabled Download on top of it.
+    if (transfers.ok) { jobs = transfers.j?.jobs ?? []; stale = false; } else stale = jobs.some(running);
   } catch {
-    if (own === generation) library.error = 'Warden could not be reached. Check the gateway connection and refresh.';
+    if (own === generation) { library.error = 'Warden could not be reached. Check the gateway connection and refresh.'; stale = jobs.some(running); }
   } finally {
     if (own === generation) library.loading = false;
   }
   scheduleTransfers();
 }
 
+/**
+ * One timer, one read in flight. Two seconds while something is moving; ten
+ * while nothing is, because the job belongs to the gateway and another
+ * administrator may have started one this browser has never heard of. The
+ * backend job does not care whether anybody is watching: leaving the page
+ * stops the questions, not the download.
+ */
 function scheduleTransfers() {
   clearTimeout(timer);
-  if (!activePage() || !jobs.some((job) => ['queued', 'downloading'].includes(job.state))) return;
-  timer = setTimeout(async () => {
-    if (!activePage()) return;
-    await loadLibrary();
-    if (activePage()) render();
-  }, 2000);
+  if (!activePage() || (typeof document !== 'undefined' && document.hidden)) return;
+  timer = setTimeout(pollTransfers, stale ? 5000 : jobs.some(running) ? 2000 : 10000);
+}
+
+export function leaveLibrary() { clearTimeout(timer); generation++; focused = null; }
+
+async function pollTransfers() {
+  if (reading || !activePage()) return;
+  reading = true;
+  const own = generation;
+  let next = null;
+  try {
+    const result = await api('/api/settings/models/downloads');
+    if (result.ok) next = result.j?.jobs ?? [];
+  } catch { /* handled as a stale read below */ }
+  reading = false;
+  if (own !== generation || !activePage()) return;
+  if (next) await applyJobs(next);
+  else if (!stale && jobs.some(running)) { stale = true; renderLibrary(); }
+  scheduleTransfers();
+}
+
+const structure = (list) => list.map((job) => `${job.id}:${job.state}:${job.canCancel !== false}`).sort().join('|');
+
+/**
+ * Take a new reading. Bytes are written into the row that is already there;
+ * the page is only drawn again when a job starts, ends or changes what can be
+ * done to it. Drawing it every two seconds restarted the arrow's pulse on every
+ * poll and closed the menu Cancel lives in a moment after it was opened.
+ */
+export async function applyJobs(next) {
+  const before = jobs;
+  const wasStale = stale;
+  jobs = next;
+  stale = false;
+  for (const job of next.filter(isBuiltin)) {
+    const previous = before.find((old) => old.id === job.id);
+    if (previous?.state !== job.state) announce(job, Boolean(previous));
+  }
+  const finished = next.some((job) => job.state === 'complete' && before.find((old) => old.id === job.id)?.state !== 'complete');
+  if (!wasStale && structure(before) === structure(next)) { for (const job of next) patchJob(job); return; }
+  // A file that has just landed changes three answers at once: the catalogue,
+  // the analyzer picker and the runtime inventory. Refreshing only the first
+  // left Use pointing at a choice that still said "download required".
+  if (finished) await refreshInstalled();
+  renderLibrary();
+}
+
+async function refreshInstalled() {
+  const own = generation;
+  const [catalog] = await Promise.all([api('/api/settings/models').catch(() => ({ ok: false })), refreshAdjudicator(), refreshCompiler()]);
+  if (own === generation && catalog.ok) library.catalog = catalog.j;
+}
+
+/** Transitions, once each, to a region that outlives the page being redrawn. */
+function announce(job, known) {
+  const text = { connecting: known ? '' : `Downloading ${job.name}.`, complete: `${job.name} downloaded.`, cancelled: `${job.name} download cancelled.`,
+    failed: `${job.name} download failed.`, interrupted: `${job.name} download was interrupted.` }[job.state];
+  if (!text || typeof document === 'undefined' || !document.body) return;
+  let region = $('libraryLive');
+  if (!region) {
+    region = Object.assign(document.createElement('div'), { id: 'libraryLive', className: 'sr-only' });
+    region.setAttribute('role', 'status'); region.setAttribute('aria-live', 'polite');
+    document.body.append(region);
+  }
+  region.textContent = text;
+}
+
+/** The console tests have no DOM to draw a whole page into. They replace this
+ * to count redraws, which is the behaviour a poll must not get wrong. */
+let draw = render;
+export function setLibraryRedraw(fn) { draw = fn ?? render; }
+
+/** Redraw without losing the open menu or the focused control to it. */
+function renderLibrary() {
+  if (!activePage() || typeof document === 'undefined') return;
+  const open = document.querySelector?.('details.menu[open] > summary[id]')?.id;
+  const focus = document.activeElement?.id;
+  draw();
+  if (open) $(open)?.parentElement?.setAttribute('open', '');
+  if (focus) $(focus)?.focus?.({ preventScroll: true });
 }
 
 function field(id, label, value, placeholder, options = '') {
@@ -126,49 +225,124 @@ function statusCell(model, active, tested, roles) {
 }
 
 /**
- * The built-in weights, in the same table as your own. The judge's built-in
- * choices come from the adjudicator settings, the local rule writer from the
- * model inventory; built-ins are shipped and chosen, not tested per role, and
- * one that is not on disk says so and offers the download.
+ * What a built-in row says, from the file on disk and its latest job.
+ *
+ * A running job first, because that is what somebody is waiting on; then what
+ * is installed and whether it is actually in force; then how the last attempt
+ * ended. A cancelled job says nothing — the file is simply not there.
  */
-function builtInRows() {
-  const a = state.adjudicator;
-  const customJudge = library.catalog?.selections?.adjudicator;
-  const judges = (a?.choices ?? []).map((c) => {
-    const selected = !customJudge && c.id === a.model;
-    const status = selected && c.onDisk ? '<span class="status-text --allow">Active · judging</span>'
-      : selected ? '<span class="status-text --attention">Selected · not downloaded</span>'
-        : c.onDisk ? '<span>Downloaded · built-in</span>' : '<span class="cell-muted">Not downloaded</span>';
-    const items = [
-      ...(c.onDisk && !selected ? [{ label: 'Use for analysis', attrs: `data-judge-builtin="${esc(c.id)}"` }] : []),
-      ...(!c.onDisk && !selected ? [{ label: 'Select for download', attrs: `data-judge-builtin="${esc(c.id)}"` }] : []),
-      ...(!c.onDisk && state.canLeaveDemo ? [{ label: 'Download models', cls: 'js-get-models' }] : [])
-    ];
-    return `<div class="trow" role="row">
-      <span class="cell-stack"><span class="mono cell-strong">${esc(c.filename ?? c.label)}</span><small>${esc(c.label)} · ${(c.approxMB / 1000).toFixed(1)} GB · ${esc(c.perDecision ?? 'Speed not measured')}</small></span>
-      <span>Request judge</span>
-      <span class="mono cell-muted">${esc(c.format ?? (/dynaguard/i.test(c.filename ?? c.id) ? 'dynaguard' : 'compliance'))}</span>
-      <span>${status}</span>
-      <span class="row-menu">${items.length ? `<details class="menu --right"><summary class="menu-trigger --dots" aria-label="More actions for ${esc(c.label)}">···</summary><div class="menu-list" role="menu">${items.map(menuItem).join('')}</div></details>` : ''}</span>
-    </div>`;
-  });
-  const localWriter = state.models?.models?.find((m) => m.role === 'compiler');
-  const writerActive = state.compiler?.provider === 'local' && !library.catalog?.selections?.compiler;
-  const writer = localWriter ? `<div class="trow" role="row">
-      <span class="cell-stack"><span class="mono cell-strong">${esc(localWriter.name)}</span><small>${esc(modelLabel(localWriter.name))} · local rule writer</small></span>
-      <span>Rule writer</span>
-      <span class="mono cell-muted">compliance</span>
-      <span>${writerActive && localWriter.onDisk ? '<span class="status-text --allow">Active · drafting</span>' : writerActive ? '<span class="status-text --attention">Selected · not downloaded</span>' : localWriter.onDisk ? '<span>Downloaded · built-in</span>' : '<span class="cell-muted">Not downloaded</span>'}</span>
-      <span></span>
-    </div>` : '';
-  return judges.join('') + writer;
+export function builtinStatus(b, job) {
+  const bytes = (n) => downloadSize(n ?? 0);
+  if (job && running(job)) {
+    const known = job.total > 0;
+    const moved = job.received > 0 ? known ? `${bytes(job.received)} of ${bytes(job.total)}` : `${bytes(job.received)} downloaded` : '';
+    const text = job.state === 'downloading' ? known ? `Downloading · ${Math.floor(job.received / job.total * 100)}%` : 'Downloading'
+      : job.state === 'retrying' ? `Retrying · attempt ${job.attempt} of ${job.maxAttempts}`
+        : job.state === 'verifying' ? 'Verifying…' : job.state === 'cancelling' ? 'Cancelling…' : 'Connecting…';
+    return { text, detail: stale ? `Status unavailable · last read ${moved || 'before any data arrived'}` : moved, tone: stale ? 'attention' : '', arrow: stale ? 'stale' : 'live',
+      progress: job.state === 'cancelling' ? null : { received: job.received ?? 0, total: known ? job.total : null } };
+  }
+  if (b.onDisk) {
+    const active = b.activeRoles ?? [];
+    if (active.length) return { text: `Active · ${active.map((r) => (r === 'adjudicator' ? 'judging' : 'drafting')).join(', ')}`, detail: '', tone: 'allow' };
+    // A file Warden did not fetch itself is there, not vouched for.
+    return { text: b.verifiedDownload ? 'Downloaded · built-in' : 'On disk · built-in', detail: (b.selectedRoles ?? []).length ? 'Selected · not loaded' : '', tone: '' };
+  }
+  if (b.downloadBlockedReason) return { text: 'Model file requires repair', detail: b.downloadBlockedReason, tone: 'attention' };
+  if (job?.state === 'failed') return { text: 'Download failed', detail: job.error ?? 'Retry to continue.', tone: 'block' };
+  if (job?.state === 'interrupted') return { text: 'Download interrupted', detail: job.error ?? 'The gateway stopped during this download.', tone: 'attention' };
+  if ((b.selectedRoles ?? []).length) return { text: 'Selected · not downloaded', detail: '', tone: 'attention' };
+  return { text: 'Not downloaded', detail: '', tone: 'muted' };
 }
 
+const toneClass = (tone) => tone === 'muted' ? 'cell-muted' : tone ? `status-text --${tone}` : '';
+const progressAttrs = (p) => p ? ` role="progressbar" aria-valuemin="0"${p.total ? ` aria-valuemax="${p.total}" aria-valuenow="${Math.min(p.received, p.total)}"` : ''}` : '';
+
+function statusMarkup(b, job) {
+  const s = builtinStatus(b, job);
+  const id = attr(b.id);
+  return `<span class="download-status" id="builtin-status-${id}">
+    <span class="download-line">${s.arrow ? `<span class="download-arrow --${s.arrow}" id="builtin-progress-${id}" aria-label="Download progress for ${esc(b.name)}"${progressAttrs(s.progress)}>${ICONS.download}</span>` : ''}<span id="builtin-status-text-${id}" class="${toneClass(s.tone)}">${esc(s.text)}</span></span>
+    <small id="builtin-status-detail-${id}" title="${esc(s.detail)}">${esc(s.detail)}</small>
+  </span>`;
+}
+
+/** Bytes into the existing row. Anything that is not there is a redraw's job. */
+function patchJob(job) {
+  if (!running(job)) return;
+  if (!isBuiltin(job)) {
+    const line = $(`transfer-text-${job.id}`);
+    if (line) line.textContent = `${fileSize(job.received ?? 0)}${job.total ? ` of ${fileSize(job.total)}` : ''} downloaded`;
+    const bar = $(`transfer-progress-${job.id}`);
+    if (bar && job.total) { bar.max = job.total; bar.value = job.received ?? 0; }
+    return;
+  }
+  const b = library.catalog?.builtins?.find((entry) => entry.id === job.builtinId);
+  if (!b) return;
+  const s = builtinStatus(b, job);
+  const text = $(`builtin-status-text-${b.id}`);
+  const detail = $(`builtin-status-detail-${b.id}`);
+  const bar = $(`builtin-progress-${b.id}`);
+  if (text) text.textContent = s.text;
+  if (detail) { detail.textContent = s.detail; detail.title = s.detail; }
+  if (bar && s.progress?.total) { bar.setAttribute('aria-valuemax', s.progress.total); bar.setAttribute('aria-valuenow', Math.min(s.progress.received, s.progress.total)); }
+}
+
+/**
+ * The built-in weights, in the same table as your own: one row per file on the
+ * gateway's disk, from the gateway's own inventory of them. The compiler row
+ * used to be inferred from the runtime's model list, which describes whatever
+ * is loaded — an imported file or an override as readily as the bundled one.
+ * Qwen3 1.7B writes rules and can judge; it is one file, so it is one row.
+ *
+ * Download fetches that file and changes nothing else. Use stays a separate
+ * item that appears once the file is here.
+ */
+function builtInRows() {
+  const catalog = library.catalog;
+  const transfer = catalog?.transfer ?? { available: false, reason: null, active: null };
+  return (catalog?.builtins ?? []).map((b) => {
+    const id = attr(b.id);
+    const job = builtinJob(b.id);
+    const choice = state.adjudicator?.choices?.find((c) => c.id === b.adjudicatorChoice);
+    const busy = !job || !running(job) ? transfer.active ?? jobs.find(running) ?? null : null;
+    const why = !transfer.available ? transfer.reason ?? 'Model downloads are unavailable on this gateway.'
+      : b.downloadBlockedReason ? b.downloadBlockedReason
+        : busy ? `${busy.name} is being transferred. Finish or cancel it first.` : stale ? 'The gateway is not answering. Download becomes available when it does.' : '';
+    const items = [];
+    if (job && running(job)) items.push({ label: 'Cancel download', id: `builtin-cancel-${id}`, attrs: `data-cancel-download="${attr(job.id)}" data-builtin-row="${id}"`, disabled: job.canCancel === false || pending.has(b.id) });
+    else if (b.onDisk) {
+      const judging = (b.activeRoles ?? []).includes('adjudicator');
+      const blocked = catalog?.overrides?.adjudicator ? 'The environment controls this role. Remove its override to use a saved model.'
+        : state.models?.mock ? 'This gateway is in demo mode. Restart it with real inference to use a downloaded model.' : '';
+      if (b.roles.includes('adjudicator') && !judging) {
+        items.push({ label: 'Use for analysis', id: `builtin-use-${id}`, attrs: `data-judge-builtin="${esc(b.adjudicatorChoice)}"`, disabled: Boolean(blocked) });
+        if (blocked) items.push({ note: blocked });
+      }
+    } else {
+      const retry = job?.state === 'failed' || job?.state === 'interrupted';
+      items.push({ label: retry ? 'Retry download' : `Download · ${downloadSize(b.approxBytes, { estimate: true })}`, id: `builtin-download-${id}`, attrs: `data-builtin-download="${id}"`, disabled: Boolean(why) || pending.has(b.id) || job?.canRetry === false });
+      if (why) items.push({ note: why });
+    }
+    const note = rowNotes.get(b.id);
+    return `<div class="trow" role="row" data-builtin-id="${esc(b.id)}">
+      <span class="cell-stack"><span class="mono cell-strong">${esc(b.filename)}</span><small>${esc(b.name)} · ${downloadSize(b.onDisk && b.bytes ? b.bytes : b.approxBytes, { estimate: !(b.onDisk && b.bytes) })}${choice?.perDecision ? ` · ${esc(choice.perDecision)}` : ''}</small></span>
+      <span>${b.roles.map(jobName).join(', ')}</span>
+      <span class="mono cell-muted">${esc(b.format)}</span>
+      <span>${statusMarkup(b, job)}</span>
+      <span class="row-menu">${items.length ? `<details class="menu --right"><summary class="menu-trigger --dots" id="builtin-menu-${id}" aria-label="More actions for ${esc(b.name)}">···</summary><div class="menu-list" role="menu">${items.map(menuItem).join('')}</div></details>` : ''}</span>
+    </div>
+    ${note ? `<div class="trow-note">${note}</div>` : ''}`;
+  }).join('');
+}
+
+/** Imports of your own. A built-in shows its progress in its row, not here as well. */
 function transferMarkup() {
-  if (!jobs.length) return '';
-  return `<div class="model-transfers" aria-label="Model downloads">${jobs.map((job) => {
-    const running = ['queued', 'downloading'].includes(job.state);
-    return `<div class="model-transfer"><div><b>${esc(job.name ?? 'Model download')}</b><span>${job.state === 'complete' ? 'Imported. Test it below before use.' : job.state === 'failed' ? esc(job.error ?? 'Download failed. Add the model again to retry.') : job.state === 'cancelled' ? 'Download cancelled.' : `${fileSize(job.received ?? 0)}${job.total ? ` of ${fileSize(job.total)}` : ''} downloaded`}</span></div>${running ? `<progress aria-label="Download progress for ${esc(job.name ?? 'model')}"${job.total ? ` max="${job.total}" value="${job.received ?? 0}"` : ''}></progress><button type="button" class="btn --compact" data-cancel-download="${attr(job.id)}">Cancel</button>` : `<span class="status-text${job.state === 'failed' ? ' --block' : ''}">${esc(job.state)}</span>`}</div>`;
+  const custom = jobs.filter((job) => !isBuiltin(job));
+  if (!custom.length) return '';
+  return `<div class="model-transfers" aria-label="Model downloads">${custom.map((job) => {
+    const active = running(job);
+    return `<div class="model-transfer"><div><b>${esc(job.name ?? 'Model download')}</b><span>${job.state === 'complete' ? 'Imported. Test it below before use.' : job.state === 'failed' ? esc(job.error ?? 'Download failed. Add the model again to retry.') : job.state === 'cancelled' ? 'Download cancelled.' : `<span id="transfer-text-${attr(job.id)}">${fileSize(job.received ?? 0)}${job.total ? ` of ${fileSize(job.total)}` : ''} downloaded</span>`}</span></div>${active ? `<progress id="transfer-progress-${attr(job.id)}" aria-label="Download progress for ${esc(job.name ?? 'model')}"${job.total ? ` max="${job.total}" value="${job.received ?? 0}"` : ''}></progress><button type="button" class="btn --compact" data-cancel-download="${attr(job.id)}">Cancel</button>` : `<span class="status-text${job.state === 'failed' ? ' --block' : ''}">${esc(job.state)}</span>`}</div>`;
   }).join('')}</div>`;
 }
 
@@ -223,7 +397,56 @@ export function bindLibrary(onChanged) {
       await onChanged();
     } finally { editor.busy = ''; if (activePage()) { render(); $(focusId)?.focus(); } }
   };
-  for (const button of document.querySelectorAll('[data-cancel-download]')) button.onclick = async () => { button.disabled = true; try { const result = await del(`/api/settings/models/downloads/${button.dataset.cancelDownload}`); if (!result.ok) editor.note = { scope: 'library', ok: false, text: safeError(result.j, 'The download could not be cancelled.') }; } catch { editor.note = { scope: 'library', ok: false, text: 'Warden could not be reached. Try again.' }; } await loadLibrary(); render(); };
+  // Download and Retry are the same request: this row's file, and nothing about
+  // which model judges. The answer decides what the row says, so a refusal
+  // stays beside the model it was about instead of passing by in a toast.
+  for (const button of document.querySelectorAll('[data-builtin-download]')) button.onclick = async () => {
+    const id = decodeURIComponent(button.dataset.builtinDownload);
+    if (pending.has(id)) return;
+    pending.add(id); rowNotes.delete(id);
+    button.closest('details.menu')?.removeAttribute('open');
+    let failure = '';
+    try {
+      const result = await post(`/api/settings/models/builtins/${attr(id)}/download`, {});
+      if (result.ok && result.j?.job) jobs = [...jobs.filter((job) => !(isBuiltin(job) && job.builtinId === id)), result.j.job];
+      else if (!result.ok) failure = safeError(result.j, 'The download could not be started. Try again.');
+    } catch { failure = 'Warden could not be reached. Try again.'; }
+    pending.delete(id);
+    if (failure) rowNotes.set(id, note({ ok: false, text: failure }));
+    await loadLibrary();
+    if (!activePage()) return;
+    render();
+    $(`builtin-menu-${id}`)?.focus();
+  };
+  for (const button of document.querySelectorAll('[data-cancel-download]')) button.onclick = async () => {
+    const row = button.dataset.builtinRow ? decodeURIComponent(button.dataset.builtinRow) : null;
+    const key = row ?? button.dataset.cancelDownload;
+    if (pending.has(key)) return;
+    pending.add(key); button.disabled = true;
+    button.closest('details.menu')?.removeAttribute('open');
+    let failure = '';
+    try {
+      const result = await del(`/api/settings/models/downloads/${button.dataset.cancelDownload}`);
+      // "Already finished" is not a failed cancel; the refresh below shows what it became.
+      if (!result.ok && result.j?.code !== 'transfer_finished') failure = safeError(result.j, 'The download could not be cancelled.');
+    } catch { failure = 'Warden could not be reached. Try again.'; }
+    pending.delete(key);
+    if (failure && row) rowNotes.set(row, note({ ok: false, text: failure }));
+    else if (failure) editor.note = { scope: 'library', ok: false, text: failure };
+    await loadLibrary();
+    if (!activePage()) return;
+    render();
+    if (row) $(`builtin-menu-${row}`)?.focus();
+  };
+  // A link from Active or the compiler's notice names a row. Bring it into view
+  // once; coming back to the same address must not start or change anything.
+  const wanted = state.query?.model;
+  if (wanted && focused !== wanted && library.catalog) {
+    focused = wanted;
+    const trigger = $(`builtin-menu-${wanted}`);
+    trigger?.scrollIntoView?.({ block: 'center' });
+    trigger?.focus?.({ preventScroll: true });
+  }
   bindEditor(onChanged);
 }
 
@@ -272,3 +495,10 @@ function bindEditor(onChanged) {
     finally { body.apiKey = ''; editor.controller = null; editor.busy = ''; if (activePage()) { render(); $(editor.draft ? 'saveCustomModel' : 'addCustomModel')?.focus(); } }
   };
 }
+
+// Coming back to the tab reads the gateway at once instead of waiting out a
+// timer that was stopped while nobody was looking.
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(timer);
+  else if (activePage()) void pollTransfers();
+});

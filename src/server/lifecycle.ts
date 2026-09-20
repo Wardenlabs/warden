@@ -3,6 +3,7 @@
  * orphaning the inference worker.
  */
 import type { Server } from 'node:http';
+import { builtinDownloads } from '../models/builtin-downloads.js';
 import { probeRuntime, shutdown, warmup } from '../qvac/client.js';
 import { isMock } from '../qvac/index.js';
 import { onShellMessage } from './desktop-bridge.js';
@@ -72,6 +73,21 @@ export function preloadModels(): void {
 }
 
 /**
+ * Settle what the last process left of its downloads.
+ *
+ * Reading the journal is synchronous and happens on first use, so a status
+ * request can never see a dead gateway's job as still running. What is left for
+ * here is the one repair that costs time: a file published in the instant
+ * before a crash has no receipt, and writing one means hashing it. Not awaited,
+ * for the reason the warmup is not — the console comes up first. Nothing is
+ * resumed: an interrupted transfer waits for somebody to press Retry rather
+ * than spending a connection nobody asked it to.
+ */
+export function reconcileTransfers(): void {
+  void builtinDownloads.reconcile().catch(() => undefined);
+}
+
+/**
  * Exit paths. The QVAC worker is a separate OS process the SDK spawns; exiting
  * without `shutdown()` leaves it orphaned — which is exactly what a plain
  * Ctrl-C did until now. The desktop app depends on this handler too: it asks
@@ -88,11 +104,15 @@ export function installExitHandlers(server: Server): void {
     // A wedged model unload must not outlive the desktop app's five-second
     // patience — leaving cleanly at four beats being force-killed at five.
     setTimeout(finish, 4000).unref();
+    // Mock mode has no inference worker to unload, and it used to leave at
+    // once. It can download real files now, so it stops them like any other:
+    // closed streams and an Interrupted job, inside the same four seconds.
+    const transfers = builtinDownloads.shutdown().catch(() => undefined);
     if (isMock()) {
-      finish();
+      void transfers.then(finish);
       return;
     }
-    void shutdown().catch(() => undefined).then(finish);
+    void Promise.all([transfers, shutdown().catch(() => undefined)]).then(finish);
   };
   process.on('SIGTERM', gracefulExit);
   process.on('SIGINT', gracefulExit);

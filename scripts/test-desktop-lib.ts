@@ -32,6 +32,29 @@ for (const name of members('CatalogLib')) {
 }
 console.log(`✓ the desktop shell's contract holds: ${[...members('DownloadLib'), ...members('CatalogLib')].join(', ')}`);
 
+// Electron's main process loads these two modules and everything they import.
+// The downloader grew three helpers on 2026-09-20; walk the whole graph so none
+// of them, now or later, can pull the inference runtime in through a side door.
+const seen = new Set<string>();
+const walk = (file: string): void => {
+  if (seen.has(file)) return;
+  seen.add(file);
+  const source = readFileSync(file, 'utf8');
+  for (const match of source.matchAll(/^import\s+(type\s+)?[^'"]*?from\s+'([^']+)'|^import\s+'([^']+)'/gm)) {
+    const target = match[2] ?? match[3]!;
+    if (match[1]) continue;
+    assert.ok(!target.startsWith('@qvac/'), `${file} imports ${target}: the desktop shell must not load the SDK`);
+    if (target.startsWith('.')) {
+      const next = join(file, '..', target.replace(/\.js$/, '.ts'));
+      assert.ok(!/\/src\/qvac\//.test(next), `${file} imports ${target}: src/qvac is the SDK boundary`);
+      walk(next);
+    }
+  }
+};
+for (const entry of ['download', 'catalog']) walk(join(import.meta.dirname, '..', 'src', 'setup', `${entry}.ts`));
+assert.ok([...seen].some((file) => file.endsWith('transfer-lock.ts')) && [...seen].some((file) => file.endsWith('model-http.ts')));
+console.log(`✓ ${seen.size} setup modules load without the QVAC runtime`);
+
 const temporary = mkdtempSync(join(tmpdir(), 'warden-setup-models-'));
 const settingsPath = join(temporary, 'settings.json');
 const baseRoles = ['detector', 'adjudicator', 'embedder'];
@@ -91,15 +114,18 @@ try {
   // Use the actual disk-presence algorithm with small stand-ins for large
   // weights. The selected plan is what both desktop boot and setup consume.
   save({ compiler: savedCompiler('claude-cli') });
+  // Presence now reads the GGUF header, so a fixture has to carry one.
+  const weights = Buffer.alloc(32, 1);
+  weights.write('GGUF'); weights.writeUInt32LE(3, 4); weights.writeBigUInt64LE(1n, 8); weights.writeBigUInt64LE(1n, 16);
   const tiny = catalog.setupModelDownloads(settingsPath, false, {}).map((spec) => ({ ...spec, approxMB: 0.00001 }));
   assert.equal(download.missingModels(temporary, tiny).length, 3);
-  for (const spec of tiny) writeFileSync(join(temporary, spec.filename), 'test-weights');
+  for (const spec of tiny) writeFileSync(join(temporary, spec.filename), weights);
   assert.deepEqual(download.missingModels(temporary, tiny), [], 'Claude-default desktop can boot without Qwen compiler file');
   save({ compiler: savedCompiler('local') });
   const selectedLocal = catalog.setupModelDownloads(settingsPath, false, {}).map((spec) => ({ ...spec, approxMB: 0.00001 }));
   assert.deepEqual(download.missingModels(temporary, selectedLocal).map((spec) => spec.role), ['compiler']);
   const compiler = selectedLocal.find((spec) => spec.role === 'compiler')!;
-  writeFileSync(join(temporary, compiler.filename), 'test-weights');
+  writeFileSync(join(temporary, compiler.filename), weights);
   assert.deepEqual(download.missingModels(temporary, selectedLocal), [], 'local selection becomes ready once its download arrives');
   console.log('✓ actual missing-model checks accept Claude-only setup and request weights after selecting local');
 } finally {

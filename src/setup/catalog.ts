@@ -92,6 +92,44 @@ export const MODEL_CATALOG: DownloadSpec[] = [
   }
 ];
 
+/**
+ * The physical files the console's Library may fetch one at a time.
+ *
+ * A second list rather than a flag on `MODEL_CATALOG` because the two answer
+ * different questions: that one is what setup can download, this one is what a
+ * browser is allowed to ask a running gateway for. The detector, the embedder
+ * and the bench-only Qwen3 4B are in the first and deliberately not here.
+ *
+ * `id` is the catalogue role, which is the artifact's identity: Qwen3 1.7B is
+ * the local compiler and the `base` analyzer seat, and it is one file, one row
+ * and one transfer. URLs stay in `MODEL_CATALOG`; nothing here reaches a disk
+ * path or a network address without going through it.
+ */
+export type LibraryBuiltin = {
+  id: string;
+  name: string;
+  roles: Array<'compiler' | 'adjudicator'>;
+  adjudicatorChoice: string;
+  format: 'compliance' | 'dynaguard' | 'shieldstral' | 'granite-guardian';
+};
+
+export const LIBRARY_BUILTINS: LibraryBuiltin[] = [
+  { id: 'adjudicator', name: 'DynaGuard 4B', roles: ['adjudicator'], adjudicatorChoice: 'default', format: 'dynaguard' },
+  { id: 'adjudicator-dynaguard', name: 'DynaGuard 1.7B', roles: ['adjudicator'], adjudicatorChoice: 'dynaguard', format: 'dynaguard' },
+  { id: 'adjudicator-dynaguard-8b', name: 'DynaGuard 8B', roles: ['adjudicator'], adjudicatorChoice: 'dynaguard-8b', format: 'dynaguard' },
+  { id: 'compiler', name: 'Qwen3 1.7B', roles: ['compiler', 'adjudicator'], adjudicatorChoice: 'base', format: 'compliance' },
+  { id: 'adjudicator-large', name: 'Qwen3 8B', roles: ['adjudicator'], adjudicatorChoice: 'large', format: 'compliance' },
+  { id: 'adjudicator-shieldstral', name: 'Shieldstral 1.0 3B', roles: ['adjudicator'], adjudicatorChoice: 'shieldstral', format: 'shieldstral' },
+  { id: 'adjudicator-granite-guardian', name: 'Granite Guardian 4.1 8B', roles: ['adjudicator'], adjudicatorChoice: 'granite-guardian', format: 'granite-guardian' }
+];
+
+/** A Library id and the pinned download it stands for, or null for anything else. */
+export function libraryBuiltin(id: string): { builtin: LibraryBuiltin; spec: DownloadSpec } | null {
+  const builtin = LIBRARY_BUILTINS.find((entry) => entry.id === id);
+  const spec = builtin && MODEL_CATALOG.find((entry) => entry.role === builtin.id && entry.url);
+  return builtin && spec ? { builtin, spec } : null;
+}
+
 /** The bundled compiler is optional when drafting uses a CLI, an endpoint, or
  * an imported model. Read the same settings as the gateway, including its
  * conservative local fallback for unreadable prior configuration. */

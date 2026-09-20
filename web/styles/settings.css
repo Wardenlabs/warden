@@ -107,6 +107,18 @@
 .model-transfer > div { display: grid; flex: 1; min-width: 0; font-size: var(--fs-4); overflow-wrap: anywhere; }
 .model-transfer > div span { font-size: var(--fs-3); color: var(--muted); }
 .model-transfer progress, .transfer-status progress { width: 120px; accent-color: var(--action); }
+/* A built-in's status is two lines whether or not it is downloading, so a row
+   does not change height when a transfer starts or ends. Only the arrow moves,
+   and only in opacity; the global reduced-motion rule above stills it. */
+.download-status { display: grid; align-content: center; gap: 2px; min-height: 34px; min-width: 0; font-variant-numeric: tabular-nums; }
+.download-line { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.download-status small { font-size: var(--fs-3); color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.download-status small:empty::before { content: '\00a0'; }
+.download-arrow { display: inline-flex; flex: none; width: 14px; height: 14px; color: var(--action); }
+.download-arrow svg { width: 100%; height: 100%; }
+.download-arrow.--live { animation: download-pulse 1.6s ease-in-out infinite; }
+.download-arrow.--stale { color: var(--muted); }
+@keyframes download-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .transfer-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
 .model-file-input { font-size: var(--fs-4); color: var(--ink-body); }
 .model-file-input::file-selector-button { margin-right: var(--s-4); padding: var(--s-2) var(--s-4); border: 1px solid var(--line-accessible); border-radius: var(--r-control); background: var(--surface-page); color: var(--ink); font: inherit; cursor: pointer; }
