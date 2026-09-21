@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const suites = [
-  'test-browser-boundary.ts', 'test-archive-security.mjs',
+  'test-credential-storage.ts', 'test-browser-boundary.ts', 'test-archive-security.mjs',
   'test-sanitize.ts',
   'test-vote.ts', 'test-hook.ts', 'test-cli-compiler.ts', 'test-claude-setup.ts', 'test-draft-schema.ts',
   'test-native-guards.ts', 'test-screen.ts', 'test-desktop-lib.ts', 'test-builtin-downloads.ts', 'test-auth.ts', 'test-installation.ts', 'test-reach.ts', 'test-devices.ts', 'test-verification.ts', 'test-pause.ts', 'test-rules-for-actor.ts',
@@ -24,6 +24,7 @@ try {
     for (const field of ['AUDIT', 'POLICY', 'COMPANY', 'SETTINGS', 'PROMPT', 'PROMPT_TEMPLATES', 'APPEALS', 'ESCALATIONS', 'RATE_STATE', 'MODEL_CATALOG', 'DEVICES', 'VERIFIED']) {
       env[`WARDEN_${field}_PATH`] = join(folder, `${field.toLowerCase()}.json`);
     }
+    env.WARDEN_CREDENTIAL_KEY_PATH = join(folder, 'credential.key');
     env.WARDEN_ADAPTER = 'mock';
     env.WARDEN_MODELS_DIR = join(folder, 'models');
     env.CLAUDE_CODE_ENTRYPOINT = 'test';

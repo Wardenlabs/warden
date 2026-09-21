@@ -118,28 +118,6 @@ echo "Downloading the Warden hook…"
 curl -fsSL "${url}/warden-hook.mjs" -o "$HOOK"
 chmod +x "$HOOK"
 
-# The source of truth, written before anything that copies from it.
-#
-# The profile block below and the \`env\` block --fix writes into Claude Code's
-# settings both still exist — a Claude Code opened from the Dock never sourced
-# a profile, and its env block is static JSON that cannot point at a file — but
-# since this file exists they are copies rather than three separate opinions,
-# and \`--status\` says which one has drifted. See docs/specs/wiring-and-unwiring.md §7.
-#
-# umask before the write, not chmod after: a chmod leaves an instant where the
-# file exists and anybody on the machine can read the key out of it.
-mkdir -p "$HOME/.warden"
-chmod 700 "$HOME/.warden" 2>/dev/null || true
-(
-  umask 077
-  cat > "$HOME/.warden/credentials.json" <<'WARDEN_CREDENTIALS'
-{
-  "url": "${url}",
-  "apiKey": "${person.apiKey}"
-}
-WARDEN_CREDENTIALS
-)
-
 # $BASH_VERSION is not "the shell chose bash": on macOS /bin/sh is bash
 # under the hood, so it is set here even though this ran as sh, and every
 # install used to land in ~/.bashrc — a file zsh (the default shell since
@@ -162,12 +140,11 @@ fi
 cat >> "$PROFILE" <<'WARDEN_BLOCK'
 # >>> warden >>>
 export WARDEN_URL=${url}
-export WARDEN_API_KEY=${person.apiKey}
 # <<< warden <<<
 WARDEN_BLOCK
 
 echo ""
-echo "Done. Hook at $HOOK, key at $HOME/.warden/credentials.json, environment in $PROFILE."
+echo "Hook at $HOOK. Credentials will be stored encrypted by --fix."
 echo "Open a new terminal (or: source $PROFILE)."
 
 # What is on this machine, and then wiring it. --fix adds the hook to the tools
@@ -194,18 +171,14 @@ if [ -z "$NODE_BIN" ]; then
   done
 fi
 
-# The two values just written to the profile go to --fix on its own line,
-# because this shell never sourced that profile and --fix copies them into
-# Claude Code's settings.json \`env\` block too: a Claude Code opened from the
-# desktop app never sourced the profile either, and without them its hook
-# fails open.
+# Pass the credential to this process only; do not put it in a shell profile.
 if [ -n "$NODE_BIN" ]; then
-  WARDEN_URL="${url}" WARDEN_API_KEY="${person.apiKey}" "$NODE_BIN" "$HOOK" --fix${onlyFlag(tool)} || true
+  WARDEN_URL="${url}" WARDEN_API_KEY="${person.apiKey}" "$NODE_BIN" "$HOOK" --fix${onlyFlag(tool)}
 else
   echo ""
   echo "Could not find Node on this machine, so Claude Code / Codex were not wired automatically."
-  echo "Install Node, then run this once:"
-  echo "  WARDEN_URL=${url} WARDEN_API_KEY=${person.apiKey} node \"$HOOK\" --fix${onlyFlag(tool)}"
+  echo "Re-run this installer after installing Node."
+  exit 1
 fi
 
 echo "Anything it could not wire: ${url}  ->  People  ->  ${safeName}  ->  Onboarding"

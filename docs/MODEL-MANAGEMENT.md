@@ -87,7 +87,7 @@ Imported weights are copied into `<WARDEN_MODELS_DIR>/custom/<uuid>.gguf`.
 The catalogue and settings are atomically replaced with mode `0600`, preserving
 unrelated settings. An unreadable existing file is retained and edits fail
 instead of erasing its contents. As with the existing settings file, provider
-keys are plaintext at rest; the browser receives only `hasKey` and a short
+keys are encrypted at rest (see SECURITY.md for key management); the browser receives only `hasKey` and a short
 suffix, never the key or the validation fingerprint.
 
 All model endpoints require the existing administrative authorization. Gateway

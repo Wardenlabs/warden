@@ -8,7 +8,7 @@
  * mean every hire re-hashes the policy version and every audit entry claims a
  * policy change that never happened.
  *
- * Like the policy, this is plain JSON a human can open and read. It is seeded
+ * The directory is JSON; credential fields are encrypted at rest. It is seeded
  * once from `data/seed/company.json` and then owned by the admin console —
  * the seed file stays pristine so a fresh clone always demonstrates the same
  * company, and so `git status` stays quiet while someone plays with the app.
@@ -18,9 +18,10 @@
  * credential rather than a convenience.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { z } from 'zod';
+import { readCredentialJSON, writeCredentialJSON, migrateCredentialJSON } from '../security/credentials.js';
+import { publishedCredentialHashes } from '../security/published-credentials.js';
 import { markPendingReconnect } from './devices.js';
 
 const COMPANY_PATH = process.env['WARDEN_COMPANY_PATH'] ?? 'data/company.json';
@@ -196,49 +197,36 @@ export function loadSampleCompany(seedPath = SEED_PATH): Directory {
     employees: seeded.employees.map((e) => ({ ...e, apiKey: newApiKey(e.id) }))
   };
 
-  try {
-    return save(issued);
-  } catch {
-    // A read-only checkout still gets a working directory for this process;
-    // the keys simply do not survive a restart.
-    cached = issued;
-    return cached;
-  }
+  return save(issued);
 }
 
 function readIfPresent(path: string): Directory | null {
   if (!existsSync(path)) return null;
-  const parsed = directorySchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+  const raw = path === COMPANY_PATH ? readCredentialJSON(path, 'company') : JSON.parse(readFileSync(path, 'utf8'));
+  const parsed = directorySchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error(`company directory at ${path} is malformed: ${parsed.error.message}`);
+    throw new Error('The saved company directory is malformed. Restore its file before changing people.');
+  }
+  if (path === COMPANY_PATH) {
+    const rotated: string[] = [];
+    for (const employee of parsed.data.employees) {
+      if (publishedCredentialHashes.has(createHash('sha256').update(employee.apiKey).digest('hex'))) {
+        employee.apiKey = newApiKey(employee.id);
+        rotated.push(employee.id);
+      }
+    }
+    if (rotated.length) {
+      writeCredentialJSON(path, parsed.data, 'company');
+      for (const id of rotated) markPendingReconnect(id);
+    }
+    else migrateCredentialJSON(path, parsed.data, 'company');
   }
   return parsed.data;
 }
 
 function save(next: Directory): Directory {
   const validated = directorySchema.parse(next);
-  mkdirSync(dirname(COMPANY_PATH), { recursive: true });
-  writeFileSync(COMPANY_PATH, JSON.stringify(validated, null, 2) + '\n');
-  /*
-   * This file holds every employee's API key in plaintext, and it was writing
-   * 0644 — readable by every account on the machine, and by anything that ends
-   * up with the data folder in a backup, a sync client or a container image.
-   * The settings file beside it has been 0600 since it started holding a
-   * compiler key, for exactly this reason; the directory is the more valuable
-   * of the two and had the weaker mode.
-   *
-   * It does not make the keys not plaintext. That is the honest limitation in
-   * SECURITY.md and this does not close it — it removes the readers who never
-   * needed to be trusted with them in the first place.
-   *
-   * Best effort: a filesystem without POSIX modes throws here and the file is
-   * still written, which is the right trade for a save that already succeeded.
-   */
-  try {
-    chmodSync(COMPANY_PATH, 0o600);
-  } catch {
-    /* not a POSIX filesystem */
-  }
+  writeCredentialJSON(COMPANY_PATH, validated, 'company');
   cached = validated;
   return validated;
 }

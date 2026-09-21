@@ -10,6 +10,7 @@ import { buildUnwireScript } from '../src/server/routes/install.js';
 type HookResult = { code: number | null; stdout: string; stderr: string };
 type Handler = (req: IncomingMessage, res: ServerResponse) => void;
 
+const defaultHome = mkdtempSync(join(tmpdir(), 'warden-hook-isolated-'));
 const hook = resolve('integrations/warden-hook.mjs');
 const allow = { verdict: 'ALLOW', auditId: 'audit-allow', firedRules: [] };
 const block = {
@@ -22,6 +23,8 @@ async function runHook(payload: unknown, url: string, env: Record<string, string
   const child = spawn(process.execPath, [hook], {
     env: {
       ...process.env,
+      HOME: defaultHome,
+      USERPROFILE: defaultHome,
       WARDEN_URL: url,
       WARDEN_USER: 'fede',
       // Healthy child-process requests must survive a loaded CI machine.
@@ -134,37 +137,67 @@ async function main(): Promise<void> {
   console.log('✓ WARDEN_INTERNAL lets the gateway\'s own compile through unjudged');
 
   const unavailable = await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1');
-  assert.equal(unavailable.code, 0);
-  assert.equal(unavailable.stdout, '');
-  assert.match(unavailable.stderr, /Prompt allowed unchecked/);
-  console.log('✓ unavailable gateway fails open with a warning');
+  assert.equal(unavailable.code, 2);
+  assert.equal(JSON.parse(unavailable.stdout).decision, 'block');
+  assert.match(unavailable.stderr, /could not be reached/);
+  console.log('✓ unavailable gateway blocks with a reason');
+  const stateFile = join(defaultHome, '.warden-hook.state.json');
+  writeFileSync(stateFile, JSON.stringify({ 'http://127.0.0.1:1': { failClosed: false } }));
+  assert.equal((await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1')).code, 2);
+  writeFileSync(stateFile, JSON.stringify({ 'http://127.0.0.1:1': { failClosed: false, failurePolicyVersion: 1 } }));
+  assert.equal((await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1')).code, 0);
+  writeFileSync(stateFile, '{broken');
+  assert.equal((await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1')).code, 2);
+  console.log('✓ only a versioned explicit opt-out survives an outage; old and corrupt caches block');
 
   await withServer((req, res) => {
     if (req.url === '/health') return setTimeout(() => json(res, { ok: true }), 100);
     json(res, allow);
   }, async (url) => {
     const result = await runHook({ prompt: 'hello' }, url, { WARDEN_HEALTH_TIMEOUT_MS: '20' });
-    assert.equal(result.code, 0);
-    assert.match(result.stderr, /Prompt allowed unchecked/);
+    assert.equal(result.code, 2);
+    assert.equal(JSON.parse(result.stdout).decision, 'block');
   });
-  console.log('✓ slow health check fails open at its own deadline');
+  console.log('✓ slow health check blocks at its own deadline');
 
   await withServer((req, res) => {
     if (req.url === '/health') return json(res, { ok: true });
     setTimeout(() => json(res, allow), 100);
   }, async (url) => {
     const result = await runHook({ prompt: 'hello' }, url, { WARDEN_TIMEOUT_MS: '20' });
-    assert.equal(result.code, 0);
-    assert.match(result.stderr, /Prompt allowed unchecked/);
+    assert.equal(result.code, 2);
+    assert.equal(JSON.parse(result.stdout).decision, 'block');
   });
-  console.log('✓ slow decision body fails open at the decision deadline');
+  console.log('✓ slow decision body blocks at the decision deadline');
 
   await withServer(normal({ verdict: 'MAYBE' }), async (url) => {
     const result = await runHook({ prompt: 'hello' }, url);
-    assert.equal(result.code, 0);
+    assert.equal(result.code, 2);
+    assert.equal(JSON.parse(result.stdout).decision, 'block');
     assert.match(result.stderr, /invalid verdict/);
   });
-  console.log('✓ invalid gateway response fails open visibly');
+  console.log('✓ invalid gateway response blocks visibly');
+
+  await withServer((req, res) => {
+    if (req.url === '/health') return json(res, { ok: true, failClosed: false, failurePolicyVersion: 1 });
+    res.destroy();
+  }, async (url) => {
+    const result = await runHook({ prompt: 'hello' }, url);
+    assert.equal(result.code, 0);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /Prompt allowed unchecked/);
+  });
+  console.log('✓ an explicit administrator opt-out permits unchecked requests');
+
+  await withServer((req, res) => {
+    if (req.url === '/health') return json(res, { ok: true, failClosed: false });
+    res.destroy();
+  }, async (url) => {
+    const result = await runHook({ prompt: 'hello' }, url);
+    assert.equal(result.code, 2);
+    assert.equal(JSON.parse(result.stdout).decision, 'block');
+  });
+  console.log('✓ legacy fail-open health data cannot weaken the closed default');
 
   for (const [name, value] of [
     ['WARDEN_HEALTH_TIMEOUT_MS', '0'],
@@ -173,10 +206,14 @@ async function main(): Promise<void> {
     ['WARDEN_TIMEOUT_MS', 'not-a-number']
   ] as const) {
     const result = await runHook({ prompt: 'hello' }, 'http://127.0.0.1:1', { [name]: value });
-    assert.equal(result.code, 0);
+    assert.equal(result.code, 2);
     assert.match(result.stderr, /must be a positive finite number/);
   }
   console.log('✓ timeout configuration rejects non-positive and non-finite values');
+  for (const invalid of [undefined, null, { unknown_host_field: 'uninspected text' }]) {
+    assert.equal((await runHook(invalid, 'http://127.0.0.1:1')).code, 2);
+  }
+  console.log('✓ malformed and unsupported hook events cannot silently allow a request');
 
   // Claude Code cancels a UserPromptSubmit hook at 30 s unless the entry says
   // otherwise, and a cancelled hook lets the prompt through. So the entry
@@ -209,15 +246,14 @@ async function main(): Promise<void> {
   assert.equal(entries[0]?.command, 'node /old/.warden-hook.mjs');
   assert.equal(entries[0]?.timeout, 300);
   // A Claude Code opened from the desktop app never reads the shell profile,
-  // so the gateway address and key have to be in settings.json's env block
-  // for its hook to reach anything. Both writes put them there; a value the
-  // person set by hand for some other variable survives.
+  // so its hook reads the encrypted file directly. The address remains in
+  // settings.json, while an unrelated environment variable survives.
   assert.equal(repaired.env?.WARDEN_URL, 'http://gw.test:8080');
-  assert.equal(repaired.env?.WARDEN_API_KEY, 'wk-test-key');
+  assert.equal(repaired.env?.WARDEN_API_KEY, undefined);
   writeFileSync(settings, JSON.stringify({ env: { OTHER: 'kept', WARDEN_URL: 'http://stale:1' }, hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node /old/.warden-hook.mjs', timeout: 120 }] }] } }));
   const refreshed = await fix();
   assert.equal(refreshed.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks)[0]?.timeout, 300, 'repair the old 120-second entry for document checks');
-  assert.deepEqual(refreshed.env, { OTHER: 'kept', WARDEN_URL: 'http://gw.test:8080', WARDEN_API_KEY: 'wk-test-key' });
+  assert.deepEqual(refreshed.env, { OTHER: 'kept', WARDEN_URL: 'http://gw.test:8080' });
   console.log('✓ --fix writes the Claude Code hook timeout, repairs an entry without one, and puts the gateway in env');
 
   /*
@@ -425,7 +461,7 @@ async function main(): Promise<void> {
 
   const down = await status('http://127.0.0.1:1', 'wk-fede-aaaa');
   assert.notEqual(down.code, 0, 'no gateway is not a pass');
-  assert.match(down.said, /UNCHECKED/, 'and the fail-open is said out loud rather than left in SECURITY.md');
+  assert.match(down.said, /REFUSED/, 'and the fail-open is said out loud rather than left in SECURITY.md');
   console.log('✓ --status names the gateway, the identity and the wiring, and its exit code says whether all three are good');
 
   // Under the Claude desktop app the block is also shown as an OS dialog,
@@ -534,16 +570,40 @@ async function main(): Promise<void> {
   assert.ok(existsSync(credFile), '--fix writes the source of truth');
   assert.equal(statSync(credFile).mode & 0o777, 0o600, 'a credential is not world-readable, not even for an instant');
   const written = JSON.parse(readFileSync(credFile, 'utf8'));
-  assert.equal(written.apiKey, 'wk-fede-written');
+  assert.match(written.apiKey, /^warden-hook:v1:/);
+  assert.ok(!readFileSync(credFile, 'utf8').includes('wk-fede-written'));
   assert.equal(written.url, 'http://gateway.test:8080');
   assert.ok(written.updatedAt, 'and says when, so a stale copy can be recognised as one');
-  assert.match(fixSaid, /the copies below are written from it/, 'and says which direction the copying goes');
+  assert.match(fixSaid, /hooks read this file directly/, 'and says which direction the copying goes');
   const claudeAfter = JSON.parse(readFileSync(join(fixHome, '.claude', 'settings.json'), 'utf8'));
-  assert.equal(claudeAfter.env.WARDEN_API_KEY, 'wk-fede-written', 'the copy in Claude Code matches the source');
-  console.log('✓ --fix writes ~/.warden/credentials.json 0600 first, then derives the copies from it');
+  assert.equal(claudeAfter.env.WARDEN_API_KEY, undefined, 'Claude Code does not retain a plaintext key');
+  console.log('✓ --fix encrypts ~/.warden/credentials.json and removes the host key copy');
+  const pluginHome = mkdtempSync(join(tmpdir(), 'warden-plugin-upgrade-'));
+  try {
+    const pluginFile = join(pluginHome, '.config', 'opencode', 'plugin', 'warden.js');
+    mkdirSync(join(pluginHome, '.config', 'opencode', 'plugin'), { recursive: true });
+    const previous = 'export const WardenPlugin = async () => ({}); // .warden-hook.mjs legacy';
+    writeFileSync(pluginFile, previous);
+    const current = readFileSync(resolve('integrations/opencode/warden.js'), 'utf8');
+    await withServer((req, res) => {
+      if (req.url === '/integrations/opencode/warden.js') return void res.end(current);
+      res.writeHead(404).end();
+    }, async (url) => {
+      const child = spawn(process.execPath, [hook, '--fix', '--only', 'opencode'], {
+        env: { PATH: process.env.PATH, HOME: pluginHome, USERPROFILE: pluginHome, WARDEN_URL: url }, stdio: 'ignore'
+      });
+      const [code] = await once(child, 'close');
+      assert.equal(code, 0);
+      assert.equal(readFileSync(pluginFile, 'utf8'), current);
+      assert.equal(readFileSync(pluginFile + '.warden-bak', 'utf8'), previous);
+      if (process.platform !== 'win32') assert.equal(statSync(pluginFile + '.warden-bak').mode & 0o777, 0o600);
+    });
+  } finally { rmSync(pluginHome, { recursive: true, force: true }); }
+  console.log('✓ --fix upgrades an existing Warden OpenCode plugin and keeps a private backup');
+
 }
 
 main().catch((err) => {
   console.error(err);
   process.exitCode = 1;
-});
+}).finally(() => rmSync(defaultHome, { recursive: true, force: true }));

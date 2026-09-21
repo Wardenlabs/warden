@@ -123,11 +123,9 @@ want port 8080 and each one only knows the keys it issued itself, so "your key
 is not recognised" was indistinguishable from "your key is wrong". People spent
 evenings re-issuing a key that was already correct.
 
-It also catches the two copies of the key disagreeing: `--fix` writes
-`WARDEN_API_KEY` into the `env` block of `~/.claude/settings.json` as well as
-your shell profile, because a Claude Code opened from the Dock never sourced a
-profile — and when those two drift, the terminal and the app are judged as
-different people.
+The hook reads its encrypted credential file directly, including when launched
+from the Dock. `--fix` removes the plaintext key from Claude Code settings.
+
 
 It exits 0 only when all three are good, so a setup script can branch on it.
 
@@ -304,13 +302,11 @@ Ansible, a provisioning script) and the gateway stops being a suggestion.
 
 ## Behaviour worth knowing
 
-**By default, if Warden is unreachable, the prompt goes through**, with a warning
-on stderr. A hook that has learned the gateway's `WARDEN_FAIL_CLOSED=1` policy
-refuses instead. This is the one place in the system that can fail open. Everywhere else an
-unusable answer escalates to a human; here that would mean a crashed daemon
-bricking every developer's CLI at once, and a gateway that can strand the team
-gets uninstalled the first morning it does. The missing heartbeat in the admin
-console is the alert.
+**By default, an unreachable gateway blocks the prompt.** Updated hooks also
+block with missing or old cached state. Only an explicit `WARDEN_FAIL_CLOSED=0`
+opt-out learned from an updated gateway permits unchecked requests. The
+OpenCode plugin refuses when its hook fails to execute. Host-side cancellation
+can still bypass a hook's result; verify the deployed client versions.
 
 Availability and inference use separate deadlines. `/health` gets 10 seconds by
 default (`WARDEN_HEALTH_TIMEOUT_MS`); a real decision gets whatever the

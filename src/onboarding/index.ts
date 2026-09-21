@@ -91,7 +91,9 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
       code:
         `Invoke-WebRequest -Uri '${gatewayUrl}/warden-hook.mjs' -OutFile "$HOME\\.warden-hook.mjs"\n` +
         `$env:WARDEN_URL = '${gatewayUrl}'\n` +
-        `$env:WARDEN_API_KEY = '${employee.apiKey}'`
+        `$env:WARDEN_API_KEY = '${employee.apiKey}'\n` +
+        `node "$HOME\\.warden-hook.mjs" --fix\n` +
+        `Remove-Item Env:WARDEN_API_KEY`
     },
     {
       title: 'Then open a new terminal, and check it reaches the gateway',
@@ -108,9 +110,7 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
       code:
         `curl -fsSL ${gatewayUrl}/warden-hook.mjs -o ${HOOK_PATH}\n` +
         `chmod +x ${HOOK_PATH}\n\n` +
-        `# in ~/.zshrc or ~/.bashrc\n` +
-        `export WARDEN_URL=${gatewayUrl}\n` +
-        `export WARDEN_API_KEY=${employee.apiKey}`
+        `WARDEN_URL=${gatewayUrl} WARDEN_API_KEY=${employee.apiKey} node ${HOOK_PATH} --fix`
     }
   ];
 }
@@ -206,43 +206,15 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
         'OpenCode exposes a chat.message plugin that runs before the request goes to the model.',
       steps: [
         {
-          title: 'Save as ~/.config/opencode/plugin/warden.js',
-          language: 'js',
+          title: 'Install the OpenCode plugin',
+          language: 'bash',
           note:
             'Nobody on this team has watched OpenCode refuse a prompt through this yet. ' +
             'Treat it as a starting point, not a working integration, and tell the admin ' +
             'what happens when you try it.',
-          // `~` is resolved on the employee's machine with homedir(), not here.
-          // Interpolating this server's HOME would write the gateway host's home
-          // directory into a file that runs on somebody else's laptop.
           code:
-            `import { execFileSync } from "node:child_process";\n` +
-            `import { homedir } from "node:os";\n` +
-            `import { join } from "node:path";\n\n` +
-            `const HOOK = join(homedir(), ".warden-hook.mjs");\n\n` +
-            `export const WardenPlugin = async () => ({\n` +
-            `  "chat.message": async (input) => {\n` +
-            `    const text = (input?.parts ?? [])\n` +
-            `      .map((part) => part.text)\n` +
-            `      .filter(Boolean)\n` +
-            `      .join("\\n");\n` +
-            `    if (!text.trim()) return;\n` +
-            `    try {\n` +
-            `      execFileSync("node", [HOOK], {\n` +
-            `        input: JSON.stringify({ prompt: text, source: "opencode" }),\n` +
-            `        env: { ...process.env, WARDEN_API_KEY: "${employee.apiKey}", WARDEN_URL: "${gatewayUrl}" },\n` +
-            `        timeout: 90000\n` +
-            `      });\n` +
-            `    } catch (err) {\n` +
-            `      // Exit 2 is Warden refusing; throwing is what stops the message.\n` +
-            `      // Anything else (hook missing, node not found) fails open, the\n` +
-            `      // same contract as the hook itself.\n` +
-            `      if (err?.status === 2) {\n` +
-            `        throw new Error(err.stderr?.toString().trim() || "Blocked by Warden");\n` +
-            `      }\n` +
-            `    }\n` +
-            `  }\n` +
-            `});\n`
+            `mkdir -p ~/.config/opencode/plugin\n` +
+            `curl -fsSL ${gatewayUrl}/integrations/opencode/warden.js -o ~/.config/opencode/plugin/warden.js`
         }
       ]
     },

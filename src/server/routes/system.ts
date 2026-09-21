@@ -86,21 +86,10 @@ systemRoutes.get('/health', (req, res) =>
     // 45 s extraction + 180 s analysis + 5 s cancellation grace, with 10 s
     // left to deliver and validate the response. Text retains its own budget.
     deadlines: { decisionMs: hookDecisionDeadlineMs(), documentMs: 240_000 },
-    /*
-     * Whether a hook that cannot reach this gateway may let the prompt through.
-     *
-     * Open by default and under protest, which is the trade SECURITY.md has
-     * always named: a crashed gateway bricking every developer's CLI at once
-     * gets Warden uninstalled the first morning it happens, and a guard nobody
-     * runs stops nothing. That reasoning is about a laptop on a desk.
-     *
-     * It stops being obviously right the moment a gateway is the control an
-     * organisation says it has. `WARDEN_FAIL_CLOSED=1` refuses instead, and
-     * like the deadline it is stated here rather than set per machine — an
-     * employee who can choose whether their own guard is optional does not
-     * have one.
-     */
-    failClosed: process.env['WARDEN_FAIL_CLOSED'] === '1'
+    // Blocking is the default, including a first connection and legacy caches.
+    // Only an explicit administrator opt-out authorizes unchecked requests.
+    failurePolicyVersion: 1,
+    failClosed: process.env['WARDEN_FAIL_CLOSED'] !== '0'
   })
 );
 

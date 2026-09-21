@@ -12,7 +12,7 @@
 
 ## Coverage
 
-Claude Code, Codex and OpenCode use prompt hooks. Clients with a custom OpenAI-compatible base URL can use the gateway proxy. Warden checks requests sent through these connections, not all traffic on a device. Host deadlines and attachment support affect coverage. Hooks fail open when the gateway cannot answer unless they have learned WARDEN_FAIL_CLOSED=1.
+Claude Code, Codex and OpenCode use prompt hooks. Clients with a custom OpenAI-compatible base URL can use the gateway proxy. Warden checks requests sent through these connections, not all traffic on a device. Host deadlines and attachment support affect coverage. Hooks block when the gateway cannot answer. Administrators can opt out with WARDEN_FAIL_CLOSED=0.
 
 Rule writing is separate from request evaluation. A remote rule writer or signed-in CLI may receive administrator instructions and directory context. A person reviews and activates drafts. Request decisions allow, block or hold for review.
 

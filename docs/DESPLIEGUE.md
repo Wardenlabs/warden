@@ -141,8 +141,9 @@ $env:WARDEN_TIMEOUT_MS = '90000'
 
 El health check tiene 10 s y la decisión completa 90 s. El segundo timeout
 incluye headers, lectura y validación del body. Los valores deben ser positivos
-y finitos. Si la decisión supera 90 s, el diseño fail-open deja pasar el prompt
-con advertencia; por eso una máquina que cruza ese límite no está verificada.
+y finitos. Los hooks actualizados bloquean si la decisión supera el plazo.
+Sólo `WARDEN_FAIL_CLOSED=0` en el gateway permite continuar sin revisar.
+El cliente puede imponer otro plazo: hay que verificar cada integración.
 El health check era de 2 s hasta la 0.1.41: por un túnel de Cloudflare tarda
 entre 2 y 2,7 s, y con eso el hook dejaba pasar todos los prompts sin revisar,
 con el gateway levantado.

@@ -41,18 +41,14 @@ export const WardenPlugin = async () => ({
         timeout: 300_000,
         maxBuffer: 1024 * 1024
       });
+      child.child.stdin.on('error', () => {}); // The rejected child promise handles early exit.
       child.child.stdin.end(JSON.stringify({ parts, source: 'opencode' }));
       await child;
     } catch (err) {
-      // Exit 2 is the hook refusing; it writes the reason to stderr, and
-      // throwing is what stops the message. Every other failure — hook file
-      // not installed, node missing from PATH, a crash — fails open, exactly
-      // as the hook itself does when the gateway is unreachable. Treating
-      // ENOENT as a refusal would present "not set up yet" as "Blocked by
-      // Warden" on every single message.
       if (err?.code === 2 || err?.status === 2) {
         throw new Error(err.stderr?.toString().trim() || 'Blocked by Warden');
       }
+      throw new Error('Warden could not inspect this request. Restore the hook connection before retrying.');
     }
   }
 });

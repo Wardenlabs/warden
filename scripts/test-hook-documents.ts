@@ -50,7 +50,7 @@ const address = server.address();
 assert(address && typeof address === 'object');
 const gatewayUrl = `http://127.0.0.1:${address.port}`;
 
-async function run(payload: unknown, plugin = false, observeTimers = false) {
+async function run(payload: unknown, plugin = false, observeTimers = false, hookPath = hook) {
   const args = plugin ? ['--input-type=module', '-e', `
     import { readFileSync } from 'node:fs';
     const { WardenPlugin } = await import(${JSON.stringify(pathToFileURL(resolve('integrations/opencode/warden.js')).href)});
@@ -61,8 +61,8 @@ async function run(payload: unknown, plugin = false, observeTimers = false) {
   if (observeTimers) args.unshift('--import', timerProbe);
   const child = spawn(process.execPath, args, {
     env: {
-      ...process.env,
-      WARDEN_HOOK_PATH: hook, WARDEN_URL: gatewayUrl,
+      ...process.env, HOME: root, USERPROFILE: root,
+      WARDEN_HOOK_PATH: hookPath, WARDEN_URL: gatewayUrl,
       WARDEN_API_KEY: 'test-key', WARDEN_HEALTH_TIMEOUT_MS: '2000', WARDEN_TIMEOUT_MS: '5000',
       WARDEN_HOOK_STATE_PATH: join(root, 'state.json'), WARDEN_NO_DIALOG: '1'
     },
@@ -78,6 +78,10 @@ async function run(payload: unknown, plugin = false, observeTimers = false) {
 }
 
 try {
+  const absent = await run({ parts: [{ type: 'text', text }] }, true, false, join(root, 'missing-hook.mjs'));
+  assert.equal(absent.code, 2);
+  assert.match(absent.stderr, /could not inspect/);
+  console.log('✓ OpenCode refuses when its installed hook is missing');
   for (const [deadlines, expected] of [
     [undefined, 240_000],
     [{ decisionMs: 90_000, documentMs: 270_000 }, 270_000],

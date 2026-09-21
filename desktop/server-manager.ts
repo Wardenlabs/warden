@@ -11,6 +11,7 @@ import { utilityProcess } from 'electron';
 import { createWriteStream, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
+import { credentialEnvironment } from './credentials.js';
 
 type Child = ReturnType<typeof utilityProcess.fork>;
 
@@ -82,6 +83,7 @@ export function startServer(
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    ...credentialEnvironment(config.cwd),
     WARDEN_HOST: config.host,
     WARDEN_PORT: String(config.port),
     WARDEN_ASSETS_DIR: config.assetsDir,

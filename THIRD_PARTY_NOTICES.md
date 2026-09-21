@@ -21,7 +21,7 @@ lockfile. Package license files and bundled notices remain authoritative.
 | `require-asset` | 1.2.2 | Apache-2.0 | [Runtime asset resolution](https://github.com/holepunchto/require-asset) |
 | `pdfjs-dist` | 6.3.289 | Apache-2.0 | [PDF text, forms, rendering and source images](https://github.com/mozilla/pdf.js) |
 | `@napi-rs/canvas` | 1.0.8 | MIT | [Native canvas used to render PDF pages for OCR](https://github.com/Brooooooklyn/canvas) |
-| `image-size` | 2.0.2 | MIT | [Dimensions before decoding untrusted images](https://github.com/image-size/image-size) |
+| `image-size` | 2.0.4 | MIT | [Dimensions before decoding untrusted images](https://github.com/image-size/image-size) |
 | `yauzl` | 3.4.0 | MIT | [Bounded DOCX ZIP inspection](https://github.com/thejoshwolfe/yauzl) |
 | `saxes` | 6.0.0 | ISC | [DOCX XML parsing](https://github.com/lddubeau/saxes) |
 | `tesseract.js` | 7.0.0 | Apache-2.0 | [Offline OCR worker interface](https://github.com/naptha/tesseract.js) |

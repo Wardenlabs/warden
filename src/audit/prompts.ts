@@ -1,12 +1,13 @@
 /**
- * Prompt text the console may still show, and the date it stops existing.
+ * Prompt text the console may still show, and the expiry enforced by application reads.
  *
  * The audit log keeps a hash of the prompt and never the text. That is the
  * promise the record makes and it does not move: `recordDecision` strips
  * `maskedPrompt` before writing, and nothing here is written into the chain
  * `verifyChain()` walks. What this file adds is a **second store, with a
  * different job and a shorter life** — so an administrator can read what
- * their team actually sent last Tuesday, and cannot read it next month.
+ * their team sent within the configured retention window. Direct access to
+ * backups or snapshots is outside this application-level retention control.
  *
  * It replaces an in-memory Map capped at 300 entries that emptied on every
  * restart. That was not a retention policy, it was an accident of process

@@ -89,7 +89,7 @@
 <nav class="docs-index" aria-label="On this page"><a href="#connect">Connect a tool</a><a href="#rules">Write a rule</a><a href="#privacy">Data and privacy</a><a href="#deploy">Deploy</a></nav>
 <section id="connect"><h2>Connect a tool.</h2>
 <p>The desktop app runs the gateway and its admin console. Install Warden for macOS or Windows, then open <strong>This device</strong> to connect Claude Code, Codex or OpenCode through their prompt hooks. Other clients can use the OpenAI-compatible proxy when they support a custom base URL.</p>
-<p>Warden only checks traffic sent through a connection. Host deadlines, attachment support and failure settings affect coverage. Hooks fail open when the gateway cannot answer unless they have learned <code>WARDEN_FAIL_CLOSED=1</code>.</p>
+<p>Warden only checks traffic sent through a connection. Host deadlines, attachment support and failure settings affect coverage. Hooks block when the gateway cannot answer. Administrators can opt out with <code>WARDEN_FAIL_CLOSED=0</code>.</p>
 <a href="https://github.com/Wardenlabs/warden/blob/main/integrations/README.md">Connection setup</a> · <a href="https://github.com/Wardenlabs/warden/blob/main/docs/HOOK-VERIFICATION.md">Verified coverage</a></section>
 <section id="rules"><h2>Write, review, activate.</h2>
 <p>Describe a restriction in <strong>Rules</strong>, review the proposed policy and activate it. Drafting does not activate a rule. Request decisions can allow, block or hold for human review; <strong>Activity</strong> records the result and its reason.</p>

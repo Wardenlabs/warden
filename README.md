@@ -79,11 +79,11 @@ Warden can miss attacks and refuse legitimate requests. Read the
 [measurements](docs/MEASUREMENTS.md) before choosing a model or interpreting an
 accuracy claim. Passing the regression suite does not establish model accuracy.
 
-- Hooks fail open when the gateway cannot answer unless they have learned
-  `WARDEN_FAIL_CLOSED=1`. The host application's deadline also applies.
+- Hooks block when the gateway cannot answer. An administrator can explicitly
+  opt out with `WARDEN_FAIL_CLOSED=0`. The host application's deadline also applies.
 - The gateway trusts direct local administration. Other callers need a key for
   an exempt role. On a shared host, set `WARDEN_ADMIN_REQUIRE_KEY=1`.
-- API keys remain plaintext in the private directory file. An installation link
+- Saved API keys are encrypted; protect the separate encryption key and backups. An installation link
   carries a credential; rotating the person's key invalidates that link.
 - The audit chain stores prompt hashes. A separate store keeps masked prompt
   text for seven days by default; `WARDEN_PROMPT_RETENTION_DAYS=0` disables it.

@@ -1,0 +1,260 @@
+# Exact historical fingerprints reviewed 2026-09-21. See docs/SECURITY-REVIEW-2026-09-21.md.
+# No paths, commits, or rules are excluded wholesale. New occurrences must be reviewed.
+# browser storage namespace
+033bfe4917fa84c75a2511c2003dc86ec3114963:landing/vendor/kool/browser.mjs:generic-api-key:1
+# browser storage namespace
+033bfe4917fa84c75a2511c2003dc86ec3114963:scripts/kool-browser.test.mjs:generic-api-key:11
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:10
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:11
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:12
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:6
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:7
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:8
+# revoked historical sample credential
+1e629666a1154a90e4ffbd30ebee3a7dc530129c:data/seed/company.json:generic-api-key:9
+# benchmark content hash
+1f1c8448eadb0db1557ef7b61c277ff3906c81a6:data/bench-1.7b.json:generic-api-key:128
+# benchmark content hash
+1f1c8448eadb0db1557ef7b61c277ff3906c81a6:data/bench-1.7b.json:generic-api-key:368
+# benchmark content hash
+1f1c8448eadb0db1557ef7b61c277ff3906c81a6:data/bench-1.7b.json:generic-api-key:480
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:1224
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:1736
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:1928
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2088
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2128
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2200
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2360
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2440
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:2504
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:48
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:520
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:648
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b-compliance.json:generic-api-key:688
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:1224
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:1736
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:1928
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2088
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2128
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2200
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2360
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2440
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:2504
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:48
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:520
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:648
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-dynaguard-1.7b.json:generic-api-key:688
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:1224
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:1736
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:1928
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2088
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2128
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2200
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2360
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2440
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:2504
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:48
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:520
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:648
+# benchmark content hash
+274a79ac7e27cdb19e7c18408f992a8b26bdafaa:data/bench-m1pro-1.7b-base.json:generic-api-key:688
+# public analytics ingestion token
+307ad7a796404720cff811677129c311ed08a445:landing/analytics-config.js:generic-api-key:4
+# synthetic test fixture
+7cba4b6817bc9785bc8c6d60452f099d834b0c2c:scripts/test-console.mjs:generic-api-key:604
+# revoked historical sample credential
+9e76e5ec1ec65cff9f63189493eff88994d57e71:data/seed/company.json:generic-api-key:10
+# revoked historical sample credential
+9e76e5ec1ec65cff9f63189493eff88994d57e71:data/seed/company.json:generic-api-key:11
+# revoked historical sample credential
+9e76e5ec1ec65cff9f63189493eff88994d57e71:data/seed/company.json:generic-api-key:12
+# revoked historical sample credential
+9e76e5ec1ec65cff9f63189493eff88994d57e71:data/seed/company.json:generic-api-key:8
+# revoked historical sample credential
+9e76e5ec1ec65cff9f63189493eff88994d57e71:data/seed/company.json:generic-api-key:9
+# benchmark content hash
+b5563925c88a467f0236e842454178806fc9ac3c:data/bench-qvac.json:generic-api-key:128
+# benchmark content hash
+b5563925c88a467f0236e842454178806fc9ac3c:data/bench-qvac.json:generic-api-key:368
+# benchmark content hash
+b5563925c88a467f0236e842454178806fc9ac3c:data/bench-qvac.json:generic-api-key:480
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:1225
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:1737
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:1929
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2089
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2129
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2201
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2361
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2441
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:2505
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:49
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:521
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:649
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-nofence.json:generic-api-key:689
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:1225
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:1737
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:1929
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2089
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2129
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2201
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2361
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2441
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:2505
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:49
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:521
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:649
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots0.json:generic-api-key:689
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:1225
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:1737
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:1929
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2089
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2129
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2201
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2361
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2441
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:2505
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:49
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:521
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:649
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-shots4.json:generic-api-key:689
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:1225
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:1737
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:1929
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2089
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2129
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2201
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2361
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2441
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:2505
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:49
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:521
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:649
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-1.7b-v2.json:generic-api-key:689
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:1224
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:1736
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:1928
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2088
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2128
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2200
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2360
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2440
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:2504
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:48
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:520
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:648
+# benchmark content hash
+cf69555427eebb708db1324a6a62124d71c990ee:data/bench-dynaguard-4b.json:generic-api-key:688
+# synthetic test fixture
+cfc4c322b98dcf6155f03ba12fa3ab3faafce644:scripts/test-proxy-documents.ts:generic-api-key:60
+# browser storage namespace
+fa3ebe0ee025e94b6ae91c8de34a41aaa9155c58:landing/assets/kool/browser.mjs:generic-api-key:1
+# browser storage namespace
+fa3ebe0ee025e94b6ae91c8de34a41aaa9155c58:scripts/landing-kool-browser.test.mjs:generic-api-key:10

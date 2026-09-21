@@ -12,18 +12,11 @@
  * preference into it would change every rule's version because someone swapped
  * a compiler. These are two different kinds of state and they get two files.
  *
- * ## The key
- *
- * Stored in plaintext, like the employee API keys in the directory beside it,
- * and for the same reason: this repo has no secret store and inventing half of
- * one would be worse than being honest about it. `SECURITY.md` lists it. What
- * is done here is the part that costs nothing — the file is written 0600, it
- * lives in `data/` which is gitignored, and the key is never sent back to a
- * browser. Callers get `hasKey` and the last four characters.
+ * API keys are encrypted on disk and never returned to browser responses.
  */
-import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { atomicJSON } from './models/store.js';
+import { readCredentialJSON, writeCredentialJSON, migrateCredentialJSON, CredentialStorageError } from './security/credentials.js';
 import { z } from 'zod';
 
 const SETTINGS_PATH = process.env['WARDEN_SETTINGS_PATH'] ?? join('data', 'settings.json');
@@ -140,7 +133,7 @@ const DEFAULT_COMPILER: CompilerSettings = { ...LOCAL, provider: 'claude-cli' };
 function compilerConfigurationState(settingsPath = SETTINGS_PATH): 'missing' | 'configured' | 'invalid' {
   if (!existsSync(settingsPath)) return 'missing';
   try {
-    const raw = JSON.parse(readFileSync(settingsPath, 'utf8'));
+    const raw = readCredentialJSON(settingsPath, 'settings') as Record<string, unknown>;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'invalid';
     if (!Object.hasOwn(raw, 'compiler')) return 'missing';
     return compilerSettingsSchema.safeParse(raw.compiler).success ? 'configured' : 'invalid';
@@ -160,11 +153,13 @@ export function compilerSetupRequired(): boolean {
 export function loadCompilerSettings(settingsPath = SETTINGS_PATH): CompilerSettings {
   if (!existsSync(settingsPath)) return { ...DEFAULT_COMPILER };
   try {
-    const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as { compiler?: unknown };
+    const raw = readCredentialJSON(settingsPath, 'settings') as { compiler?: unknown };
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && !Object.hasOwn(raw, 'compiler')) return { ...DEFAULT_COMPILER };
     const parsed = compilerSettingsSchema.safeParse(raw.compiler);
+    if (parsed.success) migrateCredentialJSON(settingsPath, raw, 'settings');
     return parsed.success ? parsed.data : { ...LOCAL };
-  } catch {
+  } catch (error) {
+    if (error instanceof CredentialStorageError) throw error;
     // A corrupt settings file must not stop the gateway, and the safe direction
     // is unambiguous: fall back to running compilation on this machine.
     return { ...LOCAL };
@@ -177,12 +172,12 @@ export function saveCompilerSettings(next: CompilerSettings): CompilerSettings {
   let existing: Record<string, unknown> = {};
   if (existsSync(SETTINGS_PATH)) {
     try {
-      existing = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as Record<string, unknown>;
+      existing = readCredentialJSON(SETTINGS_PATH, 'settings') as Record<string, unknown>;
     } catch {
       throw new Error('The saved settings file is unreadable. Restore it before changing settings.');
     }
   }
-  atomicJSON(SETTINGS_PATH, { ...existing, compiler: settings });
+  writeCredentialJSON(SETTINGS_PATH, { ...existing, compiler: settings }, 'settings');
   // Best effort: on a filesystem without POSIX modes this throws and the file
   // is still written. Failing the save over it would be the wrong trade.
   try {
@@ -236,7 +231,7 @@ const DEFAULT_ADJUDICATOR: AdjudicatorSettings = { model: 'default' };
 export function loadAdjudicatorSettings(settingsPath = SETTINGS_PATH): AdjudicatorSettings {
   if (!existsSync(settingsPath)) return { ...DEFAULT_ADJUDICATOR };
   try {
-    const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as { adjudicator?: unknown };
+    const raw = readCredentialJSON(settingsPath, 'settings') as { adjudicator?: unknown };
     const parsed = adjudicatorSettingsSchema.safeParse(raw.adjudicator);
     return parsed.success ? parsed.data : { ...DEFAULT_ADJUDICATOR };
   } catch {
@@ -256,7 +251,7 @@ export function loadAdjudicatorSettings(settingsPath = SETTINGS_PATH): Adjudicat
 export function savedAdjudicatorChoice(settingsPath = SETTINGS_PATH): AdjudicatorSettings['model'] | null {
   if (!existsSync(settingsPath)) return null;
   try {
-    const raw = JSON.parse(readFileSync(settingsPath, 'utf8')) as { adjudicator?: unknown };
+    const raw = readCredentialJSON(settingsPath, 'settings') as { adjudicator?: unknown };
     const parsed = adjudicatorSettingsSchema.safeParse(raw.adjudicator);
     return parsed.success && !parsed.data.modelId ? parsed.data.model : null;
   } catch {
@@ -270,14 +265,14 @@ export function saveAdjudicatorSettings(next: AdjudicatorSettings): AdjudicatorS
   let existing: Record<string, unknown> = {};
   if (existsSync(SETTINGS_PATH)) {
     try {
-      existing = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as Record<string, unknown>;
+      existing = readCredentialJSON(SETTINGS_PATH, 'settings') as Record<string, unknown>;
     } catch {
       throw new Error('The saved settings file is unreadable. Restore it before changing settings.');
     }
   }
   // Merged, not replaced — the compiler settings live in the same file and a
   // whole-file write here would delete somebody's API key for choosing a model.
-  atomicJSON(SETTINGS_PATH, { ...existing, adjudicator: settings });
+  writeCredentialJSON(SETTINGS_PATH, { ...existing, adjudicator: settings }, 'settings');
   try {
     chmodSync(SETTINGS_PATH, 0o600);
   } catch {

@@ -1,8 +1,8 @@
 # Security
 
-Warden is a policy gate for AI assistants. Its whole purpose is to be the thing
-an employee cannot route around, so a weakness here is not a bug beside the
-product — it is the product failing.
+Warden is a policy gate for AI assistants. It checks requests routed through its configured connections. Host integration
+coverage and administrative control of the device determine whether a user
+can bypass those connections.
 
 This document says what Warden defends against, what it does not, and how to
 report something.
@@ -10,8 +10,9 @@ report something.
 ## Reporting a vulnerability
 
 Open a [security advisory](https://github.com/Wardenlabs/warden/security/advisories/new)
-on the repository, or email the maintainer listed in `package.json`. Please do
-not open a public issue for something exploitable.
+using GitHub private vulnerability reporting when enabled. If the private form
+is unavailable, ask the maintainer to enable it without posting exploit details.
+Do not post credentials or reproducible exploit details in a public issue.
 
 Include what you can reach, from where, and what it gets you. A working request
 is worth more than a description. We will acknowledge, and we would rather have
@@ -71,20 +72,17 @@ inside the call.
 never the prompt: `recordDecision` strips the text before writing, so the
 governance record cannot become the thing it is meant to make accountable.
 
-Prompt text does exist in one other place, deliberately and with a limit. The
-console has to be able to show an administrator what was actually blocked, so
-`src/audit/prompts.ts` keeps the **masked** text — secrets already removed —
-for **seven days by default**, in `data/prompts.jsonl`, mode `0600` and
-gitignored. Expiry is enforced on every read and not only by a sweep, so a copy
-of that file taken to another machine, or restored from a backup, still cannot
-be read past its date. `WARDEN_PROMPT_RETENTION_DAYS=0` disables it entirely
-and deletes the file.
+Masked prompt history is separate from the audit chain. The console can show
+an administrator the retained text for seven days by default. The store uses
+`data/prompts.jsonl`, mode `0600`, and filters expired entries on application
+reads. A cleanup sweep removes expired records from the active file.
 
-What this means for the people being logged is a sentence you can put in
-writing: *an administrator can read what you sent for seven days, with secrets
-already masked, and after that nobody can — including them.* Lengthening the
-window lengthens what an attacker who reaches the gateway walks away with, in
-direct proportion.
+These controls do not encrypt or erase independent copies. Someone with direct
+access to an old file, backup or filesystem snapshot may still read its contents.
+Backup retention and access controls must match the deployment's policy.
+`WARDEN_PROMPT_RETENTION_DAYS=0` disables the active store and attempts to remove
+its file; it cannot delete backups, snapshots or recoverable disk blocks.
+Credential masking is detection-based and may miss an unfamiliar secret format.
 
 **Reaching the administrative surface.** Policy writes, key issuance, the
 onboarding script and the audit record require an administrator: a request from
@@ -167,7 +165,7 @@ presence and a suffix, never a key or test fingerprint. Provider response bodies
 and raw JSON parser errors are suppressed during connection tests.
 
 The catalogue and settings are atomically replaced in mode `0600`; endpoint
-keys remain plaintext at rest, as with the existing compiler settings. Browser
+keys are encrypted at rest, as with the compiler settings and employee directory. Browser
 form snapshots exclude password and file controls. An employee credential in a
 Simulator request takes precedence over a saved administrator credential, so
 its policy exemption cannot silently change the test identity.
@@ -193,32 +191,24 @@ contracts are in [model management](docs/MODEL-MANAGEMENT.md).
 These are real and stated on purpose. A security document that lists only
 strengths is marketing.
 
-**The hook fails open on timeout.** The `UserPromptSubmit` integrations wait a
-bounded time for a decision. If the gateway is unreachable or slow past that
-deadline, the prompt goes through unchecked and the employee is told so on
-stderr. A cold Codex decision was observed exceeding the 30-second deadline on
-2026-08-23. Failing closed would mean a broken gateway stops all work, and that
-is a product decision the deployment gets to make, not one this repo makes for
-it. `WARDEN_FAIL_CLOSED=1` selects refusal after the hook learns and remembers
-that policy; a machine that has never reached the gateway has no remembered
-policy. The native client's own deadline remains an independent boundary.
+**Hooks block on gateway failure by default.** Missing or corrupt cached state,
+first contact, timeouts and invalid responses all result in refusal. An
+administrator can set `WARDEN_FAIL_CLOSED=0` on the gateway to allow unchecked
+requests during an outage. Updated hooks accept that opt-out only from a
+versioned `/health` response and remember it per gateway URL. Old unversioned
+fail-open cache entries are ignored. Distribute updated hooks to existing clients.
 
-The deadline has two halves and both fail open. Warden's own is 90 seconds.
-Claude Code has one of its own for `UserPromptSubmit` hooks, 30 seconds by
-default as of September 2026, and a hook it cancels is a prompt that reaches
-the model with the hook's output discarded. So the hook entry in
-`~/.claude/settings.json` has to carry `"timeout": 120`; `warden-hook --fix`
-writes it, and repairs an entry written before it did.
+A host application can still discard a hook's refusal or kill it before it
+answers. Warden's text deadline defaults to 90 seconds; document checks allow
+240 seconds. `warden-hook --fix` sets Claude Code's hook timeout to 300 seconds.
+That does not prove the host honors the result; see the verification record below.
+The OpenCode plugin also refuses if its hook crashes, is absent or times out.
 
-The same file has to carry the gateway address and the API key in its `env`
-block. Hooks inherit Claude Code's environment, and a Claude Code opened from
-the desktop app or the Dock never sourced a shell profile, so a hook wired
-there with the values only in `~/.zshrc` asks `localhost:8080`, finds nothing
-and fails open, on a laptop that looks wired. `--fix` writes both values into
-`env` from its own environment and the install script hands them to it. That
-is the key in a second file, in the same home directory, readable by the same
-person; the alternative, measured on 2026-09-06, was a desktop app that
-judged nothing.
+Hooks read their encrypted credential file directly, including when launched
+from the Dock. `--fix` removes the plaintext key from Claude Code's active
+settings. New installer scripts no longer put keys in shell profiles. Old shell
+exports and configuration backups are not erased automatically: remove those
+copies and rotate their keys when migrating an existing deployment.
 
 **Both hook integrations are NOT VERIFIED end to end.** See
 [`docs/HOOK-VERIFICATION.md`](docs/HOOK-VERIFICATION.md).
@@ -229,9 +219,9 @@ trusted as administrative: refusing it at the HTTP layer would buy nothing. Wher
 employees can log into the gateway host, set `WARDEN_ADMIN_REQUIRE_KEY=1` so
 every administrative call must present an exempt key.
 
-**API keys are stored in plaintext** in the directory file, and appear in the
-onboarding script served to the employee they belong to. Read access to that
-file is impersonation of every employee in it.
+**Onboarding scripts and links carry credentials.** The directory stores
+encrypted keys, but the authorized install response contains the employee key.
+Treat saved scripts, browser downloads and copied onboarding commands as secrets.
 
 The onboarding link is therefore a credential, and is addressed by an install
 token rather than by employee id — 128 bits derived from the key it delivers,
@@ -315,7 +305,7 @@ guess whether it came off their own machine.
   reads the peer address off the socket precisely so a header cannot forge it.
   A reverse proxy connects from `127.0.0.1`, so *every* request arriving through
   one used to satisfy that check: everyone who could reach the tunnel was an
-  administrator, with the directory of plaintext API keys, policy edits and
+  administrator, with access to employee keys, policy edits and
   deleting people behind it. Confirmed against a running gateway while preparing
   a tunnel — the admin API answered unauthenticated.
 
@@ -353,11 +343,9 @@ guess whether it came off their own machine.
   by the caller, and believing it would let anyone evade the limit by rotating
   a string. It never affects authorisation — `isLoopback` refuses a proxied
   request either way.
-- **The directory file is written 0600.** It holds every employee's API key in
-  plaintext and was 0644 until v0.1.23: readable by every account on the
-  machine, and by anything that picked up the data folder in a backup, a sync
-  client or a container image. The mode change removes readers who never needed
-  those keys; it does not make them not plaintext.
+- **Credential files are encrypted and written atomically with mode 0600.**
+  Encryption does not protect against a compromised gateway process or an OS
+  account that can unlock the credential key. See the storage details below.
 
 ### Running one in production
 
@@ -384,13 +372,34 @@ Doing it by hand, or running the gateway some other way:
    for seven days, and an exposed gateway is a larger blast radius than a
    laptop.
 
-**What is still missing, on the honest list.** API keys are plaintext in the
-directory file. The install route has to hand an employee their key and the
-console re-displays it, so anything that stores a hash has to stop the server
-being able to re-display one — keys shown once at issue, rotate to replace.
-That is the right change and it is a change to how the product delivers
-credentials, not a column swap; half a secret store in the meantime would be
-worse than an admitted plaintext one.
+### Credential storage and migration
+
+Gateway employee keys, compiler keys and model endpoint keys use AES-256-GCM
+with fresh nonces and authenticated field locations. Valid legacy files are
+migrated on read. Decryption failures do not replace saved credentials. Old
+published sample keys are rotated on load, even if their employee was renamed.
+Those clients need to reconnect with a newly issued onboarding link.
+
+On desktop, Electron `safeStorage` wraps the encryption key using the OS store
+when available. Its `basic_text` Linux fallback is not treated as secure storage.
+If an existing OS-protected key cannot be unlocked, startup stops. A new Linux
+installation without a working keyring uses a mode-0600 key file under
+`~/.warden/keys/`, outside the gateway data directory, and logs that limitation.
+That installation stays file-backed if a keyring is subsequently enabled.
+
+Headless gateways use `~/.warden/keys/gateway.key`. Set
+`WARDEN_CREDENTIAL_KEY_PATH` to a separately managed 32-byte binary key file,
+or supply `WARDEN_CREDENTIAL_KEY` as 64 hexadecimal characters via a secret
+manager. The gateway consumes the environment value before spawning workers.
+The hook has its own file-backed key at `~/.warden/keys/hook.key` and encrypted
+credentials at `~/.warden/credentials.json`. These files use private POSIX
+permissions; on Windows, restrict their ACLs to the owning account.
+
+Back up the encryption key separately and protect it as a credential. Copying
+both the key and data defeats the protection; losing the key prevents recovery.
+An OS-wrapped key may be tied to its machine/account. Migrate through the running
+installation or reissue credentials on a new machine. Encryption of active files
+does not remove plaintext from old backups, snapshots, scripts or shell history.
 
 The failed-administrative-attempt counter is persisted (`data/admin-attempts.json`,
 0600, gitignored), because a restart there handed a guesser ten fresh attempts
@@ -419,19 +428,14 @@ carries a credential and `/api/policy/ratify` carries rule text, and this log's
 promise is that it holds neither. 429s are skipped so a flood cannot write the
 log. Read it at `GET /api/audit/admin`.
 
-### A gateway can require its hooks to refuse
+### Failure policy
 
-`WARDEN_FAIL_CLOSED=1` makes an unreachable gateway block rather than let the
-prompt through. Stated on `/health` like the deadline, and **remembered by the
-hook across runs** in `~/.warden-hook.state.json`, because the outage is when
-the policy matters and the outage is when the gateway cannot be asked. Learning
-it only from a live response means never knowing it at the one moment it
-decides anything — the first version of this shipped with exactly that hole.
+Updated hooks refuse an unreachable gateway by default. Only the explicit
+`WARDEN_FAIL_CLOSED=0` opt-out, advertised with `failurePolicyVersion: 1`, enables
+unchecked requests. Hook caches remember that opt-out across runs. Changing the
+gateway back to closed requires clients to contact it again; an offline client
+cannot learn a policy change. Host deadlines remain an independent boundary.
 
-A machine that has never reached this gateway has nothing remembered and fails
-open, which is the only answer available: this closes the door for a team that
-has been running, not for a laptop being set up while the gateway is already
-down. The default stays open, and stays the documented trade it always was.
 - `WARDEN_CORS_ORIGIN` is unset by default and should stay that way. The console
   is served by the same process and needs no cross-origin access.
 - Keep `data/` off shared storage. It holds the directory, the policy and the

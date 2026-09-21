@@ -1,9 +1,10 @@
-/** Models belong to this gateway installation. Secrets stay in a 0600 file;
+/** Models belong to this gateway installation. Secrets are encrypted in a 0600 file;
  * catalogue responses are assembled field by field, never by spreading it. */
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { readCredentialJSON, writeCredentialJSON, migrateCredentialJSON } from '../security/credentials.js';
 
 export const managedRoleSchema = z.enum(['compiler', 'adjudicator']);
 export type ManagedRole = z.infer<typeof managedRoleSchema>;
@@ -46,7 +47,11 @@ export function readCatalog(): ModelEntry[] {
   if (!existsSync(catalogPath())) return [];
   // Losing a corrupt catalogue must not look like permission to overwrite all
   // saved connections. Keep the original file and make the failure explicit.
-  try { return catalogSchema.parse(JSON.parse(readFileSync(catalogPath(), 'utf8'))).models; }
+  try {
+    const catalog = catalogSchema.parse(readCredentialJSON(catalogPath(), 'models'));
+    migrateCredentialJSON(catalogPath(), catalog, 'models');
+    return catalog.models;
+  }
   catch { throw new Error('The saved model catalogue is unreadable. Restore its file before changing models.'); }
 }
 export function findModel(id: string): ModelEntry {
@@ -62,12 +67,12 @@ export function putModel(entry: ModelEntry, expectedRevision?: number): ModelEnt
     throw new Error('This model changed while the operation was running. Try again.');
   }
   if (index < 0) models.push(next); else models[index] = next;
-  atomicJSON(catalogPath(), catalogSchema.parse({ version: 1, models }));
+  writeCredentialJSON(catalogPath(), catalogSchema.parse({ version: 1, models }), 'models');
   return next;
 }
 export function removeModel(id: string): void {
   const entry = findModel(id);
-  atomicJSON(catalogPath(), { version: 1, models: readCatalog().filter((m) => m.id !== id) });
+  writeCredentialJSON(catalogPath(), { version: 1, models: readCatalog().filter((m) => m.id !== id) }, 'models');
   if (entry.kind === 'local' && existsSync(modelPath(entry))) unlinkSync(modelPath(entry));
 }
 export function fingerprint(entry: ModelEntry): string {

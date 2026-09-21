@@ -49,6 +49,9 @@ They use synthetic data; they do not change an installed gateway's rules.
 
 ## Remaining boundaries
 
+Historical status at this review date. Credential storage and failure defaults
+are superseded by [the 2026-09-21 review](SECURITY-REVIEW-2026-09-21.md).
+
 API keys remain plaintext in private files. Local users who can edit the data
 files remain trusted; this change only stops unrelated browser origins from
 borrowing that trust. Hooks retain the documented fail-open default and host

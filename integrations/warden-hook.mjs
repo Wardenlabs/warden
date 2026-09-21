@@ -33,38 +33,61 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
-import { closeSync, constants, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
+import { closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * `~/.warden/credentials.json` — where the key lives, and the one place it is
- * authoritative.
- *
- * Before this there were three copies and no original: the shell profile, the
- * `env` block of `~/.claude/settings.json`, and whatever was exported in the
- * terminal you happened to be in. Nothing said which was right, so when they
- * disagreed the terminal was judged as one person and the desktop app as
- * another — or the app was refused outright with a key the person could see
- * was correct in their shell, and no message anywhere connected the two.
- *
- * The copies do not go away, and cannot: a Claude Code opened from the Dock
- * never sourced a profile, and its `env` block is static JSON that cannot
- * point at a file. What changes is that they stop being originals. `--fix`
- * writes this file first and rewrites the copies from it, and `--status`
- * names any copy that has drifted instead of leaving somebody to find it by
- * being refused. See docs/specs/wiring-and-unwiring.md §7.
- */
+/** The hook reads its credential file even when launched from the Dock.
+ * The encryption key lives separately; both files require the same OS account. */
 const CREDENTIALS_PATH = join(homedir(), '.warden', 'credentials.json');
+
+const HOOK_KEY_PATH = join(homedir(), '.warden', 'keys', 'hook.key');
+const SECRET_PREFIX = 'warden-hook:v1:';
+function credentialKey(create) {
+  if (create && !existsSync(HOOK_KEY_PATH)) {
+    mkdirSync(dirname(HOOK_KEY_PATH), { recursive: true, mode: 0o700 });
+    try { writeFileSync(HOOK_KEY_PATH, randomBytes(32), { flag: 'wx', mode: 0o600 }); }
+    catch (err) { if (err?.code !== 'EEXIST') throw err; }
+  }
+  const fd = openSync(HOOK_KEY_PATH, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size !== 32 || (process.platform !== 'win32' &&
+      ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()))) throw new Error('Unsafe credential key file');
+    const key = readFileSync(fd);
+    if (key.length !== 32) throw new Error('Invalid credential key');
+    return key;
+  } finally { closeSync(fd); }
+}
+function sealCredential(value) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', credentialKey(true), iv);
+  cipher.setAAD(Buffer.from(SECRET_PREFIX));
+  const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return SECRET_PREFIX + Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64');
+}
+function openCredential(value) {
+  if (!value.startsWith(SECRET_PREFIX)) return value;
+  const packed = Buffer.from(value.slice(SECRET_PREFIX.length), 'base64');
+  if (packed.length < 29) throw new Error('Invalid encrypted credential');
+  const cipher = createDecipheriv('aes-256-gcm', credentialKey(false), packed.subarray(0, 12));
+  cipher.setAAD(Buffer.from(SECRET_PREFIX));
+  cipher.setAuthTag(packed.subarray(12, 28));
+  return Buffer.concat([cipher.update(packed.subarray(28)), cipher.final()]).toString('utf8');
+}
 
 function readCredentials() {
   try {
     const raw = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
     if (!raw || typeof raw !== 'object') return null;
     const url = typeof raw.url === 'string' ? raw.url : '';
-    const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey : '';
+    const apiKey = typeof raw.apiKey === 'string' ? openCredential(raw.apiKey) : '';
+    if (apiKey && !raw.apiKey.startsWith(SECRET_PREFIX)) {
+      const failed = writeCredentials({ url, apiKey });
+      if (failed) throw new Error('Credential migration failed');
+    }
     const updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : '';
     return url || apiKey ? { url, apiKey, updatedAt } : null;
   } catch {
@@ -84,8 +107,12 @@ function readCredentials() {
 function writeCredentials({ url, apiKey }) {
   try {
     mkdirSync(dirname(CREDENTIALS_PATH), { recursive: true, mode: 0o700 });
-    const body = JSON.stringify({ url, apiKey, updatedAt: new Date().toISOString() }, null, 2) + '\n';
-    writeFileSync(CREDENTIALS_PATH, body, { mode: 0o600 });
+    const body = JSON.stringify({ url, apiKey: sealCredential(apiKey), updatedAt: new Date().toISOString() }, null, 2) + '\n';
+    const temporary = `${CREDENTIALS_PATH}.${randomBytes(12).toString('hex')}.tmp`;
+    try {
+      writeFileSync(temporary, body, { mode: 0o600, flag: 'wx' });
+      renameSync(temporary, CREDENTIALS_PATH);
+    } finally { if (existsSync(temporary)) unlinkSync(temporary); }
     return null;
   } catch (err) {
     return err?.message ?? String(err);
@@ -156,7 +183,7 @@ function timeoutFromEnv(name, fallback) {
   if (raw === undefined) return fallback;
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`${name} must be a positive finite number, got "${raw}"`);
+    throw new Error(`${name} must be a positive finite number`);
   }
   return value;
 }
@@ -891,7 +918,15 @@ function onlyAgents() {
 /** Copy a file to `<path>.warden-bak` before touching it. */
 function backup(path) {
   try {
-    if (existsSync(path)) copyFileSync(path, `${path}.warden-bak`);
+    if (existsSync(path)) {
+      // The original can contain another tool's credentials as well as old Warden keys.
+      const target = `${path}.warden-bak`;
+      const temporary = `${target}.${randomBytes(12).toString('hex')}.tmp`;
+      try {
+        writeFileSync(temporary, readFileSync(path), { mode: 0o600, flag: 'wx' });
+        renameSync(temporary, target);
+      } finally { if (existsSync(temporary)) unlinkSync(temporary); }
+    }
     return true;
   } catch (err) {
     process.stderr.write(`   could not back up ${path}: ${err?.message ?? err}\n`);
@@ -932,29 +967,13 @@ function fixClaudeCode() {
   const ours = list.flatMap((entry) => entry?.hooks ?? []).find((h) => String(h?.command ?? '').includes('warden-hook'));
   const entryOk = Boolean(ours) && ours.timeout >= CLAUDE_CODE_HOOK_TIMEOUT_S;
 
-  // Hooks inherit Claude Code's environment, and a Claude Code opened from
-  // the desktop app or the Dock never sourced a shell profile. So the URL and
-  // key the install script wrote to ~/.zshrc are invisible to the hook there:
-  // with no URL it asks localhost:8080, finds nothing, and fails open, on a
-  // laptop that looks wired. On 2026-09-06 that was the whole reason a
-  // desktop app judged nothing until the same two values were put in the
-  // `env` block of settings.json by hand, which is where Claude Code
-  // documents that variables for hooks go. So what this process was handed
-  // is written there too. It is the key in a second file, in the same home
-  // directory, read by the same person; the alternative was a guard that
-  // guarded the terminal and not the app.
-  //
-  // Since F6 the values written here are the resolved ones — the environment
-  // if this shell has it, otherwise `~/.warden/credentials.json` — rather than
-  // `process.env` alone. That is what makes this block a copy rather than a
-  // fourth opinion: run `--fix` from a terminal that never sourced a profile
-  // and it still writes the right key, because it reads the file.
+  // The hook reads its encrypted file directly; do not duplicate its key in host settings.
   const env = settings.env && typeof settings.env === 'object' && !Array.isArray(settings.env) ? settings.env : {};
   const wanted = {};
-  for (const [name, value] of [['WARDEN_URL', WARDEN_URL], ['WARDEN_API_KEY', API_KEY]]) {
+  for (const [name, value] of [['WARDEN_URL', WARDEN_URL]]) {
     if (value && env[name] !== value) wanted[name] = value;
   }
-  if (entryOk && Object.keys(wanted).length === 0) return null;
+  if (entryOk && Object.keys(wanted).length === 0 && !Object.hasOwn(env, 'WARDEN_API_KEY')) return null;
 
   if (!backup(file)) return 'backup failed, so nothing was written';
   if (!entryOk) {
@@ -962,6 +981,7 @@ function fixClaudeCode() {
     else list.push({ hooks: [{ type: 'command', command: `node ${hookPath()}`, timeout: CLAUDE_CODE_HOOK_TIMEOUT_S }] });
   }
   settings.env = { ...env, ...wanted };
+  delete settings.env.WARDEN_API_KEY;
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
   return ours ? REPAIRED : null;
@@ -1002,7 +1022,10 @@ function fixCodex() {
  */
 async function fixOpenCode() {
   const file = join(homedir(), '.config', 'opencode', 'plugin', 'warden.js');
-  if (existsSync(file) ) return null;
+  const previous = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  if (previous !== null && !(previous.includes('export const WardenPlugin') && previous.includes('.warden-hook.mjs'))) {
+    return 'the existing plugin is not recognized as Warden; review it before replacing it';
+  }
 
   let source;
   try {
@@ -1011,13 +1034,16 @@ async function fixOpenCode() {
     });
     if (!res.ok) throw new Error(`gateway answered ${res.status}`);
     source = await res.text();
+    if (!source.includes('export const WardenPlugin') || !source.includes('.warden-hook.mjs')) throw new Error('invalid plugin response');
   } catch (err) {
     return `could not fetch the plugin from ${WARDEN_URL} (${err?.message ?? err})`;
   }
 
+  if (previous === source) return null;
+  if (previous !== null && !backup(file)) return 'backup failed, so nothing was written';
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, source);
-  return null;
+  return previous === null ? null : REPAIRED;
 }
 
 async function fixMode(agents) {
@@ -1033,8 +1059,12 @@ async function fixMode(agents) {
    */
   if (API_KEY) {
     const failed = writeCredentials({ url: WARDEN_URL, apiKey: API_KEY });
-    if (failed) process.stdout.write(`  ✗ ${'credentials'.padEnd(12)} could not be written to ${CREDENTIALS_PATH} (${failed})\n`);
-    else process.stdout.write(`  ✓ ${'credentials'.padEnd(12)} ${CREDENTIALS_PATH}, 0600 — the copies below are written from it\n`);
+    if (failed) {
+      process.stderr.write('Warden could not save credentials. Host settings were not changed.\n');
+      process.exitCode = 1;
+      return;
+    }
+    else process.stdout.write(`  ✓ ${'credentials'.padEnd(12)} ${CREDENTIALS_PATH}, encrypted, 0600 — hooks read this file directly\n`);
   }
 
   const fixers = { 'claude-code': fixClaudeCode, codex: fixCodex, opencode: fixOpenCode };
@@ -1053,11 +1083,12 @@ async function fixMode(agents) {
     }
     const name = agent.name.padEnd(12);
     if (outcome === REPAIRED) {
-      process.stdout.write(`  ✓ ${name} was wired but incomplete; timeout set to ${CLAUDE_CODE_HOOK_TIMEOUT_S} s and the gateway address and key put in its env, restart it to pick this up\n`);
-    } else if (agent.wired) {
-      process.stdout.write(`  · ${name} already wired, left alone\n`);
+      process.stdout.write(`  ✓ ${name} updated; restart it to use the current hook configuration\n`);
     } else if (outcome) {
       process.stdout.write(`  ✗ ${name} ${outcome}\n`);
+      process.exitCode = 1;
+    } else if (agent.wired) {
+      process.stdout.write(`  · ${name} already wired, left alone\n`);
     } else {
       process.stdout.write(`  ✓ ${name} wired, restart it to pick this up\n`);
     }
@@ -1343,9 +1374,9 @@ async function statusMode(timeoutMs) {
     out(`             ✗ no answer (${reason})`);
     // The fail-open, said out loud. It is the sentence SECURITY.md has always
     // carried and the one nobody reads until the morning it matters.
-    const failClosed = readState()[WARDEN_URL]?.failClosed === true;
+    const failClosed = cachedFailClosed(WARDEN_URL);
     out(failClosed
-      ? '             this gateway was last seen set to fail closed, so prompts are being REFUSED'
+      ? '             prompts are being REFUSED until the gateway can inspect them'
       : '             while it is down, every prompt goes through UNCHECKED');
   }
 
@@ -1400,19 +1431,8 @@ async function statusMode(timeoutMs) {
     out(`    ${mark} ${agent.name.padEnd(12)} ${state}`);
   }
 
-  /*
-   * The second key, and why it is checked here.
-   *
-   * `--fix` writes WARDEN_API_KEY into the `env` block of
-   * ~/.claude/settings.json as well as the shell profile, because a Claude Code
-   * opened from the Dock never sourced a profile. Two copies of a credential is
-   * two things that can disagree, and when they do, the terminal is judged as
-   * one person and the app as another — or the app is refused outright with a
-   * key the person can see is correct in their shell. Nothing said so.
-   *
-   * Reconciling them is F6 of the spec. Noticing is this cheap and is most of
-   * the value.
-   */
+  // Older installations may still have a shell or host-setting copy that overrides
+  // the encrypted file. Report drift until the administrator removes that copy.
   const drifted = keyCopies();
   const mismatched = drifted.length > 0;
   if (mismatched) {
@@ -1604,30 +1624,8 @@ function desktopCardCommand(text) {
   return null;
 }
 
-/**
- * What this machine last learned from the gateway, remembered across runs.
- *
- * `failClosed` is stated by the gateway on `/health`, which is exactly the call
- * that fails when the gateway is down — so learning it only from a live
- * response means never knowing it at the one moment it decides anything. The
- * first version of this shipped with that hole: an administrator set
- * `WARDEN_FAIL_CLOSED=1`, the gateway went down, and every hook cheerfully
- * failed open because it had forgotten to ask while it still could.
- *
- * So it is remembered from the last successful contact and applied during the
- * next outage, which is how HSTS works and for the same reason. Keyed by
- * gateway URL, because pointing a machine at a different Warden must not
- * inherit the last one's policy.
- *
- * A machine that has never reached this gateway has nothing remembered and
- * fails open. That is the only answer available and it is worth being plain
- * about: this closes the door for a team that has been running, not for a
- * laptop being set up while the gateway is already down.
- *
- * Best effort in both directions — an unreadable or unwritable state file must
- * never stop a prompt, since the whole point is to not be the thing that
- * breaks somebody's morning.
- */
+/** Remember explicit administrator opt-outs across outages, scoped by gateway.
+ * Missing, corrupt and pre-versioned state all retain the fail-closed default. */
 const STATE_PATH = join(homedir(), '.warden-hook.state.json');
 
 function readState() {
@@ -1639,9 +1637,15 @@ function readState() {
   }
 }
 
+function cachedFailClosed(url) {
+  const policy = readState()[url];
+  // Old caches cannot distinguish the old default from an administrator's opt-out.
+  return !(policy?.failurePolicyVersion === 1 && policy.failClosed === false);
+}
+
 function rememberGateway(url, failClosed) {
   writeState((state) => {
-    state[url] = { ...(state[url] ?? {}), failClosed: failClosed === true, at: new Date().toISOString() };
+    state[url] = { ...(state[url] ?? {}), failClosed: failClosed !== false, failurePolicyVersion: 1, at: new Date().toISOString() };
   });
 }
 
@@ -1762,7 +1766,7 @@ async function main() {
   // Whether an unreachable gateway refuses. Stated by the gateway on /health
   // and remembered here from the last time it answered, because the outage is
   // when it matters and the outage is when it cannot be asked.
-  let failClosed = readState()[WARDEN_URL]?.failClosed === true;
+  let failClosed = cachedFailClosed(WARDEN_URL);
 
   // Run by a person, not by a tool, so it takes its input as a prompt on stdin
   // rather than a hook event — and it never blocks anything.
@@ -1822,8 +1826,8 @@ async function main() {
   // in the developer's keystroke path indefinitely. Unref'd, so it cannot keep
   // the process alive on its own — it only fires if something else already is.
   const watchdog = setTimeout(() => {
-    process.stderr.write('⚠ warden-hook: no event arrived on stdin. Prompt allowed unchecked.\n');
-    process.exit(0);
+    refuseUninspected('No complete hook event arrived before the input deadline.');
+    process.exit(2);
   }, decisionTimeoutMs);
   watchdog.unref?.();
 
@@ -1836,8 +1840,7 @@ async function main() {
   try {
     payload = JSON.parse(raw);
   } catch {
-    // Not an event we recognise. Staying out of the way beats guessing.
-    return;
+    return refuseUninspected('The hook event is not valid JSON. Check the host integration.');
   }
 
   let detected;
@@ -1849,7 +1852,7 @@ async function main() {
     return refuseUninspected(err?.message ?? 'An attachment could not be read.');
   }
   const { tool, prompt } = detected;
-  if (!prompt.trim() && !attachments.length) return;
+  if (!prompt.trim() && !attachments.length) return refuseUninspected('The host supplied no readable prompt text or supported attachments.');
 
   // Read before the gateway call so a slow disk shows up in our own timing
   // rather than eating into the decision deadline.
@@ -1881,11 +1884,9 @@ async function main() {
       decisionTimeoutMs = Math.max(decisionTimeoutMs, DEFAULT_DOCUMENT_TIMEOUT_MS,
         Number.isFinite(documentMs) && documentMs > 0 ? documentMs : 0);
     }
-    // Read on the health call so it is known before the decision can fail. A
-    // gateway that never answered leaves this false, which is the fail-open
-    // default and the only answer available: refusing on the basis of a policy
-    // nobody stated would brick a CLI over a typo'd URL.
-    failClosed = health?.failClosed === true;
+    // Only a versioned, explicit server policy can permit unchecked requests.
+    // An older gateway or an incomplete health response keeps the closed default.
+    failClosed = !(health?.failurePolicyVersion === 1 && health.failClosed === false);
     rememberGateway(WARDEN_URL, failClosed);
     /*
      * The hourly wiring report, started here rather than after the decision.
@@ -1935,18 +1936,8 @@ async function main() {
       }
     );
   } catch (err) {
-    /**
-     * The one place this deliberately fails open.
-     *
-     * Everywhere inside Warden, an unusable answer escalates. Here it would
-     * mean a crashed gateway bricking every developer's CLI at once, and a
-     * gateway that can strand the whole team gets uninstalled the first morning
-     * it does. Warn loudly, let the prompt through, and let the missing
-     * heartbeat be the alert on the admin's side.
-     *
-     * Note this catch no longer swallows a rejected key: that is handled above
-     * as the answer it is.
-     */
+    // Failure to inspect blocks by default. The only exception is the explicit
+    // administrator policy remembered from a successful gateway health response.
     if (failClosed) {
       // The administrator asked for this gateway to be a gate rather than a
       // recommendation, so an unreachable one refuses. Same shape as any other
@@ -2047,7 +2038,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // A crash in the hook must never take the employee's tool down with it.
-  process.stderr.write(`⚠ warden-hook error: ${err?.message ?? err}\n`);
-  process.exitCode = 0;
+  // An inspection crash is not an authorization to forward an unchecked prompt.
+  refuseUninspected(`The hook could not inspect this request: ${err?.message ?? 'unexpected failure'}`);
 });
