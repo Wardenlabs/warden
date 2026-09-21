@@ -54,8 +54,8 @@ La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamen
 
 ## Alineación de la guía y cierre (21 septiembre 2026)
 
-- La guía tiene un contenedor de 64rem, con un único eje para introducción, títulos y paneles. El margen interior pasa de 20px a 32px; ningún capítulo vuelve a una composición lateral.
+- La guía y su footer comparten un contenedor de 76rem, con un único eje para introducción, títulos, paneles y cierre. El margen interior pasa de 20px a 64px; ningún capítulo vuelve a una composición lateral.
 - Describe, Review, Activate y Reset pertenecen a la cabecera del mismo panel. El paso seleccionado usa una superficie gris; la acción principal conserva el blanco. La navegación es explícita y el estado sigue anunciado a lectores de pantalla.
 - Separación entre capítulos: 64px en escritorio, 48px en móvil. El bloque de límites sigue exactamente el mismo ritmo.
 - El footer tiene dos grupos equilibrados: lockup oficial con versión, y plataforma principal con otras descargas. La marca conserva proporciones; el nombre de la plataforma dirige la acción. Debajo queda una línea independiente de enlaces y licencia.
-- En móvil los grupos se apilan con 48px de separación. Enlaces y botones mantienen al menos 44px de alto. No agregar párrafos de apoyo, etiquetas de ejemplo ni nuevas animaciones para llenar el espacio.
+- El footer de portada ocupa hasta 88rem; el lockup llega a 36rem y la plataforma principal a 76px. El espacio superior crece entre 80px y 144px. En móvil los grupos se apilan con 64px de separación y la marca aprovecha el ancho disponible. Enlaces y botones mantienen al menos 44px de alto. No agregar párrafos de apoyo, etiquetas de ejemplo ni nuevas animaciones para llenar el espacio.

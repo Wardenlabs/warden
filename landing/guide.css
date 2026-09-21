@@ -82,7 +82,7 @@
 .js .guide-page [data-step="1"] .policy-list-footer { justify-content: flex-end; }
 
 /* Keep every chapter and its controls on the same reading axis. */
-.guide-page .guide-intro, .guide-page .sec { max-width: 64rem; --page-gutter: clamp(1.25rem, 4vw, 2rem); }
+.guide-page .guide-intro, .guide-page .sec, .guide-page .site-footer .foot { width: 100%; max-width: 76rem; --page-gutter: clamp(1.25rem, 4vw, 4rem); }
 .guide-page .chapter .stage {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "says" "panel";
