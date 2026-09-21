@@ -34,50 +34,26 @@ header nav .nav-download { color: #eee; }
 .proof h2 { font-size: var(--warden-title); font-weight: 550; line-height: 1.12; letter-spacing: -.04em; }
 .proof-heading > a { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; color: var(--warden-muted-dark); font-size: .8125rem; text-decoration: none; }
 .policy-example { min-inline-size: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--warden-line-dark); border-radius: var(--warden-radius); background: #121212; color: var(--warden-white); color-scheme: dark; }
-.example-rule { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; align-items: center; padding: 2rem 2.5rem; border-bottom: 1px solid var(--warden-line-dark); }
-.example-label { grid-column: 1/-1; color: var(--warden-muted-dark); font-size: .75rem; }
-.example-rule p { font-size: clamp(1.125rem, 2.6vw, 1.5rem); font-weight: 500; line-height: 1.4; letter-spacing: -.025em; }
-.active-rule { display: inline-flex; gap: .35rem; align-items: center; color: #b8b8b8; font-size: .75rem; }
+.example-rule { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "label state" "rule rule"; gap: .75rem 1rem; align-items: center; padding: 2rem; border-bottom: 1px solid var(--warden-line-dark); }
+.example-label { grid-area: label; color: var(--warden-muted-dark); font-size: .75rem; }
+.example-rule p { grid-area: rule; font-size: clamp(1.125rem, 2.6vw, 1.5rem); font-weight: 500; line-height: 1.4; letter-spacing: -.025em; }
+.active-rule { grid-area: state; display: inline-flex; gap: .35rem; align-items: center; color: #b8b8b8; font-size: .75rem; }
 .active-rule svg { width: 1rem; height: 1rem; }
-.example-switch { display: flex; gap: 1.5rem; padding-inline: 2.5rem; padding-top: .5rem; }
+.example-switch { display: flex; gap: 1.5rem; padding-inline: 2rem; padding-top: 1rem; }
 .example-switch label { position: relative; display: inline-flex; align-items: center; min-height: 48px; color: var(--warden-muted-dark); font-size: .8125rem; cursor: pointer; }
 .example-switch label::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: var(--warden-white); transform: scaleX(0); transition: transform var(--warden-fast) var(--warden-ease); }
 #example-private:checked ~ .example-switch label[for="example-private"], #example-public:checked ~ .example-switch label[for="example-public"] { color: #fff; }
 #example-private:checked ~ .example-switch label[for="example-private"]::after, #example-public:checked ~ .example-switch label[for="example-public"]::after { transform: scaleX(1); }
 #example-private:focus-visible ~ .example-switch label[for="example-private"], #example-public:focus-visible ~ .example-switch label[for="example-public"] { outline: 2px solid #fff; outline-offset: 4px; }
-.example-case { display: none; padding: 2.5rem; }
+.example-case { display: none; padding: 1.5rem 2rem 2rem; }
 #example-private:checked ~ .case-private, #example-public:checked ~ .case-public { display: block; }
 .example-request { min-height: 3.25rem; color: #b8b8b8; font-size: clamp(1rem, 2.2vw, 1.25rem); line-height: 1.5; }
 .example-decision { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .example-decision > svg { width: 1.4rem; height: 1.4rem; }
 .example-decision strong { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 540; line-height: 1.2; letter-spacing: -.03em; }
-.example-decision > span { color: var(--warden-muted-dark); font-size: .8125rem; }
-.example-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; padding: 1.25rem 2.5rem; border-top: 1px solid var(--warden-line-dark); color: var(--warden-muted-dark); font-size: .6875rem; }
-.proof-note { margin-top: 1.25rem; color: var(--warden-muted-dark); font-size: .75rem; line-height: 1.7; }
-.proof-note a { color: inherit; text-decoration-color: #aaa; text-underline-offset: .25em; }
 .proof a:focus-visible { outline-color: var(--warden-white); }
 .proof ::selection { background: var(--warden-white); color: var(--warden-ink); }
 
-/* A compact close. Other installers are plain links below the primary. */
-footer { background: var(--warden-black); border-top: 1px solid var(--warden-line-dark); }
-.foot { padding-block: clamp(2.5rem, 5vw, 4rem) 1.5rem; }
-.closing-copy { display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center; }
-.close { color: var(--warden-white); font-size: var(--warden-title); font-weight: 550; line-height: 1.12; letter-spacing: -.04em; }
-.fine { margin-top: 1rem; color: var(--warden-muted-dark); font-size: .8125rem; }
-.dl { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .5rem 1.25rem; max-width: 25rem; }
-.dl::after { content: ""; flex-basis: 100%; order: -1; }
-.dl > a { display: inline-flex; align-items: center; gap: .6rem; min-height: 44px; color: var(--warden-muted-dark); font-size: .75rem; text-decoration: none; }
-.dl > a > svg, .dl .dl-verb, .dl .go { display: none; }
-.dl > a:first-child { order: -2; min-height: 48px; padding: .85rem 1.25rem; border-radius: var(--warden-control-radius); background: var(--warden-white); color: var(--warden-ink); white-space: nowrap; }
-.dl > a:first-child > svg { display: block; width: 1rem; height: 1rem; flex: none; }
-.dl > a:first-child .dl-verb { display: inline; }
-.dl > a:first-child .t { font-size: .875rem; font-weight: 650; }
-.links { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem 1.25rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 0; color: var(--warden-muted-dark); font-size: .75rem; }
-.links .brand { display: inline-flex; align-items: center; gap: .4rem; color: var(--warden-white); margin-right: auto; }
-.links .brand .mark { width: 1.35rem; height: 1.35rem; }
-.links .brand .word { width: 4.5rem; height: auto; }
-.links > a { display: inline-flex; align-items: center; min-height: 44px; }
-.links .sep { display: none; }
 .film-bar button { display: inline-flex; align-items: center; justify-content: center; }
 @media (max-width: 47.999rem) {
   :root { --header-height: 4rem; }
@@ -91,60 +67,21 @@ footer { background: var(--warden-black); border-top: 1px solid var(--warden-lin
   .hero-art { width: clamp(14rem, 37svh, 21rem); margin-block: .5rem; }
   .compatibility { gap: 1.5rem; font-size: .6875rem; }
   .proof-heading { margin-bottom: 1.5rem; }
-  .example-rule { padding: 1.5rem; grid-template-columns: 1fr; }
-  .active-rule { margin-top: .25rem; }
+  .example-rule { padding: 1.5rem; }
   .example-switch { padding-inline: 1.5rem; gap: 1.5rem; }
   .example-case { padding: 2rem 1.5rem; }
   .example-request { min-height: 3rem; }
   .example-decision { gap: .6rem; }
-  .example-decision > span { flex-basis: 100%; padding-left: 2rem; }
-  .example-caption { padding: 1rem 1.5rem; }
-  .closing-copy { grid-template-columns: 1fr; text-align: center; gap: 1.75rem; }
-  .dl { justify-content: center; max-width: 24rem; margin: auto; gap: .5rem 1rem; }
-  .links { gap: .25rem 1rem; margin-top: 2.5rem; }
-  .links .brand { flex-basis: 100%; margin-bottom: .5rem; }
 }
 @media (max-height: 650px) and (min-width: 48rem) {
   .hero { min-height: 38rem; }
   .hero-art { width: 18rem; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .hero-download:hover, .dl > a:first-child:hover { background: #d7d7d3; color: #080808; }
-  .hero-film:hover, .links a:hover, header nav a:hover, .dl > a:not(:first-child):hover { color: #fff; }
-  .proof-heading > a:hover, .proof-note a:hover { color: #fff; }
+  .hero-download:hover { background: #d7d7d3; color: #080808; }
+  .hero-film:hover, header nav a:hover { color: #fff; }
+  .proof-heading > a:hover { color: #fff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .example-switch label::after { transition: none; }
-}
-
-/* A compact colophon aligned with the proof above; installers remain direct links. */
-.footer-brand { display: inline-flex; align-items: center; gap: .65rem; color: var(--warden-white); text-decoration: none; }
-.footer-brand .mark { width: 1.8rem; height: 1.8rem; }
-.footer-brand .word { width: 5.8rem; height: auto; }
-.foot { max-width: 58rem; padding-block: 2.75rem 1.25rem; }
-.closing-copy { align-items: start; gap: 2rem; padding-bottom: 0; }
-.fine { margin-top: .6rem; font-size: .6875rem; }
-.dl { display: grid; grid-template-columns: auto auto; gap: 0 1.5rem; max-width: none; }
-.dl::after { display: none; }
-.dl > a:first-child { grid-column: 1 / -1; justify-self: end; min-height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--warden-white); }
-.dl > a:first-child .t { font-size: .875rem; font-weight: 550; }
-.dl > a:first-child > svg { display: none; }
-.dl > a:first-child .go { display: inline-flex; }
-.dl > a:first-child .go svg { width: 1rem; height: 1rem; }
-.dl > a { min-height: 36px; font-size: .6875rem; }
-.dl > a:last-child { grid-column: 1 / -1; justify-self: end; }
-.foot .links { gap: .25rem 1.25rem; margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid #202020; font-size: .6875rem; }
-.foot .links > span:not(.sep) { order: 1; margin-right: 0; margin-left: auto; }
-.foot .links > a { text-decoration: none; text-underline-offset: .3em; }
-.foot .links > a:hover { text-decoration: underline; }
-@media (hover: hover) and (pointer: fine) {
- .dl > a:first-child:hover { background: transparent; color: var(--warden-white); }
- .dl > a:first-child:hover .go { transform: translateY(2px); }
-}
-@media (max-width: 47.999rem) {
- .foot { padding-top: 2rem; }
- .closing-copy { text-align: left; gap: 1.25rem; }
- .dl { justify-content: start; margin: 0; gap: 0 1.5rem; }
- .dl > a:first-child, .dl > a:last-child { justify-self: start; }
- .foot .links { column-gap: 1rem; margin-top: 1rem; }
 }

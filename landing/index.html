@@ -77,7 +77,7 @@ setTimeout(function () {
 </script>
 <link rel="stylesheet" href="foundation-v2.css?v=monochrome-1">
 <link rel="stylesheet" href="design-system.css?v=quiet-1">
-<link rel="stylesheet" href="landing.css?v=footer-4">
+<link rel="stylesheet" href="landing.css?v=space-5">
 
 <!-- Preload the page controller; content and downloads also work without it. -->
 <link rel="modulepreload" href="app.js?v=manual-1">
@@ -85,7 +85,8 @@ setTimeout(function () {
 <!-- Anonymous Vercel page views remain available alongside the PostHog funnel.
      Only the production hostname loads this collector; local previews stay clean. -->
 <script>if (location.hostname === 'warden-theta.vercel.app') { window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); }; const a = document.createElement('script'); a.defer = true; a.src = '/_vercel/insights/script.js'; document.head.append(a); }</script>
-<link rel="stylesheet" href="motion.css?v=taste-1">
+<link rel="stylesheet" href="motion.css?v=space-5">
+<link rel="stylesheet" href="footer.css?v=signature-1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -152,7 +153,7 @@ setTimeout(function () {
  <circle class="signal-impact" cx="320" cy="42" r="14"/>
  <path class="signal-packet" pathLength="1" d="M8 42h300"/>
  </svg>
-        <div class="example-decision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m8 3-5 5v8l5 5h8l5-5V8l-5-5H8Z"/><path d="m9 9 6 6m0-6-6 6"/></svg><strong>Blocked.</strong><span>By your rule.</span></div>
+        <div class="example-decision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m8 3-5 5v8l5 5h8l5-5V8l-5-5H8Z"/><path d="m9 9 6 6m0-6-6 6"/></svg><strong>Blocked.</strong></div>
       </div>
       <div class="example-case case-public">
         <p class="example-request">“Summarize our public pricing.”</p>
@@ -164,14 +165,14 @@ setTimeout(function () {
  <circle class="signal-impact" cx="320" cy="42" r="14"/>
  <path class="signal-packet" pathLength="1" d="M8 42h624"/>
  </svg>
-        <div class="example-decision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg><strong>Allowed.</strong><span>Within your rule.</span></div>
+        <div class="example-decision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg><strong>Allowed.</strong></div>
       </div>
     </fieldset>
   </div>
 </section>
 </main>
 
-<footer id="download">
+<footer id="download" class="site-footer">
   <div class="wrap foot">
     <div class="closing-body">
       <div class="closing-copy">

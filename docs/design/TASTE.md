@@ -28,9 +28,13 @@ Se aplicaron también `gpt-taste` y `frontend-design` a pedido del usuario. El b
 
 - La guía abandona autoplay y avance por scroll. Describe, Review y Activate controlan un solo espacio de trabajo. No hay un editor falso: la instrucción de ejemplo se presenta como texto.
 - Los cambios de estado actualizan título y mensaje accesible. Una acción que desaparece deja el foco en el selector estable del paso.
-- El footer reduce la escala de marca, agrupa instaladores, retira el botón relleno repetido y alinea su ancho con la prueba superior.
+- La primera revisión compactó el footer; el usuario aclaró después que buscaba composición y presencia, no menor tamaño. Se reemplazó por la firma centrada descrita abajo.
 - El escudo entra frontal y continúa con un balanceo lento. Se limita a 30fps y pausa por visibilidad o movimiento reducido.
 
 ## Edición de texto
 
 Se retiran los párrafos explicativos debajo de los títulos, las bandas de “Illustrative example”, “For connected tools” y las notas de política. “Usage limit” queda como nombre funcional. La página muestra acciones y resultados; los datos de demostración siguen siendo locales y no representan actividad real del visitante. Los mensajes de estado para lectores de pantalla se conservan sin añadir ruido visual.
+
+## Footer como firma de marca
+
+El cierre usa el lockup oficial grande y centrado, con aire alrededor. La descarga principal es tipográfica, con un icono contenido en un círculo; las demás plataformas forman una fila subordinada. Sin un nuevo slogan. La navegación queda en la línea inferior. Se retiran también “By your rule.” y “Within your rule.” de la prueba, cuyos márgenes y espacios internos se normalizan.

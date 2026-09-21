@@ -113,9 +113,9 @@ Supporting hero copy uses a 1.5 line height. Navigation and option labels use 0.
 
 The hero covers at least the full viewport including its compatibility strip, without a desktop height cap. All page backgrounds, including overscroll, remain black. The default content width is 68rem plus gutters; the proof wrapper has a total maximum width of 58rem. Gutters grow from 1.125rem to 2rem at 48rem. The page supports a 20rem minimum viewport. The absolute header has a separate 100rem cap and fluid horizontal padding; it does not remain sticky on this homepage.
 
-The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a dark evidence section containing one native private/public example. A compact closing signature pairs the official lockup with downloads. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
+The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a dark evidence section containing one native private/public example. A large centered official lockup closes the page, followed by a prominent text download and one row of alternative installers. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
 
-Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. The footer aligns to the 58rem proof column and uses a compact navigation row. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
+Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. The footer uses the 68rem content width; its centered lockup grows to a 6rem symbol and 22rem wordmark. Navigation forms a quiet lower baseline. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
 
 ## Elevation & Depth
 
@@ -131,7 +131,7 @@ The official mark's outline and proportions are binding. Primary download contro
 
 ## Components
 
-**Download.** Off-white pill with dark text and an operating-system icon; minimum height 48px. Hover changes to light gray on fine pointers. The hero inherits a small pressed translation/scale from the shared button. Footer downloads are grouped text links; the primary includes a small downward icon instead of a second filled pill. Direct links work before enhancement; platform detection updates the primary installer and footer ordering. Preserve existing installer targets and hooks.
+**Download.** Off-white pill with dark text and an operating-system icon; minimum height 48px. Hover changes to light gray on fine pointers. The hero inherits a small pressed translation/scale from the shared button. Footer downloads are grouped text links; the primary uses 20–28px type and a downward icon in a thin circular outline, without repeating the hero pill. Direct links work before enhancement; platform detection updates the primary installer and footer ordering. Preserve existing installer targets and hooks.
 
 **Film link and dialog.** A quiet text link beneath the download, with a play icon and 44px minimum target. It directly links to the existing film and enhances into a native dialog with native video controls, lazy media loading, Escape/close support, pause on close and focus restoration. The current film is an existing asset; this proposal does not claim it was remade.
 
@@ -170,3 +170,5 @@ The official mark's outline and proportions are binding. Primary download contro
 How it works uses explicit Describe / Review / Activate controls. No scrolling or automatic playback changes the chosen step or tool. One composer or rule list is visible at a time; activation exposes a link to the blocked-request example. Reset returns to the instruction. Stage changes announce a concise status and move focus to the selected stable step when an action disappears. Without JavaScript the rule definitions remain readable.
 
 Visible captions and explanatory paragraphs under guide headings were removed at the user’s request. Keep functional labels and decisions; do not reintroduce repeated example disclaimers or microcopy. Demo data remains deterministic, with no claim of live evaluation.
+
+Footer composition lives in `landing/footer.css`, loaded last on both pages. The proof uses one inset for rule, selectors and result (32px desktop, 24px mobile). Rule label and state share a row above the policy; the 64px desktop / 48px mobile trajectory connects the request to the verdict. No explanatory suffix follows Blocked or Allowed.
