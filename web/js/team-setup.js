@@ -228,7 +228,11 @@ function stepConnect() {
   const busy = state.teamSetup.busy;
   const copy = button('Copy setup message', { kind: 'primary', id: 'teamSetupCopy' });
   const again = button(busy ? 'Checking…' : 'Check again', { kind: 'link', id: 'teamSetupCheck', busy });
-  const message = `One command. It carries ${first}’s key and this address: ${address}. Treat it like a password.`;
+  // Where the message goes is said here because the person reading it may never
+  // have opened a terminal. The first administrator to try this run asked
+  // whether the text was meant for an agent or for this console, and the card
+  // said "send" without saying to whom, how, or what happens at the other end.
+  const message = `Copy it and send it to ${first} privately — a direct message or an email. It is one command, pasted into the Terminal on their own computer. It carries ${first}’s key and this address: ${address}. Treat it like a password.`;
 
   const shapes = {
     never: {

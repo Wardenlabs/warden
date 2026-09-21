@@ -200,8 +200,10 @@ un bypass por orden alfabético. Si eligen un rol exento, la misma advertencia e
 
 > **Send Ana their setup**
 >
-> `Send the setup message` — *One command. It carries Ana's key and this
-> address: http://192.168.1.42:8080. Treat it like a password.*
+> `Send the setup message` — *Copy it and send it to Ana privately — a direct
+> message or an email. It is one command, pasted into the Terminal on their own
+> computer. It carries Ana's key and this address: http://192.168.1.42:8080.
+> Treat it like a password.*
 >
 > `Waiting for Ana's device` — *Nothing has reported yet. You can leave — this
 > updates when it does.*
