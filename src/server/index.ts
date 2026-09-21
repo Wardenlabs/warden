@@ -8,7 +8,7 @@ import { loadPolicy } from '../policy/store.js';
 import { adapterName } from '../qvac/index.js';
 import { createApp } from './app.js';
 import { HOST, PORT, seedPath } from './config.js';
-import { lanAddresses } from './http.js';
+import { lanAddresses, listeningOn } from './http.js';
 import { installExitHandlers, preloadModels, reconcileTransfers } from './lifecycle.js';
 import { portAvailable, portHolder } from './installation.js';
 
@@ -69,8 +69,15 @@ if (!(await portAvailable(PORT, HOST))) {
 const server = createApp().listen(PORT, HOST, () => {
   console.log(`\nWarden  (adapter=${adapterName()})`);
   console.log(`  local     http://localhost:${PORT}`);
-  for (const ip of lanAddresses()) {
-    console.log(`  network   http://${ip}:${PORT}   <- teammates point here`);
+  // Only what is bound. This printed every LAN address the machine had while
+  // listening on loopback, and "teammates point here" under an address that
+  // refuses them is the setup message's mistake made at the top of the log.
+  if (listeningOn() === 'network') {
+    for (const ip of lanAddresses()) {
+      console.log(`  network   http://${ip}:${PORT}   <- teammates point here`);
+    }
+  } else {
+    console.log('  network   off — bound to this computer only (WARDEN_HOST)');
   }
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);

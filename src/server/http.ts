@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import type { Request, Response } from 'express';
-import { PORT } from './config.js';
+import { HOST, PORT } from './config.js';
 import { CompilerSetupRequiredError } from '../qvac/types.js';
 
 /**
@@ -85,14 +85,69 @@ export function lanAddresses(): string[] {
 }
 
 /**
- * The address to hand an employee.
+ * Whether this process accepts connections from another machine at all.
+ *
+ * `HOST` is what was bound, so it is the fact; the interface list only says
+ * what the machine has. The desktop app binds `127.0.0.1` until the
+ * administrator allows LAN access, and on that gateway a LAN address is a
+ * number nobody is listening on.
+ */
+export function listeningOn(host: string = HOST): 'loopback' | 'network' {
+  return /^(127\.|localhost$|::1$)/.test(host) ? 'loopback' : 'network';
+}
+
+/** Where a teammate on this network would point, or null when nobody could. */
+export function lanUrl(host: string = HOST): string | null {
+  if (listeningOn(host) === 'loopback') return null;
+  const lan = lanAddresses()[0];
+  return lan ? `http://${lan}:${PORT}` : null;
+}
+
+export type Reach = {
+  listening: 'loopback' | 'network';
+  lanUrl: string | null;
+  publicUrl: string | null;
+  canChange: boolean;
+};
+
+/**
+ * How another machine gets here, as facts and not as a verdict.
+ *
+ * "Reachable" is left for the reader to work out — either URL being set —
+ * because a computed field would be a second copy of these two, and second
+ * copies drift. `canChange` is whether a desktop shell is attached to ask;
+ * without one this is set by `WARDEN_HOST` and a restart.
+ *
+ * `relayed` withholds the LAN address. `/health` answers without a credential
+ * and through a tunnel, and the inside of somebody's network is not something
+ * to tell a caller from the internet. A direct caller already had an address
+ * for this machine; a relayed one is told the public address, which is theirs.
+ */
+export function reachFor(relayed: boolean, canChange: boolean, bound: string = HOST): Reach {
+  return {
+    listening: listeningOn(bound),
+    lanUrl: relayed ? null : lanUrl(bound),
+    publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
+    canChange
+  };
+}
+
+/**
+ * The address to hand an employee, or null when there is none to hand.
  *
  * Taken from the request the console made, because that is by construction an
  * address that reached this server. Guessing from the interface list gets it
  * wrong on a machine with several, and an onboarding pack with the wrong host
  * fails in the least helpful way possible: silently, on someone else's laptop.
+ *
+ * It used to always answer, and that was the same failure by another road. A
+ * console open on `localhost` fell through to the first LAN address without
+ * asking whether the process was bound there, so a desktop install with LAN
+ * access off — the default — issued setup messages pointing at a port that
+ * refused every connection. Null is the honest answer there, and the caller
+ * decides what to say about it. docs/prd/teams-onboarding.md §0.
  */
-export function gatewayUrl(req: Request): string {
+export function gatewayUrl(req: Request, bound: string = HOST): string | null {
   const configured = process.env['WARDEN_PUBLIC_URL'];
   if (configured) return configured.replace(/\/$/, '');
   // The Host header is written by the caller, and this URL is interpolated into
@@ -119,7 +174,7 @@ export function gatewayUrl(req: Request): string {
   }
 
   // The console is open on the gateway machine itself, so localhost is what it
-  // sees — but localhost is useless to everyone else. Prefer a LAN address.
-  const lan = lanAddresses()[0];
-  return lan ? `http://${lan}:${PORT}` : `http://${host ?? `localhost:${PORT}`}`;
+  // sees — but localhost is useless to everyone else. A LAN address, if this
+  // process is bound to one; otherwise nothing, rather than a guess.
+  return lanUrl(bound);
 }

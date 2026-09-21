@@ -48,6 +48,11 @@ function takeHealth(j) {
   state.canLeaveDemo = Boolean(j.canLeaveDemo);
   // The address the team reaches this gateway at, when a tunnel is up.
   state.publicUrl = j.publicUrl ?? null;
+  // How another machine gets here: what the process is bound to, the LAN
+  // address if it is bound to one, and whether a shell could change it. Null
+  // from a gateway older than this field, which reads as "not known" and must
+  // never be drawn as "not reachable".
+  state.reach = j.reach ?? null;
   // How long prompt text stays readable. Shown on the screen that shows it,
   // because a retention policy nobody can see is one nobody can rely on.
   state.prompts = j.prompts ?? null;
@@ -178,6 +183,15 @@ function subscribe() {
   const src = new EventSource('/api/events');
   src.onmessage = async (e) => {
     let payload; try { payload = JSON.parse(e.data); } catch { return; }
+    // Somebody's machine reported its wiring. The event is a doorbell: what
+    // changed is read from the directory, not from the payload. Drawn again
+    // only where people are on screen — anywhere else an arriving event must
+    // not take away what somebody is in the middle of typing.
+    if (payload.type === 'device') {
+      await refreshPeople();
+      if (['people', 'teamSetup'].includes(state.view)) render();
+      return;
+    }
     if (payload.type !== 'decision') return;
     noteFirstRunDecision(payload);
     const { ok, j } = await api('/api/audit?limit=1');

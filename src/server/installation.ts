@@ -65,7 +65,7 @@ export function installationVersion(): string {
   return cachedVersion;
 }
 
-export type Installation = { label: string; version: string; dataDir?: string };
+export type Installation = { label: string; version: string; dataDir?: string; intent?: 'solo' | 'team' };
 
 /**
  * What this gateway says about itself, trimmed to what the asker may know.
@@ -78,6 +78,11 @@ export type Installation = { label: string; version: string; dataDir?: string };
  */
 export function installationReport(loopback: boolean): Installation {
   const report: Installation = { label: installationLabel(), version: installationVersion() };
+  // What the desktop splash was told, when it was asked. The console reads it
+  // to tell a team install with nobody in it yet from a solo one, which the
+  // directory alone cannot. It decides what is drawn and authorises nothing.
+  const intent = process.env['WARDEN_INSTALL_INTENT'];
+  if (intent === 'solo' || intent === 'team') report.intent = intent;
   return loopback ? { ...report, dataDir: dataDir() } : report;
 }
 

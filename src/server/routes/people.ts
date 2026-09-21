@@ -27,7 +27,7 @@ import {
 } from '../../policy/people.js';
 import { loadPolicy, rulesForActor, savePolicy } from '../../policy/store.js';
 import { quotaSchema } from '../../policy/types.js';
-import { asyncRoute, gatewayUrl } from '../http.js';
+import { asyncRoute, gatewayUrl, listeningOn } from '../http.js';
 
 export const peopleRoutes = Router();
 
@@ -76,7 +76,16 @@ peopleRoutes.get('/api/people', (_req, res) => {
 peopleRoutes.get('/api/people/:id/onboarding', (req, res) => {
   const person = findEmployee(String(req.params['id']));
   if (!person) return res.status(404).json({ error: 'no such employee' });
-  res.json(onboardingFor(person, gatewayUrl(req)));
+  const url = gatewayUrl(req);
+  // A setup message is something an administrator pastes to somebody else. With
+  // no address another machine could use, there is no message worth copying —
+  // and the one this used to build failed on the other person's laptop, where
+  // nobody who could fix it was looking. `reach` says why, so the console can
+  // offer the way to change it rather than an error to read.
+  if (!url) {
+    return res.status(409).json({ error: 'Nobody else can reach this gateway yet.', reach: listeningOn() });
+  }
+  res.json(onboardingFor(person, url));
 });
 
 /** What the gateway knows how to onboard, and which of it anyone has verified. */

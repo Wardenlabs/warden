@@ -127,6 +127,7 @@ export const state = {
   /** True when a desktop shell is listening that can fetch the models. */
   canLeaveDemo: false,
   publicUrl: null,
+  reach: null,
   /** What weights are on disk and which seat each model fills. Null until loaded. */
   models: null,
   adjudicator: null,
@@ -162,6 +163,28 @@ export const state = {
    * tool, and they are the only reason this is state at all: a decision that
    * has already gone past cannot be asked for again.
    */
+  /**
+   * The first run of Team. Like `firstRun` below, none of this is a cursor:
+   * the step is read off the company's name, how the gateway is reached and who
+   * is in the directory. What is here is what somebody is in the middle of.
+   */
+  teamSetup: {
+    /** Set by ← Back only. Null means derive it. */
+    step: null,
+    /** 'lan' or 'public': which card is chosen on step 2. */
+    reach: 'lan',
+    /** What is typed on step 1 and step 3, kept so a redraw does not eat it. */
+    company: '',
+    person: '',
+    /** The role picked on step 3. Null means the first one offered. */
+    role: null,
+    busy: false,
+    /** 'lan' or 'public' while the gateway has been asked and has not answered. */
+    asked: null,
+    error: '',
+    /** Left by the wordmark, this session. Memory only: it says they left, not where they were. */
+    left: false
+  },
   firstRun: {
     /** The tool picked on step 1. Null means "whatever is already wired". */
     tool: null,
@@ -176,7 +199,9 @@ export const state = {
     /** ...and it was an ALLOW: the path works, the rule is unproven. */
     allowed: false,
     /** ...and it came back after the hook's deadline, so the prompt went unchecked. */
-    late: false
+    late: false,
+    /** Left by the wordmark, this session. Without it the way out led back in. */
+    left: false
   },
 
   /**

@@ -40,6 +40,7 @@
     "test:verification": "tsx scripts/test-verification.ts",
     "test:hook": "tsx scripts/test-hook.ts",
     "test:installation": "tsx scripts/test-installation.ts",
+    "test:reach": "tsx scripts/test-reach.ts",
     "test:devices": "tsx scripts/test-devices.ts",
     "test:pause": "tsx scripts/test-pause.ts",
     "test:cli": "tsx scripts/test-cli-compiler.ts",

@@ -195,9 +195,14 @@ async function main(): Promise<void> {
   // docs/specs/solo-mode.md §8. Skipped for a smoke run: nothing answers the
   // IPC message in CI, and this would otherwise hang until the 120s
   // WARDEN_SMOKE_TIMEOUT above and fail a boot the run never asked about.
-  if (!SMOKE && !hasCompanyPeople()) {
+  if (!SMOKE && !settings.intent && !hasCompanyPeople()) {
     const mode = await askMode(splash);
     soloOnboarding = mode === 'solo';
+    // Written down, because for a team the directory cannot be the record:
+    // it stays empty until the administrator adds somebody, and an empty
+    // directory is exactly what a solo install looks like.
+    settings = { ...settings, intent: mode };
+    writeSettings(userData, settings);
   }
 
   if (settings.adapter === 'real') {
@@ -240,7 +245,8 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       assetsDir: APP_ROOT,
       modelsDir: modelsDir(),
       adapter: settings.adapter,
-      logPath: logPath()
+      logPath: logPath(),
+      ...(settings.intent ? { intent: settings.intent } : {})
     },
     onGatewayExit,
     // The console's "Download models" button, arriving the long way round: the
@@ -259,6 +265,11 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       // ordering and the failure dialog, so this is only the doorbell.
       if (msg === 'expose-on') void setExposeEnabled(true);
       if (msg === 'expose-off') void setExposeEnabled(false);
+      // The menu's "Allow LAN access", asked for from the console. It was only
+      // ever in the menu, which is not where an administrator setting up a
+      // team is looking. Same function, so the same persistence and restart.
+      if (msg === 'lan-on') void setLanEnabled(true);
+      if (msg === 'lan-off') void setLanEnabled(false);
     }
   );
 

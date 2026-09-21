@@ -61,11 +61,15 @@ export type OnboardingPack = {
   /** The shared preamble: one file and the environment every tool reads. */
   common: SetupStep[];
   integrations: Integration[];
-  /** The whole thing as plain text, for pasting into a chat message. */
+  /** What Copy copies: comments and the one install command, safe to paste into a terminal whole. */
   message: string;
 };
 
 const HOOK_PATH = '~/.warden-hook.mjs';
+
+/** The one line that installs everything. The console's first step and the copied message are the same string. */
+const installCommand = (employee: Employee, gatewayUrl: string): string =>
+  `curl -fsSL ${gatewayUrl}/install/${installToken(employee)} | sh`;
 
 function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
   return [
@@ -77,7 +81,7 @@ function commonSteps(employee: Employee, gatewayUrl: string): SetupStep[] {
         'to the internet. It carries your API key, so treat the link as a secret. ' +
         'Safe to re-run: it replaces its own block rather than stacking a second one. ' +
         'It sets two things and no more: where the gateway is, and who you are.',
-      code: `curl -fsSL ${gatewayUrl}/install/${installToken(employee)} | sh`
+      code: installCommand(employee, gatewayUrl)
     },
     {
       title: 'Windows PowerShell alternative (current session)',
@@ -283,58 +287,47 @@ function integrations(employee: Employee, gatewayUrl: string): Integration[] {
 }
 
 /**
- * The pack as text the admin can paste into a chat.
+ * What the Copy button copies: text that is safe to paste into a terminal whole.
  *
- * Not every handover happens in front of the console — most happen in a
- * message. Rendering it here rather than in the browser keeps one definition
- * of what an employee is told.
+ * This used to be the entire pack as prose, 154 lines with the one command that
+ * matters fourth from the top, and a header telling the reader to paste only
+ * that line. The first administrator to try the Team run asked whether pasting
+ * all of it works, because all of it is what the button copies. It does not:
+ * `zsh -n` stops on an unmatched quote (the apostrophe in "gateway's"), which
+ * at a prompt is a terminal sitting at `quote>` with nothing installed, and
+ * `bash -n` fails on the prose. A shell that ran it line by line would do worse
+ * — the by-hand steps, the test prompts and the OPENAI_* exports all execute.
+ *
+ * So every line that is not the command is a shell comment, and there is one
+ * command. Pasting the whole message and pasting its last line do the same
+ * thing. The reference it used to carry is not lost: the console renders
+ * `common` and `integrations` on the person's page, and those were always the
+ * source the prose was generated from.
+ *
+ * The name is the administrator's text landing on a line a shell will read. A
+ * newline in it would end the comment and start a command, so it is cut to one
+ * printable line here rather than trusted to have been validated elsewhere.
+ * `scripts/test-reach.ts` holds the parse check that keeps this true.
  */
-function asMessage(pack: Omit<OnboardingPack, 'message'>): string {
-  const lines: string[] = [
-    `Warden setup — ${pack.employee.name}`,
+function asMessage(pack: Omit<OnboardingPack, 'message'>, command: string): string {
+  const name = pack.employee.name.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').trim().slice(0, 80) || 'you';
+  return [
+    `# Warden setup — ${name}`,
+    '#',
+    '# Open the Terminal app on your own computer, paste this whole message,',
+    '# and press Enter. It connects Claude Code, Codex and OpenCode, whichever',
+    '# of them it finds, and from then on your prompts are checked against',
+    '# company policy before they reach a model.',
+    '#',
+    '# The command carries your key, which is the only thing that identifies',
+    '# you. Do not share it or paste it into an AI chat, and tell your admin if',
+    '# it leaks so they can issue a new one.',
+    '#',
+    '# Using Cursor, Windows, or another tool? Ask your admin for those steps.',
     '',
-    `Gateway:  ${pack.gatewayUrl}`,
-    '',
-    'Your API key is in the setup command below. It is the only thing that',
-    'identifies you — keep it to yourself, and tell your admin if it leaks so',
-    'they can issue a new one.',
-    '',
-    'Every prompt you send from a connected tool is checked against company',
-    'policy on the gateway machine before it reaches any model. Nothing is sent',
-    'to a cloud provider by Warden itself.',
-    '',
-    '── Setup ──'
-  ];
-
-  for (const step of pack.common) {
-    lines.push('', `${step.title}`);
-    if (step.note) lines.push(`  (${step.note})`);
-    lines.push(...step.code.split('\n').map((l) => `    ${l}`));
-  }
-
-  for (const integration of pack.integrations) {
-    if (integration.id === 'terminal') continue;
-    lines.push('', `── ${integration.name} ──`, integration.summary);
-    if (!integration.verified) lines.push('  NOT YET VERIFIED by anyone on this team.');
-    for (const step of integration.steps) {
-      lines.push('', `${step.title}`);
-      if (step.note) lines.push(`  (${step.note})`);
-      lines.push(...step.code.split('\n').map((l) => `    ${l}`));
-    }
-  }
-
-  lines.push(
-    '',
-    'If a prompt is refused you get the rule, what to do instead, and an audit',
-    'id. Two things you can do with that id, both printed on the block itself:',
-    '',
-    `  warden-hook --rewrite <audit-id>   ask for a version that goes through`,
-    '  report it as wrong                 from the console, next to the rule',
-    '',
-    'A rewrite is checked against the same policy before you see it, and there',
-    'is one per block. Nothing is suggested if nothing legitimate is left.'
-  );
-  return lines.join('\n');
+    command,
+    ''
+  ].join('\n');
 }
 
 export function onboardingFor(employee: Employee, gatewayUrl: string): OnboardingPack {
@@ -344,7 +337,7 @@ export function onboardingFor(employee: Employee, gatewayUrl: string): Onboardin
     common: commonSteps(employee, gatewayUrl),
     integrations: integrations(employee, gatewayUrl)
   };
-  return { ...partial, message: asMessage(partial) };
+  return { ...partial, message: asMessage(partial, installCommand(employee, gatewayUrl)) };
 }
 
 /** The tools the gateway knows how to onboard, without needing an employee. */

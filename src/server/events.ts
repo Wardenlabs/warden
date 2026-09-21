@@ -28,6 +28,29 @@ export function openEventStream(req: Request, res: Response): void {
 }
 
 /**
+ * Somebody's machine just said what it found in its own configuration.
+ *
+ * The stream only ever carried decisions, and a wiring report is not one: it
+ * was written to disk and told nobody. A console waiting for a teammate's first
+ * machine to check in would have sat still with the answer already on disk.
+ *
+ * A doorbell and nothing more. No machine name, no tools, no hook version: what
+ * changed is read from `GET /api/people`, which is where it is already
+ * authorised. The stream is administrative (`admin-auth.ts`), so naming the
+ * person tells no employee anything about another.
+ */
+export function emitDevice(employeeId: string): void {
+  const payload = `data: ${JSON.stringify({ type: 'device', employeeId })}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+/**
  * Prompt text for the console, held in `audit/prompts.ts` with an expiry.
  *
  * The audit log deliberately does not keep prompt text — `recordDecision`

@@ -50,8 +50,10 @@ herramienta.
 
 **No lo escribas a mano.** En la pestaña People, hacé click en la persona y
 bajá hasta **Onboarding**. Botón **"Copy the whole setup message"** → lo pegás
-en el chat y listo. Ya viene con su id, su key y la dirección real de este
-gateway adentro.
+en el chat y listo. Ya viene con su key y la dirección real de este gateway
+adentro. La persona lo pega **entero** en la Terminal de su computadora: todo
+es comentario salvo un comando, así que pegar el mensaje completo y pegar sólo
+la última línea hacen lo mismo.
 
 Abajo del botón está la misma cosa por herramienta —Claude Code, Codex, Cursor,
 OpenCode, cualquier otra— cada bloque con su botón de copiar.

@@ -85,7 +85,16 @@ const SOLO_NAV_ITEM = { view: 'soloRules', label: 'This device', icon: 'device' 
 const GATEWAY_NAV_ITEM = { view: 'gateway', label: 'Gateway', icon: 'gateway' };
 const SOLO_SETTINGS_NAV_ITEM = { view: 'soloSettings', label: 'Settings', icon: 'settings' };
 
+/**
+ * An empty directory is what a solo install looks like — and also what a team
+ * install looks like until its administrator adds somebody. The desktop splash
+ * asks which one this is, and when it said "team" that settles it: otherwise
+ * the person who chose the team console got the solo navigation, with no Team
+ * item to go and add the people whose absence was causing it. Absent, from a
+ * checkout or an install older than the field, the directory decides as before.
+ */
 export function soloIsPureInstall() {
+  if (state.health?.installation?.intent === 'team') return false;
   const emps = state.company.employees;
   return emps.length === 0 || emps.every((e) => e.role === 'solo');
 }

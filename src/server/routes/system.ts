@@ -11,10 +11,10 @@ import { selections } from '../../models/manager.js';
 import { findModel } from '../../models/store.js';
 import { setupModelDownloads } from '../../setup/catalog.js';
 import { isMock, remoteCompiler } from '../../qvac/index.js';
-import { isLoopback } from '../admin-auth.js';
+import { isLoopback, isRelayed } from '../admin-auth.js';
 import { hookDecisionDeadlineMs } from '../config.js';
 import { shellAttached, tellShell } from '../desktop-bridge.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, reachFor } from '../http.js';
 import { installationReport } from '../installation.js';
 import { modelState } from '../lifecycle.js';
 
@@ -61,6 +61,12 @@ systemRoutes.get('/health', (req, res) =>
     // screen where somebody is handing out addresses rather than leaving them
     // to guess whether the tunnel came up.
     publicUrl: process.env['WARDEN_PUBLIC_URL'] ?? null,
+    // What is bound, the LAN address if any, the public one, and whether a
+    // shell could change it. `publicUrl` above only ever knew about the tunnel;
+    // this is what lets the console notice a gateway only this machine can
+    // open. `reachFor` has the account, including what a relayed caller is not
+    // told.
+    reach: reachFor(isRelayed(req), shellAttached()),
     /*
      * How long this gateway asks a hook to wait for a decision.
      *
@@ -182,6 +188,33 @@ systemRoutes.post('/api/gateway/expose', (req, res) => {
   if (!tellShell(enabled ? 'expose-on' : 'expose-off')) {
     return res.status(409).json({
       error: 'This gateway is not running inside the desktop app, so it cannot open a tunnel for you.'
+    });
+  }
+  res.status(202).json({ ok: true });
+});
+
+/**
+ * Let this network in, or keep it out: the desktop menu's "Allow LAN access".
+ *
+ * It existed only as a checkbox in that menu, and an administrator adding their
+ * first teammate is looking at the console. Until they found it the gateway
+ * listened on loopback and every setup message it issued was dead on arrival.
+ *
+ * The same shape as the tunnel above, for the same reason: changing the bind
+ * means a restart, the restart happens on the far side of this response, and so
+ * this answers "asked" and `/health` says when it is done. Administrative like
+ * everything off the employee allowlist, with exactly the power of the menu
+ * item — which is on this machine.
+ *
+ * Turning it on widens who can connect. It does not widen who is trusted:
+ * a caller from the network is not loopback, so the administrative surface
+ * still asks them for an administrator's key.
+ */
+systemRoutes.post('/api/gateway/lan', (req, res) => {
+  const enabled = (req.body as { enabled?: unknown })?.enabled === true;
+  if (!tellShell(enabled ? 'lan-on' : 'lan-off')) {
+    return res.status(409).json({
+      error: 'This gateway is not running inside the desktop app. Set WARDEN_HOST instead, and restart it.'
     });
   }
   res.status(202).json({ ok: true });

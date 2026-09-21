@@ -32,8 +32,8 @@ const TABS = [['', 'People'], ['roles', 'Roles'], ['company', 'Company']];
 const tabOf = () => (state.sel === 'roles' || state.sel === 'company' ? state.sel : state.sel ? null : '');
 
 const exemptRoles = () => new Set(state.policy.exemptRoles ?? ['admin']);
-const isExemptRole = (role) => exemptRoles().has(role);
-const firstName = (p) => String(p?.name ?? '').split(' ')[0];
+export const isExemptRole = (role) => exemptRoles().has(role);
+export const firstName = (p) => String(p?.name ?? '').split(' ')[0];
 const toolsOf = (e) => (e.connected ?? []).map((c) => TOOL_NAMES[c.tool] ?? c.tool);
 const isConnected = (e) => Boolean(e.connected?.length);
 const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? null;
@@ -56,7 +56,7 @@ const lastActiveAt = (e) => (e.connected ?? []).map((c) => Date.parse(c.at)).fil
 const devicesOf = (e) => e.devices ?? [];
 const heardAt = (e) => devicesOf(e).map((d) => Date.parse(d.lastSeen)).filter(Number.isFinite).sort((a, b) => b - a)[0] ?? lastActiveAt(e);
 
-function wiring(e) {
+export function wiring(e) {
   const devices = devicesOf(e);
   if (!devices.length) return { kind: 'never' };
 
@@ -132,7 +132,7 @@ const maskKey = (key) => {
  * they had read anything about exemptions, was silently unjudged. A default that
  * hands out a bypass is the wrong default however defensible the sort order.
  */
-const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
+export const orderedRoles = () => [...state.company.roles].sort((a, b) => Number(isExemptRole(a)) - Number(isExemptRole(b)));
 
 function teamPage(tab = '', context = false) {
     return `<div class="sheet">
@@ -147,6 +147,9 @@ function teamPage(tab = '', context = false) {
 }
 
 VIEWS.people = {
+  // Leaving is how somebody goes to fix it, so the notice does not wait for
+  // them: coming back, the next request for a setup message decides again.
+  onLeave: () => { unreachable = false; },
   detail: () => tabOf() === null,
   background: () => teamPage('', true),
   detailLabel: 'Team',
@@ -652,6 +655,38 @@ function bindPeople() {
 // ── one person ───────────────────────────────────────────────────────────────
 
 /**
+ * The gateway refused to build a setup message, because no address it could
+ * put in one would answer from another machine.
+ *
+ * Set from the refusal and not worked out here from `/health`. The server
+ * reads the request that reached it, and behind somebody's own reverse proxy
+ * that is a public name this console has no way to know about; guessing from
+ * the bind alone would tell that administrator their working gateway cannot
+ * be reached. The endpoint is the one that knows, so it is the one believed.
+ *
+ * It outranks the other notices on the page. Paused, unwired and waiting for a
+ * new key are all about a person who was connected once; nobody gets that far
+ * through a gateway that only this computer can open.
+ */
+let unreachable = false;
+
+function unreachableNotice(p) {
+  return feedback({
+    tone: 'attention', icon: true,
+    title: 'Nobody else can reach this gateway yet',
+    body: `Warden is only listening on this computer, so a setup message would send ${esc(firstName(p))} to an address that does not answer.
+      <div class="feedback-actions">${button('Make Warden reachable', { compact: true, attrs: 'data-go="gateway" data-sel="access"' })}</div>`
+  });
+}
+
+/** True when the gateway said so; anything else is an ordinary failure. */
+export function noteUnreachable(status, j) {
+  if (status !== 409 || !j?.reach) return false;
+  unreachable = true;
+  return true;
+}
+
+/**
  * The one thing about this person that needs a person, above everything else.
  *
  * A rotated key is invisible today: the old one stops working instantly —
@@ -667,6 +702,7 @@ function bindPeople() {
  * button that implied otherwise would be promising a lock this is not.
  */
 function personNotice(p) {
+  if (unreachable) return unreachableNotice(p);
   const paused = activePause(p);
   if (paused) {
     const until = paused.until ? `until ${new Date(paused.until).toLocaleString()}` : 'until somebody turns it back on';
@@ -817,8 +853,16 @@ async function renderOnboarding(person) {
   const host = $('onboarding');
   if (!host || host.dataset.loaded) return;
   host.dataset.loaded = '1';
-  const { ok, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`).catch(() => ({ ok: false, j: null }));
+  const { ok, status, j } = await api(`/api/people/${encodeURIComponent(person.id)}/onboarding`).catch(() => ({ ok: false, j: null }));
   if (!host.isConnected) return;
+  // Re-rendering opens this disclosure again, which asks again. Once is the
+  // notice; after that the steps just say why they are not here.
+  const known = unreachable;
+  if (noteUnreachable(status, j)) {
+    if (!known) render();
+    else host.innerHTML = '<p class="disclosure-text">The steps need an address another machine can reach.</p>';
+    return;
+  }
   if (!ok) { host.innerHTML = `<p class="disclosure-text">${esc(j?.error ?? 'The setup steps could not be loaded.')}</p>`; return; }
   const tools = j.integrations ?? [];
   const step = (st) => `<div class="setup-step">
@@ -864,9 +908,12 @@ function bindActions() {
         go('activity');
         return;
       case 'copy-setup': {
-        const { ok, j } = await api(`/api/people/${encodeURIComponent(id)}/onboarding`).catch(() => ({ ok: false, j: null }));
-        if (ok) await copyText(j.message, el);
-        else showToast('The setup message could not be built', j?.error ?? 'Try again.');
+        const { ok, status, j } = await api(`/api/people/${encodeURIComponent(id)}/onboarding`).catch(() => ({ ok: false, j: null }));
+        if (ok) { unreachable = false; await copyText(j.message, el); return; }
+        // From a dialog or a row menu the notice has no page to land on, so
+        // the person's page is where this goes: that is where it is drawn.
+        if (noteUnreachable(status, j)) { dlg = null; if (state.sel === id) render(); else go('people', id); return; }
+        showToast('The setup message could not be built', j?.error ?? 'Try again.');
         return;
       }
       case 'write-rule':
