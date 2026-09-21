@@ -16,13 +16,13 @@ Menos texto y componentes, blanco y negro, conservar el logo. La referencia de a
 
 - Título: **Your AI. Your rules.**
 - Apoyo: **Control what your AI can share.**
-- Escudo centrado, aislado y sin rótulos o diagramas alrededor.
+- Escudo centrado y frontal desde el primer fotograma. La entrada mueve la iluminación; solo el puntero puede inclinarlo. El fallback vectorial conserva la misma vista frontal.
 - Descarga principal según plataforma; enlace secundario al video existente.
 - Claude Code, Codex y OpenCode en una línea discreta al pie.
 
 En escritorio el título ocupa una línea cuando cabe. En móvil se separan sus dos frases. El objeto está entre el texto y la acción; no se traslada una columna de escritorio debajo de una pila de botones. El contenido siempre puede crecer en pantallas cortas o con texto ampliado.
 
-### Prueba blanca
+### Prueba sobre negro
 
 Título: **You set the rule.** Un solo panel muestra una regla activa, un pedido y su resultado. Radios nativos permiten comparar información privada y pública sin depender de JavaScript. El ejemplo es fijo y está identificado como ilustrativo.
 
@@ -30,7 +30,7 @@ La regla mostrada ya está activa. Su creación requiere revisión y activación
 
 ### Cierre negro
 
-Título: **Make it yours.** Versión y condición gratuita/open source. Descarga principal y enlaces de otras plataformas. Pie mínimo con marca, licencia, repositorio, guía y seguridad.
+Lockup oficial de Warden, sin repetir un titular de venta. Versión y condición gratuita/open source. Descarga principal y enlaces de otras plataformas. Pie mínimo con marca, licencia, repositorio, guía y seguridad.
 
 ## Presupuesto editorial
 
@@ -48,6 +48,6 @@ Revisar escritorio, 390px y 320px; teclado y selección de ejemplos; reproducci�
 
 La portada usa ahora flechas horizontales SVG. Se eliminó el segundo enlace redundante debajo del ejemplo. La trayectoria del pedido da forma visual a la diferencia entre Blocked y Allowed: línea detenida frente a línea completa, con resultado escrito siempre disponible. No es una evaluación real ni una medida de latencia.
 
-How it works comparte tokens, botones y pie con la portada. Su fondo claro, encabezado oscuro y paneles negros mantienen el contraste. Se conservan revisión, activación, selección de herramientas, explicación de reglas, decisiones y límites de uso. El control de replay conserva su etiqueta accesible y usa un icono SVG.
+How it works comparte tokens, botones y pie con la portada. Su fondo negro, textos claros y paneles carbón mantienen la continuidad con la portada. Se conservan revisión, activación, selección de herramientas, explicación de reglas, decisiones y límites de uso. El control de replay conserva su etiqueta accesible y usa un icono SVG.
 
 La portada y la guía mantienen desplazamiento nativo. En pantallas amplias la guía conserva su secuencia vinculada al scroll cuando cabe; el móvil usa flujo normal. No se añaden bucles ambientales ni dependencias.

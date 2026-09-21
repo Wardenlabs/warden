@@ -6,6 +6,8 @@ Este conjunto traduce el pedido de menos texto, menos componentes y más cuidado
 
 ## Qué leer
 
+- [Dirección oscura vigente](DARK-DIRECTION.md): corrección de fondos, pose frontal y footer.
+
 - [Investigación y criterio](RESEARCH.md): referencias primarias, observaciones y decisiones.
 - [Brief de la landing](LANDING.md): composición, texto, recorridos y límites.
 - [Sistema de diseño](../../DESIGN.md): valores y comportamiento de la implementación.

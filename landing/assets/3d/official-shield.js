@@ -1,5 +1,5 @@
 /* Official Warden geometry, adapted directly from the approved film.
- * Original curves, bevels and camera are preserved in a neutral metal studio.
+ * Original contours and bevel dimensions in a centered neutral metal studio.
  * White faces, chrome reflections and graphite edges carry the white brand. */
 import { WARDEN_SYMBOL_PATHS } from './brand-paths.js';
 import { smoothBevels } from './smooth-bevels.js';
@@ -11,8 +11,10 @@ export function createShield({ THREE: T, canvas }) {
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.toneMappingExposure = .92;
     const scene = new T.Scene();
-    const camera = new T.PerspectiveCamera(35, 1920 / 1080, 1, 5000);
-    camera.position.set(0, 0, 1080 / (2 * Math.tan(35 * Math.PI / 360)));
+    // Centered orthographic projection keeps the official face undistorted.
+    // The former off-axis film crop showed a side even at zero rotation.
+    const camera = new T.OrthographicCamera(-300, 300, 300, -300, 1, 5000);
+    camera.position.set(0, 0, 1600);
     camera.lookAt(0, 0, 0);
     const hero = new T.Group();
     scene.add(hero);
@@ -88,6 +90,9 @@ export function createShield({ THREE: T, canvas }) {
       light.position.set(...position); light.lookAt(0, 0, 0); studio.add(light);
     }
     softbox([-5, 4, 7], 4.5, 10, 0xffffff, 3.0);
+    // The frontal pose needs a broad camera-facing reflection. Side softboxes
+    // alone turn a flat metal face black when viewed straight on.
+    softbox([-1, 2, 8], 9, 7, 0xffffff, 2.4);
     softbox([5, 1, 4], 1.2, 9, 0xffffff, 3.6);
     softbox([0, 7, 2], 10, 2.8, 0xffffff, 3.2);
     softbox([-2, -5, 3], 6, 1.0, 0xffffff, .6);
@@ -116,24 +121,24 @@ export function createShield({ THREE: T, canvas }) {
       const aspect = width / height;
       const cropHeight = Math.max(600, 480 / aspect);
       const cropWidth = cropHeight * aspect;
-      camera.setViewOffset(1920, 1080, 500 - cropWidth / 2, 368 - cropHeight / 2, cropWidth, cropHeight);
+      camera.left = -cropWidth / 2; camera.right = cropWidth / 2;
+      camera.top = cropHeight / 2; camera.bottom = -cropHeight / 2;
       camera.updateProjectionMatrix();
     }
 
-    // Optional normalized pointer input leaves the film's default pose unchanged.
-    // A small real rotation changes the studio reflections; it never spins the mark.
+    // The first and resting frames face the visitor. Only deliberate pointer
+    // movement tilts the object; the entrance animates studio light, not its pose.
     function renderAt(seconds = 2.6, interaction = {}) {
       const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 2.6;
       const pointer = value => Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
       const pointerX = pointer(interaction?.x), pointerY = pointer(interaction?.y);
       const intro = smooth(t / 2.6);
-      const settle = Math.sin(Math.PI * intro) * Math.sin(Math.PI * 1.7 * intro) * .032;
-      hero.position.set(-464.30825, 169.75097, 0);
-      hero.scale.setScalar(mix(.67, .69496079, intro));
-      hero.rotation.set(mix(.12, .045, intro) + pointerY * .065 * intro, mix(-.65, -.22, intro) + settle + pointerX * .19 * intro, mix(-.07, -.025, intro) - pointerX * .012 * intro);
+      hero.position.set(0, 0, 0);
+      hero.scale.setScalar(.69496079);
+      hero.rotation.set(pointerY * .045 * intro, pointerX * .1 * intro, 0);
       const sweep = smooth((t - 1.15) / 1.30);
-      scene.environmentRotation.set(0, mix(-.5, .12, intro) + pointerX * .16, -.12);
-      sweepLight.position.set(460 + mix(-750, 720, sweep), mix(480, -120, sweep), 700);
+      scene.environmentRotation.set(0, mix(-.14, .12, intro) + pointerX * .16, -.12);
+      sweepLight.position.set(mix(-750, 720, sweep), mix(480, -120, sweep), 700);
       sweepLight.intensity = t >= 1.15 && t <= 2.45 ? Math.sin(Math.PI * sweep) ** 2 * 350000 : 0;
       renderer.render(scene, camera);
     }

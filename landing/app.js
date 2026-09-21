@@ -331,7 +331,7 @@ const shieldStages = $$('.shield-stage, .hero-sculpture');
 const lowCapability = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
 for (const shieldStage of shieldStages) {
 if (!motion.matches && !lowCapability) {
-  const mount = () => import('./shield.js?v=studio-hd-2')
+  const mount = () => import('./shield.js?v=front-3')
     .then(({ mountShield }) => mountShield(shieldStage)).catch(() => {});
   if (hasIO) {
     const observer = new IntersectionObserver(entries => {

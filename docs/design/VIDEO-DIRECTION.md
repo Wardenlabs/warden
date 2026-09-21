@@ -12,9 +12,9 @@ El próximo video comparte el lenguaje de la landing: negro, blanco, metal neutr
 
 | Tiempo | Imagen | Texto en pantalla | Propósito |
 | --- | --- | --- | --- |
-| 0–3 s | Escudo sobre negro. Una luz blanca revela el borde y luego el frente. | Your AI. | Reconocer la marca y establecer el ritmo. |
-| 3–5 s | El escudo termina un giro pequeño. Título con más peso. | Your rules. | Presentar la promesa. |
-| 5–8 s | Corte a blanco; una sola regla en una superficie negra. Aparece su estado activo. | Keep client pricing private. | Mostrar una regla ya revisada y activada. |
+| 0–3 s | Escudo sobre negro. Frente visible desde el primer fotograma; una luz blanca recorre los biseles. | Your AI. | Reconocer la marca y establecer el ritmo. |
+| 3–5 s | El escudo mantiene su frente mientras cambia el reflejo. Título con más peso. | Your rules. | Presentar la promesa. |
+| 5–8 s | Continuidad sobre negro; una sola regla en una superficie carbón. Aparece su estado activo. | Keep client pricing private. | Mostrar una regla ya revisada y activada. |
 | 8–11 s | El pedido entra en el mismo panel. | Share a client’s private pricing. | Hacer concreto el límite. |
 | 11–14 s | La entrada se detiene. Icono y resultado, sin sacudidas de cámara. | Blocked. | Mostrar la decisión. |
 | 14–18 s | Negro. Escudo y wordmark oficial. Cierre sostenido. | Warden. Free and open source. | Dar tiempo a recordar y actuar. |
@@ -26,7 +26,7 @@ El pedido y la regla son ejemplos, no una captura de una evaluación de producci
 - Usar los vectores de `brand/` y los contornos de `landing/assets/3d/brand-paths.js`.
 - Reutilizar el renderer de `landing/assets/3d/official-shield.js` como referencia de material; verificar normales y bordes a resolución de exportación.
 - Negro `#080808`, blanco `#F4F4F2`, gris secundario `#A3A3A3` sobre negro.
-- La escena blanca usa texto `#181818`; el gris es `#61615F`.
+- No usar escenas de fondo blanco: negro `#080808`, superficies `#121212` y líneas `#303030`. Blanco reservado para texto, metal y acciones.
 - Escudo en metal neutro. Los reflejos dan profundidad; no teñirlo ni añadir un halo de color.
 - Una fuente: Manrope. Peso 400 para apertura secundaria, 580–650 para afirmación y decisión.
 - Ninguna marca de integración se presenta como cliente o aval comercial.

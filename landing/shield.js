@@ -1,7 +1,7 @@
 /**
- * The official object turns through a 4.8-second studio-light entrance. Pointer movement
+ * The official object faces forward through a 4.8-second studio-light entrance. Pointer movement
  * subtly turns its real geometry and reflected light, then rendering stops.
- * Offscreen/hidden tabs do no render work; a PNG remains if enhancement fails.
+ * Offscreen/hidden tabs do no render work; a vector remains if enhancement fails.
  */
 export function mountShield(container) {
   const canvas = container?.querySelector('canvas');
@@ -101,7 +101,7 @@ export function mountShield(container) {
     try {
       const [THREE, { createShield }] = await Promise.all([
         import('./assets/3d/three.module.js'),
-        import('./assets/3d/official-shield.js?v=studio-hd-2'),
+        import('./assets/3d/official-shield.js?v=front-3'),
       ]);
       if (destroyed) return;
       scene = createShield({ THREE, canvas });

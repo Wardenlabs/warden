@@ -205,17 +205,17 @@
     {
       "name": "Evidence panel",
       "kind": "card",
-      "description": "One flat dark field on off-white; illustrative wording and verdict icon remain explicit.",
+      "description": "One bordered charcoal field on black; illustrative wording and verdict icon remain explicit.",
       "html": "<div class=\"ds-proof\"><article class=\"ds-panel\"><div class=\"ds-rule\"><span>Your rule</span><p>Keep client pricing private.</p></div><div class=\"ds-case\"><p>“Share a client’s private pricing.”</p><div class=\"ds-decision\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"m8 3-5 5v8l5 5h8l5-5V8l-5-5H8Z\"/><path d=\"m9 9 6 6m0-6-6 6\"/></svg><strong>Blocked.</strong><span>By your rule.</span></div></div><div class=\"ds-caption\"><span>Illustrative example</span><span>Checked locally</span></div></article></div>",
-      "css": ".ds-proof{padding:1.5rem;background:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-panel{overflow:hidden;border-radius:var(--warden-radius,12px);background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2)}.ds-rule{padding:2rem 2.5rem;border-bottom:1px solid var(--warden-line-dark,#303030)}.ds-rule>span{color:var(--warden-muted-dark,#a3a3a3);font-size:.75rem}.ds-rule p{margin:.5rem 0 0;font-size:clamp(1.125rem,2.6vw,1.5rem);font-weight:500;line-height:1.4;letter-spacing:-.025em}.ds-case{padding:2.5rem}.ds-case>p{margin:0;color:#b8b8b8;font-size:clamp(1rem,2.2vw,1.25rem);line-height:1.5;min-height:3.25rem}.ds-decision{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:1.5rem}.ds-decision svg{width:1.4rem;height:1.4rem}.ds-decision strong{font-size:clamp(1.5rem,3vw,2rem);font-weight:540;line-height:1.2;letter-spacing:-.03em}.ds-decision span{color:var(--warden-muted-dark,#a3a3a3);font-size:.8125rem}.ds-caption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem 1rem;padding:1.25rem 2.5rem;border-top:1px solid var(--warden-line-dark,#303030);color:var(--warden-muted-dark,#a3a3a3);font-size:.6875rem}@media(max-width:47.999rem){.ds-rule{padding:1.5rem}.ds-case{padding:2rem 1.5rem}.ds-caption{padding:1rem 1.5rem}}",
+      "css": ".ds-proof{padding:1.5rem;background:var(--warden-black,#080808);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-panel{overflow:hidden;border-radius:var(--warden-radius,12px);background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2)}.ds-rule{padding:2rem 2.5rem;border-bottom:1px solid var(--warden-line-dark,#303030)}.ds-rule>span{color:var(--warden-muted-dark,#a3a3a3);font-size:.75rem}.ds-rule p{margin:.5rem 0 0;font-size:clamp(1.125rem,2.6vw,1.5rem);font-weight:500;line-height:1.4;letter-spacing:-.025em}.ds-case{padding:2.5rem}.ds-case>p{margin:0;color:#b8b8b8;font-size:clamp(1rem,2.2vw,1.25rem);line-height:1.5;min-height:3.25rem}.ds-decision{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:1.5rem}.ds-decision svg{width:1.4rem;height:1.4rem}.ds-decision strong{font-size:clamp(1.5rem,3vw,2rem);font-weight:540;line-height:1.2;letter-spacing:-.03em}.ds-decision span{color:var(--warden-muted-dark,#a3a3a3);font-size:.8125rem}.ds-caption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem 1rem;padding:1.25rem 2.5rem;border-top:1px solid var(--warden-line-dark,#303030);color:var(--warden-muted-dark,#a3a3a3);font-size:.6875rem}@media(max-width:47.999rem){.ds-rule{padding:1.5rem}.ds-case{padding:2rem 1.5rem}.ds-caption{padding:1rem 1.5rem}}",
       "refersTo": "example-panel"
     }
   ],
   "narrative": {
     "northStar": "Quiet contrast",
-    "overview": "**Status: implementation authorized for main on 2026-09-20.** The user requested shipping, followed by a correction to the 3D logo quality. The named direction is a working description. The user requested less text and fewer components, black and white, preservation of the official logo, and taste informed by Plaude.\n\nWarden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a change of background separates the promise from concrete evidence. Carry this identity into later video without treating this homepage's section order as a universal template.",
+    "overview": "**Status: implementation authorized for main on 2026-09-20.** The user requested shipping, followed by a correction to the 3D logo quality. The named direction is a working description. The user requested less text and fewer components, black and white, preservation of the official logo, and taste informed by Plaude.\n\nWarden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a restrained charcoal surface distinguishes concrete evidence within the continuous black canvas. Carry this identity into later video without treating this homepage's section order as a universal template.",
     "keyCharacteristics": [
-      "Black and off-white fields with neutral gray support.",
+      "Continuous black fields, charcoal surfaces and off-white content with neutral gray support.",
       "Official geometry, realistic metallic depth, flat interface surfaces.",
       "Short copy, visible actions, native controls, explicit illustrative examples."
     ],
@@ -237,7 +237,12 @@
       },
       {
         "name": "Detailed guide continuity",
-        "body": "How it works uses the shared neutral tokens, download controls and horizontal arrows. A light canvas holds dark product panels. Keep review, activation, tool selection and native keyboard behavior.",
+        "body": "How it works uses the shared neutral tokens, download controls and horizontal arrows. A continuous black canvas holds charcoal product panels. Keep review, activation, tool selection and native keyboard behavior.",
+        "section": "layout"
+      },
+      {
+        "name": "Front-facing signature",
+        "body": "Initial and resting logo poses use a centered orthographic camera. Light moves during entry; only deliberate pointer input tilts the mark. The SVG fallback is also frontal. All page backgrounds remain dark.",
         "section": "layout"
       }
     ],

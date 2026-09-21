@@ -80,24 +80,24 @@ components:
 
 **Status: implementation authorized for main on 2026-09-20.** The user requested shipping, followed by a correction to the 3D logo quality. The named direction is a working description. The user requested less text and fewer components, black and white, preservation of the official logo, and taste informed by Plaude.
 
-Warden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a change of background separates the promise from concrete evidence. Carry this identity into later video without treating this homepage's section order as a universal template.
+Warden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a restrained charcoal surface distinguishes concrete evidence within the continuous black canvas. Carry this identity into later video without treating this homepage's section order as a universal template.
 
 **Key Characteristics:**
-- Black and off-white fields with neutral gray support.
+- Continuous black fields, charcoal surfaces and off-white content with neutral gray support.
 - Official geometry, realistic metallic depth, flat interface surfaces.
 - Short copy, visible actions, native controls, explicit illustrative examples.
 
-The effective homepage cascade is [foundation-v2.css](landing/foundation-v2.css), then [design-system.css](landing/design-system.css), then [landing.css](landing/landing.css). These tokens describe that implementation. [Design notes](docs/design/README.md), [reference research](docs/design/RESEARCH.md), [landing brief](docs/design/LANDING.md) and [video direction](docs/design/VIDEO-DIRECTION.md) carry the supporting rationale and surface-specific decisions. The detailed journey at [how-it-works.html](landing/how-it-works.html) now shares the homepage tokens, navigation scale and download controls. Its light canvas and black product panels are defined by guide.css over the existing functional scene styles. Both pages load motion.css and the isolated surface-motion.js controller. Product truth comes from [PRODUCT.md](PRODUCT.md); official mark authority comes from [brand/README.md](brand/README.md).
+The effective homepage cascade is [foundation-v2.css](landing/foundation-v2.css), then [design-system.css](landing/design-system.css), then [landing.css](landing/landing.css). These tokens describe that implementation. [Design notes](docs/design/README.md), [reference research](docs/design/RESEARCH.md), [landing brief](docs/design/LANDING.md) and [video direction](docs/design/VIDEO-DIRECTION.md) carry the supporting rationale and surface-specific decisions. The detailed journey at [how-it-works.html](landing/how-it-works.html) now shares the homepage tokens, navigation scale and download controls. Its black canvas and charcoal product panels are defined by guide.css over the existing functional scene styles. Both pages load motion.css and the isolated surface-motion.js controller. Product truth comes from [PRODUCT.md](PRODUCT.md); official mark authority comes from [brand/README.md](brand/README.md).
 
 ## Colors
 
 ### Primary
 
-**Quiet white** (`warden-white`) is the primary action and major statement color on black; it also supplies the light evidence field. **Studio black** (`warden-black`) carries the hero, closing section and example panel. Neither is a chromatic accent.
+**Quiet white** (`warden-white`) is the primary action and major statement color on black; it is reserved for content and primary actions, never a full-page section. **Studio black** (`warden-black`) carries the hero, closing section and example panel. Neither is a chromatic accent.
 
 ### Neutral
 
-**Dark ink** (`warden-ink`) provides light-surface text. **Muted dark** and **muted light** support text on their respective surfaces. **Dark line** separates evidence rows and the footer; **light line** is also the primary button hover fill. Selected example labels and focus rings use literal white from the foundation.
+**Dark ink** (`warden-ink`) provides text inside light primary actions. **Muted dark** and **muted light** support text on their respective surfaces. **Dark line** separates evidence rows and the footer; **light line** is also the primary button hover fill. Selected example labels and focus rings use literal white from the foundation.
 
 **The Neutral Verdict Rule.** Blocked and Allowed use words and distinct icons; neither needs a red or green brand accent.
 
@@ -111,9 +111,9 @@ Supporting hero copy uses a 1.5 line height. Navigation and option labels use 0.
 
 ## Layout
 
-The default content width is 68rem plus gutters; the proof wrapper has a total maximum width of 58rem. Gutters grow from 1.125rem to 2rem at 48rem. The page supports a 20rem minimum viewport. The absolute header has a separate 100rem cap and fluid horizontal padding; it does not remain sticky on this homepage.
+The hero covers at least the full viewport including its compatibility strip, without a desktop height cap. All page backgrounds, including overscroll, remain black. The default content width is 68rem plus gutters; the proof wrapper has a total maximum width of 58rem. Gutters grow from 1.125rem to 2rem at 48rem. The page supports a 20rem minimum viewport. The absolute header has a separate 100rem cap and fluid horizontal padding; it does not remain sticky on this homepage.
 
-The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a white evidence section containing one native private/public example. A black closing section repeats the download. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
+The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a dark evidence section containing one native private/public example. A compact closing signature pairs the official lockup with downloads. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
 
 Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
 
@@ -123,7 +123,7 @@ The interface is flat: background contrast, spacing and hairlines establish stru
 
 The official shield supplies material depth. [official-shield.js](landing/assets/3d/official-shield.js) extrudes the canonical vector contours, preserving the ring opening and internal mark, with neutral metallic faces and reflected white studio lights. It is real geometry, not a generic shield or an approximate letter. The renderer uses 64 curve segments, 16 bevel segments and crease-aware shared normals to remove faceted reflections while preserving sharp corners. The canvas supersamples at 2–3× CSS size (1.5× device pixel ratio, capped at 3×), including Retina screens.
 
-[shield.js](landing/shield.js) runs a finite 4.8-second entrance, then settles. Fine pointers anywhere within the hero cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; a PNG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
+[shield.js](landing/shield.js) runs a finite 4.8-second light entrance with a centered orthographic camera. Initial and resting poses stay frontal; there is no automatic turn or scale change. Fine pointers anywhere within the hero cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; an exact front-facing SVG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
 
 ## Shapes
 
@@ -135,6 +135,8 @@ The official mark's outline and proportions are binding. Primary download contro
 
 **Film link and dialog.** A quiet text link beneath the download, with a play icon and 44px minimum target. It directly links to the existing film and enhances into a native dialog with native video controls, lazy media loading, Escape/close support, pause on close and focus restoration. The current film is an existing asset; this proposal does not claim it was remade.
 
+**Footer.** The official lockup and release line anchor the left; one primary download and secondary installer links anchor the right. On mobile both stack left-aligned. The final row carries license and essential links. No repeated large marketing headline or light background.
+
 **Navigation.** Official inline symbol and wordmark on the left; quiet GitHub and Download links on the right. Links are at least 44px high. The header's GitHub link hides below 48rem, while source remains available in the footer. Preserve accessible names on the lockup.
 
 **Policy example.** One black fieldset with a descriptive legend, a rule, Active status, native radios, request text and outcome. The two radio labels have 48px targets and a thin selected underline. Arrow keys use native radio behavior; the focused radio places a visible outline on its label. CSS switches the matching content even without JavaScript. The panel is explicitly an illustrative example, not a live policy editor. “For connected tools” stays visible nearby.
@@ -143,7 +145,7 @@ The official mark's outline and proportions are binding. Primary download contro
 
 **Request trajectory.** A finite 1,250ms SVG stroke travels toward the rule boundary. Blocked stops at the solid boundary with a 650ms impact ring; Allowed continues through a dashed boundary. Written outcomes stay immediately readable. Intersection observation starts the effect at 25% visibility; leaving the viewport, hiding the tab or enabling reduced motion removes animation. Native radio changes replay the selected case. The duration is illustrative, not measured product latency.
 
-**Focus and motion.** Use a 2px focus outline offset by 4px, white on dark and dark on light. Example selection transitions in 180ms with `cubic-bezier(.16, 1, .3, 1)`; inherited buttons/navigation use 160ms. Reduced motion disables smooth scrolling and effectively removes CSS transitions. The skip link and keyboard access remain functional. Do not conceal meaningful content behind animation.
+**Focus and motion.** Use a 2px focus outline offset by 4px, white on dark, including the guide and proof section. Example selection transitions in 180ms with `cubic-bezier(.16, 1, .3, 1)`; inherited buttons/navigation use 160ms. Reduced motion disables smooth scrolling and effectively removes CSS transitions. The skip link and keyboard access remain functional. Do not conceal meaningful content behind animation.
 
 ## Do's and Don'ts
 

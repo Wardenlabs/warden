@@ -10,7 +10,7 @@ a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: translateX(3px
 .hero-download:hover::after, .dl > a:first-child:hover::after { animation: button-light 650ms ease-out; }
 @keyframes button-light { to { transform: translateX(110%); } }
 
-.proof-heading > a { gap: .85rem; color: var(--warden-ink); }
+.proof-heading > a { gap: .85rem; color: var(--warden-muted-dark); }
 .proof-heading .link-arrow { width: 1.5rem; height: 1.5rem; }
 .policy-example { position: relative; }
 .example-rule { padding-block: 1.65rem; }

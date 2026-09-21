@@ -1,24 +1,24 @@
 /* The detailed tour shares the homepage's neutral materials and controls. */
-.guide-page { --ink: #181818; --ink-secondary: #61615f; --muted: #61615f; --paper-bright: #181818; --line: #d7d7d3; --line-soft: #d7d7d3; background: var(--warden-white); color: var(--warden-ink); color-scheme: light; }
-.guide-page header { color: var(--warden-ink); }
-.guide-page header .brand { color: var(--warden-ink); }
-.guide-page header nav > a:not(.btn) { color: var(--warden-muted-light); }
-.guide-page .header-download { background: var(--warden-ink); color: var(--warden-white); border: 0; border-radius: 999px; }
-.guide-page header .bar { border-bottom: 1px solid var(--warden-line-light); }
+.guide-page { --ink: #f4f4f2; --ink-secondary: #a3a3a3; --muted: #a3a3a3; --paper-bright: #f4f4f2; --line: #303030; --line-soft: #303030; background: var(--warden-black); color: var(--warden-white); color-scheme: dark; }
+.guide-page header { color: var(--warden-white); }
+.guide-page header .brand { color: var(--warden-white); }
+.guide-page header nav > a:not(.btn) { color: var(--warden-muted-dark); }
+.guide-page .header-download { background: var(--warden-white); color: var(--warden-ink); border: 0; border-radius: 999px; }
+.guide-page header .bar { border-bottom: 1px solid var(--warden-line-dark); }
 .guide-intro { padding-top: 8.5rem; padding-bottom: 3rem; }
 .guide-intro h1 { max-width: 12ch; margin-top: 2rem; font-size: clamp(3rem, 7vw, 5.25rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.08; }
-.guide-back { display: inline-flex; align-items: center; gap: .75rem; min-height: 44px; font-size: .8125rem; color: var(--warden-muted-light); text-decoration: none; }
+.guide-back { display: inline-flex; align-items: center; gap: .75rem; min-height: 44px; font-size: .8125rem; color: var(--warden-muted-dark); text-decoration: none; }
 .guide-back > .link-arrow { rotate: 180deg; }
-.guide-page #how { background: var(--warden-white); padding-top: 2rem; }
-.guide-page .say h2 { color: var(--warden-ink); font-size: clamp(2rem, 3.5vw, 3rem); line-height: 1.12; }
-.guide-page .say p { color: var(--warden-muted-light); }
-.guide-page .chapter + .chapter { border-color: var(--warden-line-light); }
-.guide-page .story-steps button { color: var(--warden-muted-light); }
-.guide-page .story-steps button[aria-pressed="true"] { color: var(--warden-ink); }
-.guide-page .story-steps button::after { background: var(--warden-ink); }
-.guide-page [data-story-replay] { color: var(--warden-muted-light); }
+.guide-page #how { background: var(--warden-black); padding-top: 2rem; }
+.guide-page .say h2 { color: var(--warden-white); font-size: clamp(2rem, 3.5vw, 3rem); line-height: 1.12; }
+.guide-page .say p { color: var(--warden-muted-dark); }
+.guide-page .chapter + .chapter { border-color: var(--warden-line-dark); }
+.guide-page .story-steps button { color: var(--warden-muted-dark); }
+.guide-page .story-steps button[aria-pressed="true"] { color: var(--warden-white); }
+.guide-page .story-steps button::after { background: var(--warden-white); }
+.guide-page [data-story-replay] { color: var(--warden-muted-dark); }
 .guide-page .panel { --product-bg: #101010; --product-raised: #181818; --product-sunken: #222; --product-line: #363636; --product-soft-line: #303030; --product-ink: #f4f4f2; --product-secondary: #c5c5c5; --product-faint: #aaa; --product-block-soft: #303030; --product-review-soft: #303030; --ink: #f4f4f2; --muted: #aaa; --paper-bright: #f4f4f2; }
-.guide-page .rules-scene .pstick, .guide-page .term, .guide-page .shot.log { border: 0; border-radius: 12px; box-shadow: none; }
+.guide-page .rules-scene .pstick, .guide-page .term, .guide-page .shot.log { border: 1px solid var(--warden-line-dark); border-radius: 12px; box-shadow: none; }
 .guide-page .rules-scene .ru, .guide-page .rules-scene .hero-box { background: transparent; }
 .guide-page .log .row:nth-child(2) { background: #202020; }
 .guide-page .policy-example-note { color: #aaa; }
@@ -35,7 +35,7 @@
 .guide-page [data-step="2"] .rules-scene .ru { background: #191919; }
 .guide-page [data-step="2"] .ract svg { stroke-dasharray: 24; stroke-dashoffset: 0; animation: approval-check 420ms ease-out; }
 @keyframes approval-check { from { stroke-dashoffset: 24; } }
-.guide-page :focus-visible { outline-color: var(--warden-ink); }
+.guide-page :focus-visible { outline-color: var(--warden-white); }
 .guide-page .panel :focus-visible, .guide-page footer :focus-visible { outline-color: var(--warden-white); }
 @media (max-width: 47.999rem) {
   .guide-page header .header-download { min-height: 44px; padding-inline: .9rem; font-size: .75rem; }

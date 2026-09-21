@@ -76,3 +76,7 @@ El usuario pidió más efecto visual y extendió la corrección a How it works. 
 Las webs de Nothing y Ophir no pudieron inspeccionarse con la búsqueda inicial; no se usan como evidencia visual de esta revisión.
 
 Aplicación concreta: iluminación ambiental neutra detrás del escudo, respuesta del metal al puntero en toda la apertura, un recorrido que se detiene en la regla privada o continúa con la pública, iconos horizontales SVG y una guía sobre blanco con superficies de producto negras. La animación es finita y se cancela fuera de pantalla, en pestañas ocultas o con movimiento reducido. No se copian recursos de las referencias.
+
+## Decisión posterior del usuario: continuidad oscura
+
+La propuesta blanco/negro de las secciones anteriores queda como registro del proceso, no como instrucción vigente. El usuario rechazó expresamente los fondos claros, la franja visible bajo el hero y el footer anterior. La implementación actual mantiene negro continuo y superficies carbón, usa el lockup oficial en el cierre y presenta el escudo de frente desde el primer instante. El video debe heredar esta decisión.
