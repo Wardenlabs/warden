@@ -26,6 +26,13 @@
   .site-footer .dl > a:hover, .site-footer .links > a:hover { color: #f4f4f2; text-decoration: underline; }
   .site-footer .dl > a:first-child:hover { background: #d7d7d3; border-color: #d7d7d3; color: #181818; text-decoration: none; }
 }
+/* Desktop shares the content rail; mobile retains its approved composition. */
+@media (min-width: 64rem) {
+  .site-footer .foot { max-width: 58rem; padding-block: 5rem 2rem; }
+  .site-footer .footer-grid { grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 1fr) minmax(0, .65fr); gap: clamp(2rem, 4vw, 4rem); }
+  .site-footer .footer-brand { max-width: 16rem; gap: .65rem; }
+  .site-footer .footer-meta { margin-top: 4rem; }
+}
 @media (max-width: 63.999rem) {
   .site-footer .footer-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem 2rem; }
   .site-footer .footer-identity { grid-column: 1 / -1; padding: 0; }

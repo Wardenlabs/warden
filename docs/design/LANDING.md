@@ -61,3 +61,7 @@ La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamen
 - Tres columnas: marca oficial, Download y Project. El logo llega a 384px. La descarga principal es un botón de altura mínima 44px, con el nombre completo de la acción; macOS no se usa como titular decorativo.
 - La versión y licencia cierran una franja común al pie. La portada conserva 88rem de ancho máximo; la guía comparte sus 76rem con el footer.
 - Por debajo de 1024px la marca ocupa una fila propia; por debajo de 576px las descargas y la navegación se apilan. Los enlaces del proyecto se distribuyen en dos columnas en móvil. No se agregan párrafos, animaciones ni secciones ajenas al footer.
+
+### Ajuste exclusivo de escritorio
+
+La composición móvil quedó aprobada por el usuario. A partir de 1024px, el footer de portada se alinea con el contenedor de 58rem de la prueba del producto. La guía conserva su eje de 76rem. El lockup ocupa hasta 256px; descargas y navegación mantienen columnas de lectura próximas y un botón principal de tamaño estable. La separación hasta la metadata es 64px. Los estilos por debajo de 1024px no cambian.
