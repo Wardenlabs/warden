@@ -77,10 +77,10 @@ setTimeout(function () {
 </script>
 <link rel="stylesheet" href="foundation-v2.css?v=monochrome-1">
 <link rel="stylesheet" href="design-system.css?v=quiet-1">
-<link rel="stylesheet" href="landing.css?v=dark-3">
+<link rel="stylesheet" href="landing.css?v=footer-4">
 
 <!-- Preload the page controller; content and downloads also work without it. -->
-<link rel="modulepreload" href="app.js?v=front-3">
+<link rel="modulepreload" href="app.js?v=manual-1">
 
 <!-- Anonymous Vercel page views remain available alongside the PostHog funnel.
      Only the production hostname loads this collector; local previews stay clean. -->
@@ -137,7 +137,7 @@ setTimeout(function () {
   <div class="wrap main">
     <div class="proof-heading"><h2 id="proof-title">You set the rule.</h2><a href="how-it-works.html">See how it works <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a></div>
     <fieldset class="policy-example" data-motion-surface>
-      <legend class="vh">Compare an illustrative blocked and allowed request</legend>
+      <legend class="vh">Compare blocked and allowed requests</legend>
       <input class="vh" type="radio" name="example" id="example-private" checked>
       <input class="vh" type="radio" name="example" id="example-public">
       <div class="example-rule"><span class="example-label">Your rule</span><p>Keep client pricing private.</p><span class="active-rule"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg>Active</span></div>
@@ -166,9 +166,7 @@ setTimeout(function () {
  </svg>
         <div class="example-decision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg><strong>Allowed.</strong><span>Within your rule.</span></div>
       </div>
-      <div class="example-caption"><span>Illustrative example</span><span>Checked locally</span></div>
     </fieldset>
-    <p class="proof-note">For connected tools.</p>
   </div>
 </section>
 </main>
@@ -199,7 +197,7 @@ setTimeout(function () {
            finds that out after 282 MB, so the other build is named here rather
            than left inside the releases page. app.js moves the button itself
            when the browser can say which chip this is. -->
-      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg">Mac with an Intel chip</a>
+      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg">macOS Intel</a>
       <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
     </div>
         </div>
@@ -220,7 +218,7 @@ setTimeout(function () {
 </footer>
 
 <dialog id="film-dialog" aria-labelledby="film-title"><div class="film-bar"><h2 id="film-title">Warden in 17 seconds</h2><button type="button" id="close-film" aria-label="Close film">✕</button></div><video id="launch-video" controls playsinline preload="none" poster="assets/launch/launch-poster-v12.jpg"><source data-src="assets/launch/launch.mp4?v=12" type="video/mp4"><a href="assets/launch/launch.mp4?v=12">Watch the Warden launch film</a></video></dialog>
-<script type="module" src="app.js?v=front-3"></script>
+<script type="module" src="app.js?v=manual-1"></script>
 
 <script type="module" src="analytics-entry.js?v=hero-flow-1"></script>
 <script type="module" src="kool-entry.js?v=download-1"></script>

@@ -12,12 +12,25 @@ Landing para desarrolladores y equipos que usan herramientas de IA. Monocromo, e
 
 - Conservar Manrope, negro #080808, carbón #121212, blanco #F4F4F2 y el sistema de radios existente. La identidad elegida por el usuario tiene prioridad sobre las recetas genéricas de la skill.
 - Conservar el hero centrado: presenta una sola promesa y el símbolo oficial. La pose frontal y los fondos oscuros son pedidos explícitos.
-- Mantener las rutas, descargas, eventos, controles nativos, foco visible y metadatos. La guía sigue siendo una demostración identificada como ejemplo.
+- Mantener las rutas, descargas, eventos, controles nativos, foco visible y metadatos. La guía conserva sus datos de demostración; a pedido del usuario, no repite rótulos de ejemplo en la interfaz.
 - Compactar la entrada de How it works: menor espacio inicial, título más breve y encabezado de acción. La primera interacción aparece antes.
 - Retirar el barrido brillante de los botones. El metal pertenece al escudo; los controles responden a la presión con 1px de desplazamiento y escala .985. El movimiento reducido elimina esa respuesta.
-- Conservar los efectos de decisión: explican visualmente el bloqueo o paso de un pedido. No agregar loops, cursores personalizados, tarjetas de relleno ni fotos ajenas al producto.
+- Conservar los efectos de decisión: explican visualmente el bloqueo o paso de un pedido. El usuario pidió después un balanceo continuo y contenido para el escudo; es la única excepción. No agregar cursores personalizados, tarjetas de relleno ni fotos ajenas al producto.
 - Mantener la versión real junto a los instaladores: sirve para identificar la descarga y no es un adorno inventado.
 
 ## Para futuras iteraciones
 
 Leer primero DESIGN.md, PRODUCT.md y DARK-DIRECTION.md. Aplicar la auditoría de taste sobre la implementación real, no usarla como excusa para reemplazar la marca. Revisar cada cambio en escritorio y móvil, mantener el texto concreto y verificar las interacciones. Para el video, conservar la pose frontal inicial y la luz como recurso de movimiento.
+
+## Revisión de uso y cierre
+
+Se aplicaron también `gpt-taste` y `frontend-design` a pedido del usuario. El brief de marca prevalece sobre las recetas de aleatorización, tipografías nuevas, bento y scroll fijado: se conserva Manrope y no se agrega fricción al recorrido.
+
+- La guía abandona autoplay y avance por scroll. Describe, Review y Activate controlan un solo espacio de trabajo. No hay un editor falso: la instrucción de ejemplo se presenta como texto.
+- Los cambios de estado actualizan título y mensaje accesible. Una acción que desaparece deja el foco en el selector estable del paso.
+- El footer reduce la escala de marca, agrupa instaladores, retira el botón relleno repetido y alinea su ancho con la prueba superior.
+- El escudo entra frontal y continúa con un balanceo lento. Se limita a 30fps y pausa por visibilidad o movimiento reducido.
+
+## Edición de texto
+
+Se retiran los párrafos explicativos debajo de los títulos, las bandas de “Illustrative example”, “For connected tools” y las notas de política. “Usage limit” queda como nombre funcional. La página muestra acciones y resultados; los datos de demostración siguen siendo locales y no representan actividad real del visitante. Los mensajes de estado para lectores de pantalla se conservan sin añadir ruido visual.

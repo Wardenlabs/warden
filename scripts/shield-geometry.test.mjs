@@ -63,5 +63,17 @@ test('the first, middle and resting frames preserve a centered front-facing mark
   assert.ok(hero.rotation.y > 0 && hero.rotation.y <= .1, 'pointer tilt remains restrained');
   shield.renderAt(2.6, { x: 0, y: 0 });
   assert.equal(hero.rotation.y, 0, 'leaving restores the frontal pose');
+  // Visible idle motion reveals volume without hiding or clipping the brand.
+  for (const idleSeconds of [0, 1, 3.5, 7, 10.5, 14, 28]) {
+    shield.renderAt(2.6, { idleSeconds });
+    assert.ok(Math.abs(hero.rotation.y) <= .18);
+    assert.ok(Math.abs(hero.rotation.x) <= .045);
+    const bounds = shield.projectedBounds();
+    assert.ok(bounds.left > 0 && bounds.right < 400 && bounds.top > 0 && bounds.bottom < 400);
+    if (idleSeconds === 3.5) assert.ok(hero.rotation.y > .17, 'idle clock produces visible volume');
+  }
+  shield.renderAt(2.6);
+  assert.equal(hero.rotation.y, 0, 'a still render remains frontal');
+  assert.equal(hero.position.y, 0);
   shield.dispose();
 });

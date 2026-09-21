@@ -115,7 +115,7 @@ The hero covers at least the full viewport including its compatibility strip, wi
 
 The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a dark evidence section containing one native private/public example. A compact closing signature pairs the official lockup with downloads. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
 
-Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
+Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. The footer aligns to the 58rem proof column and uses a compact navigation row. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
 
 ## Elevation & Depth
 
@@ -123,7 +123,7 @@ The interface is flat: background contrast, spacing and hairlines establish stru
 
 The official shield supplies material depth. [official-shield.js](landing/assets/3d/official-shield.js) extrudes the canonical vector contours, preserving the ring opening and internal mark, with neutral metallic faces and reflected white studio lights. It is real geometry, not a generic shield or an approximate letter. The renderer uses 64 curve segments, 16 bevel segments and crease-aware shared normals to remove faceted reflections while preserving sharp corners. The canvas supersamples at 2–3× CSS size (1.5× device pixel ratio, capped at 3×), including Retina screens.
 
-[shield.js](landing/shield.js) runs a finite 4.8-second light entrance with a centered orthographic camera. Initial and resting poses stay frontal; there is no automatic turn or scale change. Fine pointers anywhere within the hero cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; an exact front-facing SVG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
+[shield.js](landing/shield.js) runs a finite 4.8-second light entrance with a centered orthographic camera. The entrance stays frontal. Afterward a 14-second yaw cycle (±.18 rad), smaller pitch and 4-unit float reveal the volume without a full rotation or scale change. Fine pointers anywhere within the hero cause a small rotation and changing reflection. Visible rendering is capped at 30fps and stops offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; an exact front-facing SVG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
 
 ## Shapes
 
@@ -131,7 +131,7 @@ The official mark's outline and proportions are binding. Primary download contro
 
 ## Components
 
-**Download.** Off-white pill with dark text and an operating-system icon; minimum height 48px. Hover changes to light gray on fine pointers. The hero inherits a small pressed translation/scale from the shared button. Footer downloads use the same resting appearance without that pressed transform. Direct links work before enhancement; platform detection updates the primary installer and footer ordering. Preserve existing installer targets and hooks.
+**Download.** Off-white pill with dark text and an operating-system icon; minimum height 48px. Hover changes to light gray on fine pointers. The hero inherits a small pressed translation/scale from the shared button. Footer downloads are grouped text links; the primary includes a small downward icon instead of a second filled pill. Direct links work before enhancement; platform detection updates the primary installer and footer ordering. Preserve existing installer targets and hooks.
 
 **Film link and dialog.** A quiet text link beneath the download, with a play icon and 44px minimum target. It directly links to the existing film and enhances into a native dialog with native video controls, lazy media loading, Escape/close support, pause on close and focus restoration. The current film is an existing asset; this proposal does not claim it was remade.
 
@@ -164,3 +164,9 @@ The official mark's outline and proportions are binding. Primary download contro
 - **Don't** use color alone for a decision or remove the private/public example's native radio semantics.
 - **Don't** turn local policy checks into claims that no data ever leaves the device or that every tool is protected automatically.
 - **Don't** infer approval of a future video, change product facts or invent proof from this design document.
+
+## Manual guide
+
+How it works uses explicit Describe / Review / Activate controls. No scrolling or automatic playback changes the chosen step or tool. One composer or rule list is visible at a time; activation exposes a link to the blocked-request example. Reset returns to the instruction. Stage changes announce a concise status and move focus to the selected stable step when an action disappears. Without JavaScript the rule definitions remain readable.
+
+Visible captions and explanatory paragraphs under guide headings were removed at the user’s request. Keep functional labels and decisions; do not reintroduce repeated example disclaimers or microcopy. Demo data remains deterministic, with no claim of live evaluation.

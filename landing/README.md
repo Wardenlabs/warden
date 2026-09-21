@@ -35,7 +35,7 @@ Open [127.0.0.1:4174](http://127.0.0.1:4174). The server supports the page and `
 
 - Downloads and text are visible immediately. The main action follows the visitor's OS; other installers remain available in the footer.
 - The pricing comparison uses native radio inputs and CSS. It works without JavaScript and does not call an evaluator or activate a real rule. The visible label says it is illustrative.
-- The shield stays frontal while studio light moves through a finite 4.8-second entrance. A centered orthographic camera keeps the silhouette stable. Fine-pointer interaction changes its pose and reflections. Rendering stops when settled, offscreen or hidden. Motion preference changes and WebGL loss are handled by the existing controller.
+- The shield stays frontal while studio light moves through a finite 4.8-second entrance. A centered orthographic camera keeps the silhouette stable. Fine-pointer interaction changes its pose and reflections. After the frontal entrance, a restrained idle turn runs at up to 30fps; rendering stops offscreen or hidden. Motion preference changes and WebGL loss are handled by the existing controller.
 - Reduced-motion, low-capability and no-JavaScript visitors retain the front-facing official vector shield. Film media loads only after deliberate activation. Closing the dialog pauses video and returns focus.
 - The detailed tour retains Describe, Review and Activate controls, manual playback, tool radios and expanded definitions. Human activation remains distinct from drafting.
 - Native document scrolling remains available. At small widths the homepage is composed vertically; its secondary header link is omitted and all installers remain available below.

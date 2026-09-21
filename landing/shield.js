@@ -1,6 +1,6 @@
 /**
  * The official object faces forward through a 4.8-second studio-light entrance. Pointer movement
- * subtly turns its real geometry and reflected light, then rendering stops.
+ * subtly steers a slow idle turn. Visible motion is capped at 30 frames per second.
  * Offscreen/hidden tabs do no render work; a vector remains if enhancement fails.
  */
 export function mountShield(container) {
@@ -43,7 +43,9 @@ export function mountShield(container) {
   function draw() {
     if (!scene || destroyed || failed) return;
     try {
-      scene.renderAt(elapsed / duration * 2.6, pointer);
+      scene.renderAt(Math.min(1, elapsed / duration) * 2.6, {
+        ...pointer, idleSeconds: manual || reducedMotion.matches ? 0 : Math.max(0, elapsed - duration),
+      });
       canvas.style.visibility = 'visible';
       fallback.style.visibility = 'hidden';
       container.dataset.shield = elapsed < duration ? 'entering' : 'ready';
@@ -53,15 +55,19 @@ export function mountShield(container) {
   }
 
   function isMoving() {
-    return elapsed < duration || Math.abs(target.x - pointer.x) > .001 || Math.abs(target.y - pointer.y) > .001;
+    return !reducedMotion.matches;
   }
 
   function tick(timestamp) {
     frame = 0;
     if (!visible || document.hidden || destroyed || failed || manual) return;
-    const delta = previousTime ? Math.min(.05, (timestamp - previousTime) / 1000) : 1 / 60;
+    if (previousTime && timestamp - previousTime < 1000 / 30 - .5) {
+      frame = requestAnimationFrame(tick);
+      return;
+    }
+    const delta = previousTime ? Math.min(.1, (timestamp - previousTime) / 1000) : 1 / 30;
     previousTime = timestamp;
-    elapsed = Math.min(duration, elapsed + delta);
+    elapsed += delta;
     const damping = 1 - Math.exp(-15 * delta);
     pointer.x += (target.x - pointer.x) * damping;
     pointer.y += (target.y - pointer.y) * damping;
@@ -101,7 +107,7 @@ export function mountShield(container) {
     try {
       const [THREE, { createShield }] = await Promise.all([
         import('./assets/3d/three.module.js'),
-        import('./assets/3d/official-shield.js?v=front-3'),
+        import('./assets/3d/official-shield.js?v=idle-1'),
       ]);
       if (destroyed) return;
       scene = createShield({ THREE, canvas });

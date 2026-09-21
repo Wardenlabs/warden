@@ -115,7 +115,7 @@ export function createShield({ THREE: T, canvas }) {
       width = Math.max(1, Math.round(nextWidth));
       height = Math.max(1, Math.round(nextHeight));
       // Supersample this small hero object, including on Retina screens. The
-      // three-times cap bounds GPU cost; the controller stops rendering at rest.
+      // three-times cap bounds GPU cost; visible idle motion is capped at 30fps.
       renderer.setPixelRatio(Math.min(3, Math.max(2, pixelRatio * 1.5)));
       renderer.setSize(width, height, false);
       const aspect = width / height;
@@ -126,18 +126,23 @@ export function createShield({ THREE: T, canvas }) {
       camera.updateProjectionMatrix();
     }
 
-    // The first and resting frames face the visitor. Only deliberate pointer
-    // movement tilts the object; the entrance animates studio light, not its pose.
+    // Keep the entrance frontal, then reveal depth through a slow, bounded turn.
+    // An explicit idle clock keeps still proofs and reduced motion deterministic.
     function renderAt(seconds = 2.6, interaction = {}) {
       const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 2.6;
       const pointer = value => Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
       const pointerX = pointer(interaction?.x), pointerY = pointer(interaction?.y);
       const intro = smooth(t / 2.6);
-      hero.position.set(0, 0, 0);
+      const idle = Number.isFinite(interaction.idleSeconds) ? Math.max(0, interaction.idleSeconds) : 0;
+      const breathe = smooth(idle / 2);
+      const phase = idle * Math.PI * 2 / 14;
+      const yaw = Math.sin(phase) * .18 * breathe;
+      const pitch = Math.sin(phase * .7) * .045 * breathe;
+      hero.position.set(0, Math.sin(phase) * 4 * breathe, 0);
       hero.scale.setScalar(.69496079);
-      hero.rotation.set(pointerY * .045 * intro, pointerX * .1 * intro, 0);
+      hero.rotation.set(pitch + pointerY * .045 * intro, yaw + pointerX * .1 * intro, 0);
       const sweep = smooth((t - 1.15) / 1.30);
-      scene.environmentRotation.set(0, mix(-.14, .12, intro) + pointerX * .16, -.12);
+      scene.environmentRotation.set(0, mix(-.14, .12, intro) + yaw * .5 + pointerX * .16, -.12);
       sweepLight.position.set(mix(-750, 720, sweep), mix(480, -120, sweep), 700);
       sweepLight.intensity = t >= 1.15 && t <= 2.45 ? Math.sin(Math.PI * sweep) ** 2 * 350000 : 0;
       renderer.render(scene, camera);

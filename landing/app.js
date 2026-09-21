@@ -73,6 +73,7 @@ else {
   revealables.forEach(el => revealObserver.observe(el));
 }
 
+const manualGuide = document.body.classList.contains('guide-page');
 const chapters = $$('.chapter');
 const ruleBox = document.getElementById('ruleMsg');
 const sendButton = document.querySelector('[data-chapter="write"] .send');
@@ -137,8 +138,16 @@ function setStep(chapter, step, { effects = false, signal } = {}) {
   chapter.dataset.step = String(step);
   if (focusedActivation) chapter.querySelector('.story-steps [data-story-step="2"]')?.focus({preventScroll:true});
   $$('[data-story-step]', chapter).forEach(button => {
-    button.setAttribute('aria-pressed', String(Number(button.dataset.storyStep) === step));
+    if (button.closest('.story-steps')) button.setAttribute('aria-pressed', String(Number(button.dataset.storyStep) === step));
+    else button.removeAttribute('aria-pressed');
   });
+  if (manualGuide && chapter.dataset.chapter === 'write') {
+    const titles = ['Describe your rule.', 'Review the drafts.', 'Your rules are active.'];
+    chapter.querySelector('.say h2').textContent = titles[step];
+    chapter.querySelector('.policy-list-head strong').textContent = step === 2 ? 'Active rules' : 'Proposed rules';
+    const status = chapter.querySelector('[data-demo-status]');
+    if (status) status.textContent = ['Your instruction', 'Two drafts ready to review', 'Two rules activated'][step];
+  }
   const statements = $$('.say', chapter);
   statements.forEach((statement, index) => {
     statement.setAttribute('aria-hidden', String(statements.length > 1 && index !== step));
@@ -181,17 +190,24 @@ for (const chapter of chapters) {
   });
   chapter.dataset.step = '0';
   $$('[data-story-step]', chapter).forEach(button => {
-    button.setAttribute('aria-pressed', String(button.dataset.storyStep === '0'));
+    if (button.closest('.story-steps')) button.setAttribute('aria-pressed', String(button.dataset.storyStep === '0'));
     button.addEventListener('click', () => {
       const step = Number(button.dataset.storyStep);
       if (![0, 1, 2].includes(step)) return;
       stop(chapter); states.get(chapter).started = true; states.get(chapter).manual = true; unobserveChapter(chapter);
       setStep(chapter, step);
+      if (manualGuide && !button.closest('.story-steps')) {
+        chapter.querySelector(`.story-steps [data-story-step="${step}"]`)?.focus({preventScroll:true});
+      }
     });
   });
   $$('[data-story-replay]', chapter).forEach(button => {
     // Focus stays on the stable replay button throughout playback.
-    button.addEventListener('click', () => { states.get(chapter).manual = true; play(chapter); });
+    button.addEventListener('click', () => {
+      states.get(chapter).manual = true;
+      if (manualGuide) { stop(chapter); setStep(chapter, 0); }
+      else play(chapter);
+    });
   });
 }
 // Native scrolling advances the sequence. Tall/narrow screens keep ordinary
@@ -203,7 +219,7 @@ function sizeStories() {
   for (const chapter of chapters) {
     const state = states.get(chapter);
     const stage = chapter.querySelector('.stage');
-    const eligible = !motion.matches && scrollLayout.matches && ['write', 'hit'].includes(chapter.dataset.chapter) && stage.offsetHeight < innerHeight - header - 64;
+    const eligible = !manualGuide && !motion.matches && scrollLayout.matches && ['write', 'hit'].includes(chapter.dataset.chapter) && stage.offsetHeight < innerHeight - header - 64;
     const wasScrollDriven = state.scrollDriven;
     state.scrollDriven = Boolean(eligible);
     chapter.classList.toggle('scroll-driven', Boolean(eligible));
@@ -236,7 +252,13 @@ function updateScrollStory() {
 const queueStoryFrame = () => { if (!storyFrame) storyFrame = requestAnimationFrame(updateScrollStory); };
 addEventListener('scroll', queueStoryFrame, {passive:true});
 addEventListener('resize', sizeStories, {passive:true});
-if (motion.matches || !hasIO) chapters.forEach(complete);
+if (manualGuide) {
+  chapters.forEach(chapter => {
+    states.get(chapter).manual = true;
+    states.get(chapter).started = true;
+    setStep(chapter, chapter.dataset.chapter === 'write' ? 0 : 2);
+  });
+} else if (motion.matches || !hasIO) chapters.forEach(complete);
 else {
   autoplay = new IntersectionObserver(entries => {
     for (const entry of entries) {
@@ -259,7 +281,7 @@ if ('ResizeObserver' in window) {
 motion.addEventListener('change', () => {
   if (!motion.matches) return;
   revealObserver?.disconnect(); revealables.forEach(el => el.classList.add('is-in'));
-  chapters.forEach(complete); sizeStories();
+  chapters.forEach(chapter => manualGuide ? stop(chapter) : complete(chapter)); sizeStories();
 });
 
 // Links retain their native fallback and modified-click behavior. The movie
@@ -331,7 +353,7 @@ const shieldStages = $$('.shield-stage, .hero-sculpture');
 const lowCapability = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
 for (const shieldStage of shieldStages) {
 if (!motion.matches && !lowCapability) {
-  const mount = () => import('./shield.js?v=front-3')
+  const mount = () => import('./shield.js?v=idle-1')
     .then(({ mountShield }) => mountShield(shieldStage)).catch(() => {});
   if (hasIO) {
     const observer = new IntersectionObserver(entries => {

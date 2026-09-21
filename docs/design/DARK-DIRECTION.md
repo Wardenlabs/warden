@@ -25,7 +25,7 @@ licencia                    enlaces
 
 Alternativa descartada: un gran wordmark decorativo al final. Repetía el protagonismo del escudo y sumaba altura sin ayudar a descargar. El cierre usa el lockup a escala útil.
 
-Firma: el escudo oficial frontal, iluminado como metal, es reconocible desde el primer fotograma. Se sacrifica el giro automático para preservar el símbolo; los reflejos llevan la entrada y el puntero revela ligeramente su volumen.
+Firma: el escudo oficial frontal, iluminado como metal, es reconocible desde el primer fotograma. La entrada mantiene el frente. Por el feedback posterior del usuario, luego aparece un balanceo lento de 14 segundos, con inclinación máxima de .18 rad y flotación mínima; no gira de espaldas. Se pausa fuera de pantalla y con movimiento reducido.
 
 ## Controles de calidad
 

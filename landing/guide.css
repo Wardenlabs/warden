@@ -5,7 +5,7 @@
 .guide-page header nav > a:not(.btn) { color: var(--warden-muted-dark); }
 .guide-page .header-download { background: var(--warden-white); color: var(--warden-ink); border: 0; border-radius: 999px; }
 .guide-page header .bar { border-bottom: 1px solid var(--warden-line-dark); }
-.guide-intro { padding-top: 6rem; padding-bottom: 2rem; }
+.guide-intro { max-width: 52rem; padding-top: 6rem; padding-bottom: 2rem; }
 .guide-intro h1 { max-width: 18ch; margin-top: 1rem; font-size: clamp(2.25rem, 5vw, 4rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.08; }
 .guide-back { display: inline-flex; align-items: center; gap: .75rem; min-height: 44px; font-size: .8125rem; color: var(--warden-muted-dark); text-decoration: none; }
 .guide-back > .link-arrow { rotate: 180deg; }
@@ -52,3 +52,47 @@
 
 .guide-intro h1, .guide-page .say h2 { text-wrap: balance; }
 .guide-page .say p { text-wrap: pretty; }
+
+/* The visitor owns the sequence. One workspace, one primary action per state. */
+.guide-page [data-chapter="write"] .stage { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "says" "controls" "panel"; grid-template-rows: auto auto auto; align-items: start; gap: 1.5rem; max-width: 48rem; margin-inline: auto; }
+.guide-page [data-chapter="write"] .says { grid-area: says; }
+.guide-page [data-chapter="write"] .say { position: static; }
+.guide-page [data-chapter="write"] .say h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+.guide-page [data-chapter="write"] .say p { margin-top: .6rem; max-width: none; }
+.guide-page .story-controls { gap: 1rem; }
+.guide-page .story-steps { gap: .25rem; padding: .25rem; border: 1px solid #303030; border-radius: 10px; background: #101010; }
+.guide-page .story-steps button { padding: .65rem .75rem; text-align: center; border-radius: 6px; font-size: .8125rem; cursor: pointer; }
+.guide-page .story-steps button[aria-pressed="true"] { background: #f4f4f2; color: #181818; }
+.guide-page .story-steps button::after { display: none; }
+.guide-page [data-story-replay] { min-height: 44px; cursor: pointer; }
+.guide-page .demo-status { color: #aaa; font-size: .6875rem; text-align: right; }
+.guide-page .rules-scene .hero-box { padding: 2rem; }
+.guide-page .rules-scene #ruleMsg { height: auto; min-height: 5rem; max-width: 34ch; font-size: clamp(1.25rem, 3vw, 1.65rem); }
+.guide-page .composer-bottom > span { max-width: none; }
+.guide-page .rules-scene .ruleset { padding-inline: 2rem; }
+.guide-page .rules-scene .policy-list-head { min-height: 3.5rem; }
+.guide-page .rules-scene .policy-list-head > div > span { display: none; }
+.guide-page .policy-example-note { padding: 1rem 2rem; text-align: left; }
+.js .guide-page [data-chapter="write"][data-step="0"] .ruleset { display: none; }
+.js .guide-page [data-chapter="write"]:not([data-step="0"]) .rules-scene .shot { display: none; }
+.guide-page .rules-scene .rules-empty { display: none; }
+.guide-page .rules-scene .ru { padding-block: 1.25rem; }
+.guide-page .rules-scene .rule-definition { max-width: 55ch; }
+@media (max-width: 47.999rem) {
+ .guide-page [data-chapter="write"] .stage { gap: 1.25rem; }
+ .guide-page .story-controls { gap: .5rem; }
+ .guide-page .story-steps button { padding-inline: .35rem; font-size: .75rem; }
+ .guide-page .rules-scene .hero-box { padding: 1.25rem; }
+ .guide-page .rules-scene .ruleset { padding-inline: 1.25rem; }
+ .guide-page .policy-example-note { padding-inline: 1.25rem; }
+ .guide-page .demo-status { max-width: 13ch; }
+}
+
+.guide-page .say h2 { max-width: none; }
+.guide-page .demo-next { display: none; align-items: center; gap: .6rem; min-height: 44px; color: #f4f4f2; font-size: .8125rem; text-underline-offset: .3em; }
+.js .guide-page [data-step="2"] .demo-next { display: inline-flex; }
+.guide-page #request-example { scroll-margin-top: 2rem; }
+
+.guide-page .composer-bottom { justify-content: flex-end; }
+
+.js .guide-page [data-step="1"] .policy-list-footer { justify-content: flex-end; }

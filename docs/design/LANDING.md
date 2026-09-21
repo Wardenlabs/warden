@@ -50,4 +50,4 @@ La portada usa ahora flechas horizontales SVG. Se eliminó el segundo enlace red
 
 How it works comparte tokens, botones y pie con la portada. Su fondo negro, textos claros y paneles carbón mantienen la continuidad con la portada. Se conservan revisión, activación, selección de herramientas, explicación de reglas, decisiones y límites de uso. El control de replay conserva su etiqueta accesible y usa un icono SVG.
 
-La portada y la guía mantienen desplazamiento nativo. En pantallas amplias la guía conserva su secuencia vinculada al scroll cuando cabe; el móvil usa flujo normal. No se añaden bucles ambientales ni dependencias.
+La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamente con acciones explícitas, igual en escritorio y móvil. El escudo conserva un balanceo lento mientras es visible; no hay animaciones de fondo ni dependencias nuevas.

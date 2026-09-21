@@ -117,14 +117,34 @@ footer { background: var(--warden-black); border-top: 1px solid var(--warden-lin
   .example-switch label::after { transition: none; }
 }
 
-/* The closing signature uses the actual lockup, with no repeated sales headline. */
+/* A compact colophon aligned with the proof above; installers remain direct links. */
 .footer-brand { display: inline-flex; align-items: center; gap: .65rem; color: var(--warden-white); text-decoration: none; }
-.footer-brand .mark { width: 2.5rem; height: 2.5rem; }
-.footer-brand .word { width: 8rem; height: auto; }
-.foot .links > span:not(.sep) { margin-right: auto; }
+.footer-brand .mark { width: 1.8rem; height: 1.8rem; }
+.footer-brand .word { width: 5.8rem; height: auto; }
+.foot { max-width: 58rem; padding-block: 2.75rem 1.25rem; }
+.closing-copy { align-items: start; gap: 2rem; padding-bottom: 0; }
+.fine { margin-top: .6rem; font-size: .6875rem; }
+.dl { display: grid; grid-template-columns: auto auto; gap: 0 1.5rem; max-width: none; }
+.dl::after { display: none; }
+.dl > a:first-child { grid-column: 1 / -1; justify-self: end; min-height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--warden-white); }
+.dl > a:first-child .t { font-size: .875rem; font-weight: 550; }
+.dl > a:first-child > svg { display: none; }
+.dl > a:first-child .go { display: inline-flex; }
+.dl > a:first-child .go svg { width: 1rem; height: 1rem; }
+.dl > a { min-height: 36px; font-size: .6875rem; }
+.dl > a:last-child { grid-column: 1 / -1; justify-self: end; }
+.foot .links { gap: .25rem 1.25rem; margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid #202020; font-size: .6875rem; }
+.foot .links > span:not(.sep) { order: 1; margin-right: 0; margin-left: auto; }
+.foot .links > a { text-decoration: none; text-underline-offset: .3em; }
+.foot .links > a:hover { text-decoration: underline; }
+@media (hover: hover) and (pointer: fine) {
+ .dl > a:first-child:hover { background: transparent; color: var(--warden-white); }
+ .dl > a:first-child:hover .go { transform: translateY(2px); }
+}
 @media (max-width: 47.999rem) {
- .closing-copy { text-align: left; gap: 2rem; }
- .dl { justify-content: flex-start; margin: 0; }
- .links { margin-top: 2rem; }
- .fine { margin-top: .75rem; font-size: .75rem; }
+ .foot { padding-top: 2rem; }
+ .closing-copy { text-align: left; gap: 1.25rem; }
+ .dl { justify-content: start; margin: 0; gap: 0 1.5rem; }
+ .dl > a:first-child, .dl > a:last-child { justify-self: start; }
+ .foot .links { column-gap: 1rem; margin-top: 1rem; }
 }
