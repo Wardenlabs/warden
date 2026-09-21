@@ -5,8 +5,8 @@
 .guide-page header nav > a:not(.btn) { color: var(--warden-muted-dark); }
 .guide-page .header-download { background: var(--warden-white); color: var(--warden-ink); border: 0; border-radius: 999px; }
 .guide-page header .bar { border-bottom: 1px solid var(--warden-line-dark); }
-.guide-intro { padding-top: 8.5rem; padding-bottom: 3rem; }
-.guide-intro h1 { max-width: 12ch; margin-top: 2rem; font-size: clamp(3rem, 7vw, 5.25rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.08; }
+.guide-intro { padding-top: 6rem; padding-bottom: 2rem; }
+.guide-intro h1 { max-width: 18ch; margin-top: 1rem; font-size: clamp(2.25rem, 5vw, 4rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.08; }
 .guide-back { display: inline-flex; align-items: center; gap: .75rem; min-height: 44px; font-size: .8125rem; color: var(--warden-muted-dark); text-decoration: none; }
 .guide-back > .link-arrow { rotate: 180deg; }
 .guide-page #how { background: var(--warden-black); padding-top: 2rem; }
@@ -40,7 +40,7 @@
 @media (max-width: 47.999rem) {
   .guide-page header .header-download { min-height: 44px; padding-inline: .9rem; font-size: .75rem; }
   .guide-page header .header-download > svg { display: none; }
-  .guide-intro { padding-top: 6.5rem; padding-bottom: 1rem; }
+  .guide-intro { padding-top: 5rem; padding-bottom: .5rem; }
   .guide-page .stage { gap: 1.5rem; }
   .guide-page .story-controls { gap: .5rem; }
   .guide-page .sec { gap: 3.5rem; }
@@ -49,3 +49,6 @@
 }
 @media (max-width: 23rem) { .guide-page header .brand .word { display: block; width: 4.25rem; } }
 @media (prefers-reduced-motion: reduce) { .guide-page .ru { transition: none; } .guide-page [data-step="2"] .ract svg { animation: none; } }
+
+.guide-intro h1, .guide-page .say h2 { text-wrap: balance; }
+.guide-page .say p { text-wrap: pretty; }

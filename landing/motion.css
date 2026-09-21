@@ -5,10 +5,13 @@ a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: translateX(3px
 .hero-zone::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 30% 36%, #202020 0%, #101010 28%, transparent 65%); }
 .hero-art { isolation: isolate; }
 .hero-art::after { content: ""; position: absolute; inset: 94% 24% -1%; z-index: -1; background: radial-gradient(ellipse, #252525, transparent 68%); transform: scaleY(.3); }
-.hero-download, .dl > a:first-child { position: relative; overflow: hidden; }
-.hero-download::after, .dl > a:first-child::after { content: ""; pointer-events: none; position: absolute; inset: -70% -25%; background: linear-gradient(110deg, transparent 38%, #fff9 50%, transparent 62%); transform: translateX(-110%); }
-.hero-download:hover::after, .dl > a:first-child:hover::after { animation: button-light 650ms ease-out; }
-@keyframes button-light { to { transform: translateX(110%); } }
+/* Feedback follows the press; the mark remains the only metallic highlight. */
+.hero-download, .dl > a:first-child, .guide-page .send, .guide-page .policy-activate {
+  transition: background-color 160ms var(--warden-ease), color 160ms var(--warden-ease), transform 160ms var(--warden-ease);
+}
+.hero-download:active, .dl > a:first-child:active, .guide-page .send:active, .guide-page .policy-activate:active {
+  transform: translateY(1px) scale(.985);
+}
 
 .proof-heading > a { gap: .85rem; color: var(--warden-muted-dark); }
 .proof-heading .link-arrow { width: 1.5rem; height: 1.5rem; }
@@ -45,7 +48,8 @@ a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: translateX(3px
 @media (prefers-reduced-motion: reduce) {
   .link-arrow { transition: none; }
   a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: none; }
-  .hero-download::after, .dl > a:first-child::after { display: none; }
+  .hero-download, .dl > a:first-child, .guide-page .send, .guide-page .policy-activate { transition: none; }
+  .hero-download:active, .dl > a:first-child:active, .guide-page .send:active, .guide-page .policy-activate:active { transform: none; }
   .motion-visible .signal-packet, .motion-visible .signal-impact, .motion-visible .signal-out,
   .motion-visible .example-decision > svg { animation: none; }
 }

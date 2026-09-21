@@ -6,6 +6,8 @@ Este conjunto traduce el pedido de menos texto, menos componentes y más cuidado
 
 ## Qué leer
 
+- [Criterio Taste](TASTE.md): skills instaladas, auditoría aplicada y prioridades de marca.
+
 - [Dirección oscura vigente](DARK-DIRECTION.md): corrección de fondos, pose frontal y footer.
 
 - [Investigación y criterio](RESEARCH.md): referencias primarias, observaciones y decisiones.

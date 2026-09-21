@@ -145,6 +145,8 @@ The official mark's outline and proportions are binding. Primary download contro
 
 **Request trajectory.** A finite 1,250ms SVG stroke travels toward the rule boundary. Blocked stops at the solid boundary with a 650ms impact ring; Allowed continues through a dashed boundary. Written outcomes stay immediately readable. Intersection observation starts the effect at 25% visibility; leaving the viewport, hiding the tab or enabling reduced motion removes animation. Native radio changes replay the selected case. The duration is illustrative, not measured product latency.
 
+**Control feedback.** Download and rule-action buttons respond to a press with a 1px translation and .985 scale, without a decorative shine sweep. Reduced motion removes the transform. The guide introduction uses a shorter title and tighter spacing so the first interaction appears earlier. See [Taste audit](docs/design/TASTE.md).
+
 **Focus and motion.** Use a 2px focus outline offset by 4px, white on dark, including the guide and proof section. Example selection transitions in 180ms with `cubic-bezier(.16, 1, .3, 1)`; inherited buttons/navigation use 160ms. Reduced motion disables smooth scrolling and effectively removes CSS transitions. The skip link and keyboard access remain functional. Do not conceal meaningful content behind animation.
 
 ## Do's and Don'ts
