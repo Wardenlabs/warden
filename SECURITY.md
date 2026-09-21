@@ -382,8 +382,8 @@ Those clients need to reconnect with a newly issued onboarding link.
 
 On desktop, Electron `safeStorage` wraps the encryption key using the OS store
 when available. Its `basic_text` Linux fallback is not treated as secure storage.
-If an existing OS-protected key cannot be unlocked, startup stops. A new Linux
-installation without a working keyring uses a mode-0600 key file under
+If an existing OS-protected key cannot be unlocked, startup stops. A new
+installation without an available OS store uses a mode-0600 key file under
 `~/.warden/keys/`, outside the gateway data directory, and logs that limitation.
 That installation stays file-backed if a keyring is subsequently enabled.
 
