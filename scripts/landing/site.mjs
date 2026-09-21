@@ -4,7 +4,7 @@ export const repository = 'https://github.com/Wardenlabs/warden';
 export const pages = [
   {
     file: 'index.html', path: '/',
-    title: 'Warden | Local AI rules for Claude Code, Codex & OpenCode',
+    title: 'Warden',
     socialTitle: 'Warden — Your AI. Your rules.',
     description: 'Control what connected AI tools can share. Write rules, review decisions and check requests locally with Warden. Free and open source.',
     image: 'warden-home-v3.png',
