@@ -11,6 +11,10 @@ Warden checks AI requests against rules you write. It runs policy analysis on
 its host using QVAC; it can block a request, hold it for review, or let it pass.
 The desktop app includes the gateway and its admin console.
 
+[Website](https://warden-theta.vercel.app) ·
+[How it works](https://warden-theta.vercel.app/how-it-works) ·
+[Documentation](https://warden-theta.vercel.app/docs)
+
 [Download the desktop app](https://github.com/Wardenlabs/warden/releases/latest)
 for macOS or Windows. Open Rules, describe a restriction, review the draft, and
 activate it. Connect your tools under This device.
@@ -116,6 +120,21 @@ paired `pnpm run bench` harness. `pnpm run verify-audit` checks the audit chain.
 A model pass may tighten a verdict, never loosen it. Errors and unreadable
 model output escalate. Keep this invariant when changing the pipeline.
 [CLAUDE.md](CLAUDE.md) documents contributor conventions and previous experiments.
+
+## Website
+
+The public website lives in `landing/` and deploys separately from the desktop
+app. It runs without models. See [website development](landing/README.md) for
+the local server, metadata generator, share images and production checks.
+
+```sh
+pnpm run landing:metadata
+pnpm run landing:check
+pnpm run landing:build
+```
+
+[Production verification](docs/WEBSITE-PRODUCTION.md) records what the checks
+cover and the dependency advisories that still require local patches.
 
 Apache-2.0. Bundled dependencies and model licenses appear in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

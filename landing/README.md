@@ -1,53 +1,89 @@
-# Warden landing
+# Warden website
 
-The homepage is a short brand-and-product introduction: a black hero with the official metal shield, a charcoal surface containing one private/public pricing example, and a compact branded download footer on the same black canvas. The original detailed interactive tour is retained at `how-it-works.html`.
+The site is static HTML, CSS and browser modules. The home introduces Warden,
+`/how-it-works` walks through a rule, and `/docs` explains connections, privacy
+and deployment. Both product pages use the official shield, Manrope and a
+continuous black background. The footer closes with the full-width lockup.
 
-Status: shipping authorized for main on 2026-09-20, including improved 3D logo resolution and bevel shading. See [design direction](../docs/design/README.md), [research](../docs/design/RESEARCH.md) and [DESIGN.md](../DESIGN.md). The [video direction](../docs/design/VIDEO-DIRECTION.md) is a brief for future production; the existing launch film remains in use.
+## Develop and verify
 
-## Run locally
+From the repository root:
 
-```bash
+```sh
 npm ci --prefix integrations/kool --ignore-scripts --no-audit --no-fund
-node scripts/build-kool-browser.mjs
 node scripts/serve-kool-landing.mjs
 ```
 
-Open [127.0.0.1:4174](http://127.0.0.1:4174). The server supports the page and `POST /api/download`. It always treats local measurement as development. Vercel builds `landing/` and the existing endpoint using the root `vercel.json`.
+Open http://127.0.0.1:4174. The local server supports clean URLs, applies the
+production security headers and handles `/api/download` in test mode.
+The website itself needs no gateway or model download.
 
-## Surface ownership
+```sh
+pnpm run landing:metadata
+pnpm run landing:check
+pnpm run landing:build
+```
 
-| File | Purpose |
+Vercel installs only the isolated Kool integration and publishes `.landing-dist/`.
+The build copies public assets and pages; repository Markdown, runtime state and
+social-card source are excluded. Preview builds use `noindex` and block crawling.
+Generated output stays out of Git. The serverless download handler remains at
+`api/download.mjs`; its ingest credential belongs in deployment environment
+variables, never in this directory.
+
+## Edit the right source
+
+| Source | Owns |
 | --- | --- |
-| `index.html` | Short homepage, native pricing comparison, downloads, metadata and film dialog. |
-| `design-system.css` | Homepage tokens shared with the documented visual/video system. |
-| `landing.css` | Homepage layout, continuous dark surfaces, components and responsive behavior. |
-| `foundation-v2.css` | Shared reset, font, brand, base controls and video dialog. |
-| `how-it-works.html` | Detailed policy, activation, tool refusal, audit and usage demonstrations. |
-| `experience-v2.css`, `product-scenes-v2.css` | Detailed tour styles, not loaded by the homepage. |
-| `app.js` | Existing tour behavior, OS download selection, film and shield enhancement. |
-| `shield.js`, `assets/3d/` | Original mark geometry, neutral-metal studio, lazy renderer and fallback. |
-| `analytics-entry.js`, `analytics-config.js`, `analytics.js` | Existing production-gated PostHog measurement. |
-| `kool-entry.js`, `kool-download.js`, `vendor/kool/browser.mjs` | Existing download attribution with native links as fallback. |
-| `assets/launch/` | Existing 17-second film and poster. |
-| `llms.txt` | Product scope and limitations for automated readers. |
+| `index.html`, `landing.css` | Home content and native pricing comparison |
+| `how-it-works.html`, `guide.css` | Manual Describe, Review, Activate sequence and chapter alignment |
+| `foundation-v2.css`, `design-system.css` | Shared font, base controls and design tokens |
+| `footer.css` | Shared download composition and official closing lockup |
+| `docs.html`, `docs.css` | Readable product reference with links to source evidence |
+| `app.js`, `bootstrap.js` | Walkthrough controls, film, platform selection and readable fallback |
+| `shield.js`, `assets/3d/` | Vector geometry, WebGL renderer and lifecycle |
+| `motion.css`, `surface-motion.js` | Request paths and reduced-motion handling |
+| `../scripts/landing/site.mjs` | Canonical origin, page titles, descriptions and social-card mapping |
+| `../scripts/landing/metadata.mjs` | Generated head metadata, sitemap and crawler policy |
+| `../scripts/render-social-card.mjs` | Reproducible PNG cards using official vectors and the local font |
+| `../scripts/landing/security.mjs` | Browser security policy, mirrored in `vercel.json` and tested |
 
-## Behavior
+Do not hand-edit the generated metadata blocks. After changing site identity or
+`package.json`’s version, run `pnpm run landing:metadata`. When changing the origin,
+update the analytics host allowlist, bootstrap collector gate and links in
+`llms.txt` too. Changing the origin does not configure DNS or Vercel aliases.
 
-- Downloads and text are visible immediately. The main action follows the visitor's OS; other installers remain available in the footer.
-- The pricing comparison uses native radio inputs and CSS. It works without JavaScript and does not call an evaluator or activate a real rule. The visible label says it is illustrative.
-- The shield stays frontal while studio light moves through a finite 4.8-second entrance. A centered orthographic camera keeps the silhouette stable. Fine-pointer interaction changes its pose and reflections. After the frontal entrance, a restrained idle turn runs at up to 30fps; rendering stops offscreen or hidden. Motion preference changes and WebGL loss are handled by the existing controller.
-- Reduced-motion, low-capability and no-JavaScript visitors retain the front-facing official vector shield. Film media loads only after deliberate activation. Closing the dialog pauses video and returns focus.
-- The detailed tour retains Describe, Review and Activate controls, manual playback, tool radios and expanded definitions. Human activation remains distinct from drafting.
-- Native document scrolling remains available. At small widths the homepage is composed vertically; its secondary header link is omitted and all installers remain available below.
+To regenerate the 1200 × 630 share images, install root dependencies and run
+`pnpm run landing:cards`. Their versioned filenames avoid stale social previews.
+Each PNG must remain below 300 KB. `social-card.html` is a local preview of those
+images and is not deployed.
 
-## Measurement and truth
+## Interaction and accessibility
 
-Preserve production host allowlists, DNT handling, download asset allowlists and the independent analytics/Kool entry points. See [measurement](ANALYTICS.md) and [Kool integration](../docs/KOOL-DOWNLOADS.md). The existing download, film and guide-story hooks remain. The new radio comparison is not represented as a real policy evaluation or a tool-selection event.
+Pricing radios work without JavaScript. The walkthrough only advances when the
+visitor chooses a step or action, announces changes and keeps focus usable.
+Neither page submits real policy instructions or activates rules.
 
-Claims come from [PRODUCT.md](../PRODUCT.md), [SECURITY.md](../SECURITY.md) and the implementation. Only connected requests are checked. Local evaluation does not mean every compiler or destination model runs locally. The visual design does not establish universal protection, adoption or measured performance.
+The shield starts frontal, then turns gently; its controller stops rendering
+when hidden, offscreen or reduced motion applies. The vector fallback remains
+available without WebGL. The film loads after activation, pauses on close and
+returns focus. Keep downloads as native links when enhancing them.
 
-Installer targets must match actual assets in the [latest release](https://github.com/Wardenlabs/warden/releases/latest). The release version remains in structured metadata and the download footer.
+Check the home, guide and docs at 1440, 390 and 320 pixels. Exercise keyboard
+navigation, all rule steps, pricing radios and the film dialog. Confirm there
+is no horizontal overflow or console/CSP error. Automated coverage checks
+metadata, local links, PNG dimensions, production output, preview indexing,
+analytics boundaries, downloads and animation lifecycles.
 
-## Shared motion and detailed guide
+## Measurement and release
 
-`motion.css` and `surface-motion.js` enhance both pages with finite request trajectories, horizontal SVG link feedback and visibility/preference handling. `guide.css` brings the full tour onto the same neutral palette and shared controls. Native radios and written outcomes work independently of animation; timings are illustrative. Test the visibility/reduced-motion guard with `node --test scripts/surface-motion.test.mjs`.
+[Analytics](ANALYTICS.md) describes PostHog’s event allowlist and privacy controls.
+[Kool downloads](../docs/KOOL-DOWNLOADS.md) documents the bounded server handler.
+Both keep installer navigation independent of successful measurement.
+
+Before deployment, verify the current installer names in GitHub Releases. After
+Vercel publishes, check the canonical URLs, image responses, security headers
+and a nonexistent URL’s 404 response. See [production verification](../docs/WEBSITE-PRODUCTION.md).
+
+The [design system](../DESIGN.md), [taste decisions](../docs/design/TASTE.md) and
+[video direction](../docs/design/VIDEO-DIRECTION.md) keep future work consistent.

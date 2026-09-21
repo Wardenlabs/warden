@@ -1,0 +1,24 @@
+name: landing
+on:
+  push:
+    branches: [main]
+    paths: ['landing/**', 'scripts/**', 'integrations/kool/**', 'vercel.json', 'package.json', '.github/workflows/landing.yml']
+  pull_request:
+    paths: ['landing/**', 'scripts/**', 'integrations/kool/**', 'vercel.json', 'package.json', '.github/workflows/landing.yml']
+permissions:
+  contents: read
+concurrency:
+  group: landing-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix integrations/kool --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/landing-production.test.mjs scripts/landing-analytics.test.mjs scripts/kool-browser.test.mjs scripts/kool-download.test.mjs scripts/shield-geometry.test.mjs scripts/shield-lifecycle.test.mjs scripts/surface-motion.test.mjs
+      - run: node scripts/build-landing.mjs

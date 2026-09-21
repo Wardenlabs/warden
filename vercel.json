@@ -2,21 +2,42 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm ci --prefix integrations/kool --ignore-scripts --no-audit --no-fund",
-  "buildCommand": "node scripts/build-kool-browser.mjs",
-  "outputDirectory": "landing",
+  "buildCommand": "node scripts/build-landing.mjs",
+  "outputDirectory": ".landing-dist",
   "cleanUrls": true,
   "trailingSlash": false,
-  "github": { "silent": true },
+  "github": {
+    "silent": true
+  },
   "functions": {
-    "api/download.mjs": { "maxDuration": 30 }
+    "api/download.mjs": {
+      "maxDuration": 30
+    }
   },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self'; worker-src 'self' blob:; connect-src 'self' https://us.i.posthog.com https://us-assets.i.posthog.com; form-action 'self' https://github.com https://release-assets.githubusercontent.com"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        }
       ]
     }
   ]

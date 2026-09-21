@@ -1,0 +1,21 @@
+html { scroll-padding-top: 2rem; color-scheme: dark; }
+body { margin: 0; background: #080808; color: #f4f4f2; }
+.docs-header, .docs-footer { max-width: 72rem; margin: auto; padding: 2rem clamp(1.25rem, 4vw, 3rem); display: flex; align-items: center; gap: 2rem; }
+.docs-header nav { margin-left: auto; display: flex; gap: 1.5rem; }
+a { color: inherit; text-underline-offset: .3em; }
+.docs-header a, .docs-footer a { display: inline-flex; align-items: center; min-height: 44px; font-size: .875rem; text-decoration: none; }
+.docs-header img { display: block; }
+.docs-main { max-width: 48rem; margin: auto; padding: clamp(3rem, 8vw, 7rem) 1.25rem 5rem; }
+.docs-main h1 { font-size: clamp(2.7rem, 6vw, 4.5rem); font-weight: 500; letter-spacing: -.06em; line-height: 1.1; margin: 0 0 2rem; }
+.docs-main p { color: #b3b3b3; font-size: 1rem; line-height: 1.8; margin: 0 0 1.25rem; }
+.docs-main .docs-intro { font-size: 1.25rem; line-height: 1.65; }
+.docs-index { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; margin: 2rem 0 3rem; }
+.docs-index a { display: inline-flex; align-items: center; min-height: 44px; font-size: .875rem; }
+.docs-main section { padding: 3rem 0; border-top: 1px solid #292929; }
+.docs-main h2 { font-size: clamp(1.7rem, 4vw, 2.25rem); font-weight: 500; letter-spacing: -.045em; margin: 0 0 1.5rem; }
+.docs-main section > a { font-size: .875rem; line-height: 2; }
+.docs-main strong { color: #dedede; font-weight: 600; }
+.docs-main code { font-size: .85em; overflow-wrap: anywhere; }
+.docs-footer { border-top: 1px solid #292929; flex-wrap: wrap; color: #a3a3a3; }
+.docs-footer span { margin-left: auto; font-size: .75rem; }
+@media (max-width: 420px) { .docs-header { gap: 1rem; } .docs-header nav { gap: .75rem; } .docs-header img { width: 96px; height: auto; } .docs-footer { gap: 1.25rem; } }

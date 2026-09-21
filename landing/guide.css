@@ -96,3 +96,21 @@
 .guide-page .composer-bottom { justify-content: flex-end; }
 
 .js .guide-page [data-step="1"] .policy-list-footer { justify-content: flex-end; }
+
+/* Keep every chapter and its controls on the same reading axis. */
+.guide-page .guide-intro, .guide-page .sec { max-width: 60rem; }
+.guide-page .chapter .stage,
+.guide-page .chapter[data-chapter="write"] .stage,
+.guide-page .chapter[data-chapter="hit"] .stage,
+.guide-page .chapter[data-chapter="log"] .stage {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "says" "controls" "panel";
+  grid-template-rows: auto;
+  align-items: start;
+  max-width: none;
+  margin-inline: 0;
+  gap: 1.5rem;
+}
+.guide-page .chapter:not([data-chapter="write"]) .stage { grid-template-areas: "says" "panel"; }
+.guide-page .chapter .say { display: block; max-width: none; }
+.guide-page .chapter .say h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); }

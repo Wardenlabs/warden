@@ -3,7 +3,7 @@
   "version": "0.2.18",
   "private": true,
   "type": "module",
-  "description": "Warden — the local AI gateway. Your admin writes the rules; no prompt can break them. 100% on-device via QVAC.",
+  "description": "Warden checks connected AI requests against rules you write, with local policy analysis and human review.",
   "productName": "Warden",
   "author": "MartinPuli",
   "license": "Apache-2.0",
@@ -54,7 +54,11 @@
     "eval:lint": "tsx scripts/eval-lint.ts",
     "compare": "tsx scripts/compare.ts",
     "measurements": "tsx scripts/measurements.ts",
-    "test:remote": "tsx scripts/test-remote-boundary.ts"
+    "test:remote": "tsx scripts/test-remote-boundary.ts",
+    "landing:build": "node scripts/build-landing.mjs",
+    "landing:check": "node --test scripts/landing-production.test.mjs scripts/landing-analytics.test.mjs scripts/kool-browser.test.mjs scripts/kool-download.test.mjs scripts/shield-geometry.test.mjs scripts/shield-lifecycle.test.mjs scripts/surface-motion.test.mjs",
+    "landing:metadata": "node scripts/landing/metadata.mjs",
+    "landing:cards": "node scripts/render-social-card.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "1.0.8",

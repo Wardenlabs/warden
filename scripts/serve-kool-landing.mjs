@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve, extname, sep } from 'node:path';
+import { securityHeaders } from './landing/security.mjs';
 import { createDownloadHandler } from '../integrations/kool/download-handler.mjs';
 
 const root = fileURLToPath(new URL('../landing/', import.meta.url));
@@ -16,7 +17,7 @@ const download = createDownloadHandler({
 });
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.webp': 'image/webp', '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
+  '.webp': 'image/webp', '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml' };
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://127.0.0.1:${port}`);
@@ -25,14 +26,15 @@ const server = createServer(async (request, response) => {
       response.writeHead(405, { Allow: 'GET, HEAD' }); response.end(); return;
     }
     const pathname = decodeURIComponent(url.pathname);
-    const file = resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
+    const route = pathname === '/' ? '/index.html' : ['/how-it-works', '/docs'].includes(pathname) ? `${pathname}.html` : pathname;
+    const file = resolve(root, `.${route}`);
     if (!file.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
       || pathname.split('/').some(part => part.startsWith('.'))) {
       response.writeHead(404); response.end(); return;
     }
     const info = await stat(file);
     if (!info.isFile()) { response.writeHead(404); response.end(); return; }
-    response.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream',
+    response.writeHead(200, { ...securityHeaders, 'Content-Type': types[extname(file)] || 'application/octet-stream',
       'Content-Length': info.size, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin' });
     if (request.method === 'HEAD') response.end();
