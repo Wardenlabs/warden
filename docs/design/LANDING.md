@@ -64,4 +64,4 @@ La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamen
 
 ### Ajuste exclusivo de escritorio
 
-La composición móvil quedó aprobada por el usuario. A partir de 1024px, el footer de portada se alinea con el contenedor de 58rem de la prueba del producto. La guía conserva su eje de 76rem. El lockup ocupa hasta 256px; descargas y navegación mantienen columnas de lectura próximas y un botón principal de tamaño estable. La separación hasta la metadata es 64px. Los estilos por debajo de 1024px no cambian.
+La composición móvil quedó aprobada por el usuario. A partir de 1024px, el footer de portada ocupa hasta 64rem, ligeramente más ancho que la prueba del producto, por petición del usuario. La guía conserva su eje de 76rem. El lockup ocupa hasta 256px; descargas y navegación mantienen columnas de lectura próximas y un botón principal de tamaño estable. La separación hasta la metadata es 64px. Los estilos por debajo de 1024px no cambian.
