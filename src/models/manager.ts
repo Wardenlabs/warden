@@ -6,6 +6,7 @@ import { refreshCompiler, remoteCompiler } from '../qvac/index.js';
 import { RealQvacAdapter } from '../qvac/real.js';
 import { RemoteCompilerAdapter, validate } from '../qvac/remote.js';
 import { loadAdjudicatorSettings, loadCompilerSettings, saveAdjudicatorSettings, saveCompilerSettings, type CompilerSettings } from '../settings.js';
+import { builtinDownloads, type BuiltinDownloads } from './builtin-downloads.js';
 import { findModel, fingerprint, formatSchema, managedRoleSchema, modelPath, publicModel, putModel, readCatalog, recordTest, removeModel, testedRoles, type ManagedRole, type ModelEntry } from './store.js';
 
 const operations = new RoleCoordinator();
@@ -26,8 +27,20 @@ export function modelOverride(role: ManagedRole): boolean {
   return Boolean(process.env[`WARDEN_MODEL_${role.toUpperCase()}`] || (role === 'compiler' &&
     (process.env['WARDEN_COMPILER_CLI'] || process.env['WARDEN_COMPILER_API'])));
 }
-export function catalogResponse() {
-  return { models: readCatalog().map((entry) => publicModel(entry, selectedRoles(entry.id).filter((role) => !modelOverride(role)))), selections: selections(),
+/** Which jobs a built-in file is doing right now, from what is loaded rather
+ * than what is saved: a compiler running through a CLI is not the Qwen file,
+ * and a file that matches the configured default but never loaded is not active. */
+function builtinRoles(filename: string, choice: string, roles: readonly ManagedRole[]) {
+  const selected = selections();
+  const compiler = loadCompilerSettings();
+  const saved = { compiler: compiler.provider === 'local' && !selected.compiler,
+    adjudicator: !selected.adjudicator && loadAdjudicatorSettings().model === choice };
+  const running = (role: ManagedRole) => !modelOverride(role) && activeLocalModel(role) === filename && (role !== 'compiler' || !remoteCompiler());
+  return { activeRoles: roles.filter(running), selectedRoles: roles.filter((role) => saved[role] && !modelOverride(role)) };
+}
+export function catalogResponse(downloads: BuiltinDownloads = builtinDownloads) {
+  return { builtins: downloads.builtins().map((builtin) => ({ ...builtin, ...builtinRoles(builtin.filename, builtin.adjudicatorChoice, builtin.roles) })),
+    transfer: downloads.transfer(), models: readCatalog().map((entry) => publicModel(entry, selectedRoles(entry.id).filter((role) => !modelOverride(role)))), selections: selections(),
     overrides: { compiler: modelOverride('compiler'), adjudicator: modelOverride('adjudicator') },
     inForce: { compiler: remoteCompiler() ?? activeLocalModel('compiler'), adjudicator: activeLocalModel('adjudicator') } };
 }

@@ -5,7 +5,7 @@ import { refreshAdjudicator, refreshCompiler } from './data.js';
 import { bindGetModels } from './engine.js';
 import { modelLabel, plural } from './format.js';
 import { limitValue, quotaOf, saveQuota } from './limits.js';
-import { bindLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
+import { bindLibrary, leaveLibrary, library, libraryMarkup, loadLibrary } from './model-library.js';
 import { bindPromptEditor, closePromptEditor, hasPromptChanges, loadPrompts, promptEditor, promptEditorMarkup, promptIsDirty, togglePromptEditor } from './prompt-editor.js';
 import { render } from './render.js';
 import { button, disclosureRow, feedback, pageHead, statusText, tabs } from './ui.js';
@@ -104,7 +104,13 @@ function judgeChoices() {
   const a = state.adjudicator;
   const customId = library.catalog?.selections?.adjudicator;
   const builtIn = (a?.choices ?? [])
-    .map((c) => ({ label: c.onDisk ? c.label : `${c.label} · download required`, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));
+    // A missing model is a link to its Library row, not a selection. Picking it
+    // used to save a pending choice so the desktop installer would fetch it,
+    // which made choosing a prerequisite for downloading and did nothing at all
+    // in a browser.
+    .map((c) => c.onDisk
+      ? { label: c.label, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }
+      : { label: `${c.label} · download required`, attrs: `data-go="models" data-sel="library" data-q="model=${attr(c.builtinId ?? '')}"` });
   const custom = (library.catalog?.models ?? []).filter((m) => (m.testedRoles ?? []).includes('adjudicator'))
     .map((m) => ({ label: m.name, check: (m.activeRoles ?? []).includes('adjudicator'), attrs: `data-judge-custom="${attr(m.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));
   return [...builtIn, ...custom, { label: 'Add a model…', attrs: 'data-go="models" data-sel="library"' }];
@@ -174,7 +180,7 @@ function judgeBlock() {
         <div class="job-status">${statusText(currentStatus, switching ? 'attention' : s.tone)}</div>`}
     ${!a ? feedback({ tone: 'error', icon: true, title: 'Analyzer choices could not be loaded', body: 'Refresh Models to try again.' }) : ''}
     ${a?.overriddenByEnv ? feedback({ tone: 'attention', title: 'Controlled by the environment', body: `${esc(modelLabel(a.inForce))} is in force. Saved preferences apply after the environment override is removed.` }) : ''}
-    ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. ${state.canLeaveDemo ? '<button type="button" class="linkish js-get-models">Download models</button>' : 'Run the model setup on the gateway to download it.'}</p>` : ''}
+    ${selected && !selected.onDisk ? `<p class="job-warning">${esc(selected.label)} is selected but not downloaded yet. <button type="button" class="linkish" data-go="models" data-sel="library" data-q="model=${attr(selected.builtinId ?? '')}">Download it in Library</button></p>` : ''}
     ${judgeNote ? `<p class="job-note --${judgeNote.ok ? 'allow' : 'block'}" role="${judgeNote.ok ? 'status' : 'alert'}">${esc(judgeNote.text)}</p>` : ''}
   </section>`;
 }
@@ -307,8 +313,11 @@ function bindModels() {
   for (const b of document.querySelectorAll('[data-judge-builtin]')) b.onclick = () => {
     b.closest('details.menu')?.removeAttribute('open');
     const choice = state.adjudicator?.choices?.find((c) => c.id === b.dataset.judgeBuiltin);
-    if (!choice || b.getAttribute('aria-checked') === 'true') return;
-    void switchJudge(choice.label, from(), () => post('/api/settings/adjudicator', { model: choice.id }));
+    // Already chosen is only a reason to do nothing when it is also what is
+    // loaded. A saved choice whose weights never loaded is the case Use exists
+    // to retry, and returning here made it a button that did nothing.
+    if (!choice || (b.getAttribute('aria-checked') === 'true' && state.adjudicator?.inForce === choice.filename)) return;
+    void switchJudge(choice.label, from(), () => post('/api/settings/adjudicator', { model: choice.id, requireInstalled: true }));
   };
   for (const b of document.querySelectorAll('[data-judge-custom]')) b.onclick = () => {
     b.closest('details.menu')?.removeAttribute('open');
@@ -383,7 +392,7 @@ function bindModels() {
   bindPromptEditor();
 }
 
-VIEWS.models = { body: modelsPage, bind: bindModels, onEnter: enterModels, onLeave: () => { clearCompilerSecret(); writerOpen = false; ceilingEdit = null; } };
+VIEWS.models = { body: modelsPage, bind: bindModels, onEnter: enterModels, onLeave: () => { clearCompilerSecret(); writerOpen = false; ceilingEdit = null; leaveLibrary(); } };
 // The old compiler page's address still works — the composer's picker and older
 // links point at it — and lands on Active with the rule writer's settings open.
 VIEWS.compiler = { ...VIEWS.models, railParent: 'models' };

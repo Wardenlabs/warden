@@ -153,3 +153,18 @@ export const fileSize = (bytes) => bytes >= 1024 ** 3
   ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
   : bytes >= 1024 ** 2 ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
     : bytes === 0 ? '0 KB' : `${Math.ceil(bytes / 1024)} KB`;
+
+/**
+ * Sizes for built-in model downloads, in the decimal units the catalogue uses.
+ *
+ * `fileSize` above divides by 1024 and writes MB, which is fine for an
+ * attachment and wrong beside a catalogue whose 5030 MB means 5.03 GB: the same
+ * file would read "~5.03 GB" in the menu and "4.7 GB" once it started arriving.
+ * A count in progress rounds down, so a transfer never shows its total early,
+ * and gigabytes keep both decimals so the digits do not change width as they move.
+ */
+export function downloadSize(bytes, { estimate = false } = {}) {
+  const n = Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
+  const text = n >= 1e9 ? `${(Math.floor(n / 1e7) / 100).toFixed(2)} GB` : `${Math.floor(n / 1e6)} MB`;
+  return estimate ? `~${text}` : text;
+}

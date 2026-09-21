@@ -6,7 +6,6 @@
  * catches, so it belongs to the same person who writes the rules; and the body
  * of a compiler PUT carries an API key.
  */
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { analyzerFormat } from '../../qvac/native-guards.js';
 import { Router } from 'express';
@@ -29,7 +28,16 @@ import {
   redactedCompilerSettings,
   saveAdjudicatorSettings,
 } from '../../settings.js';
+import { LIBRARY_BUILTINS, libraryBuiltin } from '../../setup/catalog.js';
+import { installedModel } from '../../setup/model-files.js';
 import { asyncRoute } from '../http.js';
+
+/** Presence by the same test the resolver and the Library use: a name on disk
+ * is not a model while a transfer can be writing into this directory. */
+function choicePresence(choice: string) {
+  const builtin = LIBRARY_BUILTINS.find((entry) => entry.adjudicatorChoice === choice)!;
+  return { builtinId: builtin.id, ...installedModel(libraryBuiltin(builtin.id)!.spec, modelsDir()) };
+}
 
 export const settingsRoutes = Router();
 
@@ -43,7 +51,6 @@ export const settingsRoutes = Router();
  */
 settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
   const chosen = loadAdjudicatorSettings().model;
-  const dir = modelsDir();
   res.json({
     model: chosen,
     modelId: selections().adjudicator,
@@ -66,7 +73,8 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
       approxMB: c.approxMB,
       perDecision: c.perDecision,
       trade: c.trade,
-      onDisk: existsSync(resolve(dir, c.filename))
+      builtinId: choicePresence(c.id).builtinId,
+      onDisk: choicePresence(c.id).onDisk
     }))
   });
 });
@@ -88,9 +96,23 @@ settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => 
   if (!parsed.success) return res.status(400).json({ error: `model must be one of: ${ADJUDICATOR_CHOICES.map((c) => c.id).join(', ')}` });
   const choice = ADJUDICATOR_CHOICES.find((c) => c.id === parsed.data.model)!;
   const path = resolve(modelsDir(), choice.filename);
-  const onDisk = existsSync(path);
+  const onDisk = choicePresence(choice.id).onDisk;
+  // The console's Use. Without the flag this is still the legacy request, where
+  // an absent file saves a pending choice for the desktop installer to act on;
+  // old clients and first-run keep that. With it, nothing is saved unless the
+  // weights can be loaded now, and "saved in mock mode" is not reported as a
+  // model judging requests.
+  if (req.body?.requireInstalled === true) {
+    const refusal = !onDisk ? 'Download this model from the Library before using it.'
+      : isMock() ? 'This gateway is running the mock adapter. Restart it with real inference to use a downloaded model.'
+        : process.env['WARDEN_ADAPTER'] === 'llamacpp' ? 'Model management uses the QVAC runtime. Restart without the experimental llamacpp adapter to select models.'
+          : process.env['WARDEN_MODEL_ADJUDICATOR'] ? 'The environment controls this role. Remove its override before selecting a model.' : null;
+    if (refusal) return res.status(409).json({ error: refusal, code: !onDisk ? 'not_installed' : 'use_unavailable' });
+  }
   await withRoleChange('adjudicator', async () => {
     const previous = loadAdjudicatorSettings();
+    // The file can vanish between the check above and the lease.
+    if (req.body?.requireInstalled === true && !choicePresence(choice.id).onDisk) throw new Error('Download this model from the Library before using it.');
     // An absent preset is a download request. Keep the current loaded model
     // serving until the desktop completes the transfer and restarts.
     if (!onDisk || isMock() || process.env['WARDEN_MODEL_ADJUDICATOR']) {

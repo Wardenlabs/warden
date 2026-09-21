@@ -9,7 +9,7 @@ import { adapterName } from '../qvac/index.js';
 import { createApp } from './app.js';
 import { HOST, PORT, seedPath } from './config.js';
 import { lanAddresses, listeningOn } from './http.js';
-import { installExitHandlers, preloadModels } from './lifecycle.js';
+import { installExitHandlers, preloadModels, reconcileTransfers } from './lifecycle.js';
 import { portAvailable, portHolder } from './installation.js';
 
 /*
@@ -81,6 +81,7 @@ const server = createApp().listen(PORT, HOST, () => {
   }
   console.log(`  policy    ${loadPolicy().rules.length} rules · ${loadPolicy().quotas.length} quotas`);
   console.log(`  console   open the local or network URL in a browser\n`);
+  reconcileTransfers();
   preloadModels();
 });
 

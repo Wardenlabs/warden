@@ -14,7 +14,9 @@ import { loadModel, unloadModel, close } from '@qvac/sdk';
 import { withDeadline } from './deadline.js';
 import { adjudicatorFilename, MODEL_SPECS, modelsDir } from './models.js';
 import { remoteCompilerConfig } from './remote.js';
-import { loadAdjudicatorSettings, loadCompilerSettings } from '../settings.js';
+import { loadAdjudicatorSettings, loadCompilerSettings, savedAdjudicatorChoice } from '../settings.js';
+import { MODEL_CATALOG } from '../setup/catalog.js';
+import { installedModel } from '../setup/model-files.js';
 import { findModel, fingerprint, modelPath, type ManagedRole } from '../models/store.js';
 import type { ModelRole } from './types.js';
 
@@ -62,6 +64,27 @@ function overrideFor(role: ModelRole): string | null {
 }
 
 /**
+ * A shipped file in the models directory, if it is usable.
+ *
+ * `existsSync` was enough while the only thing that wrote here was setup
+ * against a stopped gateway. The console now downloads into a live one, and a
+ * name on disk is no longer proof of a model: the shared presence check wants a
+ * receipt, or for older files a GGUF header and a plausible size. A file that
+ * is there and fails it throws rather than returning null, because null means
+ * "look elsewhere", and quietly loading a different model than the one on this
+ * disk is the confusion `overrideFor` throws to avoid.
+ */
+function shippedFile(filename: string): string | null {
+  const path = resolve(modelsDir(), filename);
+  const spec = MODEL_CATALOG.find((m) => m.filename === filename);
+  if (!spec) return existsSync(path) ? path : null;
+  const state = installedModel(spec, modelsDir());
+  if (state.onDisk) return path;
+  if (state.downloadBlockedReason) throw new Error(`${filename} in the models directory is incomplete or damaged. Move it out and download it again from Models.`);
+  return null;
+}
+
+/**
  * Where a role's weights live.
  *
  * An explicit env override wins, then the path `pnpm run setup` recorded, then
@@ -89,12 +112,16 @@ export function sourceFor(role: ModelRole): string | object {
   // what it has. Honesty is handled where it belongs, in the answer: every
   // route that reports the seat reports `inForce` alongside the choice, so the
   // console can say the download has not landed instead of implying it has.
+  //
+  // An explicit `default` counts as a pick. It used to be skipped here, so
+  // pressing Use on DynaGuard 4B tested that file and then loaded whatever
+  // analyzer path `warden.local.json` still named. An installation that never
+  // chose keeps the setup path, which is why this asks what was saved rather
+  // than what the settings fall back to.
   if (role === 'adjudicator') {
-    const chosen = loadAdjudicatorSettings().model;
-    if (chosen !== 'default') {
-      const path = resolve(modelsDir(), adjudicatorFilename(chosen));
-      if (existsSync(path)) return path;
-    }
+    const chosen = savedAdjudicatorChoice();
+    const path = chosen && shippedFile(adjudicatorFilename(chosen));
+    if (path) return path;
   }
 
   const fromConfig = config()?.models[role];
@@ -110,8 +137,8 @@ export function sourceFor(role: ModelRole): string | object {
 
   // Resolved for the same reason as the override above: this is the path taken
   // on any machine that has the weights but no `warden.local.json`.
-  const conventional = resolve(modelsDir(), spec.filename);
-  if (existsSync(conventional)) return conventional;
+  const conventional = shippedFile(spec.filename);
+  if (conventional) return conventional;
 
   return spec.entry as unknown as object;
 }

@@ -14,7 +14,8 @@ const { documentAnalysisNotice, documentMetadataMarkup, documentReason, document
 const { passOutcome, passPresentation, ruleCoverageMarkup } = await import('../web/js/activity.js');
 const { policyDecisionPresentation, resultTitle } = await import('../web/js/simulator.js');
 const { renderNav, workspaceName } = await import('../web/js/nav.js');
-const { library, libraryMarkup } = await import('../web/js/model-library.js');
+const { library, libraryMarkup, builtinStatus, applyJobs, loadLibrary, bindLibrary, leaveLibrary, setLibraryRedraw } = await import('../web/js/model-library.js');
+const { downloadSize } = await import('../web/js/format.js');
 const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindCompiler } = await import('../web/js/compiler.js');
 const { compileFailure } = await import('../web/js/answers.js');
 const { restoreSoloRuleText } = await import('../web/js/solo.js');
@@ -401,18 +402,20 @@ test('choosing Claude Code as the rule writer opens guided setup with a blank mo
   } finally { document.querySelector = savedQuery; elements.delete('compilerForm'); elements.delete('cProvider'); elements.delete('pane'); elements.delete('sidebar'); }
 });
 
-test('missing local weights offer download only after the local compiler is selected', () => {
+test('missing local compiler weights link to their Library row without applying local compilation first', () => {
   state.compiler = compilerConfiguration();
   state.compilerDraft = { provider: 'local', model: '', baseUrl: '', redactNames: false };
   const previous = state.models;
   state.models = { models: [{ role: 'compiler', onDisk: false }] };
-  state.canLeaveDemo = true;
   try {
-    assert.match(compilerSettings(), /class="btn js-get-models" disabled/);
-    state.compiler.provider = 'local'; state.compiler.setupRequired = false;
-    const html = compilerSettings();
-    assert.match(html, /Download its weights before drafting/);
-    assert.ok(!html.match(/<button[^>]*class="btn js-get-models"[^>]*>/)?.[0].includes('disabled'));
+    for (const canLeaveDemo of [false, true]) {
+      state.canLeaveDemo = canLeaveDemo;
+      const html = compilerSettings();
+      const link = html.match(/<button[^>]*data-q="model=compiler"[^>]*>/)?.[0];
+      assert.ok(link?.includes('data-go="models"') && link.includes('data-sel="library"'));
+      assert.ok(!link.includes('disabled'), 'downloading the file does not wait for Apply');
+      assert.ok(!html.includes('js-get-models'), 'a per-model action never restarts the desktop app');
+    }
   } finally { state.models = previous; }
 });
 
@@ -1268,6 +1271,218 @@ test('records open over their lists while creation and team settings remain full
 });
 
 
+
+const BUILTIN_FILES = { adjudicator: ['DynaGuard 4B', 'DynaGuard-4B.Q6_K.gguf', 'default', 'dynaguard', 3630], 'adjudicator-large': ['Qwen3 8B', 'Qwen3-8B-Q4_K_M.gguf', 'large', 'compliance', 5030],
+  compiler: ['Qwen3 1.7B', 'Qwen3-1.7B-Q4_0.gguf', 'base', 'compliance', 1100], 'adjudicator-shieldstral': ['Shieldstral 1.0 3B', 'Shieldstral-1.0-3B-Q6_K.gguf', 'shieldstral', 'shieldstral', 2822],
+  'adjudicator-granite-guardian': ['Granite Guardian 4.1 8B', 'granite-guardian-4.1-8b-Q6_K.gguf', 'granite-guardian', 'granite-guardian', 6880] };
+function builtin(id, extra = {}) {
+  const [name, filename, adjudicatorChoice, format, approxMB] = BUILTIN_FILES[id];
+  return { id, name, filename, adjudicatorChoice, format, roles: id === 'compiler' ? ['compiler', 'adjudicator'] : ['adjudicator'], approxBytes: approxMB * 1e6,
+    onDisk: false, verifiedDownload: false, downloadBlockedReason: null, bytes: null, activeRoles: [], selectedRoles: [], latestJobId: null, ...extra };
+}
+const builtinJobFixture = (builtinId, state, extra = {}) => ({ id: `job-${builtinId}`, source: 'builtin', builtinId, name: BUILTIN_FILES[builtinId][0], state, received: 0, total: null,
+  attempt: 1, maxAttempts: 4, modelId: null, error: null, errorCode: null, canCancel: true, canRetry: false, ...extra });
+const openTransfer = { available: true, reason: null, maxConcurrent: 1, active: null };
+
+test('download sizes use the catalogue\'s decimal units and never round a count up to its total', () => {
+  assert.equal(downloadSize(0), '0 MB');
+  assert.equal(downloadSize(999_999), '0 MB');
+  assert.equal(downloadSize(1_000_000), '1 MB');
+  assert.equal(downloadSize(999_999_999), '999 MB');
+  assert.equal(downloadSize(1_000_000_000), '1.00 GB');
+  assert.equal(downloadSize(5_030_000_000, { estimate: true }), '~5.03 GB');
+  assert.equal(downloadSize(5_029_999_999), '5.02 GB', 'one byte short is not the whole file');
+  assert.equal(downloadSize(2_110_400_000), '2.11 GB');
+  assert.equal(downloadSize(undefined), '0 MB');
+  assert.equal(downloadSize(NaN), '0 MB');
+});
+
+test('a built-in row says what the gateway reported for each state of its file and job', async () => {
+  leaveLibrary(); await applyJobs([]);
+  const b = builtin('adjudicator-large');
+  assert.deepEqual(builtinStatus(b, null), { text: 'Not downloaded', detail: '', tone: 'muted' });
+  assert.equal(builtinStatus(b, builtinJobFixture(b.id, 'connecting')).text, 'Connecting…');
+  let s = builtinStatus(b, builtinJobFixture(b.id, 'downloading', { received: 2_110_000_000, total: 5_030_000_000 }));
+  assert.equal(s.text, 'Downloading · 41%'); assert.equal(s.detail, '2.11 GB of 5.03 GB'); assert.deepEqual(s.progress, { received: 2_110_000_000, total: 5_030_000_000 });
+  s = builtinStatus(b, builtinJobFixture(b.id, 'downloading', { received: 512_000_000 }));
+  assert.equal(s.text, 'Downloading', 'no percentage without a total'); assert.equal(s.detail, '512 MB downloaded'); assert.equal(s.progress.total, null);
+  s = builtinStatus(b, builtinJobFixture(b.id, 'downloading', { received: 5_029_999_999, total: 5_030_000_000 }));
+  assert.equal(s.text, 'Downloading · 99%');
+  assert.equal(builtinStatus(b, builtinJobFixture(b.id, 'retrying', { attempt: 3, received: 64_000_000, total: 5_030_000_000 })).text, 'Retrying · attempt 3 of 4');
+  assert.equal(builtinStatus(b, builtinJobFixture(b.id, 'verifying', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })).text, 'Verifying…');
+  assert.equal(builtinStatus(b, builtinJobFixture(b.id, 'cancelling')).progress, null);
+  assert.deepEqual(builtinStatus(b, builtinJobFixture(b.id, 'cancelled')), { text: 'Not downloaded', detail: '', tone: 'muted' }, 'a cancel returns the row to absent');
+  s = builtinStatus(b, builtinJobFixture(b.id, 'failed', { error: 'Model download returned HTTP 503.', canRetry: true }));
+  assert.equal(s.text, 'Download failed'); assert.equal(s.detail, 'Model download returned HTTP 503.'); assert.equal(s.tone, 'block');
+  assert.equal(builtinStatus(b, builtinJobFixture(b.id, 'interrupted', { canRetry: true })).text, 'Download interrupted');
+  assert.equal(builtinStatus(builtin(b.id, { onDisk: true, verifiedDownload: true }), builtinJobFixture(b.id, 'complete')).text, 'Downloaded · built-in');
+  assert.equal(builtinStatus(builtin(b.id, { onDisk: true }), null).text, 'On disk · built-in', 'an older file is present, not vouched for');
+  s = builtinStatus(builtin(b.id, { onDisk: true, verifiedDownload: true, selectedRoles: ['adjudicator'] }), null);
+  assert.equal(s.text, 'Downloaded · built-in'); assert.equal(s.detail, 'Selected · not loaded', 'configured is not in force');
+  assert.equal(builtinStatus(builtin(b.id, { onDisk: true, activeRoles: ['adjudicator'] }), null).text, 'Active · judging');
+  assert.equal(builtinStatus(builtin(b.id, { downloadBlockedReason: 'An existing model file requires repair. It will not be overwritten.' }), null).text, 'Model file requires repair');
+});
+
+test('Library downloads are per row, need no desktop shell, and keep Download apart from Use', async () => {
+  const saved = { ...state };
+  try {
+    Object.assign(state, { view: 'activity', canLeaveDemo: false, models: { mock: false, models: [{ role: 'compiler', name: 'someone-elses-import.gguf', onDisk: true }] },
+      adjudicator: { model: 'default', inForce: null, choices: [{ id: 'large', builtinId: 'adjudicator-large', label: 'Qwen3 8B', filename: 'Qwen3-8B-Q4_K_M.gguf', perDecision: 'About 11 s a decision.' }] } });
+    leaveLibrary(); await applyJobs([]);
+    library.catalog = { models: [], selections: {}, overrides: {}, transfer: openTransfer,
+      builtins: [builtin('adjudicator', { onDisk: true, verifiedDownload: true, bytes: 3_630_000_000 }), builtin('compiler'), builtin('adjudicator-large'), builtin('adjudicator-shieldstral', { downloadBlockedReason: 'An existing model file requires repair. It will not be overwritten.' })] };
+    let html = libraryMarkup();
+    assert.equal(html.match(/data-builtin-id="/g).length, 4);
+    assert.equal(html.match(/Qwen3-1\.7B-Q4_0\.gguf/g).length, 1, 'one physical file, one row');
+    assert.match(html, /data-builtin-id="compiler"[\s\S]*?<span>Rule writer, Request judge<\/span>/);
+    assert.ok(!html.includes('someone-elses-import'), 'the runtime inventory is not the built-in inventory');
+    let download = html.match(/<button[^>]*data-builtin-download="adjudicator-large"[^>]*>/)?.[0];
+    assert.ok(download && !download.includes('disabled'), 'available with canLeaveDemo false');
+    assert.match(html, /Download · ~5\.03 GB/);
+    assert.ok(!html.includes('js-get-models') && !html.includes('Select for download'));
+    assert.ok(!html.includes('data-judge-builtin="large"'), 'a missing file offers no Use');
+    assert.match(html, /<button[^>]*data-judge-builtin="default"[^>]*>\s*<span>Use for analysis/);
+    assert.ok(!html.match(/<button[^>]*data-judge-builtin="default"[^>]*>/)[0].includes('disabled'));
+    assert.match(html, /aria-label="More actions for Qwen3 8B"/);
+    assert.ok(html.match(/<button[^>]*data-builtin-download="adjudicator-shieldstral"[^>]*>/)[0].includes('disabled'));
+    assert.match(html, /menu-note">An existing model file requires repair/);
+
+    // Mock may download; it may not claim a downloaded model is judging.
+    state.models.mock = true;
+    html = libraryMarkup();
+    assert.ok(html.match(/<button[^>]*data-judge-builtin="default"[^>]*>/)[0].includes('disabled'));
+    assert.match(html, /menu-note">This gateway is in demo mode/);
+    assert.ok(!libraryMarkup().match(/<button[^>]*data-builtin-download="adjudicator-large"[^>]*>/)[0].includes('disabled'));
+    state.models.mock = false;
+
+    // Somebody else's transfer, discovered by a poll: shown, and everything else waits.
+    await applyJobs([builtinJobFixture('adjudicator-large', 'downloading', { received: 1_000_000_000, total: 5_030_000_000 })]);
+    html = libraryMarkup();
+    assert.match(html, /id="builtin-progress-adjudicator-large"[^>]*role="progressbar"[^>]*aria-valuemax="5030000000" aria-valuenow="1000000000"/);
+    assert.match(html, /class="download-arrow --live"/);
+    assert.match(html, /<button[^>]*data-cancel-download="job-adjudicator-large"[^>]*>\s*<span>Cancel download/);
+    assert.ok(!html.includes('data-builtin-download="adjudicator-large"'), 'no second start on a running row');
+    assert.ok(html.match(/<button[^>]*data-builtin-download="compiler"[^>]*>/)[0].includes('disabled'));
+    assert.match(html, /menu-note">Qwen3 8B is being transferred/);
+    assert.ok(!html.includes('class="model-transfers"'), 'a built-in is not listed a second time among custom imports');
+
+    // Publication has begun: the item stays where it was and stops working.
+    await applyJobs([builtinJobFixture('adjudicator-large', 'verifying', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })]);
+    assert.ok(libraryMarkup().match(/<button[^>]*data-cancel-download="job-adjudicator-large"[^>]*>/)[0].includes('disabled'));
+
+    await applyJobs([builtinJobFixture('adjudicator-large', 'failed', { error: '<img src=x onerror=alert(1)>', canRetry: true })]);
+    html = libraryMarkup();
+    assert.match(html, /<button[^>]*data-builtin-download="adjudicator-large"[^>]*>\s*<span>Retry download/);
+    assert.ok(!html.includes('<img'), 'a job error is text');
+
+    // A custom import keeps its own area, with a built-in beside it in its row.
+    await applyJobs([{ id: 'custom-1', name: 'My import', state: 'downloading', received: 10, total: 100, modelId: null, error: null }]);
+    html = libraryMarkup();
+    assert.match(html, /class="model-transfers"[\s\S]*My import/);
+    assert.ok(html.match(/<button[^>]*data-builtin-download="compiler"[^>]*>/)[0].includes('disabled'), 'a custom import holds the same lease');
+
+    library.catalog.transfer = { available: false, reason: 'Model management uses the QVAC runtime.', maxConcurrent: 1, active: null };
+    await applyJobs([]);
+    html = libraryMarkup();
+    assert.ok(html.match(/<button[^>]*data-builtin-download="compiler"[^>]*>/)[0].includes('disabled'));
+    assert.match(html, /menu-note">Model management uses the QVAC runtime\./);
+  } finally { Object.assign(state, saved); leaveLibrary(); await applyJobs([]); }
+});
+
+test('a progress poll writes into the row it finds and leaves the page, its menu and its form alone', async () => {
+  const saved = { ...state };
+  const node = (extra = {}) => { const attrs = {}; return { textContent: '', title: '', attrs, setAttribute: (k, v) => { attrs[k] = String(v); }, ...extra }; };
+  let renders = 0;
+  setLibraryRedraw(() => { renders++; });
+  try {
+    Object.assign(state, { view: 'models', sel: 'library', adjudicator: null, models: null });
+    library.catalog = { models: [], selections: {}, overrides: {}, transfer: openTransfer, builtins: [builtin('adjudicator-large')] };
+    leaveLibrary();
+    await applyJobs([builtinJobFixture('adjudicator-large', 'downloading', { received: 1_000_000_000, total: 5_030_000_000 })]);
+    assert.equal(renders, 1, 'a job appearing is drawn');
+    const text = node(), detail = node(), bar = node(), menu = node({ open: true }), draft = node({ value: 'half-typed model name' });
+    elements.set('builtin-status-text-adjudicator-large', text); elements.set('builtin-status-detail-adjudicator-large', detail);
+    elements.set('builtin-progress-adjudicator-large', bar); elements.set('builtin-menu-adjudicator-large', menu); elements.set('customModelName', draft);
+    renders = 0;
+    await applyJobs([builtinJobFixture('adjudicator-large', 'downloading', { received: 2_110_000_000, total: 5_030_000_000 })]);
+    assert.equal(text.textContent, 'Downloading · 41%'); assert.equal(detail.textContent, '2.11 GB of 5.03 GB');
+    assert.equal(bar.attrs['aria-valuenow'], '2110000000'); assert.equal(bar.attrs['aria-valuemax'], '5030000000');
+    assert.equal(renders, 0, 'bytes do not redraw the page');
+    assert.equal(menu.open, true); assert.equal(draft.value, 'half-typed model name');
+    // Unknown totals move the text and claim no determinate value.
+    await applyJobs([builtinJobFixture('adjudicator-large', 'downloading', { received: 2_500_000_000 })]);
+    assert.equal(text.textContent, 'Downloading'); assert.equal(detail.textContent, '2.50 GB downloaded'); assert.equal(bar.attrs['aria-valuenow'], '2110000000', 'not overwritten with a guess');
+    assert.equal(renders, 0);
+    // What can be done to the row changed, so now it is drawn — once.
+    await applyJobs([builtinJobFixture('adjudicator-large', 'verifying', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })]);
+    assert.equal(renders, 1);
+  } finally { setLibraryRedraw(null); Object.assign(state, saved); for (const id of ['builtin-status-text-adjudicator-large', 'builtin-status-detail-adjudicator-large', 'builtin-progress-adjudicator-large', 'builtin-menu-adjudicator-large', 'customModelName']) elements.delete(id); leaveLibrary(); await applyJobs([]); }
+});
+
+test('a failed status read keeps the last known bytes, says so, and enables nothing', async () => {
+  const saved = { ...state };
+  const originalFetch = globalThis.fetch;
+  try {
+    Object.assign(state, { view: 'activity', adjudicator: null, models: null });
+    library.catalog = { models: [], selections: {}, overrides: {}, transfer: openTransfer, builtins: [builtin('adjudicator-large'), builtin('compiler')] };
+    leaveLibrary();
+    await applyJobs([builtinJobFixture('adjudicator-large', 'downloading', { received: 1_000_000_000, total: 5_030_000_000 })]);
+    const catalog = JSON.stringify(library.catalog);
+    globalThis.fetch = async (path) => String(path).endsWith('/downloads') ? new Response('{"error":"bad gateway"}', { status: 502 }) : new Response(catalog);
+    await loadLibrary();
+    let html = libraryMarkup();
+    assert.match(html, /Downloading · 19%/, 'the last reading is still shown');
+    assert.match(html, /Status unavailable · last read 1\.00 GB of 5\.03 GB/);
+    assert.match(html, /class="download-arrow --stale"/, 'no live pulse for a reading nobody has');
+    assert.ok(!html.includes('Downloaded · built-in'), 'a failed read announces nothing');
+    assert.ok(html.match(/<button[^>]*data-builtin-download="compiler"[^>]*>/)[0].includes('disabled'), 'and enables no conflicting download');
+    // The next successful read reconciles every row.
+    library.catalog.builtins[0] = builtin('adjudicator-large', { onDisk: true, verifiedDownload: true, bytes: 5_030_000_000 });
+    const reconciled = JSON.stringify(library.catalog);
+    globalThis.fetch = async (path) => new Response(String(path).endsWith('/downloads') ? JSON.stringify({ jobs: [builtinJobFixture('adjudicator-large', 'complete', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })] }) : reconciled);
+    await loadLibrary();
+    html = libraryMarkup();
+    assert.match(html, /Downloaded · built-in/); assert.ok(!html.includes('Status unavailable'));
+    assert.ok(!html.match(/<button[^>]*data-builtin-download="compiler"[^>]*>/)[0].includes('disabled'));
+  } finally { globalThis.fetch = originalFetch; Object.assign(state, saved); leaveLibrary(); await applyJobs([]); }
+});
+
+test('Download posts one file to the gateway and nothing to settings; a finished file refreshes the picker too', async () => {
+  const saved = { ...state };
+  const originalFetch = globalThis.fetch;
+  const savedQuery = document.querySelectorAll;
+  const requests = [];
+  try {
+    Object.assign(state, { view: 'activity', canLeaveDemo: false, adjudicator: { model: 'default', choices: [] }, models: null, compiler: null });
+    library.catalog = { models: [], selections: {}, overrides: {}, transfer: openTransfer, builtins: [builtin('adjudicator-large')] };
+    leaveLibrary(); await applyJobs([]);
+    const button = { dataset: { builtinDownload: 'adjudicator-large' }, closest: () => null };
+    document.querySelectorAll = (selector) => selector === '[data-builtin-download]' ? [button] : [];
+    globalThis.fetch = async (path, init = {}) => {
+      requests.push(`${init.method ?? 'GET'} ${path}`);
+      if (String(path).endsWith('/builtins/adjudicator-large/download')) { assert.equal(init.body, '{}'); return new Response(JSON.stringify({ job: builtinJobFixture('adjudicator-large', 'connecting'), reused: false }), { status: 202 }); }
+      if (String(path).endsWith('/downloads')) return new Response(JSON.stringify({ jobs: [builtinJobFixture('adjudicator-large', 'connecting')] }));
+      if (path === '/api/settings/adjudicator') return new Response(JSON.stringify({ model: 'default', choices: [{ id: 'large', onDisk: true }] }));
+      return new Response(JSON.stringify(library.catalog));
+    };
+    bindLibrary(async () => {});
+    const clicks = [button.onclick(), button.onclick()];
+    await Promise.all(clicks);
+    assert.equal(requests.filter((r) => r.startsWith('POST')).length, 1, 'a double click is one request');
+    assert.deepEqual(requests.filter((r) => r.startsWith('POST')), ['POST /api/settings/models/builtins/adjudicator-large/download']);
+    assert.ok(!requests.some((r) => /adjudicator$|leave-demo|compiler$/.test(r) && !r.startsWith('GET')), 'no selection, no restart');
+    assert.match(libraryMarkup(), /Connecting…/);
+
+    requests.length = 0;
+    await applyJobs([builtinJobFixture('adjudicator-large', 'complete', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })]);
+    for (const read of ['/api/settings/models', '/api/settings/adjudicator', '/api/models']) assert.ok(requests.includes(`GET ${read}`), `${read} is refreshed when a file lands`);
+    assert.equal(state.adjudicator.choices[0].onDisk, true, 'the picker no longer says download required');
+    requests.length = 0;
+    await applyJobs([builtinJobFixture('adjudicator-large', 'complete', { received: 5_030_000_000, total: 5_030_000_000, canCancel: false })]);
+    assert.deepEqual(requests, [], 'and only once');
+  } finally { globalThis.fetch = originalFetch; document.querySelectorAll = savedQuery; Object.assign(state, saved); leaveLibrary(); await applyJobs([]); }
+});
+
 test('native guards are selectable in Models and listed with their own formats', () => {
   const saved = { ...state };
   try {
@@ -1277,22 +1492,23 @@ test('native guards are selectable in Models and listed with their own formats',
       compiler: compilerConfiguration({ setupRequired: false }), company: { roles: [], employees: [] },
       adjudicator: { model: 'default', choices: [
         { id: 'shieldstral', label: 'Shieldstral 1.0 3B', filename: 'Shieldstral-1.0-3B-Q6_K.gguf', format: 'shieldstral', approxMB: 2822, onDisk: true },
-        { id: 'granite-guardian', label: 'Granite Guardian 4.1 8B', filename: 'granite-guardian-4.1-8b-Q6_K.gguf', format: 'granite-guardian', approxMB: 6880, onDisk: false }
+        { id: 'granite-guardian', builtinId: 'adjudicator-granite-guardian', label: 'Granite Guardian 4.1 8B', filename: 'granite-guardian-4.1-8b-Q6_K.gguf', format: 'granite-guardian', approxMB: 6880, onDisk: false }
       ] }
     });
-    library.catalog = { models: [], selections: {}, overrides: {} };
+    library.catalog = { models: [], selections: {}, overrides: {}, builtins: [builtin('adjudicator-shieldstral', { onDisk: true, verifiedDownload: true }), builtin('adjudicator-granite-guardian')], transfer: { available: true, reason: null, maxConcurrent: 1, active: null } };
     const picker = VIEWS.models.body();
-    for (const id of ['shieldstral', 'granite-guardian']) {
-      assert.match(picker, new RegExp(`data-judge-builtin="${id}"`));
-      assert.ok(!picker.match(new RegExp(`<button[^>]*data-judge-builtin="${id}"[^>]*>`))?.[0].includes('disabled'));
-    }
-    assert.match(picker, /Granite Guardian 4.1 8B · download required/);
+    assert.ok(!picker.match(/<button[^>]*data-judge-builtin="shieldstral"[^>]*>/)?.[0].includes('disabled'));
+    // A missing seat is a link to its row. Choosing it used to save a pending
+    // selection so that a desktop installer would fetch it.
+    assert.ok(!picker.includes('data-judge-builtin="granite-guardian"'));
+    assert.match(picker, /data-q="model=adjudicator-granite-guardian"[^>]*>\s*<span>Granite Guardian 4.1 8B · download required/);
     const table = libraryMarkup();
     assert.match(table, /Shieldstral 1.0 3B/);
     assert.match(table, /Granite Guardian 4.1 8B/);
     assert.match(table, />shieldstral<\/span>/);
     assert.match(table, />granite-guardian<\/span>/);
-    assert.match(table, /Select for download/);
+    assert.ok(!table.includes('Select for download') && !table.includes('js-get-models'));
+    assert.match(table, /data-builtin-download="adjudicator-granite-guardian"[^>]*>\s*<span>Download · ~6\.88 GB/);
   } finally { Object.assign(state, saved); }
 });
 

@@ -4,6 +4,11 @@ import { feedback, pageHead, statusText } from './ui.js';
 import { modelLabel } from './format.js';
 import { VIEWS } from './views.js';
 
+/** Jobs whose default weights have a Library row. The detector and embedder do
+ * not: they still come from setup, and this page says so rather than implying
+ * a judge download made the gateway ready. */
+const LIBRARY_ROLES = { adjudicator: 'adjudicator', compiler: 'compiler' };
+
 function engineStatus(m) {
   if (!m) return { tone: 'bad', title: 'The gateway is not answering.', detail: 'Return to Models and refresh the connection.' };
   if (m.mock) return { tone: 'warn', title: 'Demo mode is active.', detail: 'A stand-in is answering in place of the models. These verdicts do not measure the real analyzer.' };
@@ -29,10 +34,10 @@ ${esc(m.runtime.detail)}</pre></section>` : ''}
              is about. -->
         ${m ? `<div class="table runtime-table" role="table" aria-label="Model files">
           <div class="thead" role="row"><span>Job</span><span>Model</span><span>On disk</span></div>
-          ${m.models.map((model) => `<div class="trow" role="row"><span>${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="mono cell-clip">${esc(modelLabel(model.name))}</span><span>${model.onDisk ? statusText(`On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}`, 'allow') : `<span class="cell-muted">${model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span>`}</span></div>`).join('')}
+          ${m.models.map((model) => `<div class="trow" role="row"><span>${esc(model.role === 'adjudicator' ? 'analyzer' : model.role)}</span><span class="mono cell-clip">${esc(modelLabel(model.name))}</span><span>${model.onDisk ? statusText(`On disk${model.bytes ? ` · ${(model.bytes / 1e9).toFixed(2)} GB` : ''}`, 'allow') : `<span class="cell-muted">${model.fetchable === false ? 'Optional · not installed' : 'Not downloaded'}</span>${LIBRARY_ROLES[model.role] ? ` <button type="button" class="linkish" data-go="models" data-sel="library" data-q="model=${LIBRARY_ROLES[model.role]}">Download in Library</button>` : ''}`}</span></div>`).join('')}
         </div>` : '<p class="section-lede">Model inventory is unavailable. Refresh Models to try again.</p>'}
         <p class="table-foot">Text documents are read directly. Scans and images use the document reader’s offline OCR; this inventory lists the guard’s QVAC models.</p>
-        ${m?.models.some((model) => !model.onDisk && model.fetchable !== false) ? state.canLeaveDemo ? '<div><button type="button" class="btn js-get-models">Download missing models</button></div>' : '<p class="table-foot">Run <code>pnpm run setup</code> on the gateway to download missing built-in models.</p>' : ''}
+        ${m?.models.some((model) => !model.onDisk && model.fetchable !== false && !LIBRARY_ROLES[model.role]) ? state.canLeaveDemo ? '<div><button type="button" class="btn js-get-models">Set up supporting models</button></div>' : '<p class="table-foot">Supporting models are not in the Library. Run <code>pnpm run setup</code> on the gateway to download them.</p>' : ''}
       </section>
     </div>
   </div>`;

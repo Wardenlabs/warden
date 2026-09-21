@@ -26,6 +26,8 @@ const catalogSchema = z.object({ version: z.literal(1), models: z.array(modelEnt
 export function catalogPath(): string {
   return process.env['WARDEN_MODEL_CATALOG_PATH'] ?? join(dirname(process.env['WARDEN_SETTINGS_PATH'] ?? 'data/settings.json'), 'models.json');
 }
+/** The directory every writer of weights shares, and so the identity of the transfer lease. */
+export function modelsRoot(): string { return resolve(process.env['WARDEN_MODELS_DIR'] ?? 'models'); }
 export function managedModelsDir(): string {
   return resolve(process.env['WARDEN_MODELS_DIR'] ?? 'models', 'custom');
 }
