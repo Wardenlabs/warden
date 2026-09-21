@@ -65,3 +65,14 @@ Las decisiones principales son:
 - La elegancia no se compra con texto ilegible, controles diminutos ni animaciones obligatorias.
 
 No se promete que esta dirección maximice conversiones. La decisión final de gusto corresponde al usuario; después de publicarla, la medición existente puede ayudar a evaluar comprensión y descargas.
+
+## Segunda revisión: efectos y continuidad
+
+El usuario pidió más efecto visual y extendió la corrección a How it works. Se inspeccionaron además estas páginas oficiales en navegador:
+
+- [Apple · MacBook Pro](https://www.apple.com/macbook-pro/): la escena de apertura usa dos objetos metálicos de gran escala y luz rasante para dibujar sus bordes. Se toma el criterio de iluminación y material, no su tipografía de campaña ni sus colores.
+- [Reflect](https://reflect.app/): la apertura conecta un fenómeno luminoso con una vista del producto. En la demostración de IA, un botón transforma el contenido de la escena. Se toma la relación entre acción y resultado; su violeta, las retículas y su densidad no forman parte de Warden.
+
+Las webs de Nothing y Ophir no pudieron inspeccionarse con la búsqueda inicial; no se usan como evidencia visual de esta revisión.
+
+Aplicación concreta: iluminación ambiental neutra detrás del escudo, respuesta del metal al puntero en toda la apertura, un recorrido que se detiene en la regla privada o continúa con la pública, iconos horizontales SVG y una guía sobre blanco con superficies de producto negras. La animación es finita y se cancela fuera de pantalla, en pestañas ocultas o con movimiento reducido. No se copian recursos de las referencias.

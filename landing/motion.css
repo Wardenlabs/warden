@@ -1,0 +1,51 @@
+/* Light reveals the mark. A request meets the boundary. No ambient loops. */
+.link-arrow { display: inline-block; width: 1.15rem; height: 1.15rem; flex: none; transition: transform 220ms var(--warden-ease); }
+a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: translateX(3px); }
+.hero-zone { isolation: isolate; overflow: clip; }
+.hero-zone::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 30% 36%, #202020 0%, #101010 28%, transparent 65%); }
+.hero-art { isolation: isolate; }
+.hero-art::after { content: ""; position: absolute; inset: 94% 24% -1%; z-index: -1; background: radial-gradient(ellipse, #252525, transparent 68%); transform: scaleY(.3); }
+.hero-download, .dl > a:first-child { position: relative; overflow: hidden; }
+.hero-download::after, .dl > a:first-child::after { content: ""; pointer-events: none; position: absolute; inset: -70% -25%; background: linear-gradient(110deg, transparent 38%, #fff9 50%, transparent 62%); transform: translateX(-110%); }
+.hero-download:hover::after, .dl > a:first-child:hover::after { animation: button-light 650ms ease-out; }
+@keyframes button-light { to { transform: translateX(110%); } }
+
+.proof-heading > a { gap: .85rem; color: var(--warden-ink); }
+.proof-heading .link-arrow { width: 1.5rem; height: 1.5rem; }
+.policy-example { position: relative; }
+.example-rule { padding-block: 1.65rem; }
+.example-case { padding-block: 1.75rem 2rem; }
+.example-request { min-height: 0; }
+.example-decision { margin-top: .25rem; }
+.signal-map { display: block; width: 100%; height: 84px; margin: .75rem 0; overflow: visible; }
+.signal-map path, .signal-map circle { vector-effect: non-scaling-stroke; }
+.signal-track { stroke: #363636; stroke-width: 1; }
+.signal-boundary { stroke: #d8d8d8; stroke-width: 1.5; }
+.signal-in, .signal-out { stroke: #e5e5e5; stroke-width: 1; }
+.signal-stop .signal-out { opacity: .06; }
+.signal-pass .signal-boundary { stroke-dasharray: 3 5; opacity: .5; }
+.signal-packet { stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-dasharray: .055 .945; stroke-dashoffset: -.945; opacity: 0; }
+.signal-impact { stroke: #fff; stroke-width: 1; opacity: 0; transform-origin: 320px 42px; }
+.motion-visible .signal-packet { animation: request-travel 1250ms cubic-bezier(.4,0,.2,1) both; }
+.motion-visible .signal-stop .signal-impact { animation: boundary-impact 650ms 1100ms ease-out both; }
+.motion-visible .signal-pass .signal-out { animation: route-open 1400ms ease-out both; }
+.motion-visible .example-decision > svg { animation: decision-mark 550ms 650ms var(--warden-ease) both; }
+@keyframes request-travel { 0% { stroke-dashoffset: .055; opacity: 0; } 12%, 88% { opacity: 1; } 100% { stroke-dashoffset: -.945; opacity: 0; } }
+@keyframes boundary-impact { 0% { opacity: .8; transform: scale(.3); } 100% { opacity: 0; transform: scale(2); } }
+@keyframes route-open { 0%, 45% { opacity: .1; } 100% { opacity: 1; } }
+@keyframes decision-mark { from { transform: scale(.8); opacity: .3; } to { transform: none; opacity: 1; } }
+[data-story-replay] > svg { width: 1rem; height: 1rem; }
+.guide-page .tools > .signal-map { width: calc(100% - 3rem); margin: .5rem 1.5rem 0; height: 64px; }
+.guide-page .tools .panes pre { min-height: 15rem; padding-top: .5rem; }
+@media (max-width: 47.999rem) {
+  .example-rule { padding-block: 1.5rem; }
+  .signal-map { height: 64px; margin-block: 1rem; }
+  .example-case { padding-block: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-arrow { transition: none; }
+  a:hover > .link-arrow, a:focus-visible > .link-arrow { transform: none; }
+  .hero-download::after, .dl > a:first-child::after { display: none; }
+  .motion-visible .signal-packet, .motion-visible .signal-impact, .motion-visible .signal-out,
+  .motion-visible .example-decision > svg { animation: none; }
+}

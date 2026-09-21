@@ -47,3 +47,7 @@ El sonido puede acompañar la entrada de luz y el momento de bloqueo con dos ace
 ## Antes de producir
 
 Obtener devolución sobre esta landing y ajustar el sistema, elegir duración/canal, confirmar el texto del cierre y luego cargar la skill de producción de video. La calidad del video se verifica en su exportación real, no solo en capturas de la composición.
+
+## Motivo compartido con la web
+
+Una línea representa el recorrido del pedido. Una frontera vertical lo detiene cuando la regla bloquea; una frontera discontinua permite continuar el ejemplo público. Usar este motivo en el video como explicación de la decisión, con el resultado escrito y el ejemplo identificado. La página lo anima en 1,25 segundos; ese tiempo es una decisión de montaje, no una promesa de latencia.

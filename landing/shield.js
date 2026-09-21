@@ -8,7 +8,7 @@ export function mountShield(container) {
   const fallback = container?.querySelector('img');
   if (!canvas || !fallback) throw new TypeError('The Warden shield needs a canvas and fallback image.');
 
-  const surface = container.closest('.hero-art') || container.closest('.closing-body') || container;
+  const surface = container.closest('.hero') || container.closest('.closing-body') || container;
   const originalCanvasVisibility = canvas.style.visibility;
   const originalImageVisibility = fallback.style.visibility;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');

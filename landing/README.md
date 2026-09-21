@@ -47,3 +47,7 @@ Preserve production host allowlists, DNT handling, download asset allowlists and
 Claims come from [PRODUCT.md](../PRODUCT.md), [SECURITY.md](../SECURITY.md) and the implementation. Only connected requests are checked. Local evaluation does not mean every compiler or destination model runs locally. The visual design does not establish universal protection, adoption or measured performance.
 
 Installer targets must match actual assets in the [latest release](https://github.com/Wardenlabs/warden/releases/latest). The release version remains in structured metadata and the download footer.
+
+## Shared motion and detailed guide
+
+`motion.css` and `surface-motion.js` enhance both pages with finite request trajectories, horizontal SVG link feedback and visibility/preference handling. `guide.css` brings the full tour onto the same neutral palette and shared controls. Native radios and written outcomes work independently of animation; timings are illustrative. Test the visibility/reduced-motion guard with `node --test scripts/surface-motion.test.mjs`.

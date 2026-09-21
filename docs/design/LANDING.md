@@ -43,3 +43,11 @@ Redacción de políticas, revisión y activación, negativas dentro de las herra
 ## Verificación
 
 Revisar escritorio, 390px y 320px; teclado y selección de ejemplos; reproducción/cierre del video; enlaces de descarga; controles de la guía; ausencia de errores de carga. Respetar movimiento reducido y el fallback del escudo.
+
+## Revisión de movimiento y guía
+
+La portada usa ahora flechas horizontales SVG. Se eliminó el segundo enlace redundante debajo del ejemplo. La trayectoria del pedido da forma visual a la diferencia entre Blocked y Allowed: línea detenida frente a línea completa, con resultado escrito siempre disponible. No es una evaluación real ni una medida de latencia.
+
+How it works comparte tokens, botones y pie con la portada. Su fondo claro, encabezado oscuro y paneles negros mantienen el contraste. Se conservan revisión, activación, selección de herramientas, explicación de reglas, decisiones y límites de uso. El control de replay conserva su etiqueta accesible y usa un icono SVG.
+
+La portada y la guía mantienen desplazamiento nativo. En pantallas amplias la guía conserva su secuencia vinculada al scroll cuando cabe; el móvil usa flujo normal. No se añaden bucles ambientales ni dependencias.

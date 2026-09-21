@@ -224,6 +224,21 @@
         "name": "The Neutral Verdict Rule",
         "body": "Blocked and Allowed use words and distinct icons; neither needs a red or green brand accent.",
         "section": "colors"
+      },
+      {
+        "name": "Directional links",
+        "body": "Use horizontal 24-unit SVG arrows with 1.5-unit round strokes and 3px hover/focus movement; no diagonal Unicode arrows. Reduced motion removes displacement.",
+        "section": "components"
+      },
+      {
+        "name": "Request trajectory",
+        "body": "The 1,250ms illustrative stroke stops at a solid boundary for Blocked or continues through a dashed boundary for Allowed. Outcomes stay readable. Cancel effects offscreen, in hidden tabs and with reduced motion; this is not measured latency.",
+        "section": "components"
+      },
+      {
+        "name": "Detailed guide continuity",
+        "body": "How it works uses the shared neutral tokens, download controls and horizontal arrows. A light canvas holds dark product panels. Keep review, activation, tool selection and native keyboard behavior.",
+        "section": "layout"
       }
     ],
     "dos": [

@@ -87,7 +87,7 @@ Warden combines a restrained interface with one substantial object: its official
 - Official geometry, realistic metallic depth, flat interface surfaces.
 - Short copy, visible actions, native controls, explicit illustrative examples.
 
-The effective homepage cascade is [foundation-v2.css](landing/foundation-v2.css), then [design-system.css](landing/design-system.css), then [landing.css](landing/landing.css). These tokens describe that implementation. [Design notes](docs/design/README.md), [reference research](docs/design/RESEARCH.md), [landing brief](docs/design/LANDING.md) and [video direction](docs/design/VIDEO-DIRECTION.md) carry the supporting rationale and surface-specific decisions. The detailed original journey remains at [how-it-works.html](landing/how-it-works.html), with its own existing styles. Product truth comes from [PRODUCT.md](PRODUCT.md); official mark authority comes from [brand/README.md](brand/README.md).
+The effective homepage cascade is [foundation-v2.css](landing/foundation-v2.css), then [design-system.css](landing/design-system.css), then [landing.css](landing/landing.css). These tokens describe that implementation. [Design notes](docs/design/README.md), [reference research](docs/design/RESEARCH.md), [landing brief](docs/design/LANDING.md) and [video direction](docs/design/VIDEO-DIRECTION.md) carry the supporting rationale and surface-specific decisions. The detailed journey at [how-it-works.html](landing/how-it-works.html) now shares the homepage tokens, navigation scale and download controls. Its light canvas and black product panels are defined by guide.css over the existing functional scene styles. Both pages load motion.css and the isolated surface-motion.js controller. Product truth comes from [PRODUCT.md](PRODUCT.md); official mark authority comes from [brand/README.md](brand/README.md).
 
 ## Colors
 
@@ -119,11 +119,11 @@ Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leadin
 
 ## Elevation & Depth
 
-The interface is flat: background contrast, spacing and hairlines establish structure. The exception is the inherited film dialog shadow (`0 2rem 6rem rgb(0 0 0 / 0.62)`). Do not add card shadows to the proof or download controls.
+The interface is flat: background contrast, spacing and hairlines establish structure. The hero includes a restrained neutral studio light field and a grounding reflection beneath the metal, without ambient animation. The exception is the inherited film dialog shadow (`0 2rem 6rem rgb(0 0 0 / 0.62)`). Do not add card shadows to the proof or download controls.
 
 The official shield supplies material depth. [official-shield.js](landing/assets/3d/official-shield.js) extrudes the canonical vector contours, preserving the ring opening and internal mark, with neutral metallic faces and reflected white studio lights. It is real geometry, not a generic shield or an approximate letter. The renderer uses 64 curve segments, 16 bevel segments and crease-aware shared normals to remove faceted reflections while preserving sharp corners. The canvas supersamples at 2–3× CSS size (1.5× device pixel ratio, capped at 3×), including Retina screens.
 
-[shield.js](landing/shield.js) runs a finite 4.8-second entrance, then settles. Fine pointers cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; a PNG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
+[shield.js](landing/shield.js) runs a finite 4.8-second entrance, then settles. Fine pointers anywhere within the hero cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; a PNG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
 
 ## Shapes
 
@@ -139,6 +139,10 @@ The official mark's outline and proportions are binding. Primary download contro
 
 **Policy example.** One black fieldset with a descriptive legend, a rule, Active status, native radios, request text and outcome. The two radio labels have 48px targets and a thin selected underline. Arrow keys use native radio behavior; the focused radio places a visible outline on its label. CSS switches the matching content even without JavaScript. The panel is explicitly an illustrative example, not a live policy editor. “For connected tools” stays visible nearby.
 
+**Directional links.** Use the shared 24-unit horizontal SVG arrow with 1.5-unit round strokes. It moves 3px on hover/focus. Back navigation reverses the same icon. Do not use diagonal Unicode arrows.
+
+**Request trajectory.** A finite 1,250ms SVG stroke travels toward the rule boundary. Blocked stops at the solid boundary with a 650ms impact ring; Allowed continues through a dashed boundary. Written outcomes stay immediately readable. Intersection observation starts the effect at 25% visibility; leaving the viewport, hiding the tab or enabling reduced motion removes animation. Native radio changes replay the selected case. The duration is illustrative, not measured product latency.
+
 **Focus and motion.** Use a 2px focus outline offset by 4px, white on dark and dark on light. Example selection transitions in 180ms with `cubic-bezier(.16, 1, .3, 1)`; inherited buttons/navigation use 160ms. Reduced motion disables smooth scrolling and effectively removes CSS transitions. The skip link and keyboard access remain functional. Do not conceal meaningful content behind animation.
 
 ## Do's and Don'ts
@@ -148,7 +152,7 @@ The official mark's outline and proportions are binding. Primary download contro
 - **Do** keep a short promise, a clear action and concrete evidence easy to find.
 - **Do** preserve native controls, visible keyboard focus and readable fallback content.
 - **Do** distinguish illustrative requests from live product behavior and retain connection qualifiers.
-- **Do** treat this implementation as a proposal until the user gives taste feedback.
+- **Do** carry new user feedback into both the homepage and the detailed guide.
 
 ### Don't:
 - **Don't** add chromatic accents or replace the official mark with a generic shield.

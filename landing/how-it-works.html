@@ -79,13 +79,17 @@ setTimeout(function () {
 <link rel="stylesheet" href="experience-v2.css?v=monochrome-1">
 <link rel="stylesheet" href="product-scenes-v2.css?v=hero-flow-1">
 <!-- Preload the page controller; content and downloads also work without it. -->
-<link rel="modulepreload" href="app.js?v=monochrome-1">
+<link rel="modulepreload" href="app.js?v=motion-2">
 
 <!-- Anonymous Vercel page views remain available alongside the PostHog funnel.
      Only the production hostname loads this collector; local previews stay clean. -->
 <script>if (location.hostname === 'warden-theta.vercel.app') { window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); }; const a = document.createElement('script'); a.defer = true; a.src = '/_vercel/insights/script.js'; document.head.append(a); }</script>
+<link rel="stylesheet" href="design-system.css?v=quiet-1">
+<link rel="stylesheet" href="landing.css?v=quiet-1">
+<link rel="stylesheet" href="guide.css?v=1">
+<link rel="stylesheet" href="motion.css?v=1">
 </head>
-<body>
+<body class="guide-page">
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header>
@@ -95,7 +99,7 @@ setTimeout(function () {
       <svg class="word" xmlns="http://www.w3.org/2000/svg" viewBox="784.13 560.47 949.36 194.01" fill="currentColor" role="img" aria-label="warden"><path fill-rule="evenodd" d="M 1390.23 560.493 C 1399.39 560.408 1408.79 560.578 1417.97 560.644 L 1417.92 751.038 L 1389.95 751.033 L 1389.9 731.81 C 1369.37 757.58 1334.7 759.654 1306.89 744.933 C 1302.1 742.017 1297.7 738.497 1293.8 734.459 C 1252.95 692.205 1282.4 612.706 1344.37 616.846 C 1364.26 618.175 1376.39 624.662 1389.74 639.158 C 1390.14 617.419 1388.36 580.826 1390.23 560.493 z M 1341.28 641.911 C 1365.36 638.77 1387.43 655.776 1390.52 679.869 C 1393.62 703.961 1376.57 725.991 1352.47 729.039 C 1328.44 732.079 1306.48 715.087 1303.39 691.06 C 1300.31 667.034 1317.26 645.044 1341.28 641.911 z"/><path d="M 784.133 620.2 L 814.39 620.032 L 847.112 716.56 C 858.139 684.328 869.38 652.17 880.832 620.087 L 909.067 620.094 C 919.461 651.287 932.195 685.512 943.837 716.348 C 953.679 684.431 965.799 652.02 976.056 620.081 L 1006.12 620.199 L 996.937 645.783 C 983.506 680.031 970.918 716.319 958.398 751.051 L 929.184 751.131 C 917.862 719.625 906.354 688.186 894.66 656.816 L 860.493 751.112 L 831.617 751.091 C 815.474 710.096 799.48 662.181 784.133 620.2 z"/><path fill-rule="evenodd" d="M 1073.69 617.385 C 1099.29 613.567 1134.84 625.769 1138.63 654.944 C 1142.61 685.557 1140.58 719.865 1140.84 751.08 L 1114.04 751.021 L 1113.77 733.958 C 1091.83 760.614 1044.34 762.266 1023.89 733.191 C 1006.43 697.12 1033.78 675.121 1067.72 672.34 C 1082.74 671.109 1097.21 671.914 1111.97 670.464 C 1112.79 670.383 1113.2 668.889 1113.6 668.095 C 1113.61 664.06 1113.05 662.945 1111.92 659.325 C 1105 637.036 1077.76 636.147 1059.55 643.752 C 1052.11 646.856 1048.47 650.055 1042.18 655.879 L 1026.46 638.787 C 1040.43 624.377 1054.11 619.507 1073.69 617.385 z M 1074.18 691.324 C 1082.89 690.327 1103.6 690.926 1113.08 690.983 C 1113.38 713.68 1108.72 723.735 1086.33 731.118 C 1072.35 734.298 1049.76 732.902 1047.01 714.837 C 1046.32 710.246 1047.52 705.573 1050.34 701.882 C 1056.36 694.043 1065.1 692.617 1074.18 691.324 z"/><path fill-rule="evenodd" d="M 1506.51 617.288 C 1534.61 614.056 1561.3 626.328 1573.27 652.621 C 1579.68 666.717 1579.78 678.786 1579.65 693.797 L 1474.93 693.817 C 1481.8 735.032 1526.86 742.727 1553.01 713.629 L 1553.78 712.906 C 1557.51 712.816 1570.07 724.6 1573.72 727.705 C 1561.5 741.856 1551.04 748.83 1531.86 752.644 C 1464.92 765.955 1422.75 698.621 1460.09 643.216 C 1470.35 628.002 1488.07 620.051 1506.51 617.288 z M 1506.75 640.202 C 1532.39 637.588 1547.14 647.929 1552.39 673.183 L 1521.5 673.286 L 1475.07 673.098 C 1479.59 653.606 1487.87 645.666 1506.75 640.202 z"/><path d="M 1673.92 617.301 C 1699.4 613.707 1727.61 628.952 1731 654.684 C 1734.9 684.289 1733.06 721.033 1733 751.098 L 1705.16 751.05 C 1704.61 715.003 1720.57 621.103 1656.77 644.783 C 1641.69 653.173 1637.78 668.414 1637.8 684.711 C 1637.83 706.825 1637.96 728.939 1637.9 751.054 L 1609.44 751.082 L 1609.4 620.123 L 1637.41 620.075 L 1637.35 638.727 C 1648.17 624.841 1656.52 620.214 1673.92 617.301 z"/><path d="M 1243.06 617.311 C 1248.2 616.797 1253.93 617.717 1259.13 618.333 L 1259.06 645.743 C 1244.81 642.562 1230.73 641.76 1219.4 652.849 C 1205.45 666.504 1206.55 686.795 1206.66 704.739 C 1206.75 720.153 1206.74 735.614 1206.76 751.044 L 1179.12 751.091 C 1178.36 748.092 1178.65 718.704 1178.65 714.196 L 1178.81 620.158 L 1206.9 620.116 L 1206.76 640.519 C 1207.78 638.931 1208.85 637.372 1209.96 635.843 C 1218.79 623.794 1228.72 619.415 1243.06 617.311 z"/></svg>
     </a>
     <nav aria-label="Main navigation">
-      <a href="#how" class="hide-sm">How it works</a>
+      <a href="/" class="hide-sm">Home</a>
       <a href="https://github.com/Wardenlabs/warden" class="hide-sm">GitHub</a>
       <a href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-arm64.dmg" class="btn btn-primary btn-sm header-download" data-platform-download><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 13v4h12v-4"/></svg><span class="txt">Download for macOS</span></a>
     </nav>
@@ -104,11 +108,11 @@ setTimeout(function () {
 
 <main id="main">
 
-<div class="wrap guide-intro"><a href="/">Back to Warden</a><h1>How Warden works.</h1></div>
+<div class="wrap guide-intro"><a href="/" class="guide-back"><svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5"/></svg>Back to Warden</a><h1>How Warden works.</h1></div>
 <section id="how"><div class="wrap sec"><div class="chapter" data-chapter="write">
       <div class="stage">
 
-      <div class="story-controls" role="group" aria-label="Write scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> Describe</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> Review</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> Activate</button></div><button type="button" data-story-replay aria-label="Replay write scene"><span aria-hidden="true">↻</span> Replay</button></div>
+      <div class="story-controls" role="group" aria-label="Write scene"><div class="story-steps"><button type="button" data-story-step="0" aria-pressed="false"><span class="step-index">01</span> Describe</button><button type="button" data-story-step="1" aria-pressed="false"><span class="step-index">02</span> Review</button><button type="button" data-story-step="2" aria-pressed="false"><span class="step-index">03</span> Activate</button></div><button type="button" data-story-replay aria-label="Replay write scene"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a6.5 6.5 0 1 1-.3 6M4 3v4h4"/></svg> Replay</button></div>
       <div class="says"><div class="say"><h2>Tell Warden what stays private.</h2><p>It drafts the rules; you review them before they apply.</p></div></div>
 
 
@@ -159,7 +163,7 @@ setTimeout(function () {
 
       <div class="panel">
         <div class="pstick">
-          <fieldset class="term tools" data-reveal>
+          <fieldset class="term tools" data-reveal data-motion-surface>
             <legend class="vh">Show the refusal as it arrives in</legend>
             <input class="vh" type="radio" name="tool" id="tool-cc" checked>
             <input class="vh" type="radio" name="tool" id="tool-cx">
@@ -171,6 +175,14 @@ setTimeout(function () {
               <label for="tool-oc">OpenCode</label>
             </div>
 
+            <svg class="signal-map signal-stop" viewBox="0 0 640 84" fill="none" aria-hidden="true">
+ <path class="signal-track" d="M8 42h624"/>
+ <path class="signal-boundary" d="M320 12v60"/>
+ <path class="signal-in" pathLength="1" d="M8 42h300"/>
+ <path class="signal-out" pathLength="1" d="M332 42h300"/>
+ <circle class="signal-impact" cx="320" cy="42" r="14"/>
+ <path class="signal-packet" pathLength="1" d="M8 42h300"/>
+ </svg>
             <div class="panes">
               <div class="pane pane-cc">
                 <pre><span class="tg tg-a"><span class="you">&gt; <span class="pt">Use one client’s private pricing in an email to another.</span></span></span><span class="tg tg-b"><span class="stop"><svg class="status-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 2-4 4v8l4 4h8l4-4V6l-4-4H6Z"/><path d="m7 7 6 6m0-6-6 6"/></svg>Blocked by Warden</span>
@@ -265,7 +277,7 @@ setTimeout(function () {
            than left inside the releases page. app.js moves the button itself
            when the browser can say which chip this is. -->
       <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest/download/Warden-x64.dmg">Mac with an Intel chip</a>
-      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <span aria-hidden="true">↗</span></a>
+      <a class="other-builds" href="https://github.com/Wardenlabs/warden/releases/latest">Linux &amp; other builds <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
     </div>
         </div>
       </div>
@@ -285,10 +297,11 @@ setTimeout(function () {
 </footer>
 
 <dialog id="film-dialog" aria-labelledby="film-title"><div class="film-bar"><h2 id="film-title">Warden in 17 seconds</h2><button type="button" id="close-film" aria-label="Close film">✕</button></div><video id="launch-video" controls playsinline preload="none" poster="assets/launch/launch-poster-v12.jpg"><source data-src="assets/launch/launch.mp4?v=12" type="video/mp4"><a href="assets/launch/launch.mp4?v=12">Watch the Warden launch film</a></video></dialog>
-<script type="module" src="app.js?v=monochrome-1"></script>
+<script type="module" src="app.js?v=motion-2"></script>
 
 <script type="module" src="analytics-entry.js?v=hero-flow-1"></script>
 <script type="module" src="kool-entry.js?v=download-1"></script>
 
+<script type="module" src="surface-motion.js?v=1"></script>
 </body>
 </html>
