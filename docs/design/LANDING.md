@@ -51,3 +51,11 @@ La portada usa ahora flechas horizontales SVG. Se eliminó el segundo enlace red
 How it works comparte tokens, botones y pie con la portada. Su fondo negro, textos claros y paneles carbón mantienen la continuidad con la portada. Se conservan revisión, activación, selección de herramientas, explicación de reglas, decisiones y límites de uso. El control de replay conserva su etiqueta accesible y usa un icono SVG.
 
 La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamente con acciones explícitas, igual en escritorio y móvil. El escudo conserva un balanceo lento mientras es visible; no hay animaciones de fondo ni dependencias nuevas.
+
+## Alineación de la guía y cierre (21 septiembre 2026)
+
+- La guía tiene un contenedor de 64rem, con un único eje para introducción, títulos y paneles. El margen interior pasa de 20px a 32px; ningún capítulo vuelve a una composición lateral.
+- Describe, Review, Activate y Reset pertenecen a la cabecera del mismo panel. El paso seleccionado usa una superficie gris; la acción principal conserva el blanco. La navegación es explícita y el estado sigue anunciado a lectores de pantalla.
+- Separación entre capítulos: 64px en escritorio, 48px en móvil. El bloque de límites sigue exactamente el mismo ritmo.
+- El footer tiene dos grupos equilibrados: lockup oficial con versión, y plataforma principal con otras descargas. La marca conserva proporciones; el nombre de la plataforma dirige la acción. Debajo queda una línea independiente de enlaces y licencia.
+- En móvil los grupos se apilan con 48px de separación. Enlaces y botones mantienen al menos 44px de alto. No agregar párrafos de apoyo, etiquetas de ejemplo ni nuevas animaciones para llenar el espacio.

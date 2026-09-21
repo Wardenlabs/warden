@@ -5,7 +5,7 @@
 .guide-page header nav > a:not(.btn) { color: var(--warden-muted-dark); }
 .guide-page .header-download { background: var(--warden-white); color: var(--warden-ink); border: 0; border-radius: 999px; }
 .guide-page header .bar { border-bottom: 1px solid var(--warden-line-dark); }
-.guide-intro { max-width: 52rem; padding-top: 6rem; padding-bottom: 2rem; }
+.guide-intro { padding-top: calc(var(--header-height) + 3rem); padding-bottom: 3rem; }
 .guide-intro h1 { max-width: 18ch; margin-top: 1rem; font-size: clamp(2.25rem, 5vw, 4rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.08; }
 .guide-back { display: inline-flex; align-items: center; gap: .75rem; min-height: 44px; font-size: .8125rem; color: var(--warden-muted-dark); text-decoration: none; }
 .guide-back > .link-arrow { rotate: 180deg; }
@@ -14,14 +14,11 @@
 .guide-page .say p { color: var(--warden-muted-dark); }
 .guide-page .chapter + .chapter { border-color: var(--warden-line-dark); }
 .guide-page .story-steps button { color: var(--warden-muted-dark); }
-.guide-page .story-steps button[aria-pressed="true"] { color: var(--warden-white); }
-.guide-page .story-steps button::after { background: var(--warden-white); }
 .guide-page [data-story-replay] { color: var(--warden-muted-dark); }
 .guide-page .panel { --product-bg: #101010; --product-raised: #181818; --product-sunken: #222; --product-line: #363636; --product-soft-line: #303030; --product-ink: #f4f4f2; --product-secondary: #c5c5c5; --product-faint: #aaa; --product-block-soft: #303030; --product-review-soft: #303030; --ink: #f4f4f2; --muted: #aaa; --paper-bright: #f4f4f2; }
 .guide-page .rules-scene .pstick, .guide-page .term, .guide-page .shot.log { border: 1px solid var(--warden-line-dark); border-radius: 12px; box-shadow: none; }
 .guide-page .rules-scene .ru, .guide-page .rules-scene .hero-box { background: transparent; }
 .guide-page .log .row:nth-child(2) { background: #202020; }
-.guide-page .policy-example-note { color: #aaa; }
 .guide-page .policy-activate, .guide-page .send { border-radius: 999px; }
 .guide-page .shot.log .console { background: transparent; }
 .guide-page #spend { margin-top: 3rem; padding-block: 5rem; background: var(--warden-black); }
@@ -29,7 +26,6 @@
 .guide-page #spend .say p { color: var(--warden-muted-dark); }
 .guide-page footer { --line: #303030; --line-soft: #303030; --paper-bright: #f4f4f2; color: var(--warden-white); }
 .guide-page .closing-actions { justify-self: auto; }
-.guide-page .download-heading { display: block; }
 .guide-page .dl .other-builds { justify-self: auto; }
 .guide-page .ru { transition: opacity 240ms var(--warden-ease), background-color 300ms ease; }
 .guide-page [data-step="2"] .rules-scene .ru { background: #191919; }
@@ -54,37 +50,25 @@
 .guide-page .say p { text-wrap: pretty; }
 
 /* The visitor owns the sequence. One workspace, one primary action per state. */
-.guide-page [data-chapter="write"] .stage { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "says" "controls" "panel"; grid-template-rows: auto auto auto; align-items: start; gap: 1.5rem; max-width: 48rem; margin-inline: auto; }
-.guide-page [data-chapter="write"] .says { grid-area: says; }
 .guide-page [data-chapter="write"] .say { position: static; }
-.guide-page [data-chapter="write"] .say h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
 .guide-page [data-chapter="write"] .say p { margin-top: .6rem; max-width: none; }
-.guide-page .story-controls { gap: 1rem; }
-.guide-page .story-steps { gap: .25rem; padding: .25rem; border: 1px solid #303030; border-radius: 10px; background: #101010; }
-.guide-page .story-steps button { padding: .65rem .75rem; text-align: center; border-radius: 6px; font-size: .8125rem; cursor: pointer; }
-.guide-page .story-steps button[aria-pressed="true"] { background: #f4f4f2; color: #181818; }
 .guide-page .story-steps button::after { display: none; }
 .guide-page [data-story-replay] { min-height: 44px; cursor: pointer; }
 .guide-page .demo-status { color: #aaa; font-size: .6875rem; text-align: right; }
 .guide-page .rules-scene .hero-box { padding: 2rem; }
 .guide-page .rules-scene #ruleMsg { height: auto; min-height: 5rem; max-width: 34ch; font-size: clamp(1.25rem, 3vw, 1.65rem); }
-.guide-page .composer-bottom > span { max-width: none; }
 .guide-page .rules-scene .ruleset { padding-inline: 2rem; }
 .guide-page .rules-scene .policy-list-head { min-height: 3.5rem; }
 .guide-page .rules-scene .policy-list-head > div > span { display: none; }
-.guide-page .policy-example-note { padding: 1rem 2rem; text-align: left; }
 .js .guide-page [data-chapter="write"][data-step="0"] .ruleset { display: none; }
 .js .guide-page [data-chapter="write"]:not([data-step="0"]) .rules-scene .shot { display: none; }
 .guide-page .rules-scene .rules-empty { display: none; }
 .guide-page .rules-scene .ru { padding-block: 1.25rem; }
 .guide-page .rules-scene .rule-definition { max-width: 55ch; }
 @media (max-width: 47.999rem) {
- .guide-page [data-chapter="write"] .stage { gap: 1.25rem; }
- .guide-page .story-controls { gap: .5rem; }
  .guide-page .story-steps button { padding-inline: .35rem; font-size: .75rem; }
  .guide-page .rules-scene .hero-box { padding: 1.25rem; }
  .guide-page .rules-scene .ruleset { padding-inline: 1.25rem; }
- .guide-page .policy-example-note { padding-inline: 1.25rem; }
  .guide-page .demo-status { max-width: 13ch; }
 }
 
@@ -98,19 +82,54 @@
 .js .guide-page [data-step="1"] .policy-list-footer { justify-content: flex-end; }
 
 /* Keep every chapter and its controls on the same reading axis. */
-.guide-page .guide-intro, .guide-page .sec { max-width: 60rem; }
-.guide-page .chapter .stage,
-.guide-page .chapter[data-chapter="write"] .stage,
-.guide-page .chapter[data-chapter="hit"] .stage,
-.guide-page .chapter[data-chapter="log"] .stage {
+.guide-page .guide-intro, .guide-page .sec { max-width: 64rem; --page-gutter: clamp(1.25rem, 4vw, 2rem); }
+.guide-page .chapter .stage {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "says" "controls" "panel";
+  grid-template-areas: "says" "panel";
   grid-template-rows: auto;
   align-items: start;
   max-width: none;
   margin-inline: 0;
   gap: 1.5rem;
 }
-.guide-page .chapter:not([data-chapter="write"]) .stage { grid-template-areas: "says" "panel"; }
 .guide-page .chapter .say { display: block; max-width: none; }
 .guide-page .chapter .say h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+
+/* Navigation belongs to the workspace it controls. */
+.guide-page .rules-scene .story-controls {
+  display: flex; gap: 1rem; padding: .75rem 1.5rem;
+  border-bottom: 1px solid var(--warden-line-dark);
+}
+.guide-page .rules-scene .story-steps { flex: 1; border: 0; padding: 0; background: transparent; gap: .5rem; }
+.guide-page .rules-scene .story-steps button { min-height: 44px; padding: .6rem 1rem; flex: 0 1 auto; border-radius: 6px; text-align: center; font-size: .8125rem; cursor: pointer; }
+.guide-page .rules-scene .story-steps button[aria-pressed="true"] { background: #292929; color: #f4f4f2; }
+.guide-page .rules-scene [data-story-replay] { flex: none; margin-left: auto; }
+.guide-page .rules-scene .policy-topbar { min-height: 0; height: 0; padding: 0; border: 0; }
+.guide-page .rules-scene .policy-location { display: none; }
+html:not(.js) .guide-page .rules-scene .story-controls { display: none; }
+.guide-page .rules-scene .hero-box { padding: 2rem; }
+.guide-page .rules-scene .composer-meta { margin-bottom: 1.5rem; }
+.guide-page .rules-scene .composer-scope { display: none; }
+.guide-page .rules-scene #ruleMsg { max-width: 38ch; min-height: 0; margin: 0; line-height: 1.5; }
+.guide-page .rules-scene .composer-bottom { margin-top: 2rem; }
+.guide-page .rules-scene .pstick { overflow: hidden; }
+.guide-page .sec { gap: 4rem; }
+.guide-page .chapter + .chapter { padding-top: 4rem; }
+.guide-page #how { padding-top: 0; padding-bottom: 0; }
+.guide-page #spend { margin-top: 4rem; padding-top: 0; padding-bottom: 6rem; }
+.guide-page #spend .chapter { border-top: 1px solid var(--warden-line-dark); padding-top: 4rem; }
+.guide-page .chapter .stage { position: static; }
+.guide-page .chapter .says { align-self: start; }
+.guide-page .rules-scene .policy-list-footer { padding-block: 1.5rem; }
+@media (max-width: 47.999rem) {
+  .guide-intro { padding-top: calc(var(--header-height) + 2rem); padding-bottom: 2.5rem; }
+  .guide-page .rules-scene .story-controls { gap: .5rem; padding: .5rem .75rem; }
+  .guide-page .rules-scene .story-steps { gap: .125rem; }
+  .guide-page .rules-scene .story-steps button { padding-inline: .5rem; }
+  .guide-page .rules-scene .hero-box { padding: 1.5rem; }
+  .guide-page .rules-scene .ruleset { padding-inline: 1.5rem; }
+  .guide-page .rules-scene .composer-bottom { margin-top: 1.5rem; }
+  .guide-page .sec { gap: 3rem; }
+  .guide-page .chapter + .chapter, .guide-page #spend .chapter { padding-top: 3rem; }
+  .guide-page #spend { margin-top: 3rem; padding-bottom: 4rem; }
+}
