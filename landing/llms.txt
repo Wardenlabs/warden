@@ -2,6 +2,7 @@
 
 > Warden is a local AI gateway for a team’s configured policies. An administrator describes what to protect, reviews proposed rules and activates them. Warden checks connected AI requests locally before allowed requests continue to the configured model. Free for everyone and open source under Apache-2.0.
 
+- Detailed walkthrough: https://warden-theta.vercel.app/how-it-works
 - Source: https://github.com/Wardenlabs/warden
 - Downloads and current builds: https://github.com/Wardenlabs/warden/releases/latest
 - License: https://github.com/Wardenlabs/warden/blob/main/LICENSE
@@ -10,7 +11,7 @@
 
 An administrator can describe a broad policy in one instruction. A capable configured compiler can propose multiple concrete rules, with examples of what should stop and what should pass. Proposed rules are drafts: a person reviews and activates them, individually or as a set. A limited compiler may produce fewer rules; no fixed rule count or generation time is implied.
 
-Active policies apply to requests routed through the appropriate Warden connection. Decisions can allow a request, hold it for human review or block it with a reason. This does not mean every prompt in every application is monitored. The landing’s workday, requests, records and step controls are illustrative; they do not run a backend policy check or activate real rules.
+Active policies apply to requests routed through the appropriate Warden connection. Decisions can allow a request, hold it for human review or block it with a reason. This does not mean every prompt in every application is monitored. The homepage pricing comparison and the detailed walkthrough’s requests, records and step controls are illustrative; they do not run a backend policy check or activate real rules.
 
 Policy evaluation runs locally. Allowed requests can still be sent to the employee’s configured external model. Rule compilation is separate: an administrator may use local inference or a configured compiler endpoint/CLI. Do not describe every inference operation or all AI traffic as local.
 

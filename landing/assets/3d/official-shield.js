@@ -2,13 +2,14 @@
  * Original curves, bevels and camera are preserved in a neutral metal studio.
  * White faces, chrome reflections and graphite edges carry the white brand. */
 import { WARDEN_SYMBOL_PATHS } from './brand-paths.js';
+import { smoothBevels } from './smooth-bevels.js';
 
 export function createShield({ THREE: T, canvas }) {
     const renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.02;
+    renderer.toneMappingExposure = .92;
     const scene = new T.Scene();
     const camera = new T.PerspectiveCamera(35, 1920 / 1080, 1, 5000);
     camera.position.set(0, 0, 1080 / (2 * Math.tan(35 * Math.PI / 360)));
@@ -49,24 +50,25 @@ export function createShield({ THREE: T, canvas }) {
     ringShape.holes.push(ringContours[1]);
 
     const silverFace = new T.MeshPhysicalMaterial({
-      color: 0xe8e8e8, metalness: .87, roughness: .24,
-      clearcoat: .44, clearcoatRoughness: .16, envMapIntensity: 1.22
+      color: 0xc9c9c9, metalness: 1, roughness: .27,
+      clearcoat: .26, clearcoatRoughness: .24, envMapIntensity: 1.15
     });
     const graphiteEdge = new T.MeshPhysicalMaterial({
-      color: 0x494949, metalness: .95, roughness: .20,
-      clearcoat: .30, clearcoatRoughness: .15, envMapIntensity: 1.1
+      color: 0x808080, metalness: 1, roughness: .24,
+      clearcoat: .26, clearcoatRoughness: .2, envMapIntensity: 1.1
     });
     const letterFace = new T.MeshPhysicalMaterial({
-      color: 0xf7f7f7, metalness: .65, roughness: .23,
-      clearcoat: .42, clearcoatRoughness: .13, envMapIntensity: 1.24
+      color: 0xdadada, metalness: 1, roughness: .25,
+      clearcoat: .26, clearcoatRoughness: .22, envMapIntensity: 1.15
     });
     function extrude(shape, depth, bevelSize, bevelThickness, faceMaterial, z) {
       const geometry = new T.ExtrudeGeometry(shape, {
-        depth, curveSegments: 40, steps: 1,
-        bevelEnabled: true, bevelSegments: 8, bevelSize, bevelThickness,
+        depth, curveSegments: 64, steps: 1,
+        bevelEnabled: true, bevelSegments: 16, bevelSize, bevelThickness,
         material: 0, extrudeMaterial: 1
       });
       geometry.translate(0, 0, z);
+      smoothBevels(geometry);
       geometry.computeBoundingBox();
       const mesh = new T.Mesh(geometry, [faceMaterial, graphiteEdge]);
       hero.add(mesh);
@@ -85,10 +87,10 @@ export function createShield({ THREE: T, canvas }) {
       const light = new T.Mesh(new T.PlaneGeometry(boxWidth, boxHeight), material);
       light.position.set(...position); light.lookAt(0, 0, 0); studio.add(light);
     }
-    softbox([-5, 4, 7], 3.1, 10, 0xffffff, 4.0);
-    softbox([5, 1, 4], 1.35, 9, 0xffffff, 3.0);
-    softbox([0, 7, 2], 10, 1.8, 0xffffff, 4.4);
-    softbox([-2, -5, 3], 6, 1.0, 0xffffff, 1.4);
+    softbox([-5, 4, 7], 4.5, 10, 0xffffff, 3.0);
+    softbox([5, 1, 4], 1.2, 9, 0xffffff, 3.6);
+    softbox([0, 7, 2], 10, 2.8, 0xffffff, 3.2);
+    softbox([-2, -5, 3], 6, 1.0, 0xffffff, .6);
     softbox([3, 3, -5], 2.0, 9, 0xffffff, 2.5);
     const pmrem = new T.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(studio, .02, .1, 60);
@@ -96,8 +98,8 @@ export function createShield({ THREE: T, canvas }) {
     pmrem.dispose();
     studio.traverse(node => { if (node.isMesh) { node.geometry.dispose(); node.material.dispose(); } });
 
-    scene.add(new T.HemisphereLight(0xf5f5f5, 0x151515, .58));
-    const key = new T.DirectionalLight(0xffffff, 2.4);
+    scene.add(new T.HemisphereLight(0xf5f5f5, 0x151515, .28));
+    const key = new T.DirectionalLight(0xffffff, 1.1);
     key.position.set(-600, 850, 1200); scene.add(key);
     const rim = new T.DirectionalLight(0xffffff, 2.0);
     rim.position.set(1100, 250, -700); scene.add(rim);
@@ -107,7 +109,9 @@ export function createShield({ THREE: T, canvas }) {
     function resize(nextWidth = 960, nextHeight = nextWidth, pixelRatio = 1) {
       width = Math.max(1, Math.round(nextWidth));
       height = Math.max(1, Math.round(nextHeight));
-      renderer.setPixelRatio(Math.min(1.5, Math.max(1, pixelRatio)));
+      // Supersample this small hero object, including on Retina screens. The
+      // three-times cap bounds GPU cost; the controller stops rendering at rest.
+      renderer.setPixelRatio(Math.min(3, Math.max(2, pixelRatio * 1.5)));
       renderer.setSize(width, height, false);
       const aspect = width / height;
       const cropHeight = Math.max(600, 480 / aspect);
@@ -122,13 +126,13 @@ export function createShield({ THREE: T, canvas }) {
       const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 2.6;
       const pointer = value => Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
       const pointerX = pointer(interaction?.x), pointerY = pointer(interaction?.y);
-      const intro = smooth(t / .75);
+      const intro = smooth(t / 2.6);
       const settle = Math.sin(Math.PI * intro) * Math.sin(Math.PI * 1.7 * intro) * .032;
       hero.position.set(-464.30825, 169.75097, 0);
       hero.scale.setScalar(mix(.67, .69496079, intro));
-      hero.rotation.set(mix(.14, .055, intro) + pointerY * .065 * intro, mix(-1.18, -.29, intro) + settle + pointerX * .16 * intro, mix(-.11, -.025, intro) - pointerX * .012 * intro);
+      hero.rotation.set(mix(.12, .045, intro) + pointerY * .065 * intro, mix(-.65, -.22, intro) + settle + pointerX * .19 * intro, mix(-.07, -.025, intro) - pointerX * .012 * intro);
       const sweep = smooth((t - 1.15) / 1.30);
-      scene.environmentRotation.set(0, mix(-.14, -.44, sweep) + pointerX * .07, 0);
+      scene.environmentRotation.set(0, mix(-.5, .12, intro) + pointerX * .16, -.12);
       sweepLight.position.set(460 + mix(-750, 720, sweep), mix(480, -120, sweep), 700);
       sweepLight.intensity = t >= 1.15 && t <= 2.45 ? Math.sin(Math.PI * sweep) ** 2 * 350000 : 0;
       renderer.render(scene, camera);

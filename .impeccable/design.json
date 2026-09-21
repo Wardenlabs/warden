@@ -1,745 +1,244 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-10T09:16:07+00:00",
+  "generatedAt": "2026-09-21T05:43:13.723804+00:00",
   "title": "Design System: Warden",
   "extensions": {
     "colorMeta": {
-      "white": {
+      "warden-black": {
         "role": "primary",
-        "displayName": "White",
+        "displayName": "Studio black",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
         ]
       },
-      "white-hover": {
+      "warden-white": {
         "role": "primary",
-        "displayName": "White Hover",
+        "displayName": "Quiet white",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00265 106.45)",
+          "oklch(26% 0.00265 106.45)",
+          "oklch(38% 0.00265 106.45)",
+          "oklch(49% 0.00265 106.45)",
+          "oklch(61% 0.00265 106.45)",
+          "oklch(72% 0.00265 106.45)",
+          "oklch(84% 0.00265 106.45)",
+          "oklch(95% 0.00265 106.45)"
         ]
       },
-      "white-ink": {
-        "role": "primary",
-        "displayName": "White Ink",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "studio": {
+      "warden-ink": {
         "role": "neutral",
-        "displayName": "Studio",
+        "displayName": "Dark ink",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
         ]
       },
-      "night-950": {
+      "warden-muted-dark": {
         "role": "neutral",
-        "displayName": "Night 950",
+        "displayName": "Muted dark",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
         ]
       },
-      "night-900": {
+      "warden-muted-light": {
         "role": "neutral",
-        "displayName": "Night 900",
+        "displayName": "Muted light",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00313 106.51)",
+          "oklch(26% 0.00313 106.51)",
+          "oklch(38% 0.00313 106.51)",
+          "oklch(49% 0.00313 106.51)",
+          "oklch(61% 0.00313 106.51)",
+          "oklch(72% 0.00313 106.51)",
+          "oklch(84% 0.00313 106.51)",
+          "oklch(95% 0.00313 106.51)"
         ]
       },
-      "night-850": {
+      "warden-line-dark": {
         "role": "neutral",
-        "displayName": "Night 850",
+        "displayName": "Dark line",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
         ]
       },
-      "night-800": {
+      "warden-line-light": {
         "role": "neutral",
-        "displayName": "Night 800",
+        "displayName": "Light line",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "night-750": {
-        "role": "neutral",
-        "displayName": "Night 750",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "steel-500": {
-        "role": "neutral",
-        "displayName": "Steel 500",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "steel-400": {
-        "role": "neutral",
-        "displayName": "Steel 400",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "steel-300": {
-        "role": "neutral",
-        "displayName": "Steel 300",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "steel-200": {
-        "role": "neutral",
-        "displayName": "Steel 200",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "paper": {
-        "role": "neutral",
-        "displayName": "Paper",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "line-soft": {
-        "role": "neutral",
-        "displayName": "Line Soft",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "line": {
-        "role": "neutral",
-        "displayName": "Line",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "line-strong": {
-        "role": "neutral",
-        "displayName": "Line Strong",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "coral": {
-        "role": "secondary",
-        "displayName": "Coral",
-        "tonalRamp": [
-          "oklch(15% 0.06 25)",
-          "oklch(26% 0.06 25)",
-          "oklch(38% 0.06 25)",
-          "oklch(49% 0.06 25)",
-          "oklch(61% 0.06 25)",
-          "oklch(72% 0.06 25)",
-          "oklch(84% 0.06 25)",
-          "oklch(95% 0.06 25)"
-        ]
-      },
-      "amber": {
-        "role": "tertiary",
-        "displayName": "Amber",
-        "tonalRamp": [
-          "oklch(15% 0.06 80)",
-          "oklch(26% 0.06 80)",
-          "oklch(38% 0.06 80)",
-          "oklch(49% 0.06 80)",
-          "oklch(61% 0.06 80)",
-          "oklch(72% 0.06 80)",
-          "oklch(84% 0.06 80)",
-          "oklch(95% 0.06 80)"
-        ]
-      },
-      "studio-block": {
-        "role": "secondary",
-        "displayName": "Studio Block",
-        "tonalRamp": [
-          "oklch(15% 0.06 25)",
-          "oklch(26% 0.06 25)",
-          "oklch(38% 0.06 25)",
-          "oklch(49% 0.06 25)",
-          "oklch(61% 0.06 25)",
-          "oklch(72% 0.06 25)",
-          "oklch(84% 0.06 25)",
-          "oklch(95% 0.06 25)"
-        ]
-      },
-      "product-bg": {
-        "role": "neutral",
-        "displayName": "Product Bg",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-raised": {
-        "role": "neutral",
-        "displayName": "Product Raised",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-sunken": {
-        "role": "neutral",
-        "displayName": "Product Sunken",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-line": {
-        "role": "neutral",
-        "displayName": "Product Line",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-soft-line": {
-        "role": "neutral",
-        "displayName": "Product Soft Line",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-ink": {
-        "role": "neutral",
-        "displayName": "Product Ink",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-secondary": {
-        "role": "neutral",
-        "displayName": "Product Secondary",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-faint": {
-        "role": "neutral",
-        "displayName": "Product Faint",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "product-block": {
-        "role": "secondary",
-        "displayName": "Product Block",
-        "tonalRamp": [
-          "oklch(15% 0.06 25)",
-          "oklch(26% 0.06 25)",
-          "oklch(38% 0.06 25)",
-          "oklch(49% 0.06 25)",
-          "oklch(61% 0.06 25)",
-          "oklch(72% 0.06 25)",
-          "oklch(84% 0.06 25)",
-          "oklch(95% 0.06 25)"
-        ]
-      },
-      "product-block-soft": {
-        "role": "secondary",
-        "displayName": "Product Block Soft",
-        "tonalRamp": [
-          "oklch(15% 0.06 25)",
-          "oklch(26% 0.06 25)",
-          "oklch(38% 0.06 25)",
-          "oklch(49% 0.06 25)",
-          "oklch(61% 0.06 25)",
-          "oklch(72% 0.06 25)",
-          "oklch(84% 0.06 25)",
-          "oklch(95% 0.06 25)"
-        ]
-      },
-      "product-review": {
-        "role": "tertiary",
-        "displayName": "Product Review",
-        "tonalRamp": [
-          "oklch(15% 0.06 80)",
-          "oklch(26% 0.06 80)",
-          "oklch(38% 0.06 80)",
-          "oklch(49% 0.06 80)",
-          "oklch(61% 0.06 80)",
-          "oklch(72% 0.06 80)",
-          "oklch(84% 0.06 80)",
-          "oklch(95% 0.06 80)"
-        ]
-      },
-      "product-review-soft": {
-        "role": "tertiary",
-        "displayName": "Product Review Soft",
-        "tonalRamp": [
-          "oklch(15% 0.06 80)",
-          "oklch(26% 0.06 80)",
-          "oklch(38% 0.06 80)",
-          "oklch(49% 0.06 80)",
-          "oklch(61% 0.06 80)",
-          "oklch(72% 0.06 80)",
-          "oklch(84% 0.06 80)",
-          "oklch(95% 0.06 80)"
+          "oklch(15% 0.00542 106.51)",
+          "oklch(26% 0.00542 106.51)",
+          "oklch(38% 0.00542 106.51)",
+          "oklch(49% 0.00542 106.51)",
+          "oklch(61% 0.00542 106.51)",
+          "oklch(72% 0.00542 106.51)",
+          "oklch(84% 0.00542 106.51)",
+          "oklch(95% 0.00542 106.51)"
         ]
       }
     },
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Manrope hero statement with white enforcement emphasis."
-      },
-      "headline": {
-        "displayName": "Headline",
-        "purpose": "Large Manrope section statements."
+        "purpose": "Centered hero; first phrase uses weight 400."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Manrope story arguments."
+        "purpose": "Proof and closing statements."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Manrope explanations and product content."
+        "purpose": "Supporting content."
+      },
+      "action": {
+        "displayName": "Action",
+        "purpose": "Primary download label."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "System-mono chapter labels and operational evidence."
+        "purpose": "Quiet metadata and film link."
       }
     },
     "shadows": [
       {
-        "name": "product-plane",
-        "value": "0 1rem 3rem rgb(23 24 26 / .045)",
-        "purpose": "Faint boundary around a complete flat white editor, terminal, or log."
-      },
-      {
-        "name": "hero-request",
-        "value": "0 1.5rem 3rem rgb(0 0 0 / .22)",
-        "purpose": "Lifts the small light request sheet beside the unboxed shield."
-      },
-      {
-        "name": "illustrated-object",
-        "value": "0 20px 40px rgb(22 24 28 / .12)",
-        "purpose": "Grounds request and decision sheets in the light illustration."
-      },
-      {
-        "name": "hero-shield",
-        "value": "drop-shadow(0 2.5rem 2rem rgb(0 0 0 / .38))",
-        "purpose": "Gives the official silver-and-white shield physical weight."
-      },
-      {
-        "name": "modal-focus",
-        "value": "0 2rem 6rem rgb(0 0 0 / .62)",
-        "purpose": "Deep elevation reserved for the native film dialog."
+        "name": "film-dialog",
+        "value": "0 2rem 6rem rgb(0 0 0 / 0.62)",
+        "purpose": "Inherited modal depth; homepage evidence surfaces remain flat."
       }
     ],
     "motion": [
       {
-        "name": "ease-out",
-        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "Primary settling curve for state changes, reveals, and finite impacts."
+        "name": "warden-fast",
+        "value": "180ms",
+        "purpose": "Native example selection underline."
       },
       {
-        "name": "ease-standard",
-        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
-        "purpose": "Reserved symmetric curve for deliberate state travel."
+        "name": "warden-ease",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Example selection easing."
       },
       {
-        "name": "control-fast",
-        "value": "160–180ms var(--ease-out)",
-        "purpose": "Button, link, disclosure, and tool-tab feedback."
-      },
-      {
-        "name": "state-medium",
-        "value": "220–380ms var(--ease-out)",
-        "purpose": "Pressed indicators, verdict color changes, and narration swaps."
-      },
-      {
-        "name": "content-reveal",
-        "value": "opacity 520ms var(--ease-out), transform 700ms var(--ease-out)",
-        "purpose": "One-time section reveal that settles completely for reading."
-      },
-      {
-        "name": "hero-impact",
-        "value": "620ms var(--ease-out)",
-        "purpose": "One finite request-to-verdict event across request, silver shield, and result."
-      },
-      {
-        "name": "checkpoint-sequence",
-        "value": "650–900ms var(--ease-out) with bounded 150–700ms delays",
-        "purpose": "Carries a request through the shield into the decision record once."
+        "name": "shared-control",
+        "value": "160ms",
+        "purpose": "Inherited button and navigation transitions."
       },
       {
         "name": "shield-entrance",
-        "value": "1900ms finite entrance",
-        "purpose": "Introduces the neutral silver-and-white official object once; pauses while hidden or offscreen and sleeps when settled."
+        "value": "4.8s",
+        "purpose": "Finite entrance; static completed pose with reduced motion."
       }
     ],
     "breakpoints": [
       {
-        "name": "minimum-viewport",
-        "value": "20rem"
+        "name": "mobile-max",
+        "value": "47.999rem"
       },
       {
-        "name": "checkpoint-small",
-        "value": "22.5rem"
-      },
-      {
-        "name": "checkpoint-medium",
-        "value": "26.875rem"
-      },
-      {
-        "name": "compact-product",
-        "value": "27rem"
-      },
-      {
-        "name": "compact-copy",
-        "value": "30rem"
-      },
-      {
-        "name": "checkpoint-fallback",
-        "value": "32.5rem"
-      },
-      {
-        "name": "product-comfort",
-        "value": "40rem"
-      },
-      {
-        "name": "medium",
+        "name": "desktop-min",
         "value": "48rem"
       },
       {
-        "name": "wide-layout",
-        "value": "64rem"
-      },
-      {
-        "name": "product-reference",
-        "value": "90rem"
-      },
-      {
-        "name": "cinema",
-        "value": "100rem"
+        "name": "short-desktop-max-height",
+        "value": "650px"
       }
     ]
   },
   "components": [
     {
-      "name": "Primary Download Button",
+      "name": "Primary download",
       "kind": "button",
-      "description": "A native action with visible focus and restrained neutral feedback.",
-      "html": "<button class=\"ds-primary\" type=\"button\">Download for macOS</button>",
-      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.75rem 1.125rem;border:1px solid var(--accent,#fff);border-radius:var(--radius-md,.375rem);background:var(--accent,#fff);color:var(--accent-ink,#17181b);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-primary:hover{background:var(--accent-hover,#e4e4df);}.ds-primary:focus-visible{outline:2px solid var(--accent,#fff);outline-offset:4px;}.ds-primary:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none;transform:none;}}",
+      "description": "The homepage’s OS-aware download appearance; this preview is a button without an installer action.",
+      "html": "<div class=\"ds-stage\"><button class=\"ds-download\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M16.36 12.78c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.87 2.3 1.15-.05 1.58-.75 2.97-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.12 2.78-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.68zM14.1 5.99c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.28z\"/></svg><span>Download for macOS</span></button></div>",
+      "css": ".ds-stage{padding:1.5rem;background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-download{display:inline-flex;align-items:center;justify-content:center;gap:.7rem;min-height:48px;padding:.85rem 1.25rem;border:0;border-radius:var(--warden-control-radius,999px);background:var(--warden-white,#f4f4f2);color:var(--warden-ink,#181818);font:650 .875rem/1 \"Manrope\",sans-serif;cursor:pointer;transition:background-color 160ms cubic-bezier(.16,1,.3,1),transform 160ms cubic-bezier(.16,1,.3,1)}.ds-download .ds-icon{width:1rem;height:1rem}.ds-download:focus-visible{outline:2px solid #fff;outline-offset:4px;}.ds-download:active{transform:translateY(1px) scale(.985)}@media(hover:hover) and (pointer:fine){.ds-download:hover{background:var(--warden-line-light,#d7d7d3);color:var(--warden-black,#080808)}}@media(prefers-reduced-motion:reduce){.ds-download{transition:none}}",
       "refersTo": "button-primary"
     },
     {
-      "name": "Secondary Button",
+      "name": "Film link",
       "kind": "button",
-      "description": "A native action with visible focus and restrained neutral feedback.",
-      "html": "<button class=\"ds-secondary\" type=\"button\">View source</button>",
-      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.75rem 1.125rem;border:1px solid var(--line-strong,#62666d);border-radius:var(--radius-md,.375rem);background:var(--night-900,#151619);color:var(--paper,#f2f2ef);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-secondary:hover{background:var(--night-800,#222428);}.ds-secondary:focus-visible{outline:2px solid var(--line-strong,#62666d);outline-offset:4px;}.ds-secondary:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none;transform:none;}}",
-      "refersTo": "button-secondary"
+      "description": "Quiet secondary action with an inline play icon.",
+      "html": "<div class=\"ds-stage\"><a class=\"ds-film\" href=\"#film\">Watch the film <svg viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"m7 4 9 6-9 6V4Z\"/></svg></a></div>",
+      "css": ".ds-stage{padding:1.5rem;background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-film{display:inline-flex;align-items:center;gap:.45rem;min-height:44px;color:var(--warden-muted-dark,#a3a3a3);font-size:.75rem;text-decoration:none}.ds-film svg{width:.8rem;height:.8rem}.ds-film:focus-visible{outline:2px solid #fff;outline-offset:4px;}@media(hover:hover) and (pointer:fine){.ds-film:hover{color:#fff}}",
+      "refersTo": "film-link"
     },
     {
-      "name": "Product Action",
-      "kind": "button",
-      "description": "A native action with visible focus and restrained neutral feedback.",
-      "html": "<button class=\"ds-product\" type=\"button\">Activate rules</button>",
-      "css": ".ds-product{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.75rem 1.125rem;border:1px solid var(--product-ink,#17181a);border-radius:.2rem;background:var(--product-ink,#17181a);color:var(--product-bg,#fff);font:620 .875rem/1 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));}.ds-product:hover{background:#37393d;}.ds-product:focus-visible{outline:2px solid var(--product-ink,#17181a);outline-offset:4px;}.ds-product:active{transform:translateY(1px) scale(.985);}@media(prefers-reduced-motion:reduce){.ds-product{transition:none;transform:none;}}",
-      "refersTo": "button-product"
-    },
-    {
-      "name": "Policy Composer",
-      "kind": "input",
-      "description": "A read-only landing example on a quiet pale writing area.",
-      "html": "<section class=\"ds-composer\"><strong class=\"ds-author\">You</strong><textarea class=\"ds-policy-text\" readonly tabindex=\"-1\" aria-label=\"Example policy\">customer data must not leave the company</textarea><span class=\"ds-note\">You decide what goes live.</span></section>",
-      "css": ".ds-composer{padding:1.5rem 1rem 1rem;background:var(--product-raised,#f5f5f3);color:var(--product-ink,#17181a);font-family:var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);border-bottom:1px solid var(--product-line,#d7d7d2);}.ds-author{font-size:.8125rem;font-weight:620;}.ds-policy-text{display:block;width:100%;height:9rem;resize:none;margin-top:1rem;padding:0;border:0;background:transparent;color:var(--product-ink,#17181a);font:470 1.125rem/1.42 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:-.03em;}.ds-note{color:var(--product-faint,#646870);font-size:.75rem;}",
-      "refersTo": "policy-field"
-    },
-    {
-      "name": "Block Badge",
-      "kind": "chip",
-      "description": "Explicit verdict text on a dedicated pale semantic surface.",
-      "html": "<span class=\"ds-badge-block\">BLOCK</span>",
-      "css": ".ds-badge-block{display:inline-block;padding:.22rem .45rem;border-radius:.15rem;background:var(--product-block-soft,#fff0ef);color:var(--product-block,#ac3036);font:650 .6875rem/1.4 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:.025em;text-transform:uppercase;}",
-      "refersTo": "badge-block"
-    },
-    {
-      "name": "Review Badge",
-      "kind": "chip",
-      "description": "Explicit verdict text on a dedicated pale semantic surface.",
-      "html": "<span class=\"ds-badge-review\">REVIEW</span>",
-      "css": ".ds-badge-review{display:inline-block;padding:.22rem .45rem;border-radius:.15rem;background:var(--product-review-soft,#fff5df);color:var(--product-review,#80550a);font:650 .6875rem/1.4 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);letter-spacing:.025em;text-transform:uppercase;}",
-      "refersTo": "badge-review"
-    },
-    {
-      "name": "Product Rule Row",
-      "kind": "card",
-      "description": "A flat white rule row with native disclosure and neutral active status.",
-      "html": "<article class=\"ds-rule\"><div class=\"ds-rule-head\"><strong>Customer data stays inside</strong><span class=\"ds-rule-badge\">BLOCK</span></div><p>Requests containing customer data are blocked.</p><div class=\"ds-rule-foot\"><details class=\"ds-rule-details\"><summary>Read full rule</summary><p>Do not send customer data outside the company.</p></details><span class=\"ds-active\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"m3 8 3 3 7-7\"/></svg>Active</span></div></article>",
-      "css": ".ds-rule{padding:1.25rem 1rem .75rem;background:var(--product-bg,#fff);color:var(--product-ink,#17181a);border:1px solid var(--product-line,#d7d7d2);border-radius:.25rem;font:400 1rem/1.5 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);box-shadow:0 1rem 3rem rgb(23 24 26 / .045);}.ds-rule-head,.ds-rule-foot{display:flex;justify-content:space-between;align-items:start;gap:.75rem;}.ds-rule-head strong{font-weight:620;}.ds-rule-badge{padding:.22rem .45rem;border-radius:.15rem;background:var(--product-block-soft,#fff0ef);color:var(--product-block,#ac3036);font-size:.6875rem;font-weight:650;}.ds-rule p{color:var(--product-secondary,#50535a);}.ds-rule-details summary{display:flex;min-height:44px;align-items:center;color:var(--product-secondary,#50535a);font-size:.75rem;cursor:pointer;}.ds-rule-details summary:hover{color:var(--product-ink,#17181a);text-decoration:underline;}.ds-rule-details summary:focus-visible{outline:2px solid var(--product-ink,#17181a);outline-offset:4px;}.ds-active{display:inline-flex;min-height:44px;align-items:center;gap:.35rem;font-size:.75rem;font-weight:550;white-space:nowrap;}.ds-active svg{width:.8rem;height:.8rem;}",
-      "refersTo": "product-panel"
-    },
-    {
-      "name": "Story Step Navigation",
+      "name": "Navigation",
       "kind": "nav",
-      "description": "Native story buttons with pressed state and a neutral underline on the light section.",
-      "html": "<div class=\"ds-steps\" role=\"group\" aria-label=\"Policy scene\"><button type=\"button\" aria-pressed=\"false\">Describe</button><button type=\"button\" aria-pressed=\"true\">Review</button><button type=\"button\" aria-pressed=\"false\">Activate</button></div>",
-      "css": ".ds-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#f1f1ee;border-bottom:1px solid #c7c8c4;}.ds-steps button{min-height:44px;padding:.6rem .25rem;border:0;border-bottom:2px solid transparent;background:transparent;color:#5d6067;font:400 .75rem/1.2 var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);text-align:left;cursor:pointer;}.ds-steps button[aria-pressed=\"true\"]{color:#17181b;border-bottom-color:#17181b;}.ds-steps button:hover{color:#17181b;}.ds-steps button:focus-visible{outline:2px solid #17181b;outline-offset:4px;}"
+      "description": "Official inline lockup with restrained source and download links. Source hides below 48rem.",
+      "html": "<div class=\"ds-stage\"><div class=\"ds-bar\"><a class=\"ds-brand\" href=\"#home\" aria-label=\"Warden home\">\n      <svg class=\"ds-mark\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"329.92 465.98 411.56 411.56\" fill=\"currentColor\" role=\"img\" aria-label=\"Warden\"><path fill-rule=\"evenodd\" d=\"M 533.097 473.896 C 538.686 473.076 566.931 487.167 574.826 490.581 C 617.361 508.686 661.059 523.926 705.627 536.199 C 705.37 561.895 705.3 587.592 705.416 613.288 C 705.441 640.94 707.47 673.696 699.046 699.72 C 673.21 779.541 608.686 831.238 538.355 869.477 C 530.143 872.817 475.337 833.735 466.973 827.15 C 455.676 818.297 444.906 808.792 434.716 798.684 C 402.538 766.414 373.231 721.428 367.167 675.348 C 365.155 660.064 365.868 636.098 365.873 620.046 L 365.959 536.123 C 421.364 521.555 481.205 498.238 533.097 473.896 z M 535.535 507.27 C 538.793 508.356 543.437 510.556 546.646 512.028 C 588.801 531.364 631.674 546.041 675.87 559.997 L 676.006 626.754 C 676.021 640.715 676.64 658.519 674.641 671.888 C 672.861 683.051 669.725 693.954 665.305 704.357 C 646.004 750.783 608.038 787.959 567.339 816.182 C 559.466 821.641 544.49 831.847 535.621 835.484 C 508.9 821.464 476.937 797.348 455.754 776.151 C 428.933 749.312 401.917 710.121 396.696 671.653 C 394.966 658.902 395.457 638.781 395.451 625.269 L 395.405 559.97 C 442.188 545.38 491.305 528.569 535.535 507.27 z\"/><path d=\"M 423.179 585.437 C 429.592 588.254 445.443 598.306 452.157 602.336 C 464.837 638.182 477.265 674.117 489.441 710.138 C 498.025 695.705 505.705 680.77 514.135 666.334 C 520.943 654.675 523.675 652.502 535.79 649.234 C 536.702 649.488 537.613 649.748 538.522 650.015 C 553.114 654.314 556.271 664.73 563.405 677.114 C 569.749 688.126 575.748 699.466 581.842 710.627 C 583.381 705.347 585.387 699.768 587.219 694.553 C 597.979 663.913 607.968 632.628 619.561 602.309 C 628.036 596.796 639.444 590.718 648.582 585.098 C 649.249 617.809 647.077 617.651 636.039 648.044 C 630.474 663.426 625.082 678.871 619.864 694.374 C 614.372 710.846 607.822 733.916 600.118 749.008 C 598.756 751.677 583.325 765.229 579.864 768.335 C 575.02 761.199 568.375 748.714 563.93 740.911 C 554.618 724.442 545.166 708.053 535.575 691.746 C 520.817 717.124 506.371 742.683 492.242 768.417 C 485.84 762.83 471.216 751.455 468.605 743.886 C 460.695 720.965 453.103 697.9 445.224 674.955 C 438.061 654.099 430.065 633.401 423.672 612.322 C 422.532 608.559 423.09 590.363 423.179 585.437 z\"/></svg>\n      <svg class=\"ds-word\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"784.13 560.47 949.36 194.01\" fill=\"currentColor\" role=\"img\" aria-label=\"warden\"><path fill-rule=\"evenodd\" d=\"M 1390.23 560.493 C 1399.39 560.408 1408.79 560.578 1417.97 560.644 L 1417.92 751.038 L 1389.95 751.033 L 1389.9 731.81 C 1369.37 757.58 1334.7 759.654 1306.89 744.933 C 1302.1 742.017 1297.7 738.497 1293.8 734.459 C 1252.95 692.205 1282.4 612.706 1344.37 616.846 C 1364.26 618.175 1376.39 624.662 1389.74 639.158 C 1390.14 617.419 1388.36 580.826 1390.23 560.493 z M 1341.28 641.911 C 1365.36 638.77 1387.43 655.776 1390.52 679.869 C 1393.62 703.961 1376.57 725.991 1352.47 729.039 C 1328.44 732.079 1306.48 715.087 1303.39 691.06 C 1300.31 667.034 1317.26 645.044 1341.28 641.911 z\"/><path d=\"M 784.133 620.2 L 814.39 620.032 L 847.112 716.56 C 858.139 684.328 869.38 652.17 880.832 620.087 L 909.067 620.094 C 919.461 651.287 932.195 685.512 943.837 716.348 C 953.679 684.431 965.799 652.02 976.056 620.081 L 1006.12 620.199 L 996.937 645.783 C 983.506 680.031 970.918 716.319 958.398 751.051 L 929.184 751.131 C 917.862 719.625 906.354 688.186 894.66 656.816 L 860.493 751.112 L 831.617 751.091 C 815.474 710.096 799.48 662.181 784.133 620.2 z\"/><path fill-rule=\"evenodd\" d=\"M 1073.69 617.385 C 1099.29 613.567 1134.84 625.769 1138.63 654.944 C 1142.61 685.557 1140.58 719.865 1140.84 751.08 L 1114.04 751.021 L 1113.77 733.958 C 1091.83 760.614 1044.34 762.266 1023.89 733.191 C 1006.43 697.12 1033.78 675.121 1067.72 672.34 C 1082.74 671.109 1097.21 671.914 1111.97 670.464 C 1112.79 670.383 1113.2 668.889 1113.6 668.095 C 1113.61 664.06 1113.05 662.945 1111.92 659.325 C 1105 637.036 1077.76 636.147 1059.55 643.752 C 1052.11 646.856 1048.47 650.055 1042.18 655.879 L 1026.46 638.787 C 1040.43 624.377 1054.11 619.507 1073.69 617.385 z M 1074.18 691.324 C 1082.89 690.327 1103.6 690.926 1113.08 690.983 C 1113.38 713.68 1108.72 723.735 1086.33 731.118 C 1072.35 734.298 1049.76 732.902 1047.01 714.837 C 1046.32 710.246 1047.52 705.573 1050.34 701.882 C 1056.36 694.043 1065.1 692.617 1074.18 691.324 z\"/><path fill-rule=\"evenodd\" d=\"M 1506.51 617.288 C 1534.61 614.056 1561.3 626.328 1573.27 652.621 C 1579.68 666.717 1579.78 678.786 1579.65 693.797 L 1474.93 693.817 C 1481.8 735.032 1526.86 742.727 1553.01 713.629 L 1553.78 712.906 C 1557.51 712.816 1570.07 724.6 1573.72 727.705 C 1561.5 741.856 1551.04 748.83 1531.86 752.644 C 1464.92 765.955 1422.75 698.621 1460.09 643.216 C 1470.35 628.002 1488.07 620.051 1506.51 617.288 z M 1506.75 640.202 C 1532.39 637.588 1547.14 647.929 1552.39 673.183 L 1521.5 673.286 L 1475.07 673.098 C 1479.59 653.606 1487.87 645.666 1506.75 640.202 z\"/><path d=\"M 1673.92 617.301 C 1699.4 613.707 1727.61 628.952 1731 654.684 C 1734.9 684.289 1733.06 721.033 1733 751.098 L 1705.16 751.05 C 1704.61 715.003 1720.57 621.103 1656.77 644.783 C 1641.69 653.173 1637.78 668.414 1637.8 684.711 C 1637.83 706.825 1637.96 728.939 1637.9 751.054 L 1609.44 751.082 L 1609.4 620.123 L 1637.41 620.075 L 1637.35 638.727 C 1648.17 624.841 1656.52 620.214 1673.92 617.301 z\"/><path d=\"M 1243.06 617.311 C 1248.2 616.797 1253.93 617.717 1259.13 618.333 L 1259.06 645.743 C 1244.81 642.562 1230.73 641.76 1219.4 652.849 C 1205.45 666.504 1206.55 686.795 1206.66 704.739 C 1206.75 720.153 1206.74 735.614 1206.76 751.044 L 1179.12 751.091 C 1178.36 748.092 1178.65 718.704 1178.65 714.196 L 1178.81 620.158 L 1206.9 620.116 L 1206.76 640.519 C 1207.78 638.931 1208.85 637.372 1209.96 635.843 C 1218.79 623.794 1228.72 619.415 1243.06 617.311 z\"/></svg>\n    </a><nav class=\"ds-nav\" aria-label=\"Main navigation\"><a class=\"ds-source\" href=\"#source\">GitHub ↗</a><a class=\"ds-nav-download\" href=\"#download\">Download ↓</a></nav></div></div>",
+      "css": ".ds-stage{padding:1.5rem;background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem}.ds-brand{display:inline-flex;align-items:center;gap:.5rem;min-height:44px;color:var(--warden-white,#f4f4f2);text-decoration:none}.ds-mark{width:1.6rem;height:1.6rem}.ds-word{width:5.2rem;height:auto}.ds-nav{display:flex;gap:1.5rem}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;color:#b5b5b5;font-size:.8125rem;font-weight:470;text-decoration:none;transition:color 160ms cubic-bezier(.16,1,.3,1)}.ds-nav .ds-nav-download{color:#eee}.ds-nav a:focus-visible,.ds-brand:focus-visible{outline:2px solid #fff;outline-offset:4px;}@media(max-width:47.999rem){.ds-nav .ds-source{display:none}.ds-word{width:4.75rem}}@media(hover:hover) and (pointer:fine){.ds-nav a:hover{color:#fff}}@media(prefers-reduced-motion:reduce){.ds-nav a{transition:none}}",
+      "refersTo": "navigation"
     },
     {
-      "name": "Decision Log Row",
-      "kind": "custom",
-      "description": "A labeled decision on white, separated with a soft line.",
-      "html": "<div class=\"ds-log-row\"><span class=\"ds-log-dot\" aria-hidden=\"true\"></span><strong>Customer data</strong><span class=\"ds-log-decision\">Blocked before sending</span><time>09:41</time></div>",
-      "css": ".ds-log-row{display:grid;grid-template-columns:.6rem minmax(0,1fr) auto;grid-template-areas:\"dot who time\" \". copy copy\";align-items:center;gap:.5rem .6rem;min-height:7rem;padding:1.1rem 1rem;background:var(--product-bg,#fff);border-bottom:1px solid var(--product-soft-line,#e5e5df);font-family:var(--sans, Manrope, -apple-system, BlinkMacSystemFont, sans-serif);}.ds-log-dot{grid-area:dot;width:.4rem;height:.4rem;border-radius:50%;background:var(--product-block,#ac3036);}.ds-log-row strong{grid-area:who;color:var(--product-ink,#17181a);font-size:.875rem;font-weight:580;}.ds-log-decision{grid-area:copy;color:var(--product-secondary,#50535a);font-size:1rem;}.ds-log-row time{grid-area:time;color:var(--product-faint,#646870);font:400 .75rem/1.5 var(--mono,ui-monospace,monospace);}"
+      "name": "Private/public selector",
+      "kind": "input",
+      "description": "Native radio controls with an underline and a focus outline on the associated label.",
+      "html": "<div class=\"ds-stage\"><fieldset class=\"ds-selector\"><legend class=\"ds-hidden\">Choose pricing example</legend><input class=\"ds-hidden\" type=\"radio\" name=\"ds-pricing\" id=\"ds-private\" checked><input class=\"ds-hidden\" type=\"radio\" name=\"ds-pricing\" id=\"ds-public\"><div class=\"ds-options\"><label for=\"ds-private\">Private pricing</label><label for=\"ds-public\">Public pricing</label></div></fieldset></div>",
+      "css": ".ds-stage{padding:1.5rem;background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-selector{min-inline-size:0;border:0;margin:0;padding:0}.ds-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}.ds-options{display:flex;gap:1.5rem}.ds-options label{position:relative;display:inline-flex;align-items:center;min-height:48px;color:var(--warden-muted-dark,#a3a3a3);font-size:.8125rem;cursor:pointer}.ds-options label::after{content:\"\";position:absolute;inset:auto 0 0;height:1px;background:var(--warden-white,#f4f4f2);transform:scaleX(0);transition:transform var(--warden-fast,180ms) var(--warden-ease,cubic-bezier(.16,1,.3,1))}#ds-private:checked~.ds-options label[for=\"ds-private\"],#ds-public:checked~.ds-options label[for=\"ds-public\"]{color:#fff}#ds-private:checked~.ds-options label[for=\"ds-private\"]::after,#ds-public:checked~.ds-options label[for=\"ds-public\"]::after{transform:scaleX(1)}#ds-private:focus-visible~.ds-options label[for=\"ds-private\"],#ds-public:focus-visible~.ds-options label[for=\"ds-public\"]{outline:2px solid #fff;outline-offset:4px;}@media(prefers-reduced-motion:reduce){.ds-options label::after{transition:none}}",
+      "refersTo": "example-selector"
+    },
+    {
+      "name": "Evidence panel",
+      "kind": "card",
+      "description": "One flat dark field on off-white; illustrative wording and verdict icon remain explicit.",
+      "html": "<div class=\"ds-proof\"><article class=\"ds-panel\"><div class=\"ds-rule\"><span>Your rule</span><p>Keep client pricing private.</p></div><div class=\"ds-case\"><p>“Share a client’s private pricing.”</p><div class=\"ds-decision\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"m8 3-5 5v8l5 5h8l5-5V8l-5-5H8Z\"/><path d=\"m9 9 6 6m0-6-6 6\"/></svg><strong>Blocked.</strong><span>By your rule.</span></div></div><div class=\"ds-caption\"><span>Illustrative example</span><span>Checked locally</span></div></article></div>",
+      "css": ".ds-proof{padding:1.5rem;background:var(--warden-white,#f4f4f2);font-family:var(--sans,\"Manrope\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);}.ds-panel{overflow:hidden;border-radius:var(--warden-radius,12px);background:var(--warden-black,#080808);color:var(--warden-white,#f4f4f2)}.ds-rule{padding:2rem 2.5rem;border-bottom:1px solid var(--warden-line-dark,#303030)}.ds-rule>span{color:var(--warden-muted-dark,#a3a3a3);font-size:.75rem}.ds-rule p{margin:.5rem 0 0;font-size:clamp(1.125rem,2.6vw,1.5rem);font-weight:500;line-height:1.4;letter-spacing:-.025em}.ds-case{padding:2.5rem}.ds-case>p{margin:0;color:#b8b8b8;font-size:clamp(1rem,2.2vw,1.25rem);line-height:1.5;min-height:3.25rem}.ds-decision{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:1.5rem}.ds-decision svg{width:1.4rem;height:1.4rem}.ds-decision strong{font-size:clamp(1.5rem,3vw,2rem);font-weight:540;line-height:1.2;letter-spacing:-.03em}.ds-decision span{color:var(--warden-muted-dark,#a3a3a3);font-size:.8125rem}.ds-caption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem 1rem;padding:1.25rem 2.5rem;border-top:1px solid var(--warden-line-dark,#303030);color:var(--warden-muted-dark,#a3a3a3);font-size:.6875rem}@media(max-width:47.999rem){.ds-rule{padding:1.5rem}.ds-case{padding:2rem 1.5rem}.ds-caption{padding:1rem 1.5rem}}",
+      "refersTo": "example-panel"
     }
   ],
   "narrative": {
-    "northStar": "Warden White Studio",
-    "overview": "White is Warden's brand. A large silver-and-white shield carries the identity with real geometry, neutral metal lighting, and room around its silhouette. Charcoal provides the stage for this object and the white download action; the product story opens into a light studio with white working surfaces, dark text, and deliberate whitespace.\n\nThe interface is modern, clean, and readable. Manrope gives the large statements and product copy one consistent voice. Fine rules, aligned rows, compact labels, and restrained red and amber verdicts help the reader follow a request from policy to decision. Depth belongs primarily to the sculpted shield and the request illustration; the product itself remains flat and steady.\n\nThis is a code-led system documenting the user's white brand direction and the current implementation, not a claim of an approved visual comp. The active sources are `landing/foundation-v2.css`, `landing/experience-v2.css`, and `landing/product-scenes-v2.css`, loaded by `landing/index.html`. Older unused styles are not visual authority. `PRODUCT.md` remains the source of product truth.",
+    "northStar": "Quiet contrast",
+    "overview": "**Status: implementation authorized for main on 2026-09-20.** The user requested shipping, followed by a correction to the 3D logo quality. The named direction is a working description. The user requested less text and fewer components, black and white, preservation of the official logo, and taste informed by Plaude.\n\nWarden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a change of background separates the promise from concrete evidence. Carry this identity into later video without treating this homepage's section order as a universal template.",
     "keyCharacteristics": [
-      "White brand actions and a sculptural silver-and-white official shield.",
-      "A charcoal hero and closing frame surrounding a spacious light product story.",
-      "Self-hosted Manrope paired with compact system-mono evidence.",
-      "Flat white product canvases, quiet chrome, and aligned information rows.",
-      "Red for block, amber for review, and neutral active or allow states, always labeled.",
-      "Finite explanatory motion, native controls, and complete static fallbacks."
+      "Black and off-white fields with neutral gray support.",
+      "Official geometry, realistic metallic depth, flat interface surfaces.",
+      "Short copy, visible actions, native controls, explicit illustrative examples."
     ],
     "rules": [
       {
-        "name": "The White Identity Rule",
-        "body": "White and neutral metal carry Warden's brand. Do not introduce green, mint, or teal as brand, action, activation, or lighting accents.",
+        "name": "The Neutral Verdict Rule",
+        "body": "Blocked and Allowed use words and distinct icons; neither needs a red or green brand accent.",
         "section": "colors"
-      },
-      {
-        "name": "The Labeled Verdict Rule",
-        "body": "Red means block and amber means review or hold. Active and allow stay neutral. Pair every verdict with explicit words, an icon, or both; choose the dedicated semantic tokens for its light or dark surface.",
-        "section": "colors"
-      },
-      {
-        "name": "The Statement and Evidence Rule",
-        "body": "Use Manrope for statements and interface content; reserve mono for times, rule IDs, counts, limits, platforms, and audit references.",
-        "section": "typography"
-      },
-      {
-        "name": "The Readable Evidence Rule",
-        "body": "Reflow dense rows and wrap technical strings on narrow screens. Keep compact badges and secondary references at or above 0.6875rem, and keep request and decision copy larger.",
-        "section": "typography"
-      },
-      {
-        "name": "The Immediate Download Rule",
-        "body": "The primary platform download is visible from first paint, before the demonstration, and never moves or waits for a verdict sequence.",
-        "section": "layout"
-      },
-      {
-        "name": "The Native Scroll Rule",
-        "body": "Keep browser-native vertical scrolling. Chapters can play once when visible; they never pin the viewport, trap the wheel, or require playback to reveal the complete story.",
-        "section": "layout"
-      },
-      {
-        "name": "The Flat Product Rule",
-        "body": "Separate product content through spacing, alignment, tonal surfaces, and hairlines. Keep rows and panels steady at rest and on hover; reserve physical staging for the shield illustration.",
-        "section": "elevation"
-      },
-      {
-        "name": "The Readable Rest Rule",
-        "body": "Motion explains cause and effect, then stops. A visitor must be able to inspect the full decision without chasing moving content.",
-        "section": "components"
-      },
-      {
-        "name": "The Honest Fallback Rule",
-        "body": "No-JavaScript and reduced-motion experiences show complete content and real native controls; they do not expose instructions for interactions that are unavailable.",
-        "section": "components"
       }
     ],
     "dos": [
-      "**Do** lead with white brand actions and the official silver-and-white sculpted shield.",
-      "**Do** give product examples light, flat working surfaces, aligned rows, and readable dark text.",
-      "**Do** use red for block, amber for review, and neutral active or allow states with explicit labels or icons.",
-      "**Do** keep the immediate platform download visible and repeat concrete macOS and Windows downloads near the close.",
-      "**Do** distinguish example drafts from activated rules and keep full rule text available through native disclosures.",
-      "**Do** preserve local Manrope assets and their license, native scrolling, visible focus, and 44px interaction targets.",
-      "**Do** provide complete static evidence for reduced-motion and no-JavaScript visitors.",
-      "**Do** preserve the existing analytics hooks and defer factual product claims to `PRODUCT.md`."
+      "**Do** preserve the official symbol, wordmark and vector contours in web and video.",
+      "**Do** keep a short promise, a clear action and concrete evidence easy to find.",
+      "**Do** preserve native controls, visible keyboard focus and readable fallback content.",
+      "**Do** distinguish illustrative requests from live product behavior and retain connection qualifiers.",
+      "**Do** treat this implementation as a proposal until the user gives taste feedback."
     ],
     "donts": [
-      "**Don't** reintroduce green, mint, or teal as Warden's brand, action, status, or shield-lighting direction.",
-      "**Don't** restore the obsolete continuous dark product treatment or let unused legacy styles override the active v2 system.",
-      "**Don't** box the hero shield into another dashboard or give every product row its own card and shadow.",
-      "**Don't** replace the supplied mark geometry or present the current code-led direction as an approved visual comp.",
-      "**Don't** add generic particles, constant ambient motion, scroll traps, or letter-by-letter headline animation.",
-      "**Don't** delay, move, or hide the primary download while the demonstration plays.",
-      "**Don't** convey a verdict by color alone or turn read-only examples into misleading editable controls.",
-      "**Don't** invent product evidence, installer destinations, customers, or analytics payloads for a visual effect."
+      "**Don't** add chromatic accents or replace the official mark with a generic shield.",
+      "**Don't** add explanatory cards when typography and space can carry the content.",
+      "**Don't** use color alone for a decision or remove the private/public example's native radio semantics.",
+      "**Don't** turn local policy checks into claims that no data ever leaves the device or that every tool is protected automatically.",
+      "**Don't** infer approval of a future video, change product facts or invent proof from this design document."
     ]
   }
 }

@@ -1,47 +1,26 @@
 ---
 name: Warden
-description: Continuous graphite, charcoal product surfaces, the official silver shield, and a concise client confidentiality story.
+description: Quiet black and white, the official silver shield, and concise evidence of user control.
 colors:
-  white: "#ffffff"
-  white-hover: "#e4e4df"
-  white-ink: "#17181b"
-  night-950: "#101113"
-  night-900: "#151619"
-  night-850: "#1b1d20"
-  night-800: "#222428"
-  night-750: "#2a2c30"
-  steel-500: "#777b83"
-  steel-400: "#969ba3"
-  steel-300: "#b5b8be"
-  steel-200: "#d5d7db"
-  paper: "#f2f2ef"
-  line-soft: "#2b2d31"
-  line: "#393c41"
-  line-strong: "#62666d"
-  product-bg: "#17191c"
-  product-raised: "#1d1f23"
-  product-sunken: "#272a30"
-  product-line: "#3b3e44"
-  product-soft-line: "#303339"
-  product-ink: "#f2f2f0"
-  product-secondary: "#c2c5cc"
-  product-faint: "#a6aab3"
-  product-block: "#efeff1"
-  product-block-soft: "#35383f"
-  product-review: "#dddfe4"
-  product-review-soft: "#35383f"
+  warden-black: "#080808"
+  warden-white: "#f4f4f2"
+  warden-ink: "#181818"
+  warden-muted-dark: "#a3a3a3"
+  warden-muted-light: "#61615f"
+  warden-line-dark: "#303030"
+  warden-line-light: "#d7d7d3"
 typography:
   display:
     fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "clamp(3.4rem, 14vw, 6rem)"
-    fontWeight: 600
-    lineHeight: 1.02
+    fontSize: "clamp(2.6rem, 6vw, 5.25rem)"
+    fontWeight: 580
+    lineHeight: 1.1
     letterSpacing: "-0.04em"
   title:
     fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "clamp(2.4rem, 8vw, 4.1rem)"
+    fontSize: "clamp(2rem, 4vw, 3.5rem)"
     fontWeight: 550
-    lineHeight: 1.05
+    lineHeight: 1.12
     letterSpacing: "-0.04em"
   body:
     fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -49,21 +28,20 @@ typography:
     fontWeight: 400
     lineHeight: 1.55
     letterSpacing: "-0.012em"
+  action:
+    fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: "0.875rem"
+    fontWeight: 650
+    lineHeight: 1
   label:
-    fontFamily: 'ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace'
+    fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "0.75rem"
-    fontWeight: 520
-    letterSpacing: "0.08em"
+    fontWeight: 400
 rounded:
-  sm: "0.375rem"
-  md: "0.375rem"
-  lg: "1rem"
-  xl: "1.5rem"
-  product: "0.25rem"
-  product-control: "0.2rem"
-  badge: "0.15rem"
+  warden-radius: "12px"
+  warden-control-radius: "999px"
+  dialog: "1rem"
 spacing:
-  "1": "0.25rem"
   "2": "0.5rem"
   "3": "0.75rem"
   "4": "1rem"
@@ -71,95 +49,110 @@ spacing:
   "6": "1.5rem"
   "8": "2rem"
   "10": "2.5rem"
-  "12": "3rem"
-  "16": "4rem"
-  "20": "5rem"
-  "24": "6rem"
 components:
   button-primary:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.white-ink}"
-    rounded: "{rounded.md}"
-    padding: "0.75rem 1.125rem"
-    height: "48px"
-  button-primary-hero:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.white-ink}"
-    rounded: "0.35rem"
-    padding: "0.9rem 1.2rem"
-    height: "56px"
+    backgroundColor: "{colors.warden-white}"
+    textColor: "{colors.warden-ink}"
+    typography: "{typography.action}"
+    rounded: "{rounded.warden-control-radius}"
+    padding: "0.85rem 1.25rem"
   button-primary-hover:
-    backgroundColor: "{colors.white-hover}"
-    textColor: "{colors.white-ink}"
-    rounded: "{rounded.md}"
-  button-secondary:
-    backgroundColor: "{colors.night-900}"
-    textColor: "{colors.paper}"
-    rounded: "{rounded.md}"
-    padding: "0.75rem 1.125rem"
-    height: "48px"
-  button-product:
-    backgroundColor: "{colors.product-ink}"
-    textColor: "{colors.product-bg}"
-    rounded: "{rounded.product-control}"
-    padding: "0.7rem 0.85rem"
-    height: "44px"
-  policy-field:
-    backgroundColor: "{colors.product-raised}"
-    textColor: "{colors.product-ink}"
-    padding: "1.25rem 1rem 1rem"
-  product-panel:
-    backgroundColor: "{colors.product-bg}"
-    textColor: "{colors.product-ink}"
-    rounded: "{rounded.product}"
-  badge-block:
-    backgroundColor: "{colors.product-block-soft}"
-    textColor: "{colors.product-block}"
-    rounded: "{rounded.badge}"
-    padding: "0.22rem 0.45rem"
-  badge-review:
-    backgroundColor: "{colors.product-review-soft}"
-    textColor: "{colors.product-review}"
-    rounded: "{rounded.badge}"
-    padding: "0.22rem 0.45rem"
+    backgroundColor: "{colors.warden-line-light}"
+    textColor: "{colors.warden-black}"
+  film-link:
+    textColor: "{colors.warden-muted-dark}"
+    typography: "{typography.label}"
+  example-panel:
+    backgroundColor: "{colors.warden-black}"
+    textColor: "{colors.warden-white}"
+    rounded: "{rounded.warden-radius}"
+  example-selector:
+    textColor: "{colors.warden-muted-dark}"
+  navigation:
+    textColor: "#b5b5b5"
 ---
 
-# Warden design
+# Design System: Warden
 
-A continuous graphite background carries the page from hero to closing. White and gray text, restrained charcoal product surfaces and the official silver shield establish the identity. Use short statements, aligned rows and clear labels to follow one client confidentiality example from instruction through review, activation, refusal and decision log. Usage limits are a compact secondary example.
+## Overview
 
-This document records the implemented landing. Its visual sources are [`foundation-v2.css`](landing/foundation-v2.css), [`experience-v2.css`](landing/experience-v2.css) and [`product-scenes-v2.css`](landing/product-scenes-v2.css). [`PRODUCT.md`](PRODUCT.md) governs product claims, and [`brand/`](brand/README.md) governs the mark geometry.
+**Creative North Star: "Quiet contrast"**
 
-## Palette and typography
+**Status: implementation authorized for main on 2026-09-20.** The user requested shipping, followed by a correction to the 3D logo quality. The named direction is a working description. The user requested less text and fewer components, black and white, preservation of the official logo, and taste informed by Plaude.
 
-Use the neutral tokens above throughout the page, including Block, Held, Active and Allowed states. Words and status icons carry each verdict; color is never its sole meaning. Keep the shield’s lighting neutral, product surfaces charcoal and primary actions white with dark labels. Section boundaries use spacing and quiet rules within the same graphite field.
+Warden combines a restrained interface with one substantial object: its official shield in neutral silver. Short statements and generous space give the mark room; a change of background separates the promise from concrete evidence. Carry this identity into later video without treating this homepage's section order as a universal template.
 
-Manrope is self-hosted in `landing/assets/brand/Manrope-Variable.ttf`, with its local SIL Open Font License and `font-display: swap`. Use it for statements, interface content and controls. Reserve system mono for rule IDs, times, counts, platform details and terminal evidence. The hero uses weight 600; chapter titles use 550 with tight leading. Supporting prose uses 1rem with comfortable line spacing and short measures. Responsive rules in the active stylesheets define the final sizes.
+**Key Characteristics:**
+- Black and off-white fields with neutral gray support.
+- Official geometry, realistic metallic depth, flat interface surfaces.
+- Short copy, visible actions, native controls, explicit illustrative examples.
 
-## Composition
+The effective homepage cascade is [foundation-v2.css](landing/foundation-v2.css), then [design-system.css](landing/design-system.css), then [landing.css](landing/landing.css). These tokens describe that implementation. [Design notes](docs/design/README.md), [reference research](docs/design/RESEARCH.md), [landing brief](docs/design/LANDING.md) and [video direction](docs/design/VIDEO-DIRECTION.md) carry the supporting rationale and surface-specific decisions. The detailed original journey remains at [how-it-works.html](landing/how-it-works.html), with its own existing styles. Product truth comes from [PRODUCT.md](PRODUCT.md); official mark authority comes from [brand/README.md](brand/README.md).
 
-The hero reads **“Your AI. Your rules.”** above one short explanation and an immediate, flat 56px download link with a platform icon, label and trailing arrow. Beside it, the native `.hero-art` replay button combines an unboxed request trace with the official 3D shield. The opening fills the viewport below the header, with the title and shield centered in the available space. A compact compatibility strip names Claude Code, Codex and OpenCode at the bottom edge and leads into the story. The alternate platform, film and free/open-source line reserve their space and begin appearing at 1.9 seconds. The sticky header keeps a download available while scrolling.
+## Colors
 
-The main story has three chapters. Write presents the instruction and proposed rules, with review and activation visibly separate. Hit blocks a request to include one client’s private pricing in another client’s email. Log carries that request and the same contract-terms rule into the decision record, followed by an allowed email using public pricing. Keep usage limits as a compact follow-up below this sequence. The footer closes with **“Download Warden”** and the free/open-source line directly beneath it. One flat download button sits beside the heading, with the other platform and Linux release link below it. The existing Windows detection moves that installer into the primary position. Keep this close unboxed and smaller than the hero.
+### Primary
 
-The frame supports a 20rem minimum viewport and a 90rem content width. Gutters grow from 1.125rem to 2rem at 48rem. Content stacks on small screens; at 64rem the hero gives its request trace and shield a wider column beside the copy. The hero uses a minimum viewport height rather than a fixed height, so short screens and enlarged text can scroll naturally. Stacked artwork is capped at 21rem on phones and 28rem on tablets to keep the first scene together. Write pairs a narrower text column with a wider panel; Hit reverses those columns, and Log places its heading above a full-width panel. Larger gaps and top padding separate the chapters. Wrap request text and technical strings. Full rule definitions stay inside native disclosures to keep the resting page concise.
+**Quiet white** (`warden-white`) is the primary action and major statement color on black; it also supplies the light evidence field. **Studio black** (`warden-black`) carries the hero, closing section and example panel. Neither is a chromatic accent.
 
-Product surfaces use one outer hairline, quiet charcoal chrome and restrained elevation. Separate rows with spacing and fine rules. Product panels use 0.25rem corners, actions 0.2rem and badges 0.15rem. Preserve the official shield silhouette and internal mark.
+### Neutral
 
-## Motion and controls
+**Dark ink** (`warden-ink`) provides light-surface text. **Muted dark** and **muted light** support text on their respective surfaces. **Dark line** separates evidence rows and the footer; **light line** is also the primary button hover fill. Selected example labels and focus rings use literal white from the foundation.
 
-Write and Hit use a short native scroll sequence, adding half a viewport of scroll with a sticky stage only at desktop widths of at least 64rem, viewport heights of at least 40rem, and when the whole stage fits beneath the header. The other chapters stay in ordinary flow. Mobile and shorter layouts use a finite sequence on entry, then hold the result. Wheel, touch and keyboard scrolling remain native.
+**The Neutral Verdict Rule.** Blocked and Allowed use words and distinct icons; neither needs a red or green brand accent.
 
-Write retains native Describe, Review and Activate buttons, Replay, and explicit Draft/Activate actions. Manual choices cancel playback; keyboard focus in these controls pauses the sequence. Full rules use native `details`/`summary`; connected tools use radio inputs and labels. Keep the read-only composer out of the tab sequence and make clear that these actions only change an illustrative example. Interactive targets are at least 44px high, with a visible 2px focus outline appropriate to the surface.
+The shared foundation still declares coral and amber for older fragments. Do not promote these unused homepage tokens into the new brand palette. The film dialog retains its existing cool charcoal surface and slightly blue-black backdrop; it is an inherited component, not a new accent direction.
 
-`hero-trace.js` plays a finite 4.4-second sequence: two blocked requests, then an allowed request, before resting on the first blocked result. The native `.hero-art` button replays it with pointer or keyboard activation. The trace stops when offscreen or hidden and stays on the static blocked result for reduced motion or without JavaScript. The download remains available throughout.
+## Typography
 
-The hero’s shield has a finite 1.9-second entrance and a subtle fine-pointer rotation/reflection response that settles. The hero also has a slight drift with native scroll. Rendering sleeps when settled, offscreen or in a hidden document. Keep the local `shield-fallback.png` for reduced-motion, low-capability, no-JavaScript and WebGL failure paths.
+Manrope is self-hosted with `font-display: swap` at `landing/assets/brand/Manrope-Variable.ttf`. The frontmatter owns desktop display, title, body, action and label values. The hero pairs a lighter first phrase (400) with the display weight for the second. Titles and decision labels use tight, restrained tracking rather than heavy bold. The example decision scales from 1.5rem to 2rem at weight 540.
 
-Reduced motion presents completed story content without typing, animated transitions or sticky stages. No-JavaScript visitors retain readable content, native disclosures, tool selection and direct downloads; unavailable scripted controls are hidden. The head watchdog restores readable content if the main module cannot load. The film is a direct media link enhanced into a native dialog with native video controls and a lazy source; closing pauses playback and restores focus.
+Supporting hero copy uses a 1.5 line height. Navigation and option labels use 0.8125rem; fine example captions use 0.6875rem. The foundation's monospace family is available for genuine technical evidence on the detailed page; the new homepage's labels are sans-serif.
 
-## Social preview and measurement
+## Layout
 
-[`landing/social-card.html`](landing/social-card.html) composes the official shield and lockup on graphite with “AI rules that actually apply.” and “Free. Open source.” [`scripts/render-social-card.mjs`](scripts/render-social-card.mjs) produces the 1200 × 630 [`warden-share-v2.png`](landing/assets/share/warden-share-v2.png) referenced by Open Graph and Twitter metadata. Keep this card consistent with the page’s neutral identity.
+The default content width is 68rem plus gutters; the proof wrapper has a total maximum width of 58rem. Gutters grow from 1.125rem to 2rem at 48rem. The page supports a 20rem minimum viewport. The absolute header has a separate 100rem cap and fluid horizontal padding; it does not remain sticky on this homepage.
 
-Preserve the existing analytics IDs and data hooks for download/release links, section views, manual story steps, replay, native tool changes and film events. Autoplay is not a manual step selection. PostHog retains production-host gating, explicit local test mode, Do Not Track handling and allowlisted payloads without prompt text or automatic DOM capture. Production also retains Vercel page views. [`landing/ANALYTICS.md`](landing/ANALYTICS.md) defines test filters and the separate meanings of clicks, file downloads and installations.
+The current surface centers “Your AI. Your rules.”, a short descriptor, the shield and stacked download/film actions on black. A compact compatibility row leads into a white evidence section containing one native private/public example. A black closing section repeats the download. Detailed workflow content lives on the linked page. Keep this composition in the surface brief, not as a mandate for every future screen.
+
+Below 48rem, the headline becomes `clamp(2.6rem, 10.5vw, 4rem)` with 1.08 leading and a 10ch maximum; its first phrase forms a separate line. Description width is 26ch, artwork scales from 14rem to 21rem, evidence padding decreases, and footer copy/actions stack. Desktop artwork scales from 17rem to 26rem. Short desktop windows at 650px high or less use a 38rem minimum hero and 18rem artwork. All minimum heights allow content to grow; scrolling stays native.
+
+## Elevation & Depth
+
+The interface is flat: background contrast, spacing and hairlines establish structure. The exception is the inherited film dialog shadow (`0 2rem 6rem rgb(0 0 0 / 0.62)`). Do not add card shadows to the proof or download controls.
+
+The official shield supplies material depth. [official-shield.js](landing/assets/3d/official-shield.js) extrudes the canonical vector contours, preserving the ring opening and internal mark, with neutral metallic faces and reflected white studio lights. It is real geometry, not a generic shield or an approximate letter. The renderer uses 64 curve segments, 16 bevel segments and crease-aware shared normals to remove faceted reflections while preserving sharp corners. The canvas supersamples at 2–3× CSS size (1.5× device pixel ratio, capped at 3×), including Retina screens.
+
+[shield.js](landing/shield.js) runs a finite 4.8-second entrance, then settles. Fine pointers cause a small rotation and changing reflection. Rendering stops when settled, offscreen or in hidden tabs. Reduced motion renders the completed stationary pose; a PNG stays available for no JavaScript or rendering failure. The renderer's deterministic 0–2.6-second clock is stretched to the entrance duration by the controller. The homepage currently has no visible scroll-driven shield drift.
+
+## Shapes
+
+The official mark's outline and proportions are binding. Primary download controls are pills; the evidence panel has gently rounded corners. The film dialog retains its larger foundation radius. Fine dividers structure the example without nested cards. Status icons remain open, monochrome line drawings with visible text labels.
+
+## Components
+
+**Download.** Off-white pill with dark text and an operating-system icon; minimum height 48px. Hover changes to light gray on fine pointers. The hero inherits a small pressed translation/scale from the shared button. Footer downloads use the same resting appearance without that pressed transform. Direct links work before enhancement; platform detection updates the primary installer and footer ordering. Preserve existing installer targets and hooks.
+
+**Film link and dialog.** A quiet text link beneath the download, with a play icon and 44px minimum target. It directly links to the existing film and enhances into a native dialog with native video controls, lazy media loading, Escape/close support, pause on close and focus restoration. The current film is an existing asset; this proposal does not claim it was remade.
+
+**Navigation.** Official inline symbol and wordmark on the left; quiet GitHub and Download links on the right. Links are at least 44px high. The header's GitHub link hides below 48rem, while source remains available in the footer. Preserve accessible names on the lockup.
+
+**Policy example.** One black fieldset with a descriptive legend, a rule, Active status, native radios, request text and outcome. The two radio labels have 48px targets and a thin selected underline. Arrow keys use native radio behavior; the focused radio places a visible outline on its label. CSS switches the matching content even without JavaScript. The panel is explicitly an illustrative example, not a live policy editor. “For connected tools” stays visible nearby.
+
+**Focus and motion.** Use a 2px focus outline offset by 4px, white on dark and dark on light. Example selection transitions in 180ms with `cubic-bezier(.16, 1, .3, 1)`; inherited buttons/navigation use 160ms. Reduced motion disables smooth scrolling and effectively removes CSS transitions. The skip link and keyboard access remain functional. Do not conceal meaningful content behind animation.
+
+## Do's and Don'ts
+
+### Do:
+- **Do** preserve the official symbol, wordmark and vector contours in web and video.
+- **Do** keep a short promise, a clear action and concrete evidence easy to find.
+- **Do** preserve native controls, visible keyboard focus and readable fallback content.
+- **Do** distinguish illustrative requests from live product behavior and retain connection qualifiers.
+- **Do** treat this implementation as a proposal until the user gives taste feedback.
+
+### Don't:
+- **Don't** add chromatic accents or replace the official mark with a generic shield.
+- **Don't** add explanatory cards when typography and space can carry the content.
+- **Don't** use color alone for a decision or remove the private/public example's native radio semantics.
+- **Don't** turn local policy checks into claims that no data ever leaves the device or that every tool is protected automatically.
+- **Don't** infer approval of a future video, change product facts or invent proof from this design document.

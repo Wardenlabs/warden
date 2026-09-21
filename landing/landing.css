@@ -1,0 +1,118 @@
+/* A mark, a promise, a proof. The full product tour lives at how-it-works.html. */
+html { scrollbar-color: #666 var(--warden-black); }
+body { background: var(--warden-black); }
+header { position: absolute; inset: 0 0 auto; background: transparent; }
+header .bar { width: 100%; max-width: 100rem; padding-inline: clamp(1.25rem, 4vw, 4rem); }
+header .brand { gap: .5rem; }
+header .brand .mark { width: 1.6rem; height: 1.6rem; }
+header .brand .word { width: 5.2rem; }
+header nav { gap: 1.5rem; }
+header nav > a:not(.btn) { gap: .4rem; padding: 0; color: #b5b5b5; font-size: .8125rem; }
+header nav .nav-download { color: #eee; }
+.nav-download svg { width: 1rem; height: 1rem; }
+.hero-zone { --hero-scroll: 0; position: relative; background: var(--warden-black); }
+.hero { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; min-height: min(55rem, calc(100svh - 3.5rem)); padding-top: calc(var(--header-height) + 2rem); padding-bottom: 1.5rem; text-align: center; }
+.hero .copy { position: relative; z-index: 1; }
+.hero h1 { color: var(--warden-white); font-size: var(--warden-display); font-weight: 580; letter-spacing: -.04em; line-height: 1.1; }
+.hero h1 > span { color: #b0b0b0; font-weight: 400; }
+.hero-description { margin-top: 1rem; color: var(--warden-muted-dark); font-size: 1rem; line-height: 1.5; }
+.hero-art { position: relative; width: clamp(17rem, 44svh, 26rem); aspect-ratio: 1; max-width: 100%; margin-block: .5rem; }
+.hero-sculpture { position: absolute; inset: 0; }
+.hero-sculpture img, .hero-sculpture canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cta { display: flex; flex-direction: column; align-items: center; gap: .45rem; }
+.hero .hero-download { min-height: 48px; padding: .85rem 1.25rem; gap: .7rem; border: 0; border-radius: var(--warden-control-radius); background: var(--warden-white); color: var(--warden-ink); font-size: .875rem; font-weight: 650; }
+.hero-download > .os { width: 1rem; height: 1rem; }
+.download-arrow { display: none; }
+.hero-film { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; color: var(--warden-muted-dark); font-size: .75rem; text-decoration: none; }
+.hero-film svg { width: .8rem; height: .8rem; }
+.compatibility { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 2.5rem; min-height: 3.5rem; padding: .75rem 1.25rem; color: #aaa; font-size: .75rem; }
+
+/* White marks the change from brand to evidence. One example, two outcomes. */
+.proof { padding-block: clamp(4rem, 9vw, 8rem); background: var(--warden-white); color: var(--warden-ink); color-scheme: light; }
+.proof .main { max-width: 58rem; }
+.proof-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem 2rem; margin-bottom: 2.5rem; }
+.proof h2 { font-size: var(--warden-title); font-weight: 550; line-height: 1.12; letter-spacing: -.04em; }
+.proof-heading > a { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; color: var(--warden-muted-light); font-size: .8125rem; text-decoration: none; }
+.policy-example { min-inline-size: 0; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: var(--warden-radius); background: var(--warden-black); color: var(--warden-white); color-scheme: dark; }
+.example-rule { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; align-items: center; padding: 2rem 2.5rem; border-bottom: 1px solid var(--warden-line-dark); }
+.example-label { grid-column: 1/-1; color: var(--warden-muted-dark); font-size: .75rem; }
+.example-rule p { font-size: clamp(1.125rem, 2.6vw, 1.5rem); font-weight: 500; line-height: 1.4; letter-spacing: -.025em; }
+.active-rule { display: inline-flex; gap: .35rem; align-items: center; color: #b8b8b8; font-size: .75rem; }
+.active-rule svg { width: 1rem; height: 1rem; }
+.example-switch { display: flex; gap: 1.5rem; padding-inline: 2.5rem; padding-top: .5rem; }
+.example-switch label { position: relative; display: inline-flex; align-items: center; min-height: 48px; color: var(--warden-muted-dark); font-size: .8125rem; cursor: pointer; }
+.example-switch label::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: var(--warden-white); transform: scaleX(0); transition: transform var(--warden-fast) var(--warden-ease); }
+#example-private:checked ~ .example-switch label[for="example-private"], #example-public:checked ~ .example-switch label[for="example-public"] { color: #fff; }
+#example-private:checked ~ .example-switch label[for="example-private"]::after, #example-public:checked ~ .example-switch label[for="example-public"]::after { transform: scaleX(1); }
+#example-private:focus-visible ~ .example-switch label[for="example-private"], #example-public:focus-visible ~ .example-switch label[for="example-public"] { outline: 2px solid #fff; outline-offset: 4px; }
+.example-case { display: none; padding: 2.5rem; }
+#example-private:checked ~ .case-private, #example-public:checked ~ .case-public { display: block; }
+.example-request { min-height: 3.25rem; color: #b8b8b8; font-size: clamp(1rem, 2.2vw, 1.25rem); line-height: 1.5; }
+.example-decision { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.example-decision > svg { width: 1.4rem; height: 1.4rem; }
+.example-decision strong { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 540; line-height: 1.2; letter-spacing: -.03em; }
+.example-decision > span { color: var(--warden-muted-dark); font-size: .8125rem; }
+.example-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; padding: 1.25rem 2.5rem; border-top: 1px solid var(--warden-line-dark); color: var(--warden-muted-dark); font-size: .6875rem; }
+.proof-note { margin-top: 1.25rem; color: var(--warden-muted-light); font-size: .75rem; line-height: 1.7; }
+.proof-note a { color: inherit; text-decoration-color: #aaa; text-underline-offset: .25em; }
+.proof a:focus-visible { outline-color: var(--warden-ink); }
+.proof ::selection { background: var(--warden-ink); color: var(--warden-white); }
+
+/* A compact close. Other installers are plain links below the primary. */
+footer { background: var(--warden-black); }
+.foot { padding-block: clamp(3rem, 7vw, 6rem) 1.5rem; }
+.closing-copy { display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center; }
+.close { color: var(--warden-white); font-size: var(--warden-title); font-weight: 550; line-height: 1.12; letter-spacing: -.04em; }
+.fine { margin-top: 1rem; color: var(--warden-muted-dark); font-size: .8125rem; }
+.dl { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .5rem 1.25rem; max-width: 25rem; }
+.dl::after { content: ""; flex-basis: 100%; order: -1; }
+.dl > a { display: inline-flex; align-items: center; gap: .6rem; min-height: 44px; color: var(--warden-muted-dark); font-size: .75rem; text-decoration: none; }
+.dl > a > svg, .dl .dl-verb, .dl .go { display: none; }
+.dl > a:first-child { order: -2; min-height: 48px; padding: .85rem 1.25rem; border-radius: var(--warden-control-radius); background: var(--warden-white); color: var(--warden-ink); white-space: nowrap; }
+.dl > a:first-child > svg { display: block; width: 1rem; height: 1rem; flex: none; }
+.dl > a:first-child .dl-verb { display: inline; }
+.dl > a:first-child .t { font-size: .875rem; font-weight: 650; }
+.links { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem 1.25rem; margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--warden-line-dark); color: var(--warden-muted-dark); font-size: .75rem; }
+.links .brand { display: inline-flex; align-items: center; gap: .4rem; color: var(--warden-white); margin-right: auto; }
+.links .brand .mark { width: 1.35rem; height: 1.35rem; }
+.links .brand .word { width: 4.5rem; height: auto; }
+.links > a { display: inline-flex; align-items: center; min-height: 44px; }
+.links .sep { display: none; }
+.film-bar button { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 47.999rem) {
+  :root { --header-height: 4rem; }
+  header nav { gap: 1.25rem; }
+  header .bar nav > .nav-source { display: none; }
+  header .brand .word { width: 4.75rem; }
+  .hero { min-height: calc(100svh - 3.5rem); padding-top: calc(var(--header-height) + 1.5rem); padding-bottom: .75rem; }
+  .hero h1 { max-width: 10ch; font-size: clamp(2.6rem, 10.5vw, 4rem); line-height: 1.08; }
+  .hero h1 > span { display: block; }
+  .hero-description { max-width: 26ch; margin: 1rem auto 0; font-size: .875rem; }
+  .hero-art { width: clamp(14rem, 37svh, 21rem); margin-block: .5rem; }
+  .compatibility { gap: 1.5rem; font-size: .6875rem; }
+  .proof-heading { margin-bottom: 1.5rem; }
+  .example-rule { padding: 1.5rem; grid-template-columns: 1fr; }
+  .active-rule { margin-top: .25rem; }
+  .example-switch { padding-inline: 1.5rem; gap: 1.5rem; }
+  .example-case { padding: 2rem 1.5rem; }
+  .example-request { min-height: 3rem; }
+  .example-decision { gap: .6rem; }
+  .example-decision > span { flex-basis: 100%; padding-left: 2rem; }
+  .example-caption { padding: 1rem 1.5rem; }
+  .closing-copy { grid-template-columns: 1fr; text-align: center; gap: 1.75rem; }
+  .dl { justify-content: center; max-width: 24rem; margin: auto; gap: .5rem 1rem; }
+  .links { gap: .25rem 1rem; margin-top: 2.5rem; }
+  .links .brand { flex-basis: 100%; margin-bottom: .5rem; }
+}
+@media (max-height: 650px) and (min-width: 48rem) {
+  .hero { min-height: 38rem; }
+  .hero-art { width: 18rem; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .hero-download:hover, .dl > a:first-child:hover { background: #d7d7d3; color: #080808; }
+  .hero-film:hover, .links a:hover, header nav a:hover, .dl > a:not(:first-child):hover { color: #fff; }
+  .proof-heading > a:hover, .proof-note a:hover { color: #080808; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .example-switch label::after { transition: none; }
+}

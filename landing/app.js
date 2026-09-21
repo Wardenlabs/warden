@@ -58,10 +58,6 @@ function makeTyper(elements) {
 }
 
 const zone = document.querySelector('.hero-zone');
-let heroChoiceTimer;
-function showHeroChoices() { clearTimeout(heroChoiceTimer); zone?.classList.add('hero-ready'); }
-if (motion.matches) showHeroChoices();
-else heroChoiceTimer = setTimeout(showHeroChoices, 1900);
 
 const revealables = $$('[data-reveal]');
 let revealObserver;
@@ -262,7 +258,6 @@ if ('ResizeObserver' in window) {
 
 motion.addEventListener('change', () => {
   if (!motion.matches) return;
-  showHeroChoices();
   revealObserver?.disconnect(); revealables.forEach(el => el.classList.add('is-in'));
   chapters.forEach(complete); sizeStories();
 });
@@ -336,7 +331,7 @@ const shieldStages = $$('.shield-stage, .hero-sculpture');
 const lowCapability = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
 for (const shieldStage of shieldStages) {
 if (!motion.matches && !lowCapability) {
-  const mount = () => import('./shield.js?v=scroll-story-1')
+  const mount = () => import('./shield.js?v=studio-hd-2')
     .then(({ mountShield }) => mountShield(shieldStage)).catch(() => {});
   if (hasIO) {
     const observer = new IntersectionObserver(entries => {
@@ -347,6 +342,3 @@ if (!motion.matches && !lowCapability) {
   } else mount();
 }
 }
-
-const heroArt = document.querySelector('[data-hero-replay]');
-if (heroArt) import('./hero-trace.js?v=hero-flow-1').then(({mountHeroTrace}) => mountHeroTrace(heroArt)).catch(() => { heroArt.disabled = true; });

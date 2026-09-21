@@ -1,5 +1,5 @@
 /**
- * The official closing object enters once in 1.9 seconds. Pointer movement
+ * The official object turns through a 4.8-second studio-light entrance. Pointer movement
  * subtly turns its real geometry and reflected light, then rendering stops.
  * Offscreen/hidden tabs do no render work; a PNG remains if enhancement fails.
  */
@@ -13,7 +13,7 @@ export function mountShield(container) {
   const originalImageVisibility = fallback.style.visibility;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-  const duration = 1.9;
+  const duration = 4.8;
   const pointer = { x: 0, y: 0 };
   const target = { x: 0, y: 0 };
   let scene, frame = 0, previousTime = 0, elapsed = 0;
@@ -101,7 +101,7 @@ export function mountShield(container) {
     try {
       const [THREE, { createShield }] = await Promise.all([
         import('./assets/3d/three.module.js'),
-        import('./assets/3d/official-shield.js?v=white-studio-1'),
+        import('./assets/3d/official-shield.js?v=studio-hd-2'),
       ]);
       if (destroyed) return;
       scene = createShield({ THREE, canvas });

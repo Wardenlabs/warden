@@ -1,0 +1,24 @@
+/* Warden / Quiet contrast. Shared values for the landing and future motion work.
+ * Human contract: DESIGN.md and docs/design/. No chromatic accent. */
+:root {
+  --warden-black: #080808;
+  --warden-white: #f4f4f2;
+  --warden-ink: #181818;
+  --warden-muted-dark: #a3a3a3;
+  --warden-muted-light: #61615f;
+  --warden-line-dark: #303030;
+  --warden-line-light: #d7d7d3;
+  --warden-surface: #141414;
+  --warden-radius: 12px;
+  --warden-control-radius: 999px;
+  --warden-content: 68rem;
+  --warden-display: clamp(2.6rem, 6vw, 5.25rem);
+  --warden-title: clamp(2rem, 4vw, 3.5rem);
+  --warden-ease: cubic-bezier(.16, 1, .3, 1);
+  --warden-fast: 180ms;
+  --warden-reveal: 700ms;
+  --bg: var(--warden-black);
+  --page-max: var(--warden-content);
+  --paper: var(--warden-white);
+  --header-height: 4.5rem;
+}

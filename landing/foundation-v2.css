@@ -11,7 +11,7 @@
 :root {
   color-scheme: dark;
 
-  --night-950: #101113;
+  --night-950: #080808;
   --night-900: #151619;
   --night-850: #1b1d20;
   --night-800: #222428;
@@ -91,7 +91,7 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
 
-  --page-max: 90rem;
+  --page-max: 70rem;
   --page-gutter: 1.125rem;
   --header-height: 4rem;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -325,7 +325,6 @@ header {
   top: 0;
   z-index: 100;
   height: var(--header-height);
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   background: var(--bg);
 }
 
@@ -383,6 +382,10 @@ header .header-download {
   min-height: 44px;
   padding-inline: 0.9rem;
   font-size: 0.8125rem;
+  border-color: #383838;
+  border-radius: .5rem;
+  background: transparent;
+  color: #eee;
 }
 
 .hide-sm {
