@@ -54,14 +54,14 @@ La portada y la guía mantienen desplazamiento nativo. La guía avanza únicamen
 
 ## Alineación de la guía y cierre (21 septiembre 2026)
 
-- La guía y su footer comparten un contenedor de 76rem, con un único eje para introducción, títulos, paneles y cierre. El margen interior pasa de 20px a 64px; ningún capítulo vuelve a una composición lateral.
+- La guía usa un contenedor de 76rem, con un único eje para introducción, títulos y paneles. El footer tiene su propio ancho mayor en escritorio. El margen interior pasa de 20px a 64px; ningún capítulo vuelve a una composición lateral.
 - Describe, Review, Activate y Reset pertenecen a la cabecera del mismo panel. El paso seleccionado usa una superficie gris; la acción principal conserva el blanco. La navegación es explícita y el estado sigue anunciado a lectores de pantalla.
 - Separación entre capítulos: 64px en escritorio, 48px en móvil. El bloque de límites sigue exactamente el mismo ritmo.
 - Footer revisado con referencias directas a [Linear](https://linear.app/) y [Vercel](https://vercel.com/): columnas con títulos cortos, enlaces agrupados y metadata separada. Referencias inspeccionadas el 21 septiembre 2026.
 - Tres columnas: marca oficial, Download y Project. El logo llega a 384px. La descarga principal es un botón de altura mínima 44px, con el nombre completo de la acción; macOS no se usa como titular decorativo.
-- La versión y licencia cierran una franja común al pie. La portada conserva 88rem de ancho máximo; la guía comparte sus 76rem con el footer.
+- La versión y licencia cierran una franja común al pie. En escritorio, el footer de ambas páginas usa un contenedor de 80rem y márgenes interiores de 32px, más ancho que el contenido que lo precede.
 - Por debajo de 1024px la marca ocupa una fila propia; por debajo de 576px las descargas y la navegación se apilan. Los enlaces del proyecto se distribuyen en dos columnas en móvil. No se agregan párrafos, animaciones ni secciones ajenas al footer.
 
 ### Ajuste exclusivo de escritorio
 
-La composición móvil quedó aprobada por el usuario. A partir de 1024px, el footer de portada ocupa hasta 64rem, ligeramente más ancho que la prueba del producto, por petición del usuario. La guía conserva su eje de 76rem. El lockup ocupa hasta 256px; descargas y navegación mantienen columnas de lectura próximas y un botón principal de tamaño estable. La separación hasta la metadata es 64px. Los estilos por debajo de 1024px no cambian.
+La composición móvil quedó aprobada por el usuario. A partir de 1024px, el footer ocupa hasta 80rem tanto en la portada como en la guía: debe sobresalir hacia ambos costados respecto al contenido superior, por petición del usuario. La guía conserva su eje de 76rem. El lockup ocupa hasta 256px; descargas y navegación mantienen columnas de lectura próximas y un botón principal de tamaño estable. La separación hasta la metadata es 64px. Los estilos por debajo de 1024px no cambian.

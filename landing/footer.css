@@ -28,7 +28,7 @@
 }
 /* Desktop has a wider closing rail; mobile retains its approved composition. */
 @media (min-width: 64rem) {
-  .site-footer .foot { max-width: 64rem; padding-block: 5rem 2rem; }
+  .site-footer .foot, .guide-page .site-footer .foot { max-width: 80rem; --page-gutter: 2rem; padding-block: 5rem 2rem; }
   .site-footer .footer-grid { grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 1fr) minmax(0, .65fr); gap: clamp(2rem, 4vw, 4rem); }
   .site-footer .footer-brand { max-width: 16rem; gap: .65rem; }
   .site-footer .footer-meta { margin-top: 4rem; }
