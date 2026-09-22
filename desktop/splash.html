@@ -98,32 +98,24 @@
     </div>
 
     <div id="mode" class="section">
-      <h1>Where should this open first?</h1>
-      <p class="sub">
-        You'll end up with both either way — protecting this device, and the
-        tools to manage a team, one click apart in the console. This just
-        picks what you see first.
-      </p>
+      <h1>What do you want to protect?</h1>
+      <p class="sub">Warden checks prompts before they reach an AI model. Choose where to start.</p>
       <div class="row">
-        <button id="btn-solo" class="primary">This device, for me</button>
-        <button id="btn-team">The team console</button>
+        <button id="btn-solo" class="primary">My AI tools</button>
+        <button id="btn-team">A team</button>
       </div>
-      <p class="fine">Installations that already have people in their directory skip straight past this.</p>
+      <p class="fine">You can switch between both views later.</p>
     </div>
 
     <div id="welcome" class="section">
-      <h1>Download the on-device models</h1>
-      <p class="sub">
-        Warden judges every prompt locally, so nothing leaves this machine. That
-        needs <span id="total-mb">~4.3 GB</span> of model weights, fetched once
-        from HuggingFace and kept in your app data folder.
-      </p>
+      <h1>Keep every check on this Mac</h1>
+      <p class="sub">Download <span id="total-mb">~4.3 GB</span> once. Warden then checks prompts without sending them to another service.</p>
       <div id="disk-warn" class="warn"></div>
       <div class="row">
         <button id="btn-download" class="primary">Download models</button>
-        <button id="btn-mock">Try demo mode instead</button>
+        <button id="btn-mock">Explore demo</button>
       </div>
-      <p class="fine">Demo mode runs the whole console against a keyword-matching test double, so you can look around, but it guards nothing and no verdict it shows is evidence about anything. Download the models later from the Gateway menu, or just drop them in: the app picks them up on the next start.</p>
+      <p class="fine">Demo mode uses sample checks so you can explore. It does not protect your tools.</p>
     </div>
 
     <div id="downloading" class="section">

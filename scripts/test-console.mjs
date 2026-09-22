@@ -19,6 +19,7 @@ const { downloadSize } = await import('../web/js/format.js');
 const { compilerNeedsSetup, compilerSetupNudge, compilerSettings, bindCompiler } = await import('../web/js/compiler.js');
 const { compileFailure } = await import('../web/js/answers.js');
 const { restoreSoloRuleText } = await import('../web/js/solo.js');
+const { resultPage } = await import('../web/js/draft-set.js');
 const { promptEditor, acceptPromptCatalog, hasPromptChanges, validatePromptTemplate, promptEditorMarkup, togglePromptEditor, closePromptEditor, loadPrompts } = await import('../web/js/prompt-editor.js');
 await import('../web/js/models.js');
 const { VIEWS } = await import('../web/js/views.js');
@@ -1046,6 +1047,46 @@ test('the five tool states produce five different lines', async () => {
     body = VIEWS.soloRules.body();
     assert.match(body, /Configured · waiting for a real request/);
     assert.ok(!/Judging requests/.test(body), 'wired is not judged, and the tab must not round it up');
+  } finally { Object.assign(state, saved); }
+});
+
+test('a simulator check is not presented as a missing external tool', async () => {
+  await import('../web/js/solo.js');
+  const saved = { ...state };
+  try {
+    Object.assign(state, deviceState({
+      sel: 'tools',
+      compiler: { cliTools: [{ tool: 'claude', label: 'Claude Code', found: true }] },
+      soloIdentity: {
+        id: 'you', name: 'You', role: 'solo', verified: [], devices: [],
+        connected: [{ tool: 'console', at: new Date().toISOString(), verdict: 'ALLOW', ruleIds: [] }]
+      }
+    }));
+    const body = VIEWS.soloRules.body();
+    assert.ok(!body.includes('Warden console'), 'the built-in simulator is not something a person can install or reconnect');
+    assert.match(body, /Claude Code/, 'external tools still appear');
+  } finally { Object.assign(state, saved); }
+});
+
+test('activation leads directly to testing the new rule', () => {
+  const saved = { set: state.set, draftFor: state.draftFor, ruleChat: state.ruleChat, company: state.company };
+  try {
+    state.draftFor = null;
+    state.ruleChat = [{ from: 'you', text: 'Never send my home address to AI tools.' }];
+    state.company = { ...state.company, employees: [] };
+    state.set = {
+      result: 'done',
+      items: [{
+        status: 'active',
+        rule: {
+          id: 'r-home', text: 'Never send my home address to AI tools.',
+          severity: 'block', appliesTo: ['*'], examples: { violating: [], compliant: [] }
+        }
+      }]
+    };
+    const html = resultPage();
+    assert.match(html, /id="testActivated"/);
+    assert.match(html, />Test this rule</);
   } finally { Object.assign(state, saved); }
 });
 

@@ -42,6 +42,62 @@ function hits(text: string, needles: string[]): string[] {
 }
 
 /**
+ * Demo mode cannot understand a rule, but it should still demonstrate the
+ * rule somebody just wrote when the request plainly repeats its subject.
+ *
+ * The fixed signal list above remains the deterministic baseline used by CI.
+ * This narrow lexical check only runs for adjudication and only fires when at
+ * least half of a rule's meaningful words (and at least two) occur in the
+ * request. Questions about preventing or understanding the prohibited action
+ * stay allowed. It is deliberately modest: the splash still says demo mode is
+ * a sample check, while the first-run path no longer makes a fresh rule look
+ * broken when its exact subject is tried.
+ */
+const RULE_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'from', 'into', 'with', 'that', 'this', 'those', 'these',
+  'your', 'their', 'ours', 'mine', 'yours', 'his', 'her', 'its', 'our', 'my',
+  'never', 'must', 'should', 'cannot', 'cant', 'dont', 'doesnt', 'not', 'may',
+  'one', 'anyone', 'someone', 'people', 'person', 'user', 'users',
+  'tool', 'tools', 'assistant', 'assistants', 'model', 'models'
+]);
+
+function words(text: string): string[] {
+  return text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .match(/[a-z0-9]+/g)
+    ?.filter((word) => word.length >= 3 && !RULE_STOP_WORDS.has(word)) ?? [];
+}
+
+function ruleFrom(req: CompleteRequest): string {
+  const direct = /^RULE:\s*(.+)$/mi.exec(req.system)?.[1]?.trim();
+  if (direct) return direct;
+
+  const native = /(?:Does the user's message violate this rule\?|violates this rule:)\s*([^\n]+)/i
+    .exec(`${req.system}\n${req.user}`)?.[1]?.trim();
+  if (native) return native;
+
+  // DynaGuard puts the policy in the user turn. The first policy line is the
+  // rule; later lines are standing instructions and examples.
+  const policy = /## Policy\s*\n(?:\d+\.\s*)?([^\n]+)/i.exec(req.user)?.[1]?.trim();
+  return policy ?? '';
+}
+
+function plainlyRepeatsRule(req: CompleteRequest, subject: string): boolean {
+  if (req.role !== 'adjudicator') return false;
+  if (/^\s*(how|what|why|when|where|who)\b/i.test(subject)) return false;
+  if (/^\s*(can|could|should)\s+(i|we)\b/i.test(subject)) return false;
+  if (/\b(prevent|avoid|protect|policy|process|procedure)\b/i.test(subject)) return false;
+
+  const ruleTerms = [...new Set(words(ruleFrom(req)))];
+  if (ruleTerms.length < 2) return false;
+  const requestTerms = new Set(words(subject));
+  const overlap = ruleTerms.filter((term) => requestTerms.has(term)).length;
+  return overlap >= 2 && overlap / ruleTerms.length >= 0.5;
+}
+
+/**
  * Read only what sits inside the untrusted envelope.
  *
  * The surrounding prompt is ours — it asks things like "does this attempt to
@@ -67,7 +123,9 @@ export class MockQvacAdapter implements QvacAdapter {
     await tick();
     if (req.history) {
       const subject = untrustedPart(req.user);
-      const flagged = hits(subject, INJECTION_SIGNALS).length > 0 || hits(subject, VIOLATION_SIGNALS).length > 0;
+      const flagged = hits(subject, INJECTION_SIGNALS).length > 0
+        || hits(subject, VIOLATION_SIGNALS).length > 0
+        || plainlyRepeatsRule(req, subject);
       const answer = flagged ? 'yes' : 'no';
       return { text: req.history[0]?.role === 'user' ? `<think>\n</think>\n<score>${answer}</score>` : answer, stats: mockStats() };
     }
@@ -77,7 +135,9 @@ export class MockQvacAdapter implements QvacAdapter {
     // under every other form rather than failing closed on every prompt.
     if (/^## Policy$/m.test(req.user)) {
       const subject = untrustedPart(req.user);
-      const flagged = hits(subject, INJECTION_SIGNALS).length > 0 || hits(subject, VIOLATION_SIGNALS).length > 0;
+      const flagged = hits(subject, INJECTION_SIGNALS).length > 0
+        || hits(subject, VIOLATION_SIGNALS).length > 0
+        || plainlyRepeatsRule(req, subject);
       return { text: `<answer>${flagged ? 'FAIL' : 'PASS'}</answer>`, stats: mockStats() };
     }
     return {
@@ -102,7 +162,7 @@ export class MockQvacAdapter implements QvacAdapter {
     const subject = untrustedPart(req.user);
     const injection = hits(subject, INJECTION_SIGNALS);
     const violation = hits(subject, VIOLATION_SIGNALS);
-    const flagged = injection.length > 0 || violation.length > 0;
+    const flagged = injection.length > 0 || violation.length > 0 || plainlyRepeatsRule(req, subject);
 
     // Only the fields the schema insists on. An optional field is the schema
     // giving a model room to say something extra — a refusal, a spending
@@ -232,8 +292,8 @@ function mockValue(
   // work on.
   if (type === 'array') {
     if (k === 'appliesto') return ['*'];
-    if (k === 'violating') return [`mock: ${ctx.subject.slice(0, 80)}`];
-    if (k === 'compliant') return ['mock: a nearby request that must still be allowed'];
+    if (k === 'violating') return [ctx.subject.slice(0, 80)];
+    if (k === 'compliant') return ['Ask how to handle this safely without sharing the protected information.'];
     // The policy splitter. Without this it fell through to `[]`, failed the
     // `min(1)`, and `compilePolicy` caught the failure and quietly compiled the
     // administrator's own sentence as a single rule — which is the correct way
@@ -254,8 +314,8 @@ function mockValue(
 
   if (type === 'object' && k.includes('example')) {
     return {
-      violating: [`mock: ${ctx.subject.slice(0, 80)}`],
-      compliant: ['mock: a nearby request that must still be allowed']
+      violating: [ctx.subject.slice(0, 80)],
+      compliant: ['Ask how to handle this safely without sharing the protected information.']
     };
   }
 
@@ -263,7 +323,9 @@ function mockValue(
   // signal above, because the suggestion is re-judged by the guard before it is
   // shown — a mock rewrite that tripped the mock adjudicator would make the one
   // flow this stands in for impossible to exercise without a model.
-  if (k.includes('rewrit')) return 'mock: a version of this request that stays inside the rule';
+  if (k.includes('rewrit')) return 'A safer version of this request that follows the active rule.';
+
+  if (k.includes('guidance')) return 'Remove the protected information or rewrite the request so it follows the rule.';
 
   if (k.includes('reason') || k.includes('explanation')) {
     if (ctx.injection.length > 0) return `mock: instruction-override phrasing (${ctx.injection[0]})`;

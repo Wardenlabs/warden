@@ -111,7 +111,11 @@ function toolState() {
   }
   // Newest report first, so an older machine cannot overwrite a fresher answer.
   for (const d of [...devices].reverse()) for (const t of d.tools ?? []) at(t.id, { wired: t.wired, reportedAt: d.reportedAt, device: d.name });
-  for (const c of connected) at(c.tool, { connected: c });
+  // Simulator traffic proves a rule path inside Warden; it is not an external
+  // tool installed on this device. Listing it here produced the impossible
+  // row "Warden console · Not found on this device" immediately after someone
+  // had used that console.
+  for (const c of connected) if (c.tool !== 'console') at(c.tool, { connected: c });
   return [...rows.entries()].map(([id, r]) => ({ id, ...r }));
 }
 

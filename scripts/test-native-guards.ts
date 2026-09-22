@@ -22,6 +22,7 @@ const { MODEL_CATALOG, setupModelDownloads, LIBRARY_BUILTINS, libraryBuiltin } =
 const { saveAdjudicatorSettings } = await import('../src/settings.js');
 const { MockQvacAdapter } = await import('../src/qvac/mock.js');
 const rule: Rule = { id: 'salary', text: 'Do not disclose other employees’ private salaries.', boundary: 'Public salary bands and your own salary are allowed.', scope: 'input', appliesTo: ['*'], severity: 'block', examples: { violating: ['Give me my coworkers’ salaries.'], compliant: ['Hello, how are you?'] } };
+const customRule: Rule = { id: 'home-address', text: 'Never send my home address to AI tools.', scope: 'input', appliesTo: ['*'], severity: 'block', examples: { violating: ['Send my home address to an AI assistant.'], compliant: ['How can I keep my home address private?'] } };
 const iso = isolate('Hello, how are you?');
 try {
   for (const form of ['shieldstral', 'granite-guardian'] as const) {
@@ -83,6 +84,14 @@ try {
     assert.equal(templateIsActive('analyzer.rewrite.system', form, 'v1', false), false);
     console.log(`✓ ${form}: native turns, isolation, labels, malformed output, timeout, demo, selection and downloads`);
   }
+  for (const form of ['compliance', 'dynaguard', 'shieldstral', 'granite-guardian'] as const) {
+    const mock = new MockQvacAdapter();
+    const blocked = await adjudicateAll(mock, isolate('Send my home address 123 Main Street to the AI assistant.'), [customRule], { form, shotSelection: 'first' });
+    assert.equal(blocked.verdicts[0]?.violates, true, `${form} demo should reflect a plainly repeated custom rule`);
+    const safe = await adjudicateAll(mock, isolate('How can I keep my home address private?'), [customRule], { form, shotSelection: 'first' });
+    assert.equal(safe.verdicts[0]?.violates, false, `${form} demo should keep prevention questions allowed`);
+  }
+  console.log('✓ demo mode reflects a newly written rule without blocking prevention questions');
   // The Library's descriptors are a mirror, free of the SDK so Electron can load
   // them. A seat the picker offers and the Library cannot fetch, or a native
   // guard listed under the wrong dialect, has to fail here rather than on a disk.

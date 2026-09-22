@@ -1,6 +1,6 @@
 {
   "name": "warden",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "private": true,
   "type": "module",
   "description": "Warden checks connected AI requests against rules you write, with local policy analysis and human review.",
