@@ -238,10 +238,10 @@ test('current HTML still exposes the instrumented native controls and known asse
   const downloads = hrefs.map(href => classifyLink(href, base)).filter(x => x?.name === 'download_clicked');
   assert.equal(downloads.length, 3);
   assert.match(html, /href="#download" class="nav-download"/);
-  assert.match(html, /"softwareVersion": "0\.2\.18"/);
-  assert.match(html, /"releaseNotes": "https:\/\/github\.com\/Wardenlabs\/warden\/releases\/tag\/v0\.2\.18"/);
+  assert.match(html, /"softwareVersion": "0\.2\.19"/);
+  assert.match(html, /"releaseNotes": "https:\/\/github\.com\/Wardenlabs\/warden\/releases\/tag\/v0\.2\.19"/);
   // The release version remains in the download section; the hero keeps only the free/open-source line.
-  assert.equal((html.match(/v0\.2\.18 · Free and open source\./g) || []).length, 1);
+  assert.equal((html.match(/v0\.2\.19 · Free and open source\./g) || []).length, 1);
   const guide = await readFile(new URL('../landing/how-it-works.html', import.meta.url), 'utf8');
   assert.ok(html.includes('href="/how-it-works"'));
   for (const chapter of ['write', 'hit', 'log', 'spend']) assert.ok(guide.includes(`data-chapter="${chapter}"`));

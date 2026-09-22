@@ -1595,7 +1595,7 @@ test('an install that chose the team console gets the team navigation before any
     elements.set('sidebar', sidebar);
     const empty = { name: '', roles: ['admin', 'employee'], employees: [], demo: false };
 
-    Object.assign(state, { view: 'policy', company: empty, health: { installation: { label: 'warden', version: '0.2.18', intent: 'team' } } });
+    Object.assign(state, { view: 'policy', company: empty, health: { installation: { label: 'warden', version: '0.2.19', intent: 'team' } } });
     assert.equal(soloIsPureInstall(), false, 'the splash answer outranks an empty directory');
     renderNav();
     assert.match(sidebar.innerHTML, /data-go="people"/, 'Team is on the nav');
@@ -1603,9 +1603,9 @@ test('an install that chose the team console gets the team navigation before any
 
     // Never asked — a checkout, or an install older than the field. The
     // directory decides, exactly as it did.
-    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.18' } } });
+    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.19' } } });
     assert.equal(soloIsPureInstall(), true);
-    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.18', intent: 'solo' } } });
+    Object.assign(state, { company: empty, health: { installation: { label: 'warden', version: '0.2.19', intent: 'solo' } } });
     assert.equal(soloIsPureInstall(), true);
 
     // Intent never turns a team into a solo install.
@@ -1851,4 +1851,3 @@ test('leaving the first run of This device by the wordmark does not lead straigh
     assert.equal(firstRunIsDue(), false, 'leaving is not what finishes it: the verification is');
   } finally { Object.assign(state, saved); }
 });
-
