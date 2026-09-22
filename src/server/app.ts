@@ -27,6 +27,7 @@ import { promptRoutes } from './routes/prompts.js';
 
 export function createApp(): Express {
   const app = express();
+  app.disable('x-powered-by');
 
   corsIfConfigured(app);
   app.use(securityHeaders);
@@ -83,6 +84,12 @@ export function createApp(): Express {
   app.use(express.static(join(ASSETS, 'web')));
   app.use(systemRoutes);
 
+  // Keep unknown paths predictable and avoid Express' default HTML response,
+  // which exposes framework-specific behavior to API clients.
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'not found' });
+  });
+
   // A malformed or oversized request is a refusal, not a gateway outage. In
   // particular the standalone hook must receive JSON it can distinguish from
   // the network failures covered by the installation's availability policy.
@@ -97,6 +104,17 @@ export function createApp(): Express {
     });
   };
   app.use(inputError);
+
+  // No stack trace or internal exception message crosses the HTTP boundary.
+  // Route handlers that intentionally expose actionable errors do so before
+  // this final safety net.
+  const unexpectedError: ErrorRequestHandler = (err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const name = err instanceof Error ? err.name : 'UnknownError';
+    console.error(`unexpected route failure: ${req.method} ${req.path} (${name})`);
+    res.status(500).json({ error: 'internal server error' });
+  };
+  app.use(unexpectedError);
 
   return app;
 }

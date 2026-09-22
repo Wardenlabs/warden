@@ -1,0 +1,19 @@
+# Default review coverage. GitHub enforces this once the main-branch ruleset
+# requires code-owner approval.
+* @MartinPuli @Gastonfoncea
+
+# Security boundaries and release machinery need two-maintainer visibility.
+/.github/workflows/ @MartinPuli @Gastonfoncea
+/src/security/ @MartinPuli @Gastonfoncea
+/src/server/ @MartinPuli @Gastonfoncea
+/src/guard/ @MartinPuli @Gastonfoncea
+/src/policy/ @MartinPuli @Gastonfoncea
+/src/audit/ @MartinPuli @Gastonfoncea
+/src/models/ @MartinPuli @Gastonfoncea
+/src/setup/ @MartinPuli @Gastonfoncea
+/src/documents/ @MartinPuli @Gastonfoncea
+/src/proxy/ @MartinPuli @Gastonfoncea
+/desktop/ @MartinPuli @Gastonfoncea
+/integrations/ @MartinPuli @Gastonfoncea
+/forge.config.cjs @MartinPuli @Gastonfoncea
+/patches/ @MartinPuli @Gastonfoncea

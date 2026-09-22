@@ -108,6 +108,11 @@ async function theRoute(): Promise<void> {
     check(health.reach?.lanUrl === null && health.reach?.publicUrl === null, 'and names no address another machine could use');
     check(health.reach?.canChange === false, 'and, with no desktop shell attached, that the console cannot change it');
 
+    const missing = await fetch(`${base}/definitely-not-a-warden-route`);
+    const missingBody = await missing.json() as { error?: string };
+    check(missing.status === 404 && missingBody.error === 'not found', 'unknown paths receive a small JSON refusal');
+    check(missing.headers.get('x-powered-by') === null, 'responses do not advertise the HTTP framework');
+
     const refused = await fetch(`${base}/api/people/${person.id}/onboarding`);
     const why = (await refused.json()) as Pack;
     check(refused.status === 409, 'the setup message is refused rather than built on a dead address', `status ${refused.status}`);

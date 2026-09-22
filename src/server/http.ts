@@ -40,21 +40,27 @@ export function looksLikeModelDown(message: string): boolean {
 export function asyncRoute(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response): void => {
     fn(req, res).catch((err: unknown) => {
-      console.error('route error:', err);
       // The message alone, not `String(err)`: this text is rendered straight
       // into the console, and "Error: audience names nobody…" reads as a crash
       // where "audience names nobody…" reads as the instruction it is.
       if (!res.headersSent) {
         const message = err instanceof Error ? err.message : String(err);
         if (err instanceof CompilerSetupRequiredError) {
+          console.error('route error: CompilerSetupRequiredError (compiler-setup-required)');
           res.status(409).json({ error: message, kind: 'compiler-setup-required' });
           return;
         }
+        const kind = looksLikeModelDown(message) ? 'model-down' : 'other';
+        // Model and compiler errors can contain prompts, filesystem paths or
+        // provider details. The UI receives the intended actionable message;
+        // logs keep only the error class and public classification.
+        const name = err instanceof Error ? err.name : 'UnknownError';
+        console.error(`route error: ${name} (${kind})`);
         res.status(500).json({
           error: message,
           // The console renders different advice for each, so the classification
           // happens here where the error is, not by matching strings in the UI.
-          kind: looksLikeModelDown(message) ? 'model-down' : 'other'
+          kind
         });
       }
     });
