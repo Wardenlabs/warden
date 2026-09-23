@@ -49,7 +49,7 @@ export type RunSummary = {
   durationMs: number;
   reps: number;
   /** Which engine produced these verdicts. See `adapterName()`. */
-  adapter: 'mock' | 'llamacpp' | 'qvac';
+  adapter: 'mock' | 'llamacpp' | 'qvac' | 'kev';
   policyVersion: string;
   ruleCount: number;
   warden: ClassResult[];

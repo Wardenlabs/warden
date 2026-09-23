@@ -95,6 +95,12 @@ try {
   // singleton bug. Keep this call before every save in the test.
   const gateway = adapter();
   assert.equal(remoteCompiler(), null);
+  const judgeSettings = await request('/api/settings/adjudicator');
+  assert.equal(judgeSettings.status, 200);
+  assert.deepEqual(judgeSettings.body.choices.slice(0, 2).map((choice: { id: string }) => choice.id), ['kev-4b', 'kev-9b']);
+  assert.ok(judgeSettings.body.choices.slice(0, 2).every((choice: { engine: string; format: string }) => choice.engine === 'system-one' && choice.format === 'system-one'));
+  const refusedKev = await request('/api/settings/adjudicator', 'POST', { model: 'kev-4b', requireInstalled: true });
+  assert.equal(refusedKev.status, 409); assert.equal(refusedKev.body.code, 'use_unavailable'); assert.match(refusedKev.body.error, /mock adapter/);
   assert.equal((await request(path)).status, 200);
   assert.equal((await request(path, 'GET', undefined, { 'x-forwarded-for': '203.0.113.8' })).status, 403);
   assert.equal((await request(path, 'GET', undefined, { 'x-forwarded-for': '203.0.113.8', authorization: 'Bearer employee-test-key' })).status, 403);

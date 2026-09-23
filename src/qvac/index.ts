@@ -8,9 +8,11 @@ import { RealQvacAdapter } from './real.js';
 import { RemoteCompilerAdapter, remoteCompilerConfig, validate as validateRemoteCompiler } from './remote.js';
 import { CompilerSetupRequiredError, type CompleteRequest, type QvacAdapter } from './types.js';
 import { compilerSetupRequired } from '../settings.js';
+import { loadAdjudicatorSettings } from '../settings.js';
 import type { ZodType } from 'zod';
 import { withModelRole } from './coordination.js';
 import { CliCompilerAdapter, cliCompilerConfig, cliCompilerEnvironmentError } from './cli-compiler.js';
+import { isKevChoice, KevAdapter, kevConfig } from './kev.js';
 
 let instance: QvacAdapter | null = null;
 
@@ -27,6 +29,28 @@ let instance: QvacAdapter | null = null;
 let localInstance: QvacAdapter | null = null;
 let compilerInstance: QvacAdapter | null = null;
 let compilerSignature = '';
+const kevInstances = new Map<string, KevAdapter>();
+
+function activeKev(local: QvacAdapter): KevAdapter | null {
+  if (process.env['WARDEN_ADAPTER'] === 'mock') return null;
+  if (process.env['WARDEN_MODEL_ADJUDICATOR']?.trim()) return null;
+  const selected = loadAdjudicatorSettings();
+  if (selected.modelId || !isKevChoice(selected.model)) return null;
+  const config = kevConfig(selected.model);
+  const signature = JSON.stringify([config.choice, config.baseUrl, Boolean(config.apiKey), config.timeoutMs]);
+  let current = kevInstances.get(signature);
+  if (!current) {
+    current = new KevAdapter(local, config);
+    kevInstances.set(signature, current);
+  }
+  return current;
+}
+
+function roleAdapter(local: QvacAdapter, role: CompleteRequest['role']): QvacAdapter {
+  if (role === 'compiler') return readyCompiler(local);
+  if (role === 'adjudicator') return activeKev(local) ?? local;
+  return local;
+}
 
 function compilerAdapter(local: QvacAdapter): QvacAdapter {
   if (compilerEnvironmentError()) return local;
@@ -71,9 +95,9 @@ export function adapter(): QvacAdapter {
     const choice = process.env['WARDEN_ADAPTER'];
     const local = localInstance = choice === 'mock' ? new MockQvacAdapter() : choice === 'llamacpp' ? new LlamaCppAdapter() : new RealQvacAdapter();
     instance = {
-      complete: (req) => withModelRole(req.role, () => (req.role === 'compiler' ? readyCompiler(local) : local).complete(req)),
+      complete: (req) => withModelRole(req.role, () => roleAdapter(local, req.role).complete(req)),
       completeJSON: <T>(req: CompleteRequest, schema: ZodType<T>, json: Record<string, unknown>) =>
-        withModelRole(req.role, () => (req.role === 'compiler' ? readyCompiler(local) : local).completeJSON(req, schema, json)),
+        withModelRole(req.role, () => roleAdapter(local, req.role).completeJSON(req, schema, json)),
       embed: (texts) => withModelRole('embedder', () => local.embed(texts)),
       ocr: (path) => withModelRole('ocr', () => local.ocr(path)),
       stats: () => local.stats(),
@@ -113,8 +137,10 @@ export function isMock(): boolean {
  * tie without running a single generation. Anything caching or recording a
  * result must key on this, not on `isMock()`.
  */
-export function adapterName(): 'mock' | 'llamacpp' | 'qvac' {
+export function adapterName(): 'mock' | 'llamacpp' | 'qvac' | 'kev' {
   const choice = process.env['WARDEN_ADAPTER'];
+  const selected = loadAdjudicatorSettings();
+  if (choice !== 'mock' && !process.env['WARDEN_MODEL_ADJUDICATOR']?.trim() && !selected.modelId && isKevChoice(selected.model)) return 'kev';
   return choice === 'mock' ? 'mock' : choice === 'llamacpp' ? 'llamacpp' : 'qvac';
 }
 

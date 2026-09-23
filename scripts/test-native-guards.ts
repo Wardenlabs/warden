@@ -95,8 +95,9 @@ try {
   // The Library's descriptors are a mirror, free of the SDK so Electron can load
   // them. A seat the picker offers and the Library cannot fetch, or a native
   // guard listed under the wrong dialect, has to fail here rather than on a disk.
-  assert.deepEqual(LIBRARY_BUILTINS.map((b) => b.adjudicatorChoice).sort(), ADJUDICATOR_CHOICES.map((c) => c.id).sort());
-  for (const choice of ADJUDICATOR_CHOICES) {
+  const downloadableChoices = ADJUDICATOR_CHOICES.filter((choice) => choice.engine !== 'system-one');
+  assert.deepEqual(LIBRARY_BUILTINS.map((b) => b.adjudicatorChoice).sort(), downloadableChoices.map((c) => c.id).sort());
+  for (const choice of downloadableChoices) {
     const entry = LIBRARY_BUILTINS.find((b) => b.adjudicatorChoice === choice.id)!;
     const spec = libraryBuiltin(entry.id)!.spec;
     assert.equal(spec.filename, choice.filename, choice.id);

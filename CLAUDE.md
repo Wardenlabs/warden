@@ -2,9 +2,10 @@
 
 Warden is a local AI gateway. An administrator writes policy in plain language;
 employee requests and supplied documents are checked before they reach their
-assistant. Policy analysis uses local QVAC weights; document extraction uses
-local parsers and offline OCR. Administrators can explicitly move compilation
-or the allowed upstream assistant to another service, but not analysis.
+assistant. Policy analysis uses local QVAC weights or an open Kev sidecar bound
+to loopback; document extraction uses local parsers and offline OCR.
+Administrators can explicitly move compilation or the allowed upstream
+assistant to another service, but not analysis.
 
 This file is for whoever works on it next. It is about how the codebase thinks,
 what has already been measured, and which mistakes are cheap to repeat.

@@ -209,19 +209,17 @@ export function redactedCompilerSettings(s: CompilerSettings): Omit<CompilerSett
  * and deliberately outside the policy hash — swapping the model must not
  * reversion every rule.
  *
- * It is one field because the choice is between two named seats, not a free
- * path. A free path belongs to `WARDEN_MODEL_ADJUDICATOR`, which is for
- * benchmarks and still wins over this; what the console offers is the two
- * options the corpus has numbers for.
+ * It is one field because the choice is between named, reviewed seats, not a
+ * free path. A free path belongs to `WARDEN_MODEL_ADJUDICATOR`, which is for
+ * benchmarks and still wins over this setting.
  *
  * The safe direction on a corrupt or absent file is `default`, and that is not
- * arbitrary: the 1.7B is the configuration the shipped measurements were taken
- * against and the one that fits inside the hook's deadline. A settings file
- * nobody can parse must not silently promote a model that misses 18 more
- * points of attacks.
+ * arbitrary: it is the bundled model every installation can load without a
+ * separately managed sidecar. A settings file nobody can parse must not
+ * silently switch the enforcement engine.
  */
 export const adjudicatorSettingsSchema = z.object({
-  model: z.enum(['default', 'dynaguard', 'dynaguard-8b', 'base', 'large', 'shieldstral', 'granite-guardian']),
+  model: z.enum(['kev-4b', 'kev-9b', 'default', 'dynaguard', 'dynaguard-8b', 'base', 'large', 'shieldstral', 'granite-guardian']),
   modelId: z.string().uuid().optional()
 });
 export type AdjudicatorSettings = z.infer<typeof adjudicatorSettingsSchema>;

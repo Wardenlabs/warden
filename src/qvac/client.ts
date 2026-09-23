@@ -19,6 +19,7 @@ import { MODEL_CATALOG } from '../setup/catalog.js';
 import { installedModel } from '../setup/model-files.js';
 import { findModel, fingerprint, modelPath, type ManagedRole } from '../models/store.js';
 import type { ModelRole } from './types.js';
+import { isKevChoice } from './kev.js';
 
 /** Written by `pnpm run setup` — resolved absolute paths per role. */
 type LocalConfig = { modelsDir: string; adapter: string; models: Record<string, string> };
@@ -120,7 +121,7 @@ export function sourceFor(role: ModelRole): string | object {
   // than what the settings fall back to.
   if (role === 'adjudicator') {
     const chosen = savedAdjudicatorChoice();
-    const path = chosen && shippedFile(adjudicatorFilename(chosen));
+    const path = chosen && !isKevChoice(chosen) && shippedFile(adjudicatorFilename(chosen));
     if (path) return path;
   }
 
@@ -228,6 +229,7 @@ export function configuredModel(role: ModelRole): string {
     if (custom) return `${custom.id}.gguf`;
     if (role === 'adjudicator') {
       const chosen = loadAdjudicatorSettings().model;
+      if (isKevChoice(chosen) && !loadAdjudicatorSettings().modelId) return chosen;
       if (chosen !== 'default') return adjudicatorFilename(chosen);
     }
     return sourceName(sourceFor(role));
@@ -410,6 +412,10 @@ export function resolvedModel(role: ModelRole): string {
     const remote = remoteCompilerConfig();
     if (remote) return remote.model;
   }
+  if (role === 'adjudicator' && !process.env['WARDEN_MODEL_ADJUDICATOR']) {
+    const selected = loadAdjudicatorSettings();
+    if (!selected.modelId && isKevChoice(selected.model)) return selected.model;
+  }
   // A missing built-in selection is only a download request. The old weights
   // keep serving until restart, and their identity determines their dialect.
   // Reporting the desired filename here would prompt those old weights using
@@ -517,6 +523,12 @@ export function modelInventory(): {
   const roles: ModelRole[] = ['adjudicator', 'compiler', 'embedder', 'detector', 'ocr', 'assistant'];
   return roles.map((role) => {
     try {
+      if (role === 'adjudicator' && !process.env['WARDEN_MODEL_ADJUDICATOR']) {
+        const selected = loadAdjudicatorSettings();
+        if (!selected.modelId && isKevChoice(selected.model)) {
+          return { role, name: selected.model, onDisk: true, bytes: null };
+        }
+      }
       const src = sourceFor(role);
       if (typeof src !== 'string') {
         const entry = src as { name?: string; src?: string };

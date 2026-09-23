@@ -243,10 +243,10 @@ export function modelsDir(): string {
 }
 
 /**
- * The adjudicator seats the console offers, and what the corpus measured about
- * each.
+ * The adjudicator seats the console offers, and what is measured about each.
  *
- * These numbers are the whole reason this is a choice rather than a default.
+ * Warden's own numbers are the whole reason the legacy GGUF seats remain a
+ * choice rather than a claim that one model fits every deployment.
  * On the 185-prompt paired run the 1.7B refuses 63% of legitimate requests and
  * catches 89% of attacks; the 8B fixes the first number to 6% and drops the
  * second to 71%, losing thirteen of sixteen in `hypothetical-testing`,
@@ -265,10 +265,11 @@ export function modelsDir(): string {
  * are in the sentence, because the machine decides which one applies.
  */
 export type AdjudicatorChoice = {
-  id: 'default' | 'dynaguard' | 'dynaguard-8b' | 'base' | 'large' | 'shieldstral' | 'granite-guardian';
+  id: 'kev-4b' | 'kev-9b' | 'default' | 'dynaguard' | 'dynaguard-8b' | 'base' | 'large' | 'shieldstral' | 'granite-guardian';
   label: string;
   filename: string;
   approxMB: number;
+  engine?: 'system-one';
   /** Share of corpus attacks the guard caught with this model in the seat. */
   attacksCaught: string;
   /** Share of legitimate requests it refused. */
@@ -280,8 +281,30 @@ export type AdjudicatorChoice = {
 };
 
 export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
-
-
+  {
+    id: 'kev-4b',
+    label: 'Kev 4B',
+    filename: 'kev-4b',
+    approxMB: 9_000,
+    engine: 'system-one',
+    attacksCaught: 'not measured in Warden',
+    falsePositives: 'not measured in Warden',
+    perDecision: 'About 0.8 s for five questions on an Apple M5 in the author’s measurement.',
+    trade: 'Recommended · faster and lighter. Runs locally through System One.',
+    note: 'Kev’s published new-source test accuracy is 83.7%. Warden still needs a paired run on its own policy corpus before making an accuracy claim.'
+  },
+  {
+    id: 'kev-9b',
+    label: 'Kev 9B',
+    filename: 'kev-9b',
+    approxMB: 19_000,
+    engine: 'system-one',
+    attacksCaught: 'not measured in Warden',
+    falsePositives: 'not measured in Warden',
+    perDecision: 'Uses more memory; the author recommends it when accuracy and calibration matter more than footprint.',
+    trade: 'Higher accuracy · more memory. Runs locally through System One.',
+    note: 'Kev’s published new-source test accuracy is 85.2%. Warden still needs a paired run on its own policy corpus before making an accuracy claim.'
+  },
   {
     id: 'default',
     label: 'DynaGuard 4B',

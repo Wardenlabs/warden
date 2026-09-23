@@ -58,6 +58,8 @@ function judgeState() {
   if (!m) return { text: 'status unavailable', tone: 'attention' };
   if (state.adjudicator?.overriddenByEnv) return { text: 'set by the environment · local only', tone: 'attention' };
   if (m.mock) return { text: 'demo mode · nothing is judged', tone: 'attention' };
+  const selected = state.adjudicator?.choices?.find((choice) => choice.id === state.adjudicator?.model);
+  if (selected?.engine === 'system-one') return { text: 'configured · local only', tone: 'allow' };
   if (m.runtime?.ok === false || m.state === 'failed') return { text: 'unavailable · requests are held', tone: 'block' };
   return m.state === 'ready' ? { text: 'loaded · local only', tone: 'allow' } : { text: 'loads on first request · local only', tone: 'allow' };
 }
@@ -109,7 +111,7 @@ function judgeChoices() {
     // which made choosing a prerequisite for downloading and did nothing at all
     // in a browser.
     .map((c) => c.onDisk
-      ? { label: c.label, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }
+      ? { label: c.id === 'kev-4b' ? `${c.label} · recommended` : c.id === 'kev-9b' ? `${c.label} · higher accuracy` : c.label, check: !customId && c.id === a.model, attrs: `data-judge-builtin="${esc(c.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }
       : { label: `${c.label} · download required`, attrs: `data-go="models" data-sel="library" data-q="model=${attr(c.builtinId ?? '')}"` });
   const custom = (library.catalog?.models ?? []).filter((m) => (m.testedRoles ?? []).includes('adjudicator'))
     .map((m) => ({ label: m.name, check: (m.activeRoles ?? []).includes('adjudicator'), attrs: `data-judge-custom="${attr(m.id)}"`, disabled: Boolean(library.catalog?.overrides?.adjudicator) }));

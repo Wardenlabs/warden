@@ -31,12 +31,20 @@ import {
 import { LIBRARY_BUILTINS, libraryBuiltin } from '../../setup/catalog.js';
 import { installedModel } from '../../setup/model-files.js';
 import { asyncRoute } from '../http.js';
+import { isKevChoice, kevConfig, testKevEndpoint } from '../../qvac/kev.js';
 
 /** Presence by the same test the resolver and the Library use: a name on disk
  * is not a model while a transfer can be writing into this directory. */
 function choicePresence(choice: string) {
-  const builtin = LIBRARY_BUILTINS.find((entry) => entry.adjudicatorChoice === choice)!;
+  const builtin = LIBRARY_BUILTINS.find((entry) => entry.adjudicatorChoice === choice);
+  if (!builtin) return { builtinId: null, onDisk: isKevChoice(choice), verifiedDownload: false, downloadBlockedReason: null };
   return { builtinId: builtin.id, ...installedModel(libraryBuiltin(builtin.id)!.spec, modelsDir()) };
+}
+
+function adjudicatorInForce(): string | null {
+  if (process.env['WARDEN_MODEL_ADJUDICATOR'] || selections().adjudicator) return activeLocalModel('adjudicator');
+  const selected = loadAdjudicatorSettings().model;
+  return isKevChoice(selected) ? selected : activeLocalModel('adjudicator');
 }
 
 export const settingsRoutes = Router();
@@ -58,7 +66,7 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
     loadedModel: activeLocalModel('adjudicator'),
     // What is actually loaded, which is not always what was chosen: the env
     // override outranks this setting and a bench run leaves it set.
-    inForce: activeLocalModel('adjudicator'),
+    inForce: adjudicatorInForce(),
     overriddenByEnv: Boolean(process.env['WARDEN_MODEL_ADJUDICATOR']),
     // Named fields rather than a spread: the corpus percentages stay on the
     // server. They are what the choice is grounded in, not what a console has
@@ -69,7 +77,8 @@ settingsRoutes.get('/api/settings/adjudicator', (_req, res) => {
       id: c.id,
       label: c.label,
       filename: c.filename,
-      format: analyzerFormat(c.filename),
+      format: c.engine === 'system-one' ? 'system-one' : analyzerFormat(c.filename),
+      engine: c.engine ?? 'qvac',
       approxMB: c.approxMB,
       perDecision: c.perDecision,
       trade: c.trade,
@@ -95,8 +104,9 @@ settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => 
   const parsed = adjudicatorSettingsSchema.safeParse({ model: req.body?.model });
   if (!parsed.success) return res.status(400).json({ error: `model must be one of: ${ADJUDICATOR_CHOICES.map((c) => c.id).join(', ')}` });
   const choice = ADJUDICATOR_CHOICES.find((c) => c.id === parsed.data.model)!;
+  const kev = isKevChoice(choice.id);
   const path = resolve(modelsDir(), choice.filename);
-  const onDisk = choicePresence(choice.id).onDisk;
+  const onDisk = kev || choicePresence(choice.id).onDisk;
   // The console's Use. Without the flag this is still the legacy request, where
   // an absent file saves a pending choice for the desktop installer to act on;
   // old clients and first-run keep that. With it, nothing is saved unless the
@@ -104,13 +114,25 @@ settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => 
   // model judging requests.
   if (req.body?.requireInstalled === true) {
     const refusal = !onDisk ? 'Download this model from the Library before using it.'
-      : isMock() ? 'This gateway is running the mock adapter. Restart it with real inference to use a downloaded model.'
-        : process.env['WARDEN_ADAPTER'] === 'llamacpp' ? 'Model management uses the QVAC runtime. Restart without the experimental llamacpp adapter to select models.'
+      : isMock() ? 'This gateway is running the mock adapter. Restart it with real inference to use a model.'
+        : !kev && process.env['WARDEN_ADAPTER'] === 'llamacpp' ? 'Model management uses the QVAC runtime. Restart without the experimental llamacpp adapter to select models.'
           : process.env['WARDEN_MODEL_ADJUDICATOR'] ? 'The environment controls this role. Remove its override before selecting a model.' : null;
     if (refusal) return res.status(409).json({ error: refusal, code: !onDisk ? 'not_installed' : 'use_unavailable' });
   }
   await withRoleChange('adjudicator', async () => {
     const previous = loadAdjudicatorSettings();
+    if (isKevChoice(choice.id)) {
+      try {
+        await testKevEndpoint(kevConfig(choice.id));
+        await forgetRole('adjudicator');
+        saveAdjudicatorSettings(parsed.data);
+      } catch (error) {
+        saveAdjudicatorSettings(previous);
+        if (!isKevChoice(previous.model)) await modelFor('adjudicator').catch(() => undefined);
+        throw error;
+      }
+      return;
+    }
     // The file can vanish between the check above and the lease.
     if (req.body?.requireInstalled === true && !choicePresence(choice.id).onDisk) throw new Error('Download this model from the Library before using it.');
     // An absent preset is a download request. Keep the current loaded model
@@ -131,7 +153,7 @@ settingsRoutes.post('/api/settings/adjudicator', asyncRoute(async (req, res) => 
     }
   });
   res.json({ ...parsed.data, modelId: null, onDisk, needsDownload: onDisk ? null : choice.filename,
-    configuredModel: configuredModel('adjudicator'), inForce: activeLocalModel('adjudicator') });
+    configuredModel: configuredModel('adjudicator'), inForce: adjudicatorInForce() });
 })));
 
 /**

@@ -132,6 +132,7 @@ export function sendOnEnter(el, send) {
  * the quantisation and the instruct suffix are not.
  */
 const FAMILIES = [
+  [/kev[-_ ]?4b/i, 'Kev 4B'], [/kev[-_ ]?9b/i, 'Kev 9B'],
   [/shieldstral[-_ ]1[._]0/i, 'Shieldstral 1.0'],
   [/granite[-_ ]guardian[-_ ]4[._]1/i, 'Granite Guardian 4.1'],
   [/dynaguard/i, 'DynaGuard'], [/qwen3/i, 'Qwen3'], [/embeddinggemma/i, 'EmbeddingGemma'],

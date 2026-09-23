@@ -23,10 +23,53 @@ The console guides the administrator through installation, sign-in, connection
 testing and applying the choice. Existing selections remain intact. See
 [compiler setup](COMPILER-SETUP.md) for the startup behavior and API contract.
 
-Analysis always runs locally through QVAC. A custom endpoint cannot be assigned
-to it. Model management is not available under the optional experimental
-`WARDEN_ADAPTER=llamacpp` benchmark adapter. The compiler's initial choice does
-not change analyzer weights, aggregation rules or measured accuracy claims.
+Analysis always runs locally. GGUF judges use QVAC; Kev uses its open System One
+sidecar bound to loopback. A general remote endpoint cannot be assigned to
+analysis. Model management is not available under the optional experimental
+`WARDEN_ADAPTER=llamacpp` benchmark adapter for GGUF weights. The compiler's
+initial choice does not change analyzer weights, aggregation rules or measured
+accuracy claims.
+
+## Kev 4B and 9B
+
+Kev 4B and Kev 9B are the first two choices in the request-judge menu. Kev 4B
+is the recommended balance; Kev 9B is the higher-accuracy, higher-memory option.
+Both use the TypeSafe-compatible `/v1/systemone` contract and return a closed
+choice instead of generated prose. Warden sends the policy instructions and the
+nonce-isolated request as separate structured state fields. A malformed answer,
+timeout, unavailable service, wrong checkpoint, or out-of-vocabulary verdict
+fails closed to review.
+
+Kev's code, adapter and pointer head are Apache 2.0. The Qwen3.5 4B and 9B base
+models are also Apache 2.0. Warden does not require Jev or the hosted TypeSafe
+service. The activation test checks the exact open checkpoint before replacing
+the current judge.
+
+Run either model from the open Kev repository with Python 3.12 or 3.13 and `uv`:
+
+```sh
+git clone https://github.com/jaredpalmer/kev.git
+cd kev
+git checkout 287425898c4eb695b45bfdfe9f6e59c62ac05747
+uv sync --extra serve
+uv run --extra serve python -m kev.serve --run jaredpalmer/kev-4b@485ace8703592fcf405488b262449990824cfed1 --port 8009
+```
+
+Kev 9B uses `--run jaredpalmer/kev-9b@2629c06a5aeb0feb3b9783bafed17ed8f39ecf5c
+--port 8010`. These pins are the Apache-2.0 revisions Warden tested; upgrades
+should change the pin and tests together. Warden accepts only
+`localhost`, `127.0.0.1`, or `::1` for these built-in choices. Override the
+addresses with `WARDEN_KEV_4B_API` and `WARDEN_KEV_9B_API`; if the local service
+sets `KEV_API_KEY`, provide the same value through `WARDEN_KEV_4B_API_KEY` or
+`WARDEN_KEV_9B_API_KEY`. The keys never enter the browser.
+
+The published serving footprint is about 9 GB of GPU memory for 4B and 19 GB
+for 9B. The 9B instructions therefore assume a 32 GB Mac or a suitable CUDA
+machine; 4B is the primary choice for smaller systems.
+
+The published Kev measurements are useful for choosing between family members,
+but they are not Warden policy measurements. The console labels them accordingly
+until Warden's own paired corpus has been run against both checkpoints.
 
 ## Adding and selecting a model
 

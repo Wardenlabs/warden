@@ -1,7 +1,7 @@
 /* Ordered layers: tokens, shared controls, screens, settings, responsive. */
-@import url("./styles/foundation.css?v=0.2.21");
-@import url("./styles/components.css?v=0.2.21");
-@import url("./styles/rules.css?v=0.2.21");
-@import url("./styles/settings.css?v=0.2.21");
-@import url("./styles/prompt-editor.css?v=0.2.21");
-@import url("./styles/responsive.css?v=0.2.21");
+@import url("./styles/foundation.css?v=0.2.22");
+@import url("./styles/components.css?v=0.2.22");
+@import url("./styles/rules.css?v=0.2.22");
+@import url("./styles/settings.css?v=0.2.22");
+@import url("./styles/prompt-editor.css?v=0.2.22");
+@import url("./styles/responsive.css?v=0.2.22");

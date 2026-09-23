@@ -6,6 +6,7 @@ import { refreshCompiler, remoteCompiler } from '../qvac/index.js';
 import { RealQvacAdapter } from '../qvac/real.js';
 import { RemoteCompilerAdapter, validate } from '../qvac/remote.js';
 import { loadAdjudicatorSettings, loadCompilerSettings, saveAdjudicatorSettings, saveCompilerSettings, type CompilerSettings } from '../settings.js';
+import { isKevChoice } from '../qvac/kev.js';
 import { builtinDownloads, type BuiltinDownloads } from './builtin-downloads.js';
 import { findModel, fingerprint, formatSchema, managedRoleSchema, modelPath, publicModel, putModel, readCatalog, recordTest, removeModel, testedRoles, type ManagedRole, type ModelEntry } from './store.js';
 
@@ -39,10 +40,13 @@ function builtinRoles(filename: string, choice: string, roles: readonly ManagedR
   return { activeRoles: roles.filter(running), selectedRoles: roles.filter((role) => saved[role] && !modelOverride(role)) };
 }
 export function catalogResponse(downloads: BuiltinDownloads = builtinDownloads) {
+  const judge = loadAdjudicatorSettings();
+  const adjudicatorInForce = !process.env['WARDEN_MODEL_ADJUDICATOR'] && !judge.modelId && isKevChoice(judge.model)
+    ? judge.model : activeLocalModel('adjudicator');
   return { builtins: downloads.builtins().map((builtin) => ({ ...builtin, ...builtinRoles(builtin.filename, builtin.adjudicatorChoice, builtin.roles) })),
     transfer: downloads.transfer(), models: readCatalog().map((entry) => publicModel(entry, selectedRoles(entry.id).filter((role) => !modelOverride(role)))), selections: selections(),
     overrides: { compiler: modelOverride('compiler'), adjudicator: modelOverride('adjudicator') },
-    inForce: { compiler: remoteCompiler() ?? activeLocalModel('compiler'), adjudicator: activeLocalModel('adjudicator') } };
+    inForce: { compiler: remoteCompiler() ?? activeLocalModel('compiler'), adjudicator: adjudicatorInForce } };
 }
 
 const endpointInput = z.object({ kind: z.literal('endpoint'), name: z.string().trim().min(1).max(100),

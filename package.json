@@ -1,6 +1,6 @@
 {
   "name": "warden",
-  "version": "0.2.21",
+  "version": "0.2.22",
   "private": true,
   "type": "module",
   "description": "Warden checks connected AI requests against rules you write, with local policy analysis and human review.",
@@ -47,6 +47,7 @@
     "test:compiler-setup": "tsx scripts/test-claude-setup.ts",
     "test:schema": "tsx scripts/test-draft-schema.ts",
     "test:screen": "tsx scripts/test-screen.ts",
+    "test:kev": "tsx scripts/test-kev.ts",
     "test:desktop": "tsx scripts/test-desktop-lib.ts",
     "test:auth": "tsx scripts/test-auth.ts",
     "test:rules": "tsx scripts/test-rules-for-actor.ts",

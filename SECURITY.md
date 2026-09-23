@@ -55,7 +55,11 @@ with a witness file holding the count so truncation is visible as well as
 alteration. `pnpm run verify-audit` walks it.
 
 **Sending prompts to a model you do not run.** Judging is local under every
-configuration this repo can produce. Rule *compilation* is the one thing that
+configuration this repo can produce. Built-in GGUF judges run through QVAC;
+optional Kev judges run through an open sidecar that Warden restricts to
+`localhost`, `127.0.0.1` or `::1`. The sidecar receives the policy instructions
+and nonce-isolated request as separate structured fields. It cannot be pointed
+at a remote host. Rule *compilation* is the one thing that
 can be moved — to an endpoint you configure (`WARDEN_COMPILER_API`) or to the
 `claude`/`codex` CLI already signed in on the machine (`WARDEN_COMPILER_CLI`,
 or the provider picker in the console) — because compilation turns a sentence
@@ -157,9 +161,10 @@ they are not isolated per administrator. A direct loopback request may import a
 file already on the gateway. A remote administrator must upload bytes instead
 of gaining a path-based read capability on another machine.
 
-Saved compiler endpoints are compiler-only. Analysis always uses local weights.
-Remote compiler endpoints require HTTPS and an API key; direct loopback model
-servers may use HTTP without one. Changing a saved endpoint never copies its
+Saved compiler endpoints are compiler-only. Analysis always uses a local QVAC
+model or the selected loopback-only Kev sidecar. Remote compiler endpoints
+require HTTPS and an API key; direct loopback model servers may use HTTP without
+one. Changing a saved endpoint never copies its
 credential to a different address automatically. Catalogue responses expose key
 presence and a suffix, never a key or test fingerprint. Provider response bodies
 and raw JSON parser errors are suppressed during connection tests.

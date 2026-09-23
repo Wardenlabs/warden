@@ -17,6 +17,8 @@ import { promptOverride, renderPrompt } from '../../prompts/store.js';
 import { customAdjudicatorForm, resolvedModel, thinkingMarker } from '../../qvac/client.js';
 import type { Rule } from '../../policy/types.js';
 import { isolationPreamble, type Isolated } from '../isolate.js';
+import { loadAdjudicatorSettings } from '../../settings.js';
+import { isKevChoice } from '../../qvac/kev.js';
 
 export type Label = 'VIOLATES' | 'COMPLIES' | 'UNCLEAR';
 
@@ -71,6 +73,10 @@ export type Shots = { violating: string[]; compliant: string[] };
 export function formFromEnv(): Form {
   const raw = process.env['WARDEN_ADJUDICATOR_FORM'];
   if (raw === 'choice' || raw === 'dynaguard' || raw === 'compliance' || raw === 'dynaguard-native' || (raw && isNativeGuard(raw))) return raw;
+  if (!process.env['WARDEN_MODEL_ADJUDICATOR']) {
+    const selected = loadAdjudicatorSettings();
+    if (!selected.modelId && isKevChoice(selected.model)) return 'compliance';
+  }
   return customAdjudicatorForm() ?? analyzerFormat(resolvedModel('adjudicator'));
 }
 
