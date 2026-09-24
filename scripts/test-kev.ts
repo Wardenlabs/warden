@@ -18,7 +18,8 @@ const bodies: Record<string, any>[] = [];
 const server = createServer(async (req, res) => {
   res.setHeader('content-type', 'application/json');
   if (req.url === '/v1/models') {
-    res.end(JSON.stringify({ models: [{ id: 'kev-latest', aliases: ['jev-latest'], description: 'fixture', release_date: '2026-09-21', run }] }));
+    // Match the public Kev server. It exposes `name`, not OpenAI's `id`.
+    res.end(JSON.stringify({ models: [{ name: 'kev-latest', description: 'fixture', release_date: '2026-09-21', run }] }));
     return;
   }
   if (req.url !== '/v1/systemone' || req.method !== 'POST') {
@@ -104,7 +105,8 @@ try {
   console.log('✓ malformed or unavailable Kev decisions fail closed to human review');
 
   assert.throws(() => kevConfig('kev-4b', { WARDEN_KEV_4B_API: 'https://example.com' }), /this machine/);
-  assert.throws(() => kevConfig('kev-4b', { WARDEN_KEV_TIMEOUT_MS: 'forever' }), /integer from 1000 to 120000/);
+  assert.equal(kevConfig('kev-4b', {}).timeoutMs, 180_000);
+  assert.throws(() => kevConfig('kev-4b', { WARDEN_KEV_TIMEOUT_MS: 'forever' }), /integer from 1000 to 300000/);
   assert.equal(kevConfig('kev-4b', { WARDEN_KEV_4B_API: 'http://localhost:8009/v1' }).baseUrl, 'http://localhost:8009');
   console.log('✓ Kev endpoints are restricted to loopback and normalize the public System One base URL');
 } finally {

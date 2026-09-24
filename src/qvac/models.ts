@@ -289,8 +289,8 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     engine: 'system-one',
     attacksCaught: 'not measured in Warden',
     falsePositives: 'not measured in Warden',
-    perDecision: 'About 0.8 s for five questions on an Apple M5 in the author’s measurement.',
-    trade: 'Recommended · faster and lighter. Runs locally through System One.',
+    perDecision: 'About 0.8 s for five questions on a 32 GB Apple M5 upstream; 113–123 s for one Warden rule on a 16 GB M1 Pro.',
+    trade: 'Start here on a 32 GB Mac or suitable GPU. Runs locally through System One.',
     note: 'Kev’s published new-source test accuracy is 83.7%. Warden still needs a paired run on its own policy corpus before making an accuracy claim.'
   },
   {
@@ -302,7 +302,7 @@ export const ADJUDICATOR_CHOICES: AdjudicatorChoice[] = [
     attacksCaught: 'not measured in Warden',
     falsePositives: 'not measured in Warden',
     perDecision: 'Uses more memory; the author recommends it when accuracy and calibration matter more than footprint.',
-    trade: 'Higher accuracy · more memory. Runs locally through System One.',
+    trade: 'Higher accuracy · requires at least a 32 GB Mac or suitable GPU. Runs locally through System One.',
     note: 'Kev’s published new-source test accuracy is 85.2%. Warden still needs a paired run on its own policy corpus before making an accuracy claim.'
   },
   {

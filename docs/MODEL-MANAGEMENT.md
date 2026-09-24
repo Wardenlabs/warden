@@ -33,7 +33,8 @@ accuracy claims.
 ## Kev 4B and 9B
 
 Kev 4B and Kev 9B are the first two choices in the request-judge menu. Kev 4B
-is the recommended balance; Kev 9B is the higher-accuracy, higher-memory option.
+is the starting point on supported hardware; Kev 9B is the higher-accuracy,
+higher-memory option.
 Both use the TypeSafe-compatible `/v1/systemone` contract and return a closed
 choice instead of generated prose. Warden sends the policy instructions and the
 nonce-isolated request as separate structured state fields. A malformed answer,
@@ -64,8 +65,17 @@ sets `KEV_API_KEY`, provide the same value through `WARDEN_KEV_4B_API_KEY` or
 `WARDEN_KEV_9B_API_KEY`. The keys never enter the browser.
 
 The published serving footprint is about 9 GB of GPU memory for 4B and 19 GB
-for 9B. The 9B instructions therefore assume a 32 GB Mac or a suitable CUDA
-machine; 4B is the primary choice for smaller systems.
+for 9B. Both official model instructions assume a 32 GB Mac or a suitable CUDA
+machine. Kev 4B did load and return correct Warden decisions on a 16 GB M1 Pro,
+but it took 94 seconds for the activation probe and 113–123 seconds for each
+new Warden request in a 2026-09-24 local check. That is useful for evaluation,
+not an interactive guard. On that hardware, keep the current GGUF judge or use
+a larger machine. Kev 9B was not loaded on the 16 GB machine because its
+published footprint exceeds the available memory.
+
+Warden allows Kev calls 180 seconds by default so a valid first Metal pass is
+not mistaken for a model failure. Set `WARDEN_KEV_TIMEOUT_MS` to an integer from
+1,000 through 300,000 when the local machine needs a different deadline.
 
 The published Kev measurements are useful for choosing between family members,
 but they are not Warden policy measurements. The console labels them accordingly

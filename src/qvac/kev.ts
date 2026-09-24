@@ -54,9 +54,9 @@ function localBaseUrl(raw: string): string {
 }
 
 function localTimeout(raw: string | undefined): number {
-  const value = Number(raw ?? 30_000);
-  if (!Number.isInteger(value) || value < 1_000 || value > 120_000) {
-    throw new Error('WARDEN_KEV_TIMEOUT_MS must be an integer from 1000 to 120000.');
+  const value = Number(raw ?? 180_000);
+  if (!Number.isInteger(value) || value < 1_000 || value > 300_000) {
+    throw new Error('WARDEN_KEV_TIMEOUT_MS must be an integer from 1000 to 300000.');
   }
   return value;
 }
@@ -88,7 +88,18 @@ const responseSchema = z.object({
   latency_ms: z.number().nonnegative().optional()
 });
 
-const modelsSchema = z.object({ models: z.array(z.object({ id: z.string(), aliases: z.array(z.string()).optional(), run: z.string() }).passthrough()) });
+const modelCardSchema = z.object({
+  // Kev's public server uses `name`; older TypeSafe-compatible fixtures used
+  // `id`. Accept both spellings, but require at least one stable identity.
+  name: z.string().optional(),
+  id: z.string().optional(),
+  aliases: z.array(z.string()).optional(),
+  run: z.string()
+}).passthrough().refine((model) => Boolean(model.name || model.id), {
+  message: 'A model card must include a name or id.'
+});
+
+const modelsSchema = z.object({ models: z.array(modelCardSchema) });
 
 function validateChoiceAnswer(
   answer: z.infer<typeof responseSchema>['answers']['verdict'],
@@ -192,7 +203,12 @@ export class KevAdapter implements QvacAdapter {
             }
           }
         })
-      }, req.timeoutMs ?? this.config.timeoutMs);
+      // The shared adjudicator deadline is tuned for small GGUFs. Kev's first
+      // Metal pass can compile for substantially longer, especially on older
+      // Apple Silicon. A caller-supplied AbortSignal still cancels immediately;
+      // this only prevents the generic per-call limit from cutting a healthy
+      // local Kev decision short.
+      }, Math.max(req.timeoutMs ?? 0, this.config.timeoutMs));
       const parsed = responseSchema.safeParse(raw);
       if (!parsed.success) throw new Error('Kev returned a malformed System One response');
       if (parsed.data.model !== 'kev-latest') throw new Error('Kev returned a response from an unexpected model');
@@ -239,7 +255,9 @@ export class KevAdapter implements QvacAdapter {
 export async function testKevEndpoint(config: KevConfig): Promise<void> {
   const listed = modelsSchema.safeParse(await request(config, '/v1/models', { method: 'GET' }, 10_000));
   if (!listed.success) throw new Error(`${config.label} did not return a valid model card.`);
-  const loaded = listed.data.models.find((model) => model.id === 'kev-latest' || model.aliases?.includes('kev-latest'));
+  const loaded = listed.data.models.find((model) =>
+    model.name === 'kev-latest' || model.id === 'kev-latest' || model.aliases?.includes('kev-latest')
+  );
   if (!loaded || loaded.run !== config.run) {
     throw new Error(`Start ${config.label} with --run ${config.run}; the service at ${config.baseUrl} is serving ${loaded?.run ?? 'an unknown model'}.`);
   }
@@ -250,7 +268,7 @@ export async function testKevEndpoint(config: KevConfig): Promise<void> {
       state: { policy: 'Keep private account numbers private.', request: 'Share a private account number.' },
       questions: { verdict: { type: 'choice', instructions: 'Does `request` violate `policy`?', criteria: { VIOLATES: 'It violates the policy.', COMPLIES: 'It complies with the policy.', UNCLEAR: 'It is ambiguous.' } } }
     })
-  }, 30_000));
+  }, config.timeoutMs));
   if (!probe.success) throw new Error(`${config.label} did not return the required System One choice response.`);
   if (probe.data.model !== 'kev-latest') throw new Error(`${config.label} returned a response from an unexpected model.`);
   try { validateChoiceAnswer(probe.data.answers.verdict, ['VIOLATES', 'COMPLIES', 'UNCLEAR']); }
