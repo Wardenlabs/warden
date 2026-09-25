@@ -25,7 +25,7 @@ type DownloadLib = {
 };
 type CatalogLib = {
   MODEL_CATALOG: DownloadSpec[];
-  setupModelDownloads: (settingsPath?: string, includeExtras?: boolean) => DownloadSpec[];
+  setupModelDownloads: (settingsPath?: string, includeExtras?: boolean, env?: NodeJS.ProcessEnv, catalog?: readonly DownloadSpec[]) => DownloadSpec[];
 };
 
 export type ModelProgress = { role: string; totalMB: number; receivedMB: number; done: boolean; failed?: string };

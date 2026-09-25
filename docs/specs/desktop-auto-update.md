@@ -505,26 +505,37 @@ macOS arm64, and additionally:
 
 ## 10. Spike before building (S1–S4)
 
-These are unknowns only a packaged build can answer, and each one changes a
-section above:
+These are unknowns only a running build can answer. S1 and S2 were run on
+2026-09-25; S3 and S4 remain.
 
-- **S1** `update.electronjs.org` matching our asset names
-  `Warden-darwin-arm64-X.zip` / `Warden-darwin-x64-X.zip` for `darwin-arm64`
-  and `darwin-x64`. If it does not match, either rename the Forge zip or serve
-  a static feed (`{ url, name, notes }` JSON) from the release assets. §2 would
-  change the feed URL only.
-- **S2** How to detect *absence* of a managed `AutoUpdate` key through
-  `systemPreferences` (§4).
+- **S1 — resolved.** `update.electronjs.org` already matches our assets.
+  `/Wardenlabs/warden/darwin-arm64/0.2.18` answered 200 with
+  `…/v0.2.23/Warden-darwin-arm64-0.2.23.zip`, `darwin-x64` with the x64 zip,
+  and `darwin-arm64/0.2.23` answered 204. A bare `darwin` answered with the
+  **x64** zip, so the feed URL must always carry `-${process.arch}`. No asset
+  renaming and no static feed are needed.
+- **S2 — resolved.** Read through `getUserDefault(key, 'string')`, an absent
+  key is `''`, `false` is `'0'` and `true` is `'1'`. Read as `'boolean'`,
+  absent and false are indistinguishable. Checked with Electron 43
+  (unpackaged, `com.github.Electron` domain, `defaults write`/`delete`). A
+  configuration profile lands in the same `NSUserDefaults` search list, but that
+  is not tested. §4 uses the string read.
 - **S3** Whether anything stages a download with Squirrel.Mac before
   `checkForUpdates()` is reached in the `needs-models` path, for example
   "Check for Updates…" from the menu while prefetching. §6.2 avoids it by
   ordering, and the spike confirms no other path does.
-- **S4** The first updater-bearing version can only be updated *to*. Cutting
-  two throwaway releases to test is noisy on a public repo with landing links.
-  Test against a fork, or with a `WARDEN_UPDATE_FEED` override that is honoured
-  **only when `app.isPackaged` is false**. That keeps a feed override out of
-  shipped builds, where it would be a way to point a gateway at someone else's
-  update.
+- **S4** How to exercise an update before shipping one. Squirrel.Mac only
+  updates a packaged, signed app to another build signed by the same
+  identity, so the first draft's idea of an override honoured "only when
+  unpackaged" cannot work. Instead: a local test pair, both signed with a
+  developer's own Developer ID (this machine has one), with the newer zip
+  served by a local static feed (`200 {"url": …}` / `204`). The feed URL for
+  such builds is **baked in at build time** (`WARDEN_UPDATE_FEED_BUILD` read
+  by `scripts/copy-dist-assets.mjs` into a generated constant). It is never
+  read from the runtime environment, and the release job fails if the
+  constant is set. A runtime override in a shipped build would be a way to
+  point a gateway at someone else's update. The same identity check
+  protects production, but the setting should not exist there.
 
 ## 11. Delivery order
 

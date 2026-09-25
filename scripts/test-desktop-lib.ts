@@ -111,6 +111,20 @@ try {
   assert.deepEqual(roles(true), baseRoles, 'custom analyzer does not trigger an unused bundled seat');
   console.log('✓ analyzer defaults and selected alternate downloads remain intact, including the shared Qwen base seat');
 
+  // The updater asks the same question about the next release's catalogue.
+  // A replaced default adjudicator must come back as the new file, and the
+  // current module constant must not leak into the answer.
+  save({ compiler: savedCompiler('claude-cli'), adjudicator: { model: 'dynaguard' } });
+  const next = catalog.MODEL_CATALOG.map((spec) => spec.role === 'adjudicator'
+    ? { ...spec, filename: 'Next-Default.gguf', url: 'https://huggingface.co/example/next/resolve/0000000000000000000000000000000000000000/Next-Default.gguf' }
+    : spec);
+  const planned = catalog.setupModelDownloads(settingsPath, true, {}, next);
+  assert.deepEqual(planned.map((spec) => spec.role), [...baseRoles, 'adjudicator-dynaguard']);
+  assert.equal(planned.find((spec) => spec.role === 'adjudicator')?.filename, 'Next-Default.gguf');
+  assert.deepEqual(catalog.setupModelDownloads(settingsPath, true, {}), catalog.setupModelDownloads(settingsPath, true, {}, catalog.MODEL_CATALOG), 'the default catalogue is the module constant');
+  assert.deepEqual(catalog.setupModelDownloads(settingsPath, true, {}, []), [], 'an empty catalogue plans nothing');
+  console.log('✓ the plan can be computed over a next release\'s catalogue without touching the current one');
+
   // Use the actual disk-presence algorithm with small stand-ins for large
   // weights. The selected plan is what both desktop boot and setup consume.
   save({ compiler: savedCompiler('claude-cli') });

@@ -49,6 +49,7 @@
     "test:screen": "tsx scripts/test-screen.ts",
     "test:kev": "tsx scripts/test-kev.ts",
     "test:desktop": "tsx scripts/test-desktop-lib.ts",
+    "test:desktop-update": "tsx scripts/test-desktop-update.ts",
     "test:auth": "tsx scripts/test-auth.ts",
     "test:rules": "tsx scripts/test-rules-for-actor.ts",
     "eval": "tsx scripts/eval.ts",
