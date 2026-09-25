@@ -22,6 +22,11 @@ export class RoleCoordinator {
     }
   }
 
+  /** A writer holds the role or is waiting for it. Read-only, for the desktop
+   * updater, which must not restart the gateway under a model swap. */
+  changing(): boolean {
+    return this.#writer || this.#queue.some((entry) => entry.write);
+  }
   async run<T>(write: boolean, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     await new Promise<void>((resolve, reject) => {
       const entry = { write, enter: () => { signal?.removeEventListener('abort', abort); resolve(); } };
@@ -63,6 +68,10 @@ export function withModelRole<T>(role: ModelRole, work: () => Promise<T>, signal
   return coordinator(role).run(false, () => context.run(new Set([...(held ?? []), role]), work), signal);
 }
 
+/** Whether any role is being swapped or has a swap queued. */
+export function roleChangePending(): boolean {
+  return [...roles.values()].some((role) => role.changing());
+}
 export function withRoleChange<T>(role: ModelRole, work: () => Promise<T>): Promise<T> {
   if (context.getStore()?.has(role)) throw new Error('cannot change a model from inside its active request');
   return coordinator(role).run(true, work);

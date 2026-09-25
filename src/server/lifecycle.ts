@@ -6,7 +6,9 @@ import type { Server } from 'node:http';
 import { builtinDownloads } from '../models/builtin-downloads.js';
 import { probeRuntime, shutdown, warmup } from '../qvac/client.js';
 import { isMock } from '../qvac/index.js';
-import { onShellMessage } from './desktop-bridge.js';
+import { isShellRequest, onShellMessage, replyShell } from './desktop-bridge.js';
+import { drain } from './drain.js';
+import { busyReasons } from './update-readiness.js';
 
 export type ModelState = 'cold' | 'loading' | 'ready' | 'failed';
 
@@ -117,6 +119,21 @@ export function installExitHandlers(server: Server): void {
   process.on('SIGTERM', gracefulExit);
   process.on('SIGINT', gracefulExit);
   onShellMessage((data) => {
-    if (data === 'shutdown') gracefulExit();
+    if (data === 'shutdown') {
+      gracefulExit();
+      return;
+    }
+    if (!isShellRequest(data)) return;
+    if (data.type === 'readiness?') {
+      replyShell({ type: 'readiness', id: data.id, busy: busyReasons() });
+      return;
+    }
+    // The shell sends `shutdown` after this answers; the drain itself never
+    // exits, so a drain the shell then abandons leaves a gateway that refuses
+    // work but still holds its models, and the shell's own restart recovers it.
+    void drain(server, data.boundMs).then(({ cutOff, waitedMs }) => {
+      if (cutOff > 0) console.error(`  update    drain bound reached with ${cutOff} request(s) still running`);
+      replyShell({ type: 'drained', id: data.id, cutOff, waitedMs });
+    });
   });
 }

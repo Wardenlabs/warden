@@ -9,6 +9,7 @@
 import { join } from 'node:path';
 import express, { type Express, type ErrorRequestHandler } from 'express';
 import { ASSETS } from './config.js';
+import { drainGate } from './drain.js';
 import { adminAudit, adminGate, corsIfConfigured, securityHeaders, throttle } from './middleware.js';
 import { auditRoutes } from './routes/audit.js';
 import { companyRoutes } from './routes/company.js';
@@ -28,6 +29,14 @@ import { promptRoutes } from './routes/prompts.js';
 export function createApp(): Express {
   const app = express();
   app.disable('x-powered-by');
+
+  /*
+   * Before everything, including CORS and the admin audit. A gateway draining
+   * for an update must not answer at all, since a hook reads a transport
+   * failure as "unreachable" and a JSON error as an answer. It must also not
+   * write an audit line for a request it never handled. See `drain.ts`.
+   */
+  app.use(drainGate);
 
   corsIfConfigured(app);
   app.use(securityHeaders);
