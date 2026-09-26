@@ -31,12 +31,25 @@ export type ServerConfig = {
   logPath: string;
   /** The splash's answer, when there is one. See `DesktopSettings.intent`. */
   intent?: 'solo' | 'team';
+  /**
+   * Set on the first launch after a desktop update, and on no other. The new
+   * gateway writes the audit entry for the update from it
+   * (`src/server/boot-audit.ts`).
+   */
+  update?: { from: string; stoppedAt: string | 'unknown'; cutOff: number | 'unknown' };
 };
 
 export type RunningServer = {
   port: number;
   /** Graceful stop: shutdown message, five seconds of patience, then kill. */
   stop: () => Promise<void>;
+  /**
+   * Send a question the gateway answers (`src/server/desktop-bridge.ts`
+   * `ShellRequest`) and wait for the reply with the same `id`. Rejects on
+   * timeout or if the gateway exits first. The caller decides what silence
+   * means, and for the updater it always means "do not restart".
+   */
+  request: (message: { type: string; id: string } & Record<string, unknown>, timeoutMs: number) => Promise<Record<string, unknown>>;
 };
 
 export type HealthInfo = {
@@ -46,10 +59,24 @@ export type HealthInfo = {
   models?: 'cold' | 'loading' | 'ready' | 'failed';
 };
 
-/** The preferred port if it is free on loopback, otherwise an ephemeral one. */
-export async function pickPort(preferred: number, forceEphemeral = false): Promise<number> {
-  if (!forceEphemeral && (await portFree(preferred))) return preferred;
-  return ephemeralPort();
+/**
+ * The preferred port if it is free on loopback, otherwise an ephemeral one.
+ *
+ * `waitMs` is for the launch right after a desktop update, and only that one.
+ * There, "busy" usually means the previous process has not let go of the port
+ * yet, and settling for another port would bring the gateway back at an
+ * address no hook knows. Every hook would fail open against it without a word
+ * (docs/specs/desktop-auto-update.md §6.5). An ordinary launch keeps taking a
+ * free port at once, as `docs/DESKTOP.md` promises.
+ */
+export async function pickPort(preferred: number, forceEphemeral = false, waitMs = 0): Promise<number> {
+  if (forceEphemeral) return ephemeralPort();
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    if (await portFree(preferred)) return preferred;
+    if (Date.now() >= deadline) return ephemeralPort();
+    await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+  }
 }
 
 function portFree(port: number): Promise<boolean> {
@@ -96,6 +123,14 @@ export function startServer(
   // A preference about which console to draw, and nothing else: it authorises
   // nothing and is not a second notion of administrator.
   if (config.intent) env['WARDEN_INSTALL_INTENT'] = config.intent;
+  // Only ever from `config.update`. Inherited from a shell they would record an
+  // update that never happened on every launch.
+  for (const key of ['WARDEN_UPDATED_FROM', 'WARDEN_UPDATED_STOPPED_AT', 'WARDEN_UPDATE_CUTOFF']) delete env[key];
+  if (config.update) {
+    env['WARDEN_UPDATED_FROM'] = config.update.from;
+    env['WARDEN_UPDATED_STOPPED_AT'] = config.update.stoppedAt;
+    env['WARDEN_UPDATE_CUTOFF'] = String(config.update.cutOff);
+  }
 
   /*
    * The posture a gateway on the internet has to run in, set here rather than
@@ -212,21 +247,51 @@ export function startServer(
   child.stdout?.pipe(log, { end: false });
   child.stderr?.pipe(log, { end: false });
 
+  // Replies to `request()`, by id. Anything else is a doorbell for `onMessage`.
+  const pending = new Map<string, { resolve: (value: Record<string, unknown>) => void; reject: (err: Error) => void; timer: NodeJS.Timeout }>();
+
   // The gateway talks back on the same channel `shutdown` goes out on. It is
   // how the web console asks for something only the shell can do — fetching the
   // models — without the console window needing a preload.
-  if (onMessage) {
-    child.on('message', (msg) => {
-      const data = msg && typeof msg === 'object' && 'data' in msg ? (msg as { data: unknown }).data : msg;
-      onMessage(data);
-    });
-  }
+  child.on('message', (msg) => {
+    const data = msg && typeof msg === 'object' && 'data' in msg ? (msg as { data: unknown }).data : msg;
+    const id = data && typeof data === 'object' ? (data as { id?: unknown }).id : undefined;
+    const waiter = typeof id === 'string' ? pending.get(id) : undefined;
+    if (waiter) {
+      pending.delete(id as string);
+      clearTimeout(waiter.timer);
+      waiter.resolve(data as Record<string, unknown>);
+      return;
+    }
+    onMessage?.(data);
+  });
 
   let stopping = false;
   child.on('exit', (code) => {
     log.end();
+    for (const [id, waiter] of pending) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error('the gateway exited before answering'));
+      pending.delete(id);
+    }
     if (!stopping) onExit(code ?? 0);
   });
+
+  const request: RunningServer['request'] = (message, timeoutMs) =>
+    new Promise((resolveRequest, rejectRequest) => {
+      const timer = setTimeout(() => {
+        pending.delete(message.id);
+        rejectRequest(new Error(`no answer to ${message.type} within ${timeoutMs} ms`));
+      }, timeoutMs);
+      pending.set(message.id, { resolve: resolveRequest, reject: rejectRequest, timer });
+      try {
+        child.postMessage(message);
+      } catch (err) {
+        clearTimeout(timer);
+        pending.delete(message.id);
+        rejectRequest(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
 
   const stop = (): Promise<void> =>
     new Promise((resolveStop) => {
@@ -258,7 +323,7 @@ export function startServer(
       }, 5000);
     });
 
-  return { port: config.port, stop };
+  return { port: config.port, stop, request };
 }
 
 /** Poll /health until the gateway answers or the budget runs out. */

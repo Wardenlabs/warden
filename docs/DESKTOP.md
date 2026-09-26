@@ -106,10 +106,33 @@ Los mismos del gateway: Mac Apple Silicon recomendado (Metal); Mac Intel corre
 solo en CPU; Windows/Linux necesitan Vulkan ≥ 1.4 para GPU (sin eso, CPU);
 8 GB de RAM mínimo — los modelos ocupan ~2 GB residentes.
 
+## Actualizaciones
+
+En macOS la app se actualiza sola desde los releases de GitHub. Busca
+versiones nuevas 30 segundos después de arrancar y después cada 6 horas, y
+también desde **Warden → Check for Updates…**. Descarga en segundo plano, y
+**instala solo cuando el administrador lo decide**: con **Restart to Update**,
+o al cerrar la app. Instalar reinicia el gateway, y mientras reinicia los
+hooks dejan pasar los prompts sin revisar. Por eso primero termina las
+decisiones en curso, la confirmación dice que Warden va a estar fuera de
+línea (y si hay túnel, que la dirección pública cambia), y la versión nueva
+deja el hueco registrado en la auditoría.
+
+- Se apaga desde el mismo menú, con `WARDEN_AUTO_UPDATE=0` o, en Macs
+  administradas, con `defaults write com.warden.gateway AutoUpdate -bool false`
+  (o el mismo valor por MDM), que tiene prioridad sobre lo demás.
+- La app tiene que estar en Aplicaciones para poder reemplazarse.
+- Windows sigue a mano hasta que sus builds estén firmados. Linux avisa que hay
+  versión nueva y enlaza al release.
+- Cada release sale como *prerelease* y ninguna app se actualiza a él hasta
+  promoverlo con `gh release edit vX.Y.Z --prerelease=false --latest`.
+
+Diseño completo: [PRD](prd/desktop-auto-update.md) y
+[spec](specs/desktop-auto-update.md).
+
 ## Límites conocidos
 
-- Sin firma ni notarización (ver arriba). Sin auto-update: se instala la
-  versión nueva encima.
+- Sin firma ni notarización (ver arriba).
 - El modelo de OCR solo se distribuye por el registro P2P de QVAC, igual que
   en el CLI: la app no lo descarga, y el escaneo de adjuntos se degrada
   exactamente como hasta ahora.

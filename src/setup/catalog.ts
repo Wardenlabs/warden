@@ -150,16 +150,23 @@ function needsBundledCompiler(settingsPath: string | undefined, env: NodeJS.Proc
  * Optional analyzer seats are included only for an explicit download request;
  * the automatic demo-exit check continues to require the base guard weights.
  * The Qwen base analyzer shares the bundled compiler file, so selecting that
- * analyzer still requires it even when compilation uses Claude Code. */
+ * analyzer still requires it even when compilation uses Claude Code.
+ *
+ * `catalog` exists for the desktop updater, which asks this question about the
+ * *next* release's catalogue, read from its manifest, so the weights it needs
+ * can be fetched while the current gateway is still guarding. Every other
+ * caller leaves it at the default and gets exactly the answer it always got.
+ * See docs/specs/desktop-auto-update.md §6.3. */
 export function setupModelDownloads(
   settingsPath?: string,
   includeExtras = false,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  catalog: readonly DownloadSpec[] = MODEL_CATALOG
 ): DownloadSpec[] {
   const analyzer = loadAdjudicatorSettings(settingsPath);
   const chosen = !env['WARDEN_MODEL_ADJUDICATOR']?.trim() && !analyzer.modelId ? analyzer.model : 'default';
   const compiler = needsBundledCompiler(settingsPath, env) || chosen === 'base';
-  return MODEL_CATALOG.filter((spec) => spec.url && (
+  return catalog.filter((spec) => spec.url && (
     (spec.required && spec.role !== 'compiler') ||
     (spec.role === 'compiler' && compiler) ||
     (includeExtras && spec.role === `adjudicator-${chosen}`)

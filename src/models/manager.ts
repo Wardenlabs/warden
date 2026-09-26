@@ -14,6 +14,8 @@ const operations = new RoleCoordinator();
 /** Persistence changes and tests serialize so a test cannot stamp approval on
  * a connection another browser just edited. Inference still runs concurrently. */
 export function withModelManagement<T>(work: () => Promise<T>): Promise<T> { return operations.run(true, work); }
+/** A test, an activation or a catalogue edit is running or waiting. */
+export function modelManagementPending(): boolean { return operations.changing(); }
 
 export function selections(): Record<ManagedRole, string | null> {
   const compiler = loadCompilerSettings();
