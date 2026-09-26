@@ -300,6 +300,27 @@ The console reports which model drafted a rule, and whether it was remote, on
 every draft it returns. An administrator ratifying a rule should not have to
 guess whether it came off their own machine.
 
+### Desktop update checks
+
+The desktop app on macOS makes three outbound requests that nothing else in
+Warden makes, none of them carrying policy, prompts, people or audit:
+
+1. `github.com/Wardenlabs/warden/releases/latest/download/warden-release.json`,
+   the release manifest, at launch and every six hours.
+2. `update.electronjs.org`, which learns this machine's IP, architecture and
+   Warden version, when the manifest names a newer release.
+3. The release zip from GitHub and, only if the next version needs model files
+   that are not on disk and the administrator chooses to download them, those
+   files from their revision-pinned Hugging Face URLs.
+
+Squirrel.Mac installs only an update signed by the same Developer ID as the
+running app. A prefetched model file is kept only if the new, signed
+version's own catalogue names that file at the same URL. Nothing is installed
+until an administrator restarts or quits the app. Turn all of it off with
+`WARDEN_AUTO_UPDATE=0`, the menu, or the managed preference `AutoUpdate`
+in `com.warden.gateway`, which wins over both. See
+`docs/specs/desktop-auto-update.md`.
+
 ## Deployment notes
 
 - `WARDEN_HOST` defaults to `0.0.0.0` so employees can reach the gateway. The

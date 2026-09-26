@@ -28,6 +28,19 @@ type CatalogLib = {
   setupModelDownloads: (settingsPath?: string, includeExtras?: boolean, env?: NodeJS.ProcessEnv, catalog?: readonly DownloadSpec[]) => DownloadSpec[];
 };
 
+/**
+ * The two compiled setup modules, loaded the way every caller here loads them.
+ * Exported for the updater, which asks what the next release will need and
+ * prefetches it through the same downloader first run uses, so the contract
+ * `scripts/test-desktop-lib.ts` checks is the one it relies on too.
+ */
+export async function loadSetupLibs(appRoot: string): Promise<{ lib: DownloadLib; catalog: CatalogLib }> {
+  const lib = (await import(pathToFileURL(join(appRoot, 'dist', 'setup', 'download.js')).href)) as DownloadLib;
+  const catalog = (await import(pathToFileURL(join(appRoot, 'dist', 'setup', 'catalog.js')).href)) as CatalogLib;
+  return { lib, catalog };
+}
+export type { DownloadSpec };
+
 export type ModelProgress = { role: string; totalMB: number; receivedMB: number; done: boolean; failed?: string };
 
 export type SetupState =

@@ -8,6 +8,12 @@
  * the drain had to cut. This writes it once, beside the decisions, in the
  * same chain.
  *
+ * `unknown` is a legitimate value for when it stopped and for how many
+ * requests were cut. Squirrel.Mac installs on any exit, a crash included, and
+ * a DMG copied over by hand leaves no marker at all. The shell still knows a
+ * different version ran last, and a gap on the record with an honest
+ * "unknown" beats no record.
+ *
  * The actor is the desktop operator, not an administrator. The desktop window
  * has no identity, and an audit that names one it cannot know would be the
  * governance record making something up (docs/prd/desktop-auto-update.md).
@@ -30,13 +36,16 @@ export function updateAction(env: NodeJS.ProcessEnv, version: string, now: Date)
   const from = env['WARDEN_UPDATED_FROM'];
   if (from === undefined) return null;
   const stoppedAt = env['WARDEN_UPDATED_STOPPED_AT'] ?? '';
-  const cutOff = Number(env['WARDEN_UPDATE_CUTOFF'] ?? '');
-  if (!VERSION.test(from) || Number.isNaN(Date.parse(stoppedAt)) || !Number.isInteger(cutOff) || cutOff < 0) {
+  const cutOffRaw = env['WARDEN_UPDATE_CUTOFF'] ?? '';
+  const cutOff = Number(cutOffRaw);
+  const stoppedOk = stoppedAt === 'unknown' || !Number.isNaN(Date.parse(stoppedAt));
+  const cutOffOk = cutOffRaw === 'unknown' || (cutOffRaw !== '' && Number.isInteger(cutOff) && cutOff >= 0);
+  if (!VERSION.test(from) || !stoppedOk || !cutOffOk) {
     console.error('  update    the shell described an update this gateway could not read; no audit entry written');
     return null;
   }
-  const stopped = new Date(stoppedAt).toISOString();
-  return `desktop update ${from} -> ${version}; offline ${stopped} -> ${now.toISOString()}; requests cut off ${cutOff}`;
+  const stopped = stoppedAt === 'unknown' ? 'unknown' : new Date(stoppedAt).toISOString();
+  return `desktop update ${from} -> ${version}; offline ${stopped} -> ${now.toISOString()}; requests cut off ${cutOffRaw === 'unknown' ? 'unknown' : cutOff}`;
 }
 
 /** Called once, after the server is listening. */

@@ -36,7 +36,7 @@ export type ServerConfig = {
    * gateway writes the audit entry for the update from it
    * (`src/server/boot-audit.ts`).
    */
-  update?: { from: string; stoppedAt: string; cutOff: number };
+  update?: { from: string; stoppedAt: string | 'unknown'; cutOff: number | 'unknown' };
 };
 
 export type RunningServer = {

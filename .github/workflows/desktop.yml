@@ -208,6 +208,26 @@ jobs:
           test -f "$REPORT" || { echo "no smoke report within 150 s"; exit 1; }
           cat "$REPORT"
           grep -q WARDEN_SMOKE_OK "$REPORT"
+      # A test build of the updater carries a local feed address in
+      # dist/update-feed.json (docs/specs/desktop-auto-update.md §10 S4). The
+      # build step deletes it unless WARDEN_UPDATE_FEED_BUILD is set, and this
+      # is the second lock: no bundle that could be pointed at another update
+      # server leaves CI.
+      - name: No test update feed in the bundle
+        run: |
+          test -z "${WARDEN_UPDATE_FEED_BUILD:-}" || { echo "WARDEN_UPDATE_FEED_BUILD is set in CI"; exit 1; }
+          FEED="out/Warden-darwin-${{ matrix.arch }}/Warden.app/Contents/Resources/app/dist/update-feed.json"
+          test ! -e "$FEED" || { echo "test feed shipped in $FEED"; exit 1; }
+      # The manifest the installed base reads before it downloads anything:
+      # this build's version, its model catalogue, and the macOS it needs,
+      # read from the bundle rather than assumed. Validated by the app's own
+      # parser inside the script.
+      - name: Release manifest
+        if: matrix.arch == 'arm64'
+        run: |
+          PLIST=out/Warden-darwin-arm64/Warden.app/Contents/Info.plist
+          MIN=$(plutil -extract LSMinimumSystemVersion raw "$PLIST")
+          node scripts/release-manifest.mjs out/make/warden-release.json "$MIN"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: warden-darwin-${{ matrix.arch }}
@@ -269,12 +289,30 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
+      # Installed desktops update from these assets. Without the manifest
+      # none of them will offer this release, which fails safe but silently,
+      # so it is required. The Intel build stays best-effort, but a release
+      # without it leaves every Intel Mac on the previous version, and that
+      # is said out loud rather than discovered.
+      - name: Update assets present
+        run: |
+          find artifacts -name warden-release.json | grep -q . || { echo "no warden-release.json: desktops would not see this release"; exit 1; }
+          find artifacts -name 'Warden-darwin-arm64-*.zip' | grep -q . || { echo "no arm64 zip: Apple Silicon desktops cannot update"; exit 1; }
+          find artifacts -name 'Warden-darwin-x64-*.zip' | grep -q . || echo "::warning::no darwin-x64 zip in this release: Intel Macs stay on the previous version"
+      # Published as a prerelease. Neither update.electronjs.org nor
+      # releases/latest/download/ serves a prerelease, so nothing installed
+      # updates to it, and the landing page keeps linking the previous
+      # installers, until someone has installed it by hand and promoted it:
+      #   gh release edit vX.Y.Z --prerelease=false --latest
+      # docs/prd/desktop-auto-update.md, "a bad release reaches everyone".
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          prerelease: true
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.zip
             artifacts/**/*.exe
+            artifacts/**/warden-release.json

@@ -1,8 +1,12 @@
 # Desktop auto-update: technical specification
 
-Status: proposed, 2026-09-25. Nothing is implemented. Companion:
-[PRD](../prd/desktop-auto-update.md), whose decisions 1–7 this spec implements
-and does not reopen.
+Status: implemented for macOS on 2026-09-26, except the console banner (§7.3).
+Updates surface in the app menu and as notifications, and the model prefetch
+runs from the menu. The Linux notice is in the Gateway menu. Windows stays
+manual (PRD decision 6). What was verified and what was not is in §13.
+
+Companion: [PRD](../prd/desktop-auto-update.md), whose decisions 1–7 this spec
+implements and does not reopen.
 
 Repository inspection: 2026-09-25, branch `feat/desktop-auto-update` off
 `fbe3e19`, package version `0.2.23`, Electron `^43`. Names marked **new**
@@ -553,3 +557,60 @@ These are unknowns only a running build can answer. S1 and S2 were run on
    prefetch), and statuses on this spec and the PRD.
 
 Windows is out, per PRD decision 6. What it will need is listed in the PRD.
+
+## 12. Deviations found while building
+
+Recorded as they were found, 2026-09-25.
+
+- **The marker is written when the download finishes, not at restart.**
+  Squirrel.Mac installs a staged update on *any* exit of the process: a quit,
+  `app.exit()` (which `fetchModels` already uses), a relaunch, or a crash. A
+  marker written only on the restart path would miss all of those. So
+  `update-downloaded` takes the backup and writes the marker with
+  `stoppedAt: null` and `cutOff: null`. The restart and the ordinary quit
+  refresh both with the drain's result. The audit records `unknown` for
+  whichever is missing (§6.7), rather than a 0 that might be false.
+- **An update without a marker is still recorded.** `desktop-settings.json`
+  keeps `lastRunVersion`, the version that last came up healthy. A launch of a
+  newer version with no marker (a crash while staged, or a DMG copied over by
+  hand) passes `unknown` times to the gateway, so the gap is on the record
+  either way.
+- **The failed-update screen is a native dialog, not a splash phase.** It runs
+  before the splash exists and needs four buttons and no progress. A dialog
+  says the same thing with no new IPC surface. The buttons are the ones in
+  §6.6.
+- **A release without the Intel zip warns instead of failing.** The x64 build
+  is `continue-on-error` so that a slow notarization cannot hold a release
+  hostage. Failing the release job on its absence would undo that. The job
+  now emits a GitHub warning naming the consequence. The manifest and the
+  arm64 zip are hard requirements.
+- **`autoUpdate` is optional in `DesktopSettings`,** read as `?? true`, since
+  absent-means-yes is the rule and callers that build settings by hand (tests,
+  the smoke override) should not have to know about it.
+
+## 13. What was verified, 2026-09-26
+
+On a packaged arm64 build (`WardenUpdateTest`, separate bundle id and data
+folder, mock adapter, a local feed baked in at build time, ad-hoc signed
+because the developer keychain was deliberately not used):
+
+- The CI smoke run, extended with the updater's two messages over the real
+  `utilityProcess` channel, printed `WARDEN_UPDATE_BRIDGE_OK`.
+- 0.2.23 waited the first 30 s, fetched the manifest, passed every gate, asked
+  the feed and downloaded the zip over loopback HTTP. Squirrel.Mac then refused
+  it: "Code signature … did not pass validation". That was expected for two
+  ad-hoc builds, and it is the check that stops an update signed by anyone
+  else. No marker was written, which is correct because nothing was staged.
+- A 0.2.24 launched over a marker counted its boot attempt first. It died before
+  becoming healthy, and the next launch held at the failed-update dialog
+  without starting a gateway. Why it died is itself a finding: Electron's
+  Safe Storage key in the login keychain is bound to the app's signature, so an
+  ad-hoc 0.2.24 was asked for keychain access and the prompt was cancelled.
+  Signed releases share one Developer ID and do not prompt. That is also why
+  hand-installed updates work today.
+
+**Not verified:** a Squirrel install between two builds signed by the same
+Developer ID, the restart dialog and the drain inside it, the post-update
+audit entry written by a real updated app, port reclaim, and the prefetch.
+The first two consecutive signed releases are that test. Until then,
+`OFFLINE_ESTIMATE_S` stays null.

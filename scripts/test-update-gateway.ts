@@ -186,7 +186,10 @@ async function main(): Promise<void> {
     assert.equal(updateAction(env, '0.2.24', now),
       'desktop update 0.2.23 -> 0.2.24; offline 2026-09-25T12:00:00.000Z -> 2026-09-25T12:00:30.000Z; requests cut off 1');
     assert.equal(updateAction({}, '0.2.24', now), null, 'an ordinary launch records nothing');
-    for (const broken of [{ ...env, WARDEN_UPDATED_FROM: 'v0.2.23' }, { ...env, WARDEN_UPDATED_STOPPED_AT: 'yesterday' }, { ...env, WARDEN_UPDATE_CUTOFF: '-1' }, { WARDEN_UPDATED_FROM: '0.2.23' }]) {
+    assert.equal(updateAction({ WARDEN_UPDATED_FROM: '0.2.23', WARDEN_UPDATED_STOPPED_AT: 'unknown', WARDEN_UPDATE_CUTOFF: 'unknown' }, '0.2.24', now),
+      'desktop update 0.2.23 -> 0.2.24; offline unknown -> 2026-09-25T12:00:30.000Z; requests cut off unknown',
+      'an update with no drain behind it (a crash, a hand-copied DMG) is recorded with what is not known said so');
+    for (const broken of [{ ...env, WARDEN_UPDATED_FROM: 'v0.2.23' }, { ...env, WARDEN_UPDATED_STOPPED_AT: 'yesterday' }, { ...env, WARDEN_UPDATE_CUTOFF: '-1' }, { ...env, WARDEN_UPDATE_CUTOFF: '' }, { WARDEN_UPDATED_FROM: '0.2.23' }]) {
       assert.equal(updateAction(broken, '0.2.24', now), null, `a partial description records nothing: ${JSON.stringify(broken)}`);
     }
 

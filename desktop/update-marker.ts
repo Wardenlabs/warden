@@ -49,8 +49,14 @@ export type PendingUpdate = {
   /** The port hooks were configured for, to be reclaimed after the update. */
   port: number;
   tunnelWasOn: boolean;
-  /** Decisions still in flight when the drain bound ran out. */
-  cutOff: number;
+  /**
+   * Requests still in flight when the drain bound ran out. Null until a drain
+   * has answered: Squirrel.Mac installs a downloaded update on *any* exit of
+   * this process, crashes included, so the marker is written when the download
+   * finishes and may never see a drain. The audit then says "unknown", which is
+   * true, instead of 0, which might not be.
+   */
+  cutOff: number | null;
   /** Relative to userData. */
   backup: string;
   /** Launches of the new version that began; one that never became healthy means a failed update. */
@@ -91,7 +97,7 @@ export function readMarker(userData: string): PendingUpdate | null {
   if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) return null;
   if (typeof m['tunnelWasOn'] !== 'boolean') return null;
   const cutOff = m['cutOff'];
-  if (typeof cutOff !== 'number' || !Number.isInteger(cutOff) || cutOff < 0) return null;
+  if (cutOff !== null && (typeof cutOff !== 'number' || !Number.isInteger(cutOff) || cutOff < 0)) return null;
   if (typeof m['backup'] !== 'string') return null;
   const attempts = m['bootAttempts'];
   if (typeof attempts !== 'number' || !Number.isInteger(attempts) || attempts < 0) return null;

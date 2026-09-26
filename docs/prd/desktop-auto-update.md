@@ -1,6 +1,7 @@
 # Desktop auto-update
 
-Status: **proposed**, 2026-09-24. Nothing here is implemented yet.
+Status: **implemented for macOS** on 2026-09-26, apart from the console banner.
+Proposed 2026-09-24. See the spec's §13 for what has and has not been verified.
 
 Technical companion: [desktop-auto-update spec](../specs/desktop-auto-update.md).
 

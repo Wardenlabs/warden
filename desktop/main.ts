@@ -18,7 +18,7 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { askMode, ensureModels, modelsPresent, sendState, setupLibReady } from './first-run.js';
+import { askMode, ensureModels, loadSetupLibs, modelsPresent, sendState, setupLibReady } from './first-run.js';
 import {
   fetchHealth,
   pickPort,
@@ -29,6 +29,9 @@ import {
 } from './server-manager.js';
 import { readSettings, writeSettings, type DesktopSettings } from './settings.js';
 import * as tunnel from './tunnel.js';
+import { adoptPrefetched, clearMarker, readMarker, recordBootAttempt, type PendingUpdate } from './update-marker.js';
+import { isNewer, previousInstallerUrl } from './update-policy.js';
+import * as updater from './updater.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const APP_ROOT = app.getAppPath();
@@ -54,7 +57,7 @@ function smokeReport(line: string): void {
 }
 
 let userData = '';
-let settings: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real' };
+let settings: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real', autoUpdate: true };
 let splash: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let gateway: RunningServer | null = null;
@@ -69,6 +72,21 @@ let portRetried = false;
  * it already was instead of snapping back to onboarding every time.
  */
 let soloOnboarding = false;
+
+/**
+ * Set in `main()` when this launch is the first of a newer version, and
+ * consumed by the next `launchGateway`: which port to wait for, and what the
+ * gateway should put in the audit. See docs/specs/desktop-auto-update.md §6.5.
+ */
+let updateLaunch: {
+  from: string;
+  stoppedAt: string | 'unknown';
+  cutOff: number | 'unknown';
+  port: number | null;
+  tunnelWasOn: boolean;
+  viaMarker: boolean;
+  auditHandedOver?: boolean;
+} | null = null;
 
 const modelsDir = (): string => join(userData, 'models');
 const logPath = (): string => join(userData, 'logs', 'warden-gateway.log');
@@ -116,6 +134,16 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (quitting) return;
     quitting = true;
+    // A staged update installs on this exit whatever happens next, so this
+    // quit gets the same drain and marker a restart would, only shorter.
+    if (updater.hasStagedUpdate()) {
+      event.preventDefault();
+      void updater.prepareForQuit().finally(() => {
+        gateway = null;
+        app.quit();
+      });
+      return;
+    }
     // The tunnel holds a public address open and is a separate process, so a
     // quit that only stopped the gateway would leave the internet pointed at a
     // port with nothing behind it — and leave `cloudflared` running until
@@ -153,6 +181,7 @@ async function main(): Promise<void> {
   }
   userData = app.getPath('userData');
   settings = readSettings(userData);
+  if (!SMOKE && !(await settleUpdate())) return;
   if (SMOKE) {
     settings = { ...settings, adapter: 'mock', lanEnabled: false, exposeEnabled: false };
     setTimeout(() => {
@@ -234,7 +263,15 @@ async function main(): Promise<void> {
 async function launchGateway(forceEphemeral = false): Promise<void> {
   if (splash && !splash.isDestroyed()) sendState(splash, { phase: 'starting', detail: 'boot' });
 
-  const port = await pickPort(settings.port ?? 8080, forceEphemeral);
+  const reclaim = updateLaunch?.port ?? null;
+  // The audit description goes to exactly one gateway. That gateway writes
+  // the entry as soon as it listens, so a retry after a failed health check
+  // must not be handed it again and write a second one.
+  const audit = updateLaunch && !updateLaunch.auditHandedOver
+    ? { from: updateLaunch.from, stoppedAt: updateLaunch.stoppedAt, cutOff: updateLaunch.cutOff }
+    : null;
+  if (updateLaunch) updateLaunch.auditHandedOver = true;
+  const port = await pickPort(reclaim ?? settings.port ?? 8080, forceEphemeral, reclaim !== null ? 15_000 : 0);
   gateway = startServer(
     {
       entry: SERVER_ENTRY,
@@ -246,7 +283,8 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
       modelsDir: modelsDir(),
       adapter: settings.adapter,
       logPath: logPath(),
-      ...(settings.intent ? { intent: settings.intent } : {})
+      ...(settings.intent ? { intent: settings.intent } : {}),
+      ...(audit ? { update: audit } : {})
     },
     onGatewayExit,
     // The console's "Download models" button, arriving the long way round: the
@@ -285,6 +323,7 @@ async function launchGateway(forceEphemeral = false): Promise<void> {
     settings = { ...settings, port };
     writeSettings(userData, settings);
   }
+  if (!SMOKE) afterHealthyLaunch(port);
 
   // First boot with real models: wait (bounded) while they warm, so the first
   // decision in the console is not a thirty-second surprise. Mock and
@@ -403,6 +442,18 @@ async function smokeVerify(): Promise<void> {
     const reader = await import(pathToFileURL(join(APP_ROOT, 'dist', 'documents', 'smoke.js')).href) as { smokeDocumentReading(): Promise<void> };
     await reader.smokeDocumentReading();
     smokeReport('WARDEN_DOCUMENT_SMOKE_OK');
+    // The updater's two questions, over the real utilityProcess channel of
+    // the packaged app. The gateway suite tests the drain on sockets, but only
+    // this run proves the shell and the gateway still agree on the messages.
+    // A mismatch here is an update that cannot restart, or that restarts
+    // without draining. Drained last, because a drained gateway takes no more
+    // requests.
+    if (!gateway) throw new Error('no gateway to ask');
+    const readiness = await gateway.request({ type: 'readiness?', id: 'smoke-readiness' }, 5_000);
+    if (!Array.isArray(readiness['busy'])) throw new Error('readiness answered without a busy list');
+    const drained = await gateway.request({ type: 'drain', id: 'smoke-drain', boundMs: 1_000 }, 10_000);
+    if (drained['cutOff'] !== 0) throw new Error(`drain reported ${String(drained['cutOff'])} requests cut off on an idle gateway`);
+    smokeReport('WARDEN_UPDATE_BRIDGE_OK');
     smokeReport('WARDEN_SMOKE_OK');
     await shutdownAndExit(0);
   } catch (error) {
@@ -465,6 +516,149 @@ async function gatewayFailed(reason: string): Promise<void> {
   });
   if (response === 0) await restartGateway();
   else app.quit();
+}
+
+/**
+ * Before anything else boots: was this launch an update, and did the last one
+ * come up?
+ *
+ * Returns false when the administrator chose to quit from the failed-update
+ * dialog. See docs/specs/desktop-auto-update.md §6.5 and §6.6.
+ */
+async function settleUpdate(): Promise<boolean> {
+  const current = app.getVersion();
+  let marker = readMarker(userData);
+  if (marker && marker.to !== current) {
+    // Written when a download finished, and the install never happened: the
+    // update was staged and this is still the version that staged it, or an
+    // older build was put back by hand. The next check stages it again.
+    updaterLog(`marker for ${marker.to} found while running ${current}; the install did not happen`);
+    clearMarker(userData);
+    marker = null;
+  }
+  if (marker) {
+    while (marker.bootAttempts >= 1) {
+      const choice = await failedUpdateDialog(marker);
+      if (choice === 'quit') {
+        app.quit();
+        return false;
+      }
+      if (choice === 'retry') marker = { ...marker, bootAttempts: 0 };
+    }
+    marker = recordBootAttempt(userData, marker);
+    try {
+      const { catalog } = await loadSetupLibs(APP_ROOT);
+      const plan = adoptPrefetched(userData, modelsDir(), catalog.MODEL_CATALOG);
+      if (plan.keep.length || plan.remove.length) updaterLog(`prefetched models kept: ${plan.keep.join(', ') || 'none'}; removed: ${plan.remove.join(', ') || 'none'}`);
+    } catch (err) {
+      updaterLog(`prefetch adoption: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    updateLaunch = {
+      from: marker.from,
+      stoppedAt: marker.stoppedAt ?? 'unknown',
+      cutOff: marker.cutOff ?? 'unknown',
+      port: marker.port,
+      tunnelWasOn: marker.tunnelWasOn,
+      viaMarker: true
+    };
+    return true;
+  }
+  // No marker, and yet a newer version than the one that last came up: a
+  // crash while an update was staged, or a DMG copied over by hand. Still a
+  // gap in coverage, and still recorded, with what is not known said so.
+  if (settings.lastRunVersion && isNewer(current, settings.lastRunVersion)) {
+    updateLaunch = {
+      from: settings.lastRunVersion,
+      stoppedAt: 'unknown',
+      cutOff: 'unknown',
+      port: settings.port ?? null,
+      tunnelWasOn: settings.exposeEnabled,
+      viaMarker: false
+    };
+  }
+  return true;
+}
+
+async function failedUpdateDialog(marker: PendingUpdate): Promise<'retry' | 'quit'> {
+  const installer = previousInstallerUrl(marker.from, process.arch);
+  for (;;) {
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Warden',
+      message: `Warden ${marker.to} did not start after the update.`,
+      detail:
+        `The previous version was ${marker.from}. A copy of your data from before the update is in ` +
+        `${join(userData, marker.backup)}.\n\nYou can try again, or reinstall ${marker.from} and restore the data ` +
+        'from that copy. Warden is not checking prompts until it starts.',
+      buttons: ['Try Again', `Download ${marker.from}`, 'Open Backup Folder', 'Quit'],
+      defaultId: 0,
+      cancelId: 3
+    });
+    if (response === 0) return 'retry';
+    if (response === 3) return 'quit';
+    if (response === 1 && installer) void shell.openExternal(installer);
+    if (response === 2) void shell.openPath(join(userData, marker.backup));
+  }
+}
+
+/**
+ * The first healthy answer from a gateway: close out an update if this launch
+ * was one, remember which version came up, and start the updater once.
+ */
+function afterHealthyLaunch(port: number): void {
+  const current = app.getVersion();
+  const finished = updateLaunch;
+  updateLaunch = null;
+  if (finished) {
+    if (finished.viaMarker) clearMarker(userData);
+    updaterLog(`updated ${finished.from} -> ${current}${finished.viaMarker ? '' : ' (no marker: the update was not prepared by this app)'}`);
+    const lines: string[] = [];
+    if (finished.port !== null && finished.port !== port) {
+      lines.push(`Warden came back on port ${port}, not ${finished.port}. Devices set up for ${finished.port} are not being checked until they are pointed at the new port.`);
+    }
+    if (finished.tunnelWasOn) lines.push('The public address changes when the tunnel restarts. Give remote devices the new one from the Gateway menu.');
+    if (lines.length) {
+      void dialog.showMessageBox({ type: 'warning', title: 'Warden', message: `Warden was updated to ${current}.`, detail: lines.join('\n\n'), buttons: ['OK'] });
+    }
+  }
+  if (settings.lastRunVersion !== current) {
+    settings = { ...settings, lastRunVersion: current };
+    writeSettings(userData, settings);
+  }
+  updater.start({
+    userData,
+    modelsDir: modelsDir(),
+    appRoot: APP_ROOT,
+    gatewaySettingsPath: resolve(userData, process.env['WARDEN_SETTINGS_PATH'] ?? 'data/settings.json'),
+    smoke: SMOKE,
+    log: updaterLog,
+    settings: () => settings,
+    saveSettings: (patch) => {
+      settings = { ...settings, ...patch };
+      writeSettings(userData, settings);
+    },
+    gateway: () => gateway,
+    port: () => activePort,
+    tunnelOn: () => tunnel.isRunning(),
+    window: () => (consoleWindow && !consoleWindow.isDestroyed() ? consoleWindow : null),
+    changed: () => Menu.setApplicationMenu(buildMenu()),
+    stopEverything: async () => {
+      await Promise.all([gateway?.stop() ?? Promise.resolve(), tunnel.stop()]);
+      gateway = null;
+    },
+    relaunchGateway: () => restartGateway(),
+    markQuitting: (value) => {
+      quitting = value;
+    }
+  });
+}
+
+function updaterLog(line: string): void {
+  try {
+    appendFileSync(logPath(), `${new Date().toISOString()} [updater] ${line.replace(/^\[updater\] /, '')}\n`);
+  } catch {
+    /* the log is best effort */
+  }
 }
 
 async function restartGateway(): Promise<void> {
@@ -574,7 +768,23 @@ function fetchModels(): void {
 function buildMenu(): Menu {
   const lanIp = firstLanIp();
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' } as const] : []),
+    ...(process.platform === 'darwin'
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            ...(updater.menuItems().length ? [{ type: 'separator' } as const, ...updater.menuItems()] : []),
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' }
+          ]
+        } as Electron.MenuItemConstructorOptions]
+      : []),
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
@@ -625,7 +835,11 @@ function buildMenu(): Menu {
         { type: 'separator' },
         { label: 'Restart gateway', click: () => void restartGateway() },
         { label: 'Open data folder', click: () => void shell.openPath(userData) },
-        { label: 'View gateway log', click: () => void shell.openPath(logPath()) }
+        { label: 'View gateway log', click: () => void shell.openPath(logPath()) },
+        // Linux has no app menu; its update notice lives with the gateway.
+        ...(process.platform === 'linux' && updater.menuItems().length
+          ? [{ type: 'separator' } as const, ...updater.menuItems()]
+          : [])
       ]
     }
   ];

@@ -29,9 +29,27 @@ export type DesktopSettings = {
    * this field and is handled as it always was.
    */
   intent?: 'solo' | 'team';
+  /**
+   * Check for updates on a schedule. Absent means yes (PRD decision 3): only an
+   * explicit false turns it off, and a managed preference or
+   * WARDEN_AUTO_UPDATE overrides it either way (`update-policy.ts`).
+   */
+  autoUpdate?: boolean;
+  /**
+   * The version that last came up healthy here. A launch of a newer one with no
+   * update marker was still an update (a crash while one was staged, or a DMG
+   * copied over by hand), and it goes on the record as one.
+   */
+  lastRunVersion?: string;
+  /** The last update notification shown, as `kind:version`, so each is said
+   * once across relaunches. */
+  lastNotified?: string;
+  /** "Move Warden to Applications" is said once per installation. */
+  blockedLocationNotified?: boolean;
 };
 
-const DEFAULTS: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real' };
+const DEFAULTS: DesktopSettings = { lanEnabled: false, exposeEnabled: false, adapter: 'real', autoUpdate: true };
+const VERSION = /^\d+\.\d+\.\d+$/;
 
 export function settingsPath(userData: string): string {
   return join(userData, 'desktop-settings.json');
@@ -49,7 +67,11 @@ export function readSettings(userData: string): DesktopSettings {
       lanEnabled: raw.lanEnabled === true,
       exposeEnabled: raw.exposeEnabled === true,
       adapter: raw.adapter === 'mock' ? 'mock' : 'real',
-      ...(raw.intent === 'solo' || raw.intent === 'team' ? { intent: raw.intent } : {})
+      ...(raw.intent === 'solo' || raw.intent === 'team' ? { intent: raw.intent } : {}),
+      autoUpdate: raw.autoUpdate !== false,
+      ...(typeof raw.lastRunVersion === 'string' && VERSION.test(raw.lastRunVersion) ? { lastRunVersion: raw.lastRunVersion } : {}),
+      ...(typeof raw.lastNotified === 'string' && /^[a-z-]+:\d+\.\d+\.\d+$/.test(raw.lastNotified) ? { lastNotified: raw.lastNotified } : {}),
+      ...(raw.blockedLocationNotified === true ? { blockedLocationNotified: true } : {})
     };
   } catch {
     return { ...DEFAULTS };

@@ -182,6 +182,9 @@ try {
     writeFileSync(join(userData, 'update', 'pending.json'), broken);
     assert.equal(readMarker(userData), null);
   }
+  const undrained = { ...marker, cutOff: null };
+  writeMarker(userData, undrained);
+  assert.deepEqual(readMarker(userData), undrained, 'a marker written at download time has no drain result yet');
   clearMarker(userData);
   clearMarker(userData);
   assert.ok(!existsSync(join(userData, 'update', 'pending.json')));
